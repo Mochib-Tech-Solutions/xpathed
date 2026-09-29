@@ -4,6 +4,8 @@ on:
   pull_request:
   push:
     branches: [main]
+  merge_group:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -12,10 +14,42 @@ concurrency:
   group: check-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  DOTNET_CLI_TELEMETRY_OPTOUT: 1
+  DOTNET_NOLOGO: true
+
 jobs:
-  check:
+  changes:
+    name: Select affected projects
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 5
+    outputs:
+      dotnet: ${{ steps.select.outputs.dotnet }}
+      web: ${{ steps.select.outputs.web }}
+      tooling: ${{ steps.select.outputs.tooling }}
+      docker: ${{ steps.select.outputs.docker }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24.16.0
+      - name: Select jobs from changed paths
+        id: select
+        run: node scripts/ci-changes.mjs
+
+  dotnet:
+    name: .NET / ${{ matrix.project }}
+    needs: changes
+    if: needs.changes.outputs.dotnet != '[]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        project: ${{ fromJSON(needs.changes.outputs.dotnet) }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -23,14 +57,98 @@ jobs:
       - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         with:
           global-json-file: global.json
-          cache: true
-          cache-dependency-path: "**/packages.lock.json"
+          cache: ${{ matrix.project == 'Browser' || matrix.project == 'ClientApi' }}
+          cache-dependency-path: |
+            src/Common/packages.lock.json
+            src/${{ matrix.project }}/packages.lock.json
+            tests/${{ matrix.project }}.*Tests/packages.lock.json
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24.16.0
-          cache: npm
-          cache-dependency-path: src/Web/package-lock.json
-      - name: Lint, format, and build all projects
-        run: scripts/check.sh
-      - name: Build Docker services
-        run: npm run docker:build
+      - name: Restore locked dependencies
+        run: dotnet restore "src/${{ matrix.project }}/${{ matrix.project }}.csproj" --locked-mode
+      - name: Check C# formatting
+        run: dotnet format "src/${{ matrix.project }}/${{ matrix.project }}.csproj" --no-restore --verify-no-changes
+      - name: Build and enforce analyzers
+        run: dotnet build "src/${{ matrix.project }}/${{ matrix.project }}.csproj" --no-restore --configuration Release -p:ContinuousIntegrationBuild=true
+      - name: Run associated C# tests
+        run: node scripts/ci-dotnet-tests.mjs "${{ matrix.project }}"
+
+  web:
+    name: Web
+    needs: changes
+    if: needs.changes.outputs.web == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/setup@c9883cc79df532ad1a7b81bf9ab944ceb090d65c # v2.0.0
+        with:
+          runtime: node@24.16.0
+          cache: true
+          install: false
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Check formatting
+        run: pnpm --filter xpathed format:check
+      - name: Lint React and TypeScript
+        run: pnpm --filter xpathed lint
+      - name: Build and check types
+        run: pnpm build:web
+      - name: Run frontend tests
+        run: pnpm test:web
+
+  tooling:
+    name: Repository tooling
+    needs: changes
+    if: needs.changes.outputs.tooling == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/setup@c9883cc79df532ad1a7b81bf9ab944ceb090d65c # v2.0.0
+        with:
+          runtime: node@24.16.0
+          cache: true
+          install: false
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Check configuration formatting
+        run: pnpm format:check:tooling
+      - name: Check script syntax
+        run: pnpm lint:scripts
+      - name: Test repository tooling and change selection
+        run: pnpm test:tooling
+
+  docker:
+    name: Docker configuration
+    needs: changes
+    if: needs.changes.outputs.docker == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Validate Compose and Dockerfiles without building images
+        run: scripts/ci-docker.sh
+
+  check:
+    needs: [changes, dotnet, web, tooling, docker]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Require successful relevant jobs
+        env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          RESULTS: ${{ join(needs.*.result, ',') }}
+        run: |
+          if [[ "$CHANGES_RESULT" != success || "$RESULTS" == *failure* || "$RESULTS" == *cancelled* ]]; then
+            echo "A required job failed or was cancelled: $RESULTS"
+            exit 1
+          fi

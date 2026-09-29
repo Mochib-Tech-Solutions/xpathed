@@ -1,7 +1,100 @@
+x-dotnet-environment: &dotnet-environment
+  ASPNETCORE_ENVIRONMENT: Development
+  DOTNET_WATCH_SUPPRESS_LAUNCH_BROWSER: "1"
+  DOTNET_WATCH_SUPPRESS_BROWSER_REFRESH: "1"
+  # APIs have no static assets; Vite handles frontend changes.
+  DOTNET_WATCH_SUPPRESS_STATIC_FILE_HANDLING: "1"
+
+x-common-source: &common-source
+  action: sync
+  path: src/Common
+  target: /source/src/Common
+  initial_sync: true
+  ignore: ["*.csproj", packages.lock.json, bin/, obj/]
+
+x-common-dependencies: &common-dependencies
+  action: rebuild
+  path: src/Common
+  include: ["*.csproj", packages.lock.json]
+
+x-dotnet-settings: &dotnet-settings
+  action: rebuild
+  path: .
+  include: [global.json, Directory.Build.props, .editorconfig, .dockerignore]
+
 services:
-  browser:
-    ports: ["127.0.0.1:5082:8080"]
+  web:
+    build:
+      target: development
+    init: true
     environment:
-      ViewerOrigins: http://127.0.0.1:5082,http://127.0.0.1:5173,http://localhost:5173,http://localhost:${XPATHED_PORT:-8080},http://127.0.0.1:${XPATHED_PORT:-8080}
-  db:
-    ports: ["127.0.0.1:55432:5432"]
+      XPATHED_URL: http://client-api:8080
+      XPATHED_BROWSER_URL: http://browser:8080
+    develop:
+      watch:
+        - action: sync
+          path: src/Web
+          target: /app/src/Web
+          initial_sync: true
+          ignore: [package.json, Dockerfile, node_modules/, dist/]
+        - action: rebuild
+          path: src/Web
+          include: [package.json, Dockerfile]
+        - action: rebuild
+          path: .
+          include: [package.json, pnpm-lock.yaml, pnpm-workspace.yaml, .dockerignore]
+  client-api:
+    build:
+      target: development
+    init: true
+    environment: *dotnet-environment
+    develop:
+      watch:
+        - action: sync
+          path: src/ClientApi
+          target: /source/src/ClientApi
+          initial_sync: true
+          ignore: ["*.csproj", packages.lock.json, Dockerfile, bin/, obj/]
+        - action: rebuild
+          path: src/ClientApi
+          include: ["*.csproj", packages.lock.json, Dockerfile]
+        - *common-source
+        - *common-dependencies
+        - *dotnet-settings
+  resolver:
+    build:
+      target: development
+    init: true
+    environment: *dotnet-environment
+    develop:
+      watch:
+        - action: sync
+          path: src/Resolver
+          target: /source/src/Resolver
+          initial_sync: true
+          ignore: ["*.csproj", packages.lock.json, Dockerfile, bin/, obj/]
+        - action: rebuild
+          path: src/Resolver
+          include: ["*.csproj", packages.lock.json, Dockerfile]
+        - *common-source
+        - *common-dependencies
+        - *dotnet-settings
+  browser:
+    build:
+      target: development
+    environment:
+      <<: *dotnet-environment
+      ViewerOrigins: http://browser:8080,http://localhost:${XPATHED_PORT:-8080},http://127.0.0.1:${XPATHED_PORT:-8080}
+    develop:
+      watch:
+        - action: sync
+          path: src/Browser
+          target: /source/src/Browser
+          initial_sync: true
+          ignore: ["*.csproj", packages.lock.json, Dockerfile, bin/, obj/]
+        - action: rebuild
+          path: src/Browser
+          include: ["*.csproj", packages.lock.json, Dockerfile]
+        - *common-source
+        - *common-dependencies
+        - *dotnet-settings

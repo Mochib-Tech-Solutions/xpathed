@@ -2,7 +2,7 @@ import { realpath, rm } from "node:fs/promises";
 import { dirname, join, sep } from "node:path";
 
 const root = await realpath(new URL("..", import.meta.url));
-const projects = ["src/Browser", "src/ClientApi", "src/Contracts", "src/Resolver"];
+const projects = ["src/Browser", "src/ClientApi", "src/Common", "src/Resolver"];
 const outputs = [
   ...projects.flatMap((project) => [`${project}/bin`, `${project}/obj`]),
   "src/Web/dist",

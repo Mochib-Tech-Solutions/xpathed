@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
-using Xpathed;
+using Xpathed.ClientApi.Data;
+using Xpathed.ClientApi.Endpoints;
+using Xpathed.Common.Http;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Configuration["AllowedHosts"] = "localhost;127.0.0.1;client-api;web";
@@ -27,15 +29,5 @@ app.Use(async (context, next) =>
 });
 app.MapGet("/health", async (AppDbContext db, CancellationToken token) =>
     await db.Database.CanConnectAsync(token) ? Results.Ok(new { service = "client-api", database = "connected" }) : Results.StatusCode(503));
-app.MapPost("/api/sessions", (HttpContext c, IHttpClientFactory f) => HttpBoundary.Forward(c, f.CreateClient("browser"), "/sessions"));
-app.MapDelete("/api/sessions/{id}", (string id, HttpContext c, IHttpClientFactory f) =>
-    HttpBoundary.Forward(c, f.CreateClient("browser"), $"/sessions/{Uri.EscapeDataString(id)}"));
-app.MapGet("/api/pages/{id}", (string id, HttpContext c, IHttpClientFactory f) =>
-    HttpBoundary.Forward(c, f.CreateClient("browser"), $"/pages/{Uri.EscapeDataString(id)}"));
-app.MapPost("/api/pages/{id}/navigate", (string id, HttpContext c, IHttpClientFactory f) =>
-    HttpBoundary.Forward(c, f.CreateClient("browser"), $"/pages/{Uri.EscapeDataString(id)}/navigate"));
-app.MapPost("/api/pages/{id}/inspect", (string id, HttpContext c, IHttpClientFactory f) =>
-    HttpBoundary.Forward(c, f.CreateClient("resolver"), $"/pages/{Uri.EscapeDataString(id)}/inspect"));
+app.MapBrowserEndpoints();
 app.Run();
-
-internal sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(options);

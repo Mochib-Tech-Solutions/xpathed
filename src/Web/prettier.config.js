@@ -1,7 +1,8 @@
 import shared from "../../.prettierrc.json" with { type: "json" };
+import * as tailwindcss from "prettier-plugin-tailwindcss";
 
 export default {
   ...shared,
-  plugins: ["prettier-plugin-tailwindcss"],
+  plugins: [tailwindcss],
   tailwindStylesheet: "./src/style.css",
 };

@@ -1,5 +1,5 @@
-using System.Net.Http.Json;
-using Xpathed;
+using Xpathed.Common.Http;
+using Xpathed.Resolver.Endpoints;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddHttpClient("browser", client =>
@@ -16,17 +16,5 @@ app.Use(async (context, next) =>
     await next(context);
 });
 app.MapGet("/health", () => Results.Ok(new { service = "resolver" }));
-app.MapPost("/pages/{pageId}/inspect", async (string pageId, HttpContext context, IHttpClientFactory clients) =>
-{
-    using var response = await clients.CreateClient("browser").GetAsync($"/pages/{Uri.EscapeDataString(pageId)}/inspection", context.RequestAborted);
-    if (!response.IsSuccessStatusCode)
-    {
-        context.Response.StatusCode = (int)response.StatusCode;
-        context.Response.ContentType = "application/json";
-        await response.Content.CopyToAsync(context.Response.Body, context.RequestAborted);
-        return;
-    }
-    var page = await response.Content.ReadFromJsonAsync<PageInspection>(context.RequestAborted);
-    await context.Response.WriteAsJsonAsync(new InspectionResult("resolver", page!), context.RequestAborted);
-});
+app.MapInspectionEndpoints();
 app.Run();

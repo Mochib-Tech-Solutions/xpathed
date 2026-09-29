@@ -3,11 +3,12 @@ services:
   web:
     build:
       context: .
-      dockerfile: infra/Web.Dockerfile
+      dockerfile: src/Web/Dockerfile
+      target: runtime
     ports: ["127.0.0.1:${XPATHED_PORT:-8080}:8080"]
     depends_on: [client-api, browser]
   client-api:
-    build: { context: ., dockerfile: infra/Dockerfile, target: client-api }
+    build: { context: ., dockerfile: src/ClientApi/Dockerfile, target: runtime }
     environment:
       BrowserUrl: http://browser:8080
       ResolverUrl: http://resolver:8080
@@ -17,13 +18,13 @@ services:
       db: { condition: service_healthy }
       resolver: { condition: service_started }
   resolver:
-    build: { context: ., dockerfile: infra/Dockerfile, target: resolver }
+    build: { context: ., dockerfile: src/Resolver/Dockerfile, target: runtime }
     environment:
       BrowserUrl: http://browser:8080
       Logging__LogLevel__Default: Warning
     depends_on: [browser]
   browser:
-    build: { context: ., dockerfile: infra/Dockerfile, target: browser }
+    build: { context: ., dockerfile: src/Browser/Dockerfile, target: runtime }
     init: true
     shm_size: 1gb
     security_opt: ["seccomp=./infra/browser-seccomp.json"]

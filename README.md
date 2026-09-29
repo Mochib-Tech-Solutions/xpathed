@@ -8,28 +8,28 @@ The managed browser runtime ([#2](https://github.com/Mochib-Tech-Solutions/thund
 
 Natural-language commands, XPath generation and highlighting start in #3. The chat composer is disabled until that slice is implemented. The separate resolver service can inspect the live page through the API.
 
-## Run with Docker
+## Develop locally with Docker
 
-Requires Node 24.16.0 and Docker Engine with Compose and Buildx. The tested local host is Apple Silicon with Colima (4 CPUs, 8 GiB RAM). Only the web entry point is published, on loopback. A local .NET SDK is not needed for this mode.
+Install Node 24.16.0, pnpm 12.8.1 and Docker with Compose/Buildx. `packageManager` pins pnpm for this workspace; `corepack enable` enables it on a Node installation that includes Corepack. A host .NET SDK is not required to run the app.
 
 ```sh
-npm run docker:up
+pnpm run setup
+pnpm dev
 ```
+
+All five services run in Docker: React, ClientApi, Resolver, Browser and PostgreSQL. Compose watches source changes; Vite refreshes React and `dotnet watch` reloads the APIs. Dependency changes rebuild the affected development image. Restore layers and package caches are reused.
 
 Open [localhost:8080](http://localhost:8080), click **Open browser**, then enter your website in the address bar. You can click, type and scroll within that page. **Reset session** asks for confirmation before clearing the page, chat and browsing state and starting blank again.
 
-Startup creates an ignored `.env` with a random database password. No model credentials are needed. Set `XPATHED_PORT` in the shell when using another port. Stop with `npm run docker:down`; PostgreSQL data remains in its named volume.
+Startup creates an ignored `.env` with a random database password. No model credentials are needed. Ctrl+C stops development containers; PostgreSQL data stays in its named volume. `pnpm docker:down` removes stopped project containers while preserving that data. Set `XPATHED_PORT` in the shell to choose another loopback port.
 
-## Run in development
-
-Install the .NET SDK specified by `global.json` and use Node 24.16.0. Docker runs PostgreSQL and the sandboxed Linux browser; React and both APIs run on the host. Dependencies are locked.
+## Run production images locally
 
 ```sh
-npm run setup
-npm run dev
+pnpm docker:up
 ```
 
-Open [localhost:5173](http://localhost:5173). Ctrl+C stops the local processes and preserves Docker data. When switching from Docker mode, run `npm run docker:down` first.
+This builds each app's runtime image and starts the same services at [localhost:8080](http://localhost:8080). Use `pnpm docker:down` before switching between development and runtime modes. Neither mode publishes the database, browser debugging or raw VNC ports.
 
 ### Root commands
 
@@ -37,41 +37,78 @@ Run these from the repository root. `package.json` is the single command entry p
 
 | Command | What it does |
 | --- | --- |
-| `npm run setup` | Create local config and install locked .NET/frontend dependencies |
-| `npm run dev` | Start local React/APIs and Docker browser/PostgreSQL |
-| `npm run build` | Build all .NET projects and the production frontend |
-| `npm run check` | Restore, check formatting/lint/types, run local tests and build |
-| `npm run lint` | Run .NET analyzers, frontend ESLint and script syntax checks |
-| `npm run format` | Apply C#, frontend and configuration formatting |
-| `npm run format:check` | Verify formatting without writing files |
-| `npm run test:unit` | Run the small local script/proxy tests |
-| `npm test` | Run the local script and frontend tooling tests |
-| `npm run docker:up` | Build and start the entire Docker application |
-| `npm run docker:build` | Build all runtime images |
-| `npm run docker:down` | Stop the project containers; preserve PostgreSQL data |
-| `npm run docker:logs` | Follow service logs |
-| `npm run docker:status` | Show container status |
-| `npm run clean` | Remove generated .NET output and frontend build |
+| `pnpm run setup` | Create local config and install locked workspace dependencies |
+| `pnpm dev` | Start every service in Docker with source watching |
+| `pnpm build` | Build all .NET projects and the production frontend |
+| `pnpm check` | Restore, check formatting/lint/types, run local tests and build |
+| `pnpm lint` | Run .NET analyzers, frontend ESLint and script syntax checks |
+| `pnpm format` | Apply C#, frontend and configuration formatting |
+| `pnpm format:check` | Verify formatting without writing files |
+| `pnpm test` | Run associated C# tests when present, frontend and tooling tests |
+| `pnpm docker:up` | Build and start the entire Docker application |
+| `pnpm docker:build` | Build all runtime images |
+| `pnpm docker:check` | Validate Compose and Dockerfiles without building app images |
+| `pnpm docker:down` | Stop the project containers; preserve PostgreSQL data |
+| `pnpm docker:logs` | Follow service logs |
+| `pnpm docker:status` | Show container status |
+| `pnpm clean` | Remove generated .NET output and frontend build |
 
-`clean` preserves source, `.env`, installed frontend dependencies and database volumes. Stop local development before cleaning, then rerun `setup` to restore .NET build inputs.
+`clean` preserves source, `.env`, installed dependencies and database volumes. Host C# build/format/check commands require the SDK pinned in `global.json`; `pnpm restore:dotnet` restores their build inputs. Use `pnpm check:dotnet`, `pnpm check:web` or `pnpm check:tooling` to check one part independently.
 
-CI runs formatting, lint, type checks, tooling tests, production builds and Docker builds on pull requests and pushes to `main`. No model credentials are needed.
+## CI
 
-Development ports are 5173 (React), 5080 (client API), 5081 (resolver), 5082 (browser API) and 55432 (PostgreSQL), all bound to loopback. The frontend has hot reload; restart `dev` after backend changes. The browser retains its Linux display runtime in both modes.
+Each affected component has its own job and separate restore, formatting, build/analyzer and test steps:
+
+- **Common, Browser, ClientApi and Resolver:** independent .NET matrix jobs. Shared Common or .NET build configuration changes check all four projects.
+- **Web:** strict TypeScript, ESLint, Prettier, frontend tests and a production build. Web-only edits skip .NET jobs.
+- **Repository tooling:** script syntax, configuration formatting and tooling tests, including the changed-file selector.
+- **Docker configuration:** validates both Compose modes and Dockerfiles without building application images or starting services.
+
+Documentation-only edits skip app builds. A final `check` job reports the combined result, including failures and cancellations, so required checks do not get stuck when other jobs are skipped. CI runs for PRs, pushes to `main`, merge queues and manual dispatches. No model credentials are needed.
+
+C# tests belong in `tests/<Project>.*Tests/`, for example `tests/Browser.Tests/Browser.Tests.csproj`. Relevant service jobs discover them automatically. There are currently no C# test projects; the script and frontend proxy tests run today.
+
+Only the web entry point is published, on loopback. Services communicate over the Compose network in both modes. The browser retains its sandboxed Linux display runtime.
 
 ### C# quality policy
 
 Every C# project, including tests and new projects under this repository, inherits `Directory.Build.props` and `.editorconfig`. The SDK's .NET 10 recommended analyzers run during builds and live analysis. Nullable checks and warnings as errors are enabled; code-style checks enforce braces, explicit accessibility, readonly fields where possible, file-scoped namespaces and consistent formatting.
 
-`npm run format` applies `dotnet format` to the whole solution. `npm run format:check` verifies it without changing files. `npm run lint` runs the analyzers, and `npm run check` includes both gates in CI. Add new projects to `Xpathed.slnx` so solution commands include them.
+`pnpm format` applies `dotnet format` to the whole solution. `pnpm format:check` verifies it without changing files. `pnpm lint` runs the analyzers, and `pnpm check` includes both gates in CI. Add new projects to `Xpathed.slnx` so solution commands include them.
 
 ### Frontend conventions
 
 The React app lives in `src/Web` and uses strict TypeScript and Tailwind CSS through the official Vite plugin. Layout and component styles use complete utility class names; shared colors and typography live in the CSS theme. Prettier sorts Tailwind classes using that theme. Keep custom CSS for base styles and the embedded noVNC canvas.
 
-Use small components for the chat, viewer and shared controls. Keep API contracts in `api.ts`, keep session state local to the workspace, and clean up listeners, timers and viewer connections in effects. Strict Mode exercises effect cleanup during development. ESLint checks typed code, React Hooks and DOM usage, including explicit button types. Keep native controls, accessible names, visible keyboard focus and responsive layouts when adding features.
+Use small components for the chat, viewer and shared controls. Keep workspace API contracts in `features/workspace/api.ts`, keep session state in `useWorkspace`, and clean up listeners, timers and viewer connections in effects. Strict Mode exercises effect cleanup during development. ESLint checks typed code, React Hooks and DOM usage, including explicit button types. Keep native controls, accessible names, visible keyboard focus and responsive layouts when adding features.
 
-Frontend-only commands are available with `npm --prefix src/Web run check` and `npm --prefix src/Web run build`; the root commands include them.
+Frontend-only commands are available with `pnpm check:web` and `pnpm build:web`; the root commands include them.
+
+## Project structure
+
+```text
+src/
+  Common/
+    Contracts/           Shared request and response records
+    Http/                Shared API errors and error responses
+  Browser/
+    Endpoints/           Session, page and viewer routes
+    Sessions/            Session operations and browser/display lifetime
+    Viewing/             noVNC transport
+  ClientApi/
+    Endpoints/           Client-facing routes
+    Data/                EF Core context
+    Http/                Upstream request forwarding
+  Resolver/
+    Endpoints/           Resolver routes
+  Web/src/
+    components/          Shared UI controls
+    features/workspace/  Workspace components, API types and session hook
+```
+
+`Common` replaces the old `Contracts` project and is referenced by all three .NET services. Service-specific behavior stays in its owning service. Each API keeps composition in `Program.cs` and route definitions in `Endpoints/`. Each app has its own Dockerfile; changing one service does not rebuild unrelated service source.
+
+Add new C# projects to `Xpathed.slnx`, and add their affected-path rules to `scripts/ci-changes.mjs`. Keep related React components and state within their feature folder. The [research notes](docs/research/2026-09-29-ci-and-project-structure.md) explain these choices and link the official guidance.
 
 ## Design and contracts
 
