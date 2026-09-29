@@ -1,6 +1,8 @@
 import { useEffect, useRef } from "react";
 import type { FormEvent } from "react";
-import Icon from "../../components/Icon";
+import { ArrowRight, RotateCw } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 type Props = {
   sessionId: string | undefined;
@@ -32,22 +34,23 @@ export default function BrowserToolbar({
   const hasPage = /^https?:\/\//i.test(pageUrl ?? "");
   return (
     <form
-      className="flex min-h-[53px] items-center gap-[5px] border-b border-[#e8e5eb] px-3 py-2"
+      className="flex min-h-[53px] items-center gap-1.5 border-b border-border px-3 py-2"
       onSubmit={submit}
     >
-      <button
+      <Button
         type="button"
-        className="inline-flex size-8 shrink-0 items-center justify-center rounded-[5px] border-0 bg-transparent text-muted enabled:hover:bg-soft"
+        variant="ghost"
+        size="icon"
         title="Reload page"
         aria-label="Reload page"
         onClick={() => pageUrl && onNavigate(pageUrl)}
         disabled={!hasPage || busy}
       >
-        <Icon name="refresh" size={17} />
-      </button>
-      <input
+        <RotateCw aria-hidden="true" />
+      </Button>
+      <Input
         ref={addressInput}
-        className="h-[33px] min-w-0 flex-1 rounded-[5px] border border-[#e7e4eb] bg-[#f8f7fa] px-2.5 text-sm placeholder:text-muted placeholder:opacity-100"
+        className="flex-1 bg-muted/60"
         aria-label="Page address"
         placeholder="Enter a website address"
         value={address}
@@ -56,14 +59,15 @@ export default function BrowserToolbar({
         spellCheck={false}
         autoComplete="off"
       />
-      <button
+      <Button
         type="submit"
-        className="inline-flex size-8 shrink-0 items-center justify-center rounded-[5px] border-0 bg-transparent text-muted enabled:hover:bg-soft"
+        variant="ghost"
+        size="icon"
         aria-label="Go to address"
         disabled={!sessionId || !address.trim() || busy}
       >
-        <Icon name="arrow" size={17} />
-      </button>
+        <ArrowRight aria-hidden="true" />
+      </Button>
     </form>
   );
 }

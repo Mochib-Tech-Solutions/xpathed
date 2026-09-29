@@ -14,6 +14,11 @@ export default defineConfig(
     languageOptions: { globals: globals.node },
   },
   {
+    files: ["public/*.js"],
+    extends: [js.configs.recommended],
+    languageOptions: { globals: globals.browser },
+  },
+  {
     files: ["src/**/*.{ts,tsx}"],
     extends: [
       js.configs.recommended,

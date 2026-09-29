@@ -34,6 +34,7 @@
     "test:unit": "pnpm test",
     "test:dotnet": "node scripts/ci-dotnet-tests.mjs",
     "test:web": "pnpm --filter xpathed test",
+    "test:web:watch": "pnpm --filter xpathed test:watch",
     "test:tooling": "node --test scripts/*.test.mjs",
     "docker:check": "scripts/ci-docker.sh",
     "docker:up": "scripts/setup.sh && docker/compose.sh up --build -d",
