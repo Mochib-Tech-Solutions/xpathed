@@ -4,12 +4,26 @@ Issues and specs for this repo live as GitHub issues. Use the `gh` CLI for all o
 
 Repository: `Mochib-Tech-Solutions/xpathed` (private).
 
+## Refresh an implementation task
+
+For issue-driven work, fetch the target issue's body, comments, labels and state, then read the parent specification and relevant blockers. Do this at the start and refresh before reporting completion. A closed issue can still contain older acceptance wording; apply the user's latest accepted scope and keep the repository guidance current when it changes.
+
+```sh
+rtk gh issue view <number> --repo Mochib-Tech-Solutions/xpathed --json number,title,body,comments,labels,state,url
+rtk gh issue view 1 --repo Mochib-Tech-Solutions/xpathed --comments
+rtk gh api repos/Mochib-Tech-Solutions/xpathed/issues/<number>/dependencies/blocked_by --paginate
+```
+
+Read each blocker's current state. If native dependency data is unavailable, check the `Blocked by` links in the body and report any dependency that could not be verified. Do not infer that a task is unblocked from an unavailable API response. Use `gh issue list --state open` for a live roadmap instead of copying status tables into documentation.
+
+Update `AGENTS.md`, `README.md` and relevant runtime/domain docs in the same change when accepted scope, commands or architecture move. This is a maintenance workflow, not an automatic synchronization service. External comments, assignment and status changes require authorization from the current task or an explicitly invoked workflow.
+
 ## Conventions
 
-- **Create an issue**: `gh issue create --title "..." --body "..."`. Use a heredoc for multi-line bodies.
+- **Create an issue**: `gh issue create --title "..." --body-file <path>`. Write multiline content to a file first.
 - **Read an issue**: `gh issue view <number> --comments`, filtering comments by `jq` and also fetching labels.
 - **List issues**: `gh issue list --state open --json number,title,body,labels,comments --jq '[.[] | {number, title, body, labels: [.labels[].name], comments: [.comments[].body]}]'` with appropriate `--label` and `--state` filters.
-- **Comment on an issue**: `gh issue comment <number> --body "..."`
+- **Comment on an issue**: `gh issue comment <number> --body-file <path>`
 - **Apply / remove labels**: `gh issue edit <number> --add-label "..."` / `--remove-label "..."`
 - **Close**: `gh issue close <number> --comment "..."`
 

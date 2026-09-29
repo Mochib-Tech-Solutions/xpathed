@@ -5,4 +5,7 @@
     <Project Path="src/Common/Common.csproj" />
     <Project Path="src/Resolver/Resolver.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Browser.Tests/Browser.Tests.csproj" />
+  </Folder>
 </Solution>

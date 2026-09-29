@@ -36,6 +36,8 @@ This endpoint establishes page sharing and is available through the API; the wor
 
 ## Internal API
 
+All three APIs use controller classes with explicit routes and constructor injection. `Program.cs` registers services and middleware; controllers handle HTTP contracts. Browser session operations remain in `Sessions/`, and a hosted service runs the inactivity sweep.
+
 The browser service exposes the client lifecycle routes without the `/api` prefix. Its read-only inspection is `GET /pages/{pageId}/inspection`. It also owns `/view/{pageId}`.
 
 The resolver exposes `POST /pages/{pageId}/inspect`. It calls the browser inspection endpoint and returns the result with `inspectedBy: "resolver"`. Both services provide their own `GET /health` liveness endpoint and can run without the client or database. No model integration is used in this slice.
@@ -52,7 +54,7 @@ The resolver exposes `POST /pages/{pageId}/inspect`. It calls the browser inspec
 - Cancellation while waiting for a session lock leaves the page intact. Cancellation during a running browser command closes that session, because Playwright does not provide safe interruption of that operation. Closing another session is unaffected.
 - Navigation waits for `DOMContentLoaded` with a 20-second limit. It does not retry or claim that later application scripts have finished.
 
-Errors use `{code, message, traceId}`. Unknown, closed and previous-process page IDs all return `404 page_not_found`; the service keeps no unbounded tombstone collection. Capacity exhaustion returns `409 session_limit`, invalid URLs `400 invalid_url`, browser failures `502 browser_operation_failed`, and navigation timeouts `504 navigation_timeout`. Other unavailable/timeout upstreams remain operational errors. A disconnected caller may not receive a cancellation response.
+Operation errors use `{code, message, traceId}`. Controller validation returns the same envelope with `400 invalid_request` for malformed or empty JSON navigation bodies. Unknown, closed and previous-process page IDs all return `404 page_not_found`; the service keeps no unbounded tombstone collection. Capacity exhaustion returns `409 session_limit`, invalid URLs `400 invalid_url`, browser failures `502 browser_operation_failed`, and navigation timeouts `504 navigation_timeout`. Other unavailable/timeout upstreams remain operational errors. A disconnected caller may not receive a cancellation response.
 
 ## Configuration
 
@@ -68,7 +70,7 @@ Errors use `{code, message, traceId}`. Unknown, closed and previous-process page
 | `XPATHED_URL` | Vite API upstream destination |
 | `XPATHED_BROWSER_URL` | Separate Vite viewer upstream in development |
 
-`pnpm dev` applies `compose.dev.yaml` and runs all five services in containers, with Vite and `dotnet watch` for development. Compose synchronizes source files and rebuilds images when dependency manifests change. `pnpm docker:up` uses production runtime images. Only the web port is published on loopback in either mode. Stop the previous mode with `pnpm docker:down` before switching. Both use the same PostgreSQL volume.
+`pnpm dev` applies `docker/compose.dev.yaml` over `docker/compose.yaml` and runs all five services in containers, with Vite and `dotnet watch` for development. `docker/compose.sh` keeps paths and `.env` relative to the canonical repository root. Compose synchronizes source files and rebuilds images when dependency manifests change. `pnpm docker:up` uses production runtime images. Only the web port is published on loopback in either mode. Stop the previous mode with `pnpm docker:down` before switching. Both use the same PostgreSQL volume.
 
 The default deployment is a local development tool. Session/page IDs are capabilities, not user authentication. Local HTTP/WebSocket origin checks prevent unrelated websites from controlling it. Browser/resolver control endpoints reject browser-originated requests; the client API checks same-origin requests, restricts hostnames to localhost/127.0.0.1 and its Compose names, and the dev proxy preserves foreign origins for rejection. Hosted delivery requires authenticated access and network restrictions before exposing these endpoints. Only Chromium is implemented and validated; wire contracts contain no Chromium handles.
 
@@ -76,7 +78,7 @@ The default deployment is a local development tool. Session/page IDs are capabil
 
 Chromium runs as `pwuser` with `ChromiumSandbox = true`. The Compose service uses an init process, 1 GiB of shared memory and a pinned seccomp profile. It does not use `privileged`, `SYS_ADMIN`, host IPC, or `--no-sandbox`.
 
-`infra/browser-seccomp.json` comes from [Playwright v1.63.0](https://raw.githubusercontent.com/microsoft/playwright/v1.63.0/utils/docker/seccomp_profile.json), under the included [Apache 2.0 license](../infra/LICENSE.playwright). It adds `clone3` returning `ENOSYS` so glibc can fall back to the permitted `clone` call, following the [Moby seccomp baseline](https://github.com/moby/profiles/blob/seccomp/v0.2.4/seccomp/default.json). Namespace support must be available in the Docker host. Host AppArmor/sysctl settings were not changed for the local validation.
+`docker/browser/seccomp.json` comes from [Playwright v1.63.0](https://raw.githubusercontent.com/microsoft/playwright/v1.63.0/utils/docker/seccomp_profile.json), under the included [Apache 2.0 license](../docker/browser/LICENSE.playwright). It adds `clone3` returning `ENOSYS` so glibc can fall back to the permitted `clone` call, following the [Moby seccomp baseline](https://github.com/moby/profiles/blob/seccomp/v0.2.4/seccomp/default.json). Namespace support must be available in the Docker host. Host AppArmor/sysctl settings were not changed for the local validation.
 
 Validated locally on macOS Apple Silicon, Colima with native arm64/4 CPUs/8 GiB, Docker Engine 29.5.2, Compose 5.5.1 and Buildx 0.37.1. CI builds each affected app natively on Ubuntu 24.04 amd64 and validates Docker configuration separately. It does not exercise containerized browser workflows.
 
@@ -86,6 +88,6 @@ Pinned baseline: .NET SDK 10.0.401/runtime 10.0.12, Playwright .NET/browser imag
 
 All .NET projects inherit nullable checks, the pinned `10.0-recommended` analyzer set, build/live analysis, code-style enforcement and warnings as errors from `Directory.Build.props`. `.editorconfig` defines formatting, braces, explicit accessibility, readonly fields and file-scoped namespaces. `dotnet format Xpathed.slnx` applies the policy; `dotnet format Xpathed.slnx --no-restore --verify-no-changes` verifies it. Both are wired into the root pnpm commands and CI. The frontend uses strict TypeScript, React Strict Mode, ESLint with React Hooks/DOM/Refresh rules and Prettier with Tailwind class sorting. The dev proxy has a runnable same-origin HTTP/WebSocket check.
 
-`pnpm check` performs locked restores, format/lint/type checks, script/proxy tests and production builds. `pnpm test` runs frontend/tooling tests and any associated C# test projects. `pnpm docker:build` builds the runtime images. Browser interaction is checked manually against the website supplied by the user.
+`pnpm check` performs locked restores, format/lint/type checks, controller/script/proxy tests and production builds. `pnpm test` runs frontend/tooling tests and associated C# test projects. Browser controller tests run in process without launching Chromium. `pnpm docker:build` builds the runtime images. Browser interaction is checked manually against the website supplied by the user.
 
 GitHub Actions runs independent, change-aware jobs for each .NET project, Web, repository tooling and Docker configuration, with read-only repository permission. Docker validation checks Compose and Dockerfile definitions; image builds and service startup are separate development/managed operations. It needs no model credentials. Branch protection, model evaluations and release qualification are later tickets; committing a workflow alone does not establish those controls.

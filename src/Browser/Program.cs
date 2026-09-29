@@ -1,31 +1,14 @@
-using Xpathed.Browser.Endpoints;
+using Xpathed.Browser.Middleware;
 using Xpathed.Browser.Sessions;
 using Xpathed.Common.Http;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddApiControllers();
 builder.Services.AddSingleton<BrowserSessions>();
+builder.Services.AddHostedService<BrowserSessionReaper>();
 var app = builder.Build();
 app.UseApiErrors();
-app.Use(async (context, next) =>
-{
-    if ((context.Request.Path.StartsWithSegments("/sessions") || context.Request.Path.StartsWithSegments("/pages")) &&
-        context.Request.Headers.ContainsKey("Origin"))
-    {
-        throw new ApiException(403, "invalid_origin", "Browser control is available through the client API.");
-    }
-
-    await next(context);
-});
+app.UseMiddleware<BrowserOriginMiddleware>();
 app.UseWebSockets();
-app.MapGet("/health", () => Results.Ok(new { service = "browser" }));
-app.MapBrowserEndpoints();
-app.MapViewerEndpoint();
-
-var sessions = app.Services.GetRequiredService<BrowserSessions>();
-var reaper = sessions.ReapAsync(app.Lifetime.ApplicationStopping);
+app.MapControllers();
 await app.RunAsync();
-try
-{
-    await reaper;
-}
-catch (OperationCanceledException) { }

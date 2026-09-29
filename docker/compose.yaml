@@ -3,12 +3,12 @@ services:
   web:
     build:
       context: .
-      dockerfile: src/Web/Dockerfile
+      dockerfile: docker/web/Dockerfile
       target: runtime
     ports: ["127.0.0.1:${XPATHED_PORT:-8080}:8080"]
     depends_on: [client-api, browser]
   client-api:
-    build: { context: ., dockerfile: src/ClientApi/Dockerfile, target: runtime }
+    build: { context: ., dockerfile: docker/client-api/Dockerfile, target: runtime }
     environment:
       BrowserUrl: http://browser:8080
       ResolverUrl: http://resolver:8080
@@ -18,16 +18,16 @@ services:
       db: { condition: service_healthy }
       resolver: { condition: service_started }
   resolver:
-    build: { context: ., dockerfile: src/Resolver/Dockerfile, target: runtime }
+    build: { context: ., dockerfile: docker/resolver/Dockerfile, target: runtime }
     environment:
       BrowserUrl: http://browser:8080
       Logging__LogLevel__Default: Warning
     depends_on: [browser]
   browser:
-    build: { context: ., dockerfile: src/Browser/Dockerfile, target: runtime }
+    build: { context: ., dockerfile: docker/browser/Dockerfile, target: runtime }
     init: true
     shm_size: 1gb
-    security_opt: ["seccomp=./infra/browser-seccomp.json"]
+    security_opt: ["seccomp=./docker/browser/seccomp.json"]
     environment:
       ViewerOrigins: http://localhost:${XPATHED_PORT:-8080},http://127.0.0.1:${XPATHED_PORT:-8080}
       MaxSessions: 4

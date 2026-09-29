@@ -27,11 +27,11 @@ export function classifyChanges(paths) {
       /^(global\.json|Directory\..*\.(props|targets)|NuGet\.Config|nuget\.config|Xpathed\.slnx|\.editorconfig)$/.test(
         path,
       ) ||
-      (path.startsWith("src/Common/") && !path.endsWith("/Dockerfile"))
+      path.startsWith("src/Common/")
     ) {
       projects.forEach((project) => affected.add(project));
     }
-    if (/^src\/Web\//.test(path) && !path.endsWith("/Dockerfile")) web = true;
+    if (/^src\/Web\//.test(path)) web = true;
     if (
       /^(\.editorconfig|\.prettier(ignore|rc.*)|pnpm-(lock|workspace)\.yaml|\.npmrc|\.node-version|\.nvmrc)$/.test(
         path,
@@ -41,17 +41,13 @@ export function classifyChanges(paths) {
     if (/^(scripts\/|\.github\/workflows\/|package(-lock)?\.json$|global\.json$)/.test(path))
       tooling = true;
     if (
-      /^(infra\/|compose[^/]*\.ya?ml$|\.dockerignore$|\.env\.example$)/.test(path) ||
-      path.endsWith("/Dockerfile") ||
+      /^(docker\/|\.dockerignore$|\.env\.example$)/.test(path) ||
       path === "scripts/ci-docker.sh"
     ) {
       docker = tooling = true;
     }
     for (const project of projects) {
-      if (
-        (path.startsWith(`src/${project}/`) && !path.endsWith("/Dockerfile")) ||
-        path.startsWith(`tests/${project}.`)
-      ) {
+      if (path.startsWith(`src/${project}/`) || path.startsWith(`tests/${project}.`)) {
         affected.add(project);
       }
     }
