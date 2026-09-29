@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Browser/Browser.csproj" />
+    <Project Path="src/ClientApi/ClientApi.csproj" />
+    <Project Path="src/Common/Common.csproj" />
+    <Project Path="src/Resolver/Resolver.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,9 @@
+.agents/
+.github/skills/
+**/node_modules/
+**/bin/
+**/obj/
+**/dist/
+**/package-lock.json
+**/packages.lock.json
+artifacts/
