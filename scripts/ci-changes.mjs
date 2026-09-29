@@ -8,6 +8,7 @@ export function classifyChanges(paths) {
   let web = false;
   let tooling = false;
   let docker = false;
+  let solution = false;
   for (const path of paths) {
     if (
       /^(.github\/workflows\/|scripts\/ci-changes|scripts\/check\.sh$|package(-lock)?\.json$)/.test(
@@ -15,8 +16,9 @@ export function classifyChanges(paths) {
       )
     ) {
       projects.forEach((project) => affected.add(project));
-      web = tooling = docker = true;
+      web = tooling = docker = solution = true;
     }
+    if (path === "Xpathed.slnx") solution = true;
     if (path.startsWith("scripts/ci-dotnet-tests") || path === "scripts/format.sh") {
       projects.forEach((project) => affected.add(project));
     }
@@ -57,7 +59,13 @@ export function classifyChanges(paths) {
       projects.forEach((project) => affected.add(project));
     if (path.startsWith("tests/Common.")) projects.forEach((project) => affected.add(project));
   }
-  return { dotnet: projects.filter((project) => affected.has(project)), web, tooling, docker };
+  return {
+    dotnet: projects.filter((project) => affected.has(project)),
+    web,
+    tooling,
+    docker,
+    solution,
+  };
 }
 
 export function changedPaths(eventName, event, cwd = process.cwd()) {

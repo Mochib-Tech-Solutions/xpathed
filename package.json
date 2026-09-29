@@ -11,7 +11,7 @@
     "setup": "scripts/setup.sh && pnpm install --frozen-lockfile",
     "restore": "pnpm restore:dotnet && pnpm install --frozen-lockfile",
     "restore:dotnet": "dotnet restore Xpathed.slnx --locked-mode",
-    "dev": "scripts/setup.sh && docker compose -f compose.yaml -f compose.dev.yaml up --build --watch",
+    "dev": "scripts/setup.sh && docker compose --project-directory \"$(node -p 'process.cwd()')\" -f compose.yaml -f compose.dev.yaml up --build --watch",
     "build": "pnpm build:dotnet && pnpm build:web",
     "build:dotnet": "pnpm restore:dotnet && dotnet build Xpathed.slnx --no-restore --configuration Release",
     "build:web": "pnpm --filter xpathed build",

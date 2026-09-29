@@ -7,8 +7,8 @@ import test from "node:test";
 import { changedPaths, classifyChanges, projects } from "./ci-changes.mjs";
 import { testProjects } from "./ci-dotnet-tests.mjs";
 
-const none = { dotnet: [], web: false, tooling: false, docker: false };
-const all = { dotnet: projects, web: true, tooling: true, docker: true };
+const none = { dotnet: [], web: false, tooling: false, docker: false, solution: false };
+const all = { dotnet: projects, web: true, tooling: true, docker: true, solution: true };
 
 for (const [path, expected] of [
   ["README.md", none],
@@ -24,6 +24,7 @@ for (const [path, expected] of [
   ["src/Common/Contracts/Session.cs", { ...none, dotnet: projects }],
   ["tests/Common.Tests/ContractTests.cs", { ...none, dotnet: projects }],
   ["Directory.Build.props", { ...none, dotnet: projects }],
+  ["Xpathed.slnx", { ...none, dotnet: projects, solution: true }],
   ["Directory.Packages.props", { ...none, dotnet: projects }],
   ["tests/Directory.Build.props", { ...none, dotnet: projects }],
   ["global.json", { ...none, dotnet: projects, tooling: true }],

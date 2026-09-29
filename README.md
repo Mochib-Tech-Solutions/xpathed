@@ -10,7 +10,7 @@ Natural-language commands, XPath generation and highlighting start in #3. The ch
 
 ## Develop locally with Docker
 
-Install Node 24.16.0, pnpm 12.8.1 and Docker with Compose/Buildx. `packageManager` pins pnpm for this workspace; `corepack enable` enables it on a Node installation that includes Corepack. A host .NET SDK is not required to run the app.
+Install Node 24.16.0, pnpm 12.8.1 and Docker with Compose 5.5.1 and Buildx. `packageManager` pins pnpm for this workspace; `corepack enable` enables it on a Node installation that includes Corepack. A host .NET SDK is not required to run the app.
 
 ```sh
 pnpm run setup
@@ -60,6 +60,7 @@ Run these from the repository root. `package.json` is the single command entry p
 Each affected component has its own job and separate restore, formatting, build/analyzer and test steps:
 
 - **Common, Browser, ClientApi and Resolver:** independent .NET matrix jobs. Shared Common or .NET build configuration changes check all four projects.
+- **Solution:** locked restore and Release build when `Xpathed.slnx` or the shared CI entry points change, and on full manual runs. This validates the solution's project entries in addition to each component.
 - **Web:** strict TypeScript, ESLint, Prettier, frontend tests and a production build. Web-only edits skip .NET jobs.
 - **Repository tooling:** script syntax, configuration formatting and tooling tests, including the changed-file selector.
 - **Docker configuration:** validates both Compose modes and Dockerfiles without building application images or starting services.
