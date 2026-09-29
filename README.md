@@ -6,7 +6,7 @@ A local browser workspace for turning English instructions into verified XPath e
 
 The managed browser foundation ([#2](https://github.com/Mochib-Tech-Solutions/xpathed/issues/2)) is implemented. Open your own website, interact with one Chromium page, and reset its session when you want to start again. The full-page workspace keeps chat beside the page; noVNC displays page content without Chromium's tabs or address bar. The theme menu offers System, Light and Dark modes and remembers your choice.
 
-The chat composer is currently disabled. Natural-language resolution, XPath results and highlighting begin in [#3](https://github.com/Mochib-Tech-Solutions/xpathed/issues/3). The resolver can already inspect the same managed page through its API. There is no model connection or persisted resolution history yet.
+Enter an English instruction to resolve one target on the current page through OpenRouter. Chat shows verified XPath alternatives and observed state; a browser overlay highlights the target without executing the instruction. Resolution covers ordinary controls in the main document. History is not persisted. See the [versioned resolution contract](docs/resolution.md) for supported scope and error handling.
 
 ## Setup and run
 
@@ -26,7 +26,7 @@ All five services run in Docker: the web app, client API, resolver, browser and 
 
 Open [localhost:8080](http://localhost:8080), choose **Open browser**, and enter your website. Click, type and scroll directly in the managed page. **Reset session** asks for confirmation before discarding the current page and browsing state and opening a blank session. Additional windows are blocked so the target page stays consistent.
 
-Setup creates an ignored `.env` with a random database password. No model credentials are needed. Set `XPATHED_PORT` in your shell to choose another loopback port. Ctrl+C stops the development services; `pnpm docker:down` removes their containers while preserving PostgreSQL data.
+Setup creates an ignored `.env` with a random database password. Add `OPENROUTER_API_KEY` to that file for instruction resolution; manual browsing works without a model key. Set `XPATHED_PORT` in your shell to choose another loopback port. Ctrl+C stops the development services; `pnpm docker:down` removes their containers while preserving PostgreSQL data.
 
 ### Production images locally
 
@@ -45,13 +45,13 @@ This builds and starts the runtime images at the same address. Use `pnpm docker:
 | -------------- | -------------------------------------------------------------------------- |
 | **Web**        | React interface and the HTTP/WebSocket entry point                         |
 | **ClientApi**  | Client-facing endpoints and ownership of the EF Core/PostgreSQL connection |
-| **Resolver**   | Stateless page inspection; future target resolution                        |
+| **Resolver**   | Stateless page inspection and instruction resolution                        |
 | **Browser**    | Live Chromium sessions, page operations and the noVNC stream               |
 | **PostgreSQL** | Persistent storage for later history and configuration work                |
 
 The browser creates a fresh context and returns opaque session and page IDs. Navigation retains the page ID; reset or browser restart invalidates it. The client API and resolver pass these IDs to the browser service, so inspection refers to the exact page shown in the viewer. Live browser objects never leave their owning service.
 
-The intended resolution flow will ask a model to select an element from sanitized DOM context, then construct and verify XPath expressions in ordinary code. Resolution will report and highlight a target; users will continue to perform browser actions manually. See the [specification](https://github.com/Mochib-Tech-Solutions/xpathed/issues/1) and [architecture decisions](docs/adr/) for the accepted boundaries.
+Resolution asks a model to select an element from sanitized DOM context, then constructs and verifies XPath expressions in ordinary code. It reports and highlights the target; users perform browser actions manually. See the [specification](https://github.com/Mochib-Tech-Solutions/xpathed/issues/1) and [architecture decisions](docs/adr/) for the accepted boundaries.
 
 ## Working in the repository
 
@@ -90,6 +90,8 @@ Root commands are defined in `package.json`. Host C# build and formatting comman
 | `pnpm lint`                                                   | Run analyzers, frontend lint and script syntax checks                |
 | `pnpm format` / `pnpm format:check`                           | Apply or verify shared formatting                                    |
 | `pnpm test`                                                   | Run the configured automated checks                                  |
+| `pnpm test:resolution` | Run the explicit deterministic Docker resolution checks |
+| `pnpm test:resolution:live` | Check the actual OpenRouter route with a configured API key |
 | `pnpm docker:up` / `pnpm docker:down`                         | Start runtime images or stop project containers                      |
 | `pnpm docker:build` / `pnpm docker:check`                     | Build runtime images or validate Docker definitions                  |
 | `pnpm docker:logs` / `pnpm docker:status`                     | Inspect running services                                             |
@@ -101,13 +103,13 @@ Root commands are defined in `package.json`. Host C# build and formatting comman
 
 GitHub Actions selects affected .NET projects, Web and repository tooling from changed paths. Shared code selects its consumers; documentation-only changes skip application builds. Solution changes also build `Xpathed.slnx`. Formatting, lint, build and validation failures feed one final `check` result.
 
-Docker definitions have a separate validation job. CI does not build application images or start the Docker system. Live model evaluation, release qualification and verified branch/review controls are later roadmap work.
+Docker definitions have a separate validation job. CI does not build application images or start the Docker system. The explicit resolution checks start a separate `xpathed-resolution` stack on loopback port 8081 and stop its containers afterward; the live check runs Browser and Resolver without ClientApi or PostgreSQL. Live model evaluation, release qualification and verified branch/review controls are later roadmap work.
 
 ## Roadmap
 
 GitHub Issues hold the live requirements, dependencies and progress. The next capabilities are:
 
-- [Resolve an instruction and highlight its target (#3)](https://github.com/Mochib-Tech-Solutions/xpathed/issues/3), then [expand frame handling and target-state coverage (#4)](https://github.com/Mochib-Tech-Solutions/xpathed/issues/4).
+- [Expand frame handling and target-state coverage (#4)](https://github.com/Mochib-Tech-Solutions/xpathed/issues/4).
 - [Persist history and export permitted diagnostics (#5)](https://github.com/Mochib-Tech-Solutions/xpathed/issues/5).
 - [Build independent evaluation (#6)](https://github.com/Mochib-Tech-Solutions/xpathed/issues/6), [adapt external datasets (#7)](https://github.com/Mochib-Tech-Solutions/xpathed/issues/7), [compare Stagehand (#8)](https://github.com/Mochib-Tech-Solutions/xpathed/issues/8) and [qualify fast model configurations (#9)](https://github.com/Mochib-Tech-Solutions/xpathed/issues/9).
 - [Extend verified PR/post-merge controls (#10)](https://github.com/Mochib-Tech-Solutions/xpathed/issues/10) and [add release promotion, rollback and drift monitoring (#11)](https://github.com/Mochib-Tech-Solutions/xpathed/issues/11).

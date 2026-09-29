@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Text.Json;
 using Microsoft.Playwright;
 using Xpathed.Common.Contracts;
 using Xpathed.Common.Http;
@@ -10,6 +11,7 @@ public sealed class BrowserSessions(IConfiguration configuration, ILogger<Browse
     private readonly ConcurrentDictionary<string, BrowserSessionRuntime> sessions = new();
     private readonly SemaphoreSlim creation = new(1);
     private readonly int capacity = Math.Clamp(configuration.GetValue("MaxSessions", 4), 1, 16);
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     public async Task<BrowserSession> CreateAsync(CancellationToken token)
     {
@@ -108,7 +110,7 @@ public sealed class BrowserSessions(IConfiguration configuration, ILogger<Browse
     }
 
     public Task<PageState> StateAsync(string pageId, CancellationToken token) => OnPageAsync(pageId, async s =>
-        new PageState(s.Id, s.PageId, s.Page!.Url, await s.Page.TitleAsync(), s.BlockedPopups), token);
+        new PageState(s.Id, s.PageId, s.Page!.Url, await s.Page.TitleAsync(), s.BlockedPopups, s.DocumentId), token);
 
     public Task<PageState> NavigateAsync(string pageId, string url, CancellationToken token)
     {
@@ -121,7 +123,7 @@ public sealed class BrowserSessions(IConfiguration configuration, ILogger<Browse
         return OnPageAsync(pageId, async s =>
         {
             await s.Page!.GotoAsync(url, new() { WaitUntil = WaitUntilState.DOMContentLoaded, Timeout = 20000 });
-            return new PageState(s.Id, s.PageId, s.Page.Url, await s.Page.TitleAsync(), s.BlockedPopups);
+            return new PageState(s.Id, s.PageId, s.Page.Url, await s.Page.TitleAsync(), s.BlockedPopups, s.DocumentId);
         }, token);
     }
 
@@ -130,6 +132,77 @@ public sealed class BrowserSessions(IConfiguration configuration, ILogger<Browse
         var scrollY = await s.Page!.EvaluateAsync<double>("window.scrollY");
         return new PageInspection(s.Id, s.PageId, s.Page.Url, await s.Page.TitleAsync(), scrollY, DateTimeOffset.UtcNow);
     }, token);
+
+    public Task<CandidateCapture> CaptureAsync(string pageId, CaptureRequest request, CancellationToken token) => OnPageAsync(pageId, async s =>
+    {
+        RequireDocument(s, request.DocumentId);
+        await s.Highlight!.SendAsync("Overlay.hideHighlight");
+        if (s.Capture is not null)
+        {
+            await s.Capture.DisposeAsync();
+        }
+        s.CaptureId = Guid.NewGuid().ToString("N");
+        s.Capture = await s.Page!.EvaluateHandleAsync(BrowserCaptureScript.Capture, new
+        {
+            sessionId = s.Id,
+            pageId = s.PageId,
+            documentId = request.DocumentId,
+            captureId = s.CaptureId
+        });
+        var result = await s.Capture.EvaluateAsync<JsonElement>("capture => capture.data");
+        RequireDocument(s, request.DocumentId);
+        return result.Deserialize<CandidateCapture>(JsonOptions)!;
+    }, token);
+
+    public Task<SelectionValidation> SelectAsync(string pageId, SelectionRequest request, CancellationToken token)
+    {
+        if (request.Action is not ("click" or "hover" or "fill" or "type" or "select" or "check" or "uncheck" or "unsupported"))
+        {
+            throw new ApiException(400, "invalid_action", "The requested action is not supported.");
+        }
+        return OnPageAsync(pageId, async s =>
+        {
+            RequireDocument(s, request.DocumentId);
+            if (s.Capture is null || request.CaptureId != s.CaptureId)
+            {
+                throw new ApiException(409, "stale_capture", "This capture is no longer current.");
+            }
+            var result = await s.Capture.EvaluateAsync<JsonElement>("(capture, candidateId) => capture.select(candidateId)", request.CandidateId);
+            RequireDocument(s, request.DocumentId);
+            if (result.TryGetProperty("errorCode", out var error))
+            {
+                throw new ApiException(409, error.GetString()!, "The selected target is no longer valid in this capture.");
+            }
+            var selection = result.Deserialize<SelectionValidation>(JsonOptions)!;
+            await s.Highlight!.SendAsync("Overlay.hideHighlight");
+            if (selection.Target is { State.InViewport: true } target)
+            {
+                await s.Highlight.SendAsync("Overlay.highlightRect", new Dictionary<string, object>
+                {
+                    ["x"] = (int)Math.Round(target.Geometry.X),
+                    ["y"] = (int)Math.Round(target.Geometry.Y),
+                    ["width"] = (int)Math.Round(target.Geometry.Width),
+                    ["height"] = (int)Math.Round(target.Geometry.Height),
+                    ["color"] = new { r = 59, g = 130, b = 246, a = 0.18 },
+                    ["outlineColor"] = new { r = 37, g = 99, b = 235, a = 1 }
+                });
+            }
+            if (s.DocumentId != request.DocumentId)
+            {
+                await s.Highlight!.SendAsync("Overlay.hideHighlight");
+                RequireDocument(s, request.DocumentId);
+            }
+            return selection;
+        }, token);
+    }
+
+    private static void RequireDocument(BrowserSessionRuntime session, string documentId)
+    {
+        if (session.DocumentId != documentId)
+        {
+            throw new ApiException(409, "stale_document", "The page changed while this request was running.");
+        }
+    }
 
     public async Task CloseAsync(string sessionId)
     {

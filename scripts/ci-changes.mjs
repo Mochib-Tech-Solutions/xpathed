@@ -32,6 +32,7 @@ export function classifyChanges(paths) {
       projects.forEach((project) => affected.add(project));
     }
     if (/^src\/Web\//.test(path)) web = true;
+    if (path.startsWith("tests/resolution/")) tooling = true;
     if (
       /^(\.editorconfig|\.prettier(ignore|rc.*)|pnpm-(lock|workspace)\.yaml|\.npmrc|\.node-version|\.nvmrc)$/.test(
         path,

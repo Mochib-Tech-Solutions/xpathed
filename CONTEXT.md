@@ -35,6 +35,12 @@ A managed browsing instance in which the user prepares the page and the resolver
 **Managed page**:
 The single page the user views and works with in a browser session. Its page identifier links resolution requests to that same live page.
 
+**Page document**:
+The current document within a managed page. Navigation can replace the document while keeping the managed page itself.
+
+**Candidate capture**:
+A temporary inventory of eligible candidate elements from one page document. Its candidate identities refer only to that captured inventory.
+
 **Off-screen element**:
 An element present in the current page content but outside the visible viewport. This is distinct from an element concealed by the application's display state.
 

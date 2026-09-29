@@ -6,7 +6,7 @@
 
 xpathed is a local chat and managed-browser workspace for resolving English instructions to verified XPath expressions. Read [README.md](README.md) for setup and the current feature boundary; use [docs/runtime.md](docs/runtime.md) when changing API or browser behavior.
 
-The implemented foundation is the managed browser in [issue #2](https://github.com/Mochib-Tech-Solutions/xpathed/issues/2). Sessions start blank, users open their own websites, and noVNC displays one page without browser chrome. Keep the UI full-page and minimal: chat, browser, essential navigation and a confirmed reset. The chat composer stays disabled until [#3](https://github.com/Mochib-Tech-Solutions/xpathed/issues/3) delivers real resolution.
+The implemented foundation is the managed browser in [issue #2](https://github.com/Mochib-Tech-Solutions/xpathed/issues/2). Sessions start blank, users open their own websites, and noVNC displays one page without browser chrome. Keep the UI full-page and minimal: chat, browser, essential navigation and a confirmed reset. The chat composer resolves instructions through OpenRouter under the [versioned contract](docs/resolution.md). Keep the browser-owned document/capture identities and XPath same-node verification intact.
 
 Accepted follow-ups removed the bundled fixture website, browser Smoke project, manual Inspect button and duplicate close control. Do not restore them from the older #2 wording. Future evaluation work has its own explicit scope. Resolution selects and highlights a target; it does not execute the instruction or add autonomous browsing.
 
@@ -37,6 +37,7 @@ Run commands from the repository root, using the RTK prefix required above. `pac
 - `pnpm run setup` prepares configuration and workspace dependencies; `pnpm dev` runs Docker development mode.
 - `pnpm check:dotnet`, `pnpm check:web` and `pnpm check:tooling` validate the affected area. `pnpm check` is the full local gate.
 - `pnpm format` applies formatting; `pnpm format:check` verifies it. C# builds enforce the shared recommended analyzers and warnings as errors.
+- `pnpm test:resolution` runs deterministic real-browser resolution checks in an isolated Docker stack; `pnpm test:resolution:live` explicitly exercises OpenRouter with the local API key. These remain outside CI service startup.
 - `pnpm docker:check` validates Docker definitions. `pnpm docker:build` builds images, and `pnpm docker:down` stops project containers without deleting database data.
 
 Keep CI jobs independent and selected by relevant changes. Docker image builds and service startup remain explicit operations outside CI. Update `Xpathed.slnx` and `scripts/ci-changes.mjs` when adding projects. Validate behavior at the appropriate boundary; report actual checks rather than inferring success from configuration alone.

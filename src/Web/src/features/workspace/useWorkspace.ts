@@ -1,17 +1,25 @@
 import { useEffect, useRef, useState } from "react";
 import { ApiError, request } from "./api";
-import type { PageState, Session } from "./api";
+import type { PageState, Resolution, ResolutionResult, Session } from "./api";
 
 type WorkspaceState = {
   session: Session | null;
   page: PageState | null;
   address: string;
+  instruction: string;
+  resolution: Resolution | null;
 };
-const emptyWorkspace: WorkspaceState = { session: null, page: null, address: "" };
+const emptyWorkspace: WorkspaceState = {
+  session: null,
+  page: null,
+  address: "",
+  instruction: "",
+  resolution: null,
+};
 
 export default function useWorkspace() {
   const [workspace, setWorkspace] = useState(emptyWorkspace);
-  const { session, page, address } = workspace;
+  const { session, page, address, instruction, resolution } = workspace;
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [pollError, setPollError] = useState("");
@@ -59,6 +67,7 @@ export default function useWorkspace() {
           return {
             ...previous,
             page: next,
+            resolution: previous.page?.documentId === next.documentId ? previous.resolution : null,
             address: updateAddress ? nextAddress : previous.address,
           };
         });
@@ -124,6 +133,7 @@ export default function useWorkspace() {
   function navigate(url: string) {
     if (!session) return;
     void perform("Navigating", async (isCurrent) => {
+      setWorkspace((previous) => ({ ...previous, resolution: null }));
       const next = await request<PageState>(`/pages/${session.pageId}/navigate`, "POST", { url });
       if (isCurrent())
         setWorkspace((previous) => ({
@@ -132,6 +142,46 @@ export default function useWorkspace() {
           address: next.url === "about:blank" ? "" : next.url,
         }));
     });
+  }
+
+  function resolve() {
+    const text = instruction.trim();
+    if (!session || !page || !text || text.length > 4000) return;
+    void perform("Resolving…", async (isCurrent) => {
+      setWorkspace((previous) => ({ ...previous, resolution: null }));
+      const result = await request<ResolutionResult>(`/pages/${session.pageId}/resolve`, "POST", {
+        instruction: text,
+        documentId: page.documentId,
+      });
+      if (!isCurrent()) return;
+      const current = await request<PageState>(`/pages/${session.pageId}`);
+      if (!isCurrent()) return;
+      setWorkspace((previous) => ({
+        ...previous,
+        page: current,
+        address:
+          current.url === previous.page?.url
+            ? previous.address
+            : current.url === "about:blank"
+              ? ""
+              : current.url,
+      }));
+      if (
+        current.sessionId !== session.sessionId ||
+        (result.sessionId !== null && result.sessionId !== session.sessionId) ||
+        current.pageId !== session.pageId ||
+        current.documentId !== page.documentId ||
+        result.pageId !== current.pageId ||
+        result.documentId !== current.documentId
+      ) {
+        throw new Error("The page changed. Resolve the instruction again.");
+      }
+      setWorkspace((previous) => ({ ...previous, resolution: { instruction: text, result } }));
+    });
+  }
+
+  function setInstruction(instruction: string) {
+    setWorkspace((previous) => ({ ...previous, instruction }));
   }
 
   function setAddress(address: string) {
@@ -146,11 +196,15 @@ export default function useWorkspace() {
     session,
     page,
     address,
+    instruction,
+    resolution,
     busy,
     error,
     pollError,
     start,
     navigate,
+    resolve,
+    setInstruction,
     setAddress,
     dismissError,
   };

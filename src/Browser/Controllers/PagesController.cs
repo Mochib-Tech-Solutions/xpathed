@@ -17,4 +17,12 @@ public sealed class PagesController(BrowserSessions sessions) : ControllerBase
 
     [HttpGet("{id}/inspection")]
     public Task<PageInspection> Inspect(string id, CancellationToken cancellationToken) => sessions.InspectAsync(id, cancellationToken);
+
+    [HttpPost("{id}/capture")]
+    public Task<CandidateCapture> Capture(string id, [FromBody] CaptureRequest request, CancellationToken cancellationToken) =>
+        sessions.CaptureAsync(id, request, cancellationToken);
+
+    [HttpPost("{id}/selection")]
+    public Task<SelectionValidation> Select(string id, [FromBody] SelectionRequest request, CancellationToken cancellationToken) =>
+        sessions.SelectAsync(id, request, cancellationToken);
 }

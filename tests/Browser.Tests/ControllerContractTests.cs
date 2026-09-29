@@ -58,6 +58,29 @@ public sealed class ControllerContractTests(WebApplicationFactory<HealthControll
     }
 
     [Theory]
+    [InlineData("capture", "{}")]
+    [InlineData("capture", "{\"documentId\":null}")]
+    [InlineData("selection", "{}")]
+    [InlineData("selection", "{\"documentId\":\"document\",\"captureId\":\"capture\"}")]
+    public async Task InvalidResolutionBodyReturnsBadRequest(string operation, string body)
+    {
+        using var client = application.CreateClient();
+        using var content = new StringContent(body, Encoding.UTF8, "application/json");
+        using var response = await client.PostAsync($"/pages/missing/{operation}", content);
+
+        await AssertErrorAsync(response, HttpStatusCode.BadRequest, "invalid_request");
+    }
+
+    [Fact]
+    public async Task UnsupportedActionIsRejectedBeforePageLookup()
+    {
+        using var client = application.CreateClient();
+        using var response = await client.PostAsJsonAsync("/pages/missing/selection", new { documentId = "document", captureId = "capture", candidateId = "candidate", action = "execute" });
+
+        await AssertErrorAsync(response, HttpStatusCode.BadRequest, "invalid_action");
+    }
+
+    [Theory]
     [InlineData("POST", "/sessions")]
     [InlineData("DELETE", "/sessions/missing")]
     [InlineData("GET", "/pages/missing")]

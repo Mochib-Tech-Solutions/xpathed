@@ -15,6 +15,10 @@ public sealed class PagesController(IHttpClientFactory clients) : ControllerBase
     public Task Navigate(string id) =>
         HttpForwarder.ForwardAsync(HttpContext, clients.CreateClient("browser"), $"/pages/{Uri.EscapeDataString(id)}/navigate");
 
+    [HttpPost("{id}/resolve")]
+    public Task Resolve(string id) =>
+        HttpForwarder.ForwardAsync(HttpContext, clients.CreateClient("resolver"), $"/pages/{Uri.EscapeDataString(id)}/resolve");
+
     [HttpPost("{id}/inspect")]
     public Task Inspect(string id) =>
         HttpForwarder.ForwardAsync(HttpContext, clients.CreateClient("resolver"), $"/pages/{Uri.EscapeDataString(id)}/inspect");

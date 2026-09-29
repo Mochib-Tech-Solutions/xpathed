@@ -14,11 +14,15 @@ export default function Workspace() {
     session,
     page,
     address,
+    instruction,
+    resolution,
     busy,
     error,
     pollError,
     start,
     navigate,
+    resolve,
+    setInstruction,
     setAddress,
     dismissError,
   } = useWorkspace();
@@ -66,7 +70,15 @@ export default function Workspace() {
         </div>
       )}
       <main className="flex min-h-0 flex-1 flex-col sm:grid sm:grid-cols-[270px_minmax(0,1fr)] md:grid-cols-[320px_minmax(0,1fr)]">
-        <ChatPanel />
+        <ChatPanel
+          key={session?.sessionId ?? "closed"}
+          instruction={instruction}
+          resolution={resolution}
+          disabled={!page || !/^https?:\/\//i.test(page.url) || !!busy}
+          resolving={busy === "Resolving…"}
+          onInstructionChange={setInstruction}
+          onResolve={resolve}
+        />
         <section
           className="order-first flex min-h-0 min-w-0 flex-1 flex-col bg-background sm:order-none"
           aria-label="Browser workspace"

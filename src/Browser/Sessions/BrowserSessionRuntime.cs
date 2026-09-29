@@ -12,6 +12,10 @@ internal sealed partial class BrowserSessionRuntime(int slot, ILogger logger) : 
 
     public string Id { get; } = Guid.NewGuid().ToString("N");
     public string PageId { get; } = Guid.NewGuid().ToString("N");
+    public string DocumentId { get; private set; } = Guid.NewGuid().ToString("N");
+    public string? CaptureId { get; set; }
+    public IJSHandle? Capture { get; set; }
+    public ICDPSession? Highlight { get; private set; }
     public int Slot { get; } = slot;
     private int DisplayNumber => 100 + Slot;
     public int Port => 5900 + Slot;
@@ -46,6 +50,15 @@ internal sealed partial class BrowserSessionRuntime(int slot, ILogger logger) : 
             AcceptDownloads = false
         });
         Page = await Context.NewPageAsync();
+        Page.FrameNavigated += (_, frame) =>
+        {
+            if (frame == Page.MainFrame)
+            {
+                DocumentId = Guid.NewGuid().ToString("N");
+                CaptureId = null;
+                _ = ClearNavigationHighlightAsync();
+            }
+        };
         var displayControl = await Context.NewCDPSessionAsync(Page);
         var window = await displayControl.SendAsync("Browser.getWindowForTarget");
         await displayControl.SendAsync("Browser.setWindowBounds", new Dictionary<string, object>
@@ -53,7 +66,9 @@ internal sealed partial class BrowserSessionRuntime(int slot, ILogger logger) : 
             ["windowId"] = window!.Value.GetProperty("windowId").GetInt32(),
             ["bounds"] = new { windowState = "fullscreen" }
         });
-        await displayControl.DetachAsync();
+        await displayControl.SendAsync("DOM.enable");
+        await displayControl.SendAsync("Overlay.enable");
+        Highlight = displayControl;
         Context.Page += async (_, popup) =>
         {
             if (popup == Page)
@@ -105,6 +120,19 @@ internal sealed partial class BrowserSessionRuntime(int slot, ILogger logger) : 
         process.EnableRaisingEvents = true;
         process.Exited += (_, _) => DisplayExited(logger, name);
         return process;
+    }
+
+    private async Task ClearNavigationHighlightAsync()
+    {
+        if (Highlight is null)
+        {
+            return;
+        }
+        try
+        {
+            await Highlight.SendAsync("Overlay.hideHighlight");
+        }
+        catch (PlaywrightException) { }
     }
 
     private static Task WaitUntilAsync(Func<bool> ready, CancellationToken token) => WaitUntilAsync(() => Task.FromResult(ready()), token);
