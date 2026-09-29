@@ -5,7 +5,7 @@ using Xpathed.Common.Http;
 
 namespace Xpathed.Browser.Sessions;
 
-internal sealed class BrowserSessions(IConfiguration configuration, ILogger<BrowserSessions> logger) : IAsyncDisposable
+public sealed class BrowserSessions(IConfiguration configuration, ILogger<BrowserSessions> logger) : IAsyncDisposable
 {
     private readonly ConcurrentDictionary<string, BrowserSessionRuntime> sessions = new();
     private readonly SemaphoreSlim creation = new(1);
@@ -51,7 +51,7 @@ internal sealed class BrowserSessions(IConfiguration configuration, ILogger<Brow
         }
     }
 
-    public BrowserSessionRuntime Find(string pageId)
+    internal BrowserSessionRuntime Find(string pageId)
     {
         var session = sessions.Values.FirstOrDefault(s => s.PageId == pageId && s.Ready && !s.Stop.IsCancellationRequested);
         if (session is null)

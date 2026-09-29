@@ -44,7 +44,7 @@ test("dev proxy rewrites same-origin requests and preserves foreign origins", as
   t.after(() => server.close());
   const origin = `http://127.0.0.1:${server.httpServer.address().port}`;
 
-  for (const path of ["/api/sessions", "/view/session"]) {
+  for (const path of ["/api/sessions", "/health", "/view/session"]) {
     for (const source of [origin, "https://untrusted.example"]) {
       const response = await new Promise((resolve, reject) => {
         const request = http.get(`${origin}${path}`, {

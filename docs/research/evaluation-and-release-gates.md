@@ -40,7 +40,7 @@ Do not execute unreviewed PR code with model credentials through a privileged tr
 
 ## Expanded instruction vocabulary
 
-Thunders documents click variants, input, hover, press, select, upload, validate, wait, scroll, and web extraction. Playwright additionally exposes clear and focus operations. This is a finite application vocabulary; HTML does not define an exhaustive natural-language action list. [Thunders actions](https://help.thunders.ai/en/articles/12517655-supported-ai-actions), [Playwright input](https://playwright.dev/dotnet/docs/input)
+Playwright documents text entry, checkboxes and radio buttons, selecting options, click variants, hover, key presses, file upload and focus. These browser operations provide a concrete starting point for the instruction vocabulary; the project specification determines which target-resolution requests are supported. Supporting an instruction does not add automatic action execution. [Playwright actions](https://playwright.dev/dotnet/docs/input)
 
 Propose single-target resolution for click/double/right/middle-click, hover, fill/clear, select, check/uncheck/radio, press, focus/blur, upload, and element inspection. Resolving a target for wait/validate/scroll does not execute that action or create an XPath for a node that does not yet exist. Navigation and timed pause have no element target; drag-and-drop has two and needs a separate contract decision.
 

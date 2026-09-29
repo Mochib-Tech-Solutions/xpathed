@@ -36,10 +36,12 @@ services:
           path: src/Web
           target: /app/src/Web
           initial_sync: true
-          ignore: [package.json, Dockerfile, node_modules/, dist/]
+          ignore: [package.json, node_modules/, dist/]
         - action: rebuild
           path: src/Web
-          include: [package.json, Dockerfile]
+          include: [package.json]
+        - action: rebuild
+          path: docker/web/Dockerfile
         - action: rebuild
           path: .
           include: [package.json, pnpm-lock.yaml, pnpm-workspace.yaml, .dockerignore]
@@ -54,10 +56,12 @@ services:
           path: src/ClientApi
           target: /source/src/ClientApi
           initial_sync: true
-          ignore: ["*.csproj", packages.lock.json, Dockerfile, bin/, obj/]
+          ignore: ["*.csproj", packages.lock.json, bin/, obj/]
         - action: rebuild
           path: src/ClientApi
-          include: ["*.csproj", packages.lock.json, Dockerfile]
+          include: ["*.csproj", packages.lock.json]
+        - action: rebuild
+          path: docker/client-api/Dockerfile
         - *common-source
         - *common-dependencies
         - *dotnet-settings
@@ -72,10 +76,12 @@ services:
           path: src/Resolver
           target: /source/src/Resolver
           initial_sync: true
-          ignore: ["*.csproj", packages.lock.json, Dockerfile, bin/, obj/]
+          ignore: ["*.csproj", packages.lock.json, bin/, obj/]
         - action: rebuild
           path: src/Resolver
-          include: ["*.csproj", packages.lock.json, Dockerfile]
+          include: ["*.csproj", packages.lock.json]
+        - action: rebuild
+          path: docker/resolver/Dockerfile
         - *common-source
         - *common-dependencies
         - *dotnet-settings
@@ -91,10 +97,12 @@ services:
           path: src/Browser
           target: /source/src/Browser
           initial_sync: true
-          ignore: ["*.csproj", packages.lock.json, Dockerfile, bin/, obj/]
+          ignore: ["*.csproj", packages.lock.json, bin/, obj/]
         - action: rebuild
           path: src/Browser
-          include: ["*.csproj", packages.lock.json, Dockerfile]
+          include: ["*.csproj", packages.lock.json]
+        - action: rebuild
+          path: docker/browser/Dockerfile
         - *common-source
         - *common-dependencies
         - *dotnet-settings

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import RFB from "@novnc/novnc";
+import { Button } from "@/components/ui/button";
 import type { Session } from "./api";
 
 type ViewerStatus = "Connecting" | "Connected" | "Disconnected";
@@ -18,7 +19,7 @@ export default function BrowserViewer({ session }: { session: Session }) {
     const rfb = new RFB(container, url.toString());
     rfb.scaleViewport = true;
     rfb.resizeSession = false;
-    rfb.background = "#fff";
+    rfb.background = "transparent";
     rfb.focusOnClick = true;
     const connected = () => {
       if (active) setStatus("Connected");
@@ -56,21 +57,21 @@ export default function BrowserViewer({ session }: { session: Session }) {
         aria-label="Managed browser. Press Enter to interact, F8 to leave the browser, then Tab to move to the next control."
       />
       {status !== "Connected" && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-paper/93 text-muted">
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/95 text-muted-foreground">
           <p className="my-[13px]">
             {status === "Connecting" ? "Connecting…" : "Browser disconnected."}
           </p>
           {status === "Disconnected" && (
-            <button
+            <Button
               type="button"
-              className="inline-flex items-center justify-center gap-2 rounded-md border border-[#dfdbe4] bg-white px-[11px] py-2 text-sm whitespace-nowrap enabled:hover:bg-soft"
+              variant="outline"
               onClick={() => {
                 setStatus("Connecting");
                 setConnection((previous) => previous + 1);
               }}
             >
               Reconnect view
-            </button>
+            </Button>
           )}
         </div>
       )}

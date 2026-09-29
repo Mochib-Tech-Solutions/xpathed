@@ -75,7 +75,10 @@ export default function useWorkspace() {
           setPollError("Unable to refresh the page. Retrying…");
         }
       } finally {
-        if (active) timer = setTimeout(refresh, 2000);
+        if (active)
+          timer = setTimeout(() => {
+            void refresh();
+          }, 2000);
       }
     }
     void refresh();
