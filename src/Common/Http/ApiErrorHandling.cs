@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
+using Xpathed.Common.Contracts;
 
 namespace Xpathed.Common.Http;
 
@@ -32,7 +33,7 @@ public static partial class ApiErrorHandling
                 // Keep page content, navigation URLs and upstream exception messages out of logs.
                 LogRequestFailure(app.Logger, code, context.TraceIdentifier, error.GetType().Name);
                 context.Response.StatusCode = status;
-                await context.Response.WriteAsJsonAsync(new { code, message, traceId = context.TraceIdentifier });
+                await context.Response.WriteAsJsonAsync(new ApiError(code, message, context.TraceIdentifier));
             }
         });
     }

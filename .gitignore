@@ -2,6 +2,7 @@
 **/obj/
 **/node_modules/
 **/dist/
+**/.vitest/
 .env
 .env.*
 !.env.example
