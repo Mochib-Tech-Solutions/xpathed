@@ -189,7 +189,11 @@ finally
 async Task<JsonElement> Send(string path, HttpMethod? method = null, object? body = null, CancellationToken token = default)
 {
     using var request = new HttpRequestMessage(method ?? HttpMethod.Get, path);
-    if (body is not null) request.Content = JsonContent.Create(body);
+    if (body is not null)
+    {
+        request.Content = JsonContent.Create(body);
+    }
+
     using var response = await client.SendAsync(request, token);
     var text = await response.Content.ReadAsStringAsync(token);
     Check(response.IsSuccessStatusCode, $"{method} {path}: {(int)response.StatusCode} {text}");
@@ -242,7 +246,11 @@ async Task CheckCancellation(string pageId)
         while (true)
         {
             var request = await fixture.GetContextAsync().WaitAsync(TimeSpan.FromSeconds(10));
-            if (request.Request.Url!.AbsolutePath == path) return request;
+            if (request.Request.Url!.AbsolutePath == path)
+            {
+                return request;
+            }
+
             Check(request.Request.Url.AbsolutePath == "/favicon.ico", "A cancelled queued navigation must never execute.");
             request.Response.StatusCode = 404;
             request.Response.Close();
@@ -252,8 +260,14 @@ async Task CheckCancellation(string pageId)
 
 static async Task WasCancelled(Task task)
 {
-    try { await task; }
-    catch (OperationCanceledException) { return; }
+    try
+    {
+        await task;
+    }
+    catch (OperationCanceledException)
+    {
+        return;
+    }
     throw new InvalidOperationException("The HTTP request must observe cancellation.");
 }
 
@@ -266,7 +280,11 @@ Task<JsonElement> Inspect(string id) => Send($"/api/pages/{id}/inspect", HttpMet
 async Task Status(string path, HttpMethod method, HttpStatusCode expected, object? body = null)
 {
     using var request = new HttpRequestMessage(method, path);
-    if (body is not null) request.Content = JsonContent.Create(body);
+    if (body is not null)
+    {
+        request.Content = JsonContent.Create(body);
+    }
+
     using var response = await client.SendAsync(request);
     Check(response.StatusCode == expected, $"{method} {path}: expected {expected}, got {response.StatusCode}");
 }
@@ -279,12 +297,19 @@ static async Task Poll(Func<Task<bool>> predicate, string description)
 {
     for (var i = 0; i < 30; i++)
     {
-        if (await predicate()) return;
+        if (await predicate())
+        {
+            return;
+        }
+
         await Task.Delay(200);
     }
     throw new InvalidOperationException($"Timed out: {description}");
 }
 static void Check(bool condition, string message)
 {
-    if (!condition) throw new InvalidOperationException(message);
+    if (!condition)
+    {
+        throw new InvalidOperationException(message);
+    }
 }

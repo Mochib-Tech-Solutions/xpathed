@@ -87,7 +87,7 @@ Pinned baseline: .NET SDK 10.0.401/runtime 10.0.12, Playwright .NET/browser imag
 
 ## Quality checks
 
-All .NET projects inherit nullable checks, recommended .NET 10 analyzers, code-style enforcement and warnings as errors. `dotnet format` verifies C# formatting. The frontend uses strict TypeScript, ESLint with React Hooks/Refresh rules and Prettier. The dev proxy has a runnable same-origin HTTP/WebSocket check.
+All .NET projects inherit nullable checks, the pinned `10.0-recommended` analyzer set, build/live analysis, code-style enforcement and warnings as errors from `Directory.Build.props`. `.editorconfig` defines formatting, braces, explicit accessibility, readonly fields and file-scoped namespaces. `dotnet format Xpathed.slnx` applies the policy; `dotnet format Xpathed.slnx --no-restore --verify-no-changes` verifies it. Both are wired into the root npm commands and CI. The frontend uses strict TypeScript, ESLint with React Hooks/Refresh rules and Prettier. The dev proxy has a runnable same-origin HTTP/WebSocket check.
 
 `npm run check` performs locked restores, format/lint/type checks, script/proxy tests and production builds. `npm test` builds the containers, exercises the real noVNC path and public APIs, then restarts the browser service and checks that old IDs are rejected. It writes screenshots only of the owned fixture. The underlying `scripts/check.sh` and `scripts/smoke.sh` remain usable in CI.
 

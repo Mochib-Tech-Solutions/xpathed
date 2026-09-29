@@ -59,6 +59,12 @@ The smoke run resets managed browser sessions and leaves the Docker stack runnin
 
 Development ports are 5173 (React), 5080 (client API), 5081 (resolver), 5082 (browser API) and 55432 (PostgreSQL), all bound to loopback. The frontend has hot reload; restart `dev` after backend changes. The browser retains its Linux display runtime in both modes.
 
+### C# quality policy
+
+Every C# project, including tests and new projects under this repository, inherits `Directory.Build.props` and `.editorconfig`. The SDK's .NET 10 recommended analyzers run during builds and live analysis. Nullable checks and warnings as errors are enabled; code-style checks enforce braces, explicit accessibility, readonly fields where possible, file-scoped namespaces and consistent formatting.
+
+`npm run format` applies `dotnet format` to the whole solution. `npm run format:check` verifies it without changing files. `npm run lint` runs the analyzers, and `npm run check` includes both gates in CI. Add new projects to `Xpathed.slnx` so solution commands include them.
+
 ## Design and contracts
 
 - [Runtime, APIs and lifecycle](docs/runtime.md)

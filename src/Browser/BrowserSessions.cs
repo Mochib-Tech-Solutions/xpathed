@@ -6,12 +6,12 @@ using System.Text.Json;
 using Microsoft.Playwright;
 using Xpathed;
 
-sealed partial class BrowserSessions(IConfiguration configuration, ILogger<BrowserSessions> logger) : IAsyncDisposable
+internal sealed partial class BrowserSessions(IConfiguration configuration, ILogger<BrowserSessions> logger) : IAsyncDisposable
 {
-    readonly ConcurrentDictionary<string, Session> sessions = new();
-    readonly SemaphoreSlim creation = new(1);
-    readonly int capacity = Math.Clamp(configuration.GetValue("MaxSessions", 4), 1, 16);
-    readonly string fixtureUrl = configuration["FixtureUrl"] ?? "http://127.0.0.1:8080/fixture.html";
+    private readonly ConcurrentDictionary<string, Session> sessions = new();
+    private readonly SemaphoreSlim creation = new(1);
+    private readonly int capacity = Math.Clamp(configuration.GetValue("MaxSessions", 4), 1, 16);
+    private readonly string fixtureUrl = configuration["FixtureUrl"] ?? "http://127.0.0.1:8080/fixture.html";
 
     public async Task<BrowserSession> Create(CancellationToken token)
     {
@@ -20,7 +20,11 @@ sealed partial class BrowserSessions(IConfiguration configuration, ILogger<Brows
         try
         {
             var slot = Enumerable.Range(0, capacity).FirstOrDefault(i => sessions.Values.All(s => s.Slot != i), -1);
-            if (slot < 0) throw new ApiException(409, "session_limit", $"Close a session before opening another (limit {capacity}).");
+            if (slot < 0)
+            {
+                throw new ApiException(409, "session_limit", $"Close a session before opening another (limit {capacity}).");
+            }
+
             session = new Session(slot);
             sessions[session.Id] = session;
             await session.Gate.WaitAsync(token);
@@ -53,9 +57,17 @@ sealed partial class BrowserSessions(IConfiguration configuration, ILogger<Brows
                 await displayControl.DetachAsync();
                 session.Context.Page += async (_, popup) =>
                 {
-                    if (popup == session.Page) return;
+                    if (popup == session.Page)
+                    {
+                        return;
+                    }
+
                     Interlocked.Increment(ref session.BlockedPopups);
-                    try { await popup.CloseAsync(); } catch (PlaywrightException) { }
+                    try
+                    {
+                        await popup.CloseAsync();
+                    }
+                    catch (PlaywrightException) { }
                 };
                 session.Page.Close += (_, _) => session.Stop.Cancel();
                 session.Browser.Disconnected += (_, _) => session.Stop.Cancel();
@@ -65,28 +77,49 @@ sealed partial class BrowserSessions(IConfiguration configuration, ILogger<Brows
                     "-localhost", "-forever", "-shared", "-nopw", "-quiet", "-xkb");
                 await WaitUntil(async () =>
                 {
-                    try { using var tcp = new TcpClient(); await tcp.ConnectAsync("127.0.0.1", session.Port, token); return true; }
-                    catch (SocketException) { return false; }
+                    try
+                    {
+                        using var tcp = new TcpClient();
+                        await tcp.ConnectAsync("127.0.0.1", session.Port, token);
+                        return true;
+                    }
+                    catch (SocketException)
+                    {
+                        return false;
+                    }
                 }, token);
                 token.ThrowIfCancellationRequested();
                 session.Ready = true;
                 return new(session.Id, session.PageId, $"/view/{session.PageId}");
             }
-            finally { session.Gate.Release(); }
+            finally
+            {
+                session.Gate.Release();
+            }
         }
         catch
         {
-            if (session is not null) await Close(session.Id);
+            if (session is not null)
+            {
+                await Close(session.Id);
+            }
+
             throw;
         }
-        finally { creation.Release(); }
+        finally
+        {
+            creation.Release();
+        }
     }
 
     public Session Find(string pageId)
     {
         var session = sessions.Values.FirstOrDefault(s => s.PageId == pageId && s.Ready && !s.Stop.IsCancellationRequested);
         if (session is null)
+        {
             throw new ApiException(404, "page_not_found", "This page is closed or no longer available. Start a fresh session.");
+        }
+
         session.LastSeen = DateTimeOffset.UtcNow;
         return session;
     }
@@ -98,14 +131,25 @@ sealed partial class BrowserSessions(IConfiguration configuration, ILogger<Brows
         await session.Gate.WaitAsync(linked.Token);
         try
         {
-            if (session.Stop.IsCancellationRequested) throw new ApiException(404, "page_not_found", "This page is closed.");
+            if (session.Stop.IsCancellationRequested)
+            {
+                throw new ApiException(404, "page_not_found", "This page is closed.");
+            }
+
             var task = operation(session);
-            try { return await task.WaitAsync(linked.Token); }
+            try
+            {
+                return await task.WaitAsync(linked.Token);
+            }
             catch (OperationCanceledException)
             {
                 // A running browser command cannot be cancelled safely while retaining the page.
                 await session.DisposeAsync();
-                try { await task; } catch (Exception) { }
+                try
+                {
+                    await task;
+                }
+                catch (Exception) { }
                 sessions.TryRemove(session.Id, out _);
                 throw;
             }
@@ -118,7 +162,10 @@ sealed partial class BrowserSessions(IConfiguration configuration, ILogger<Brows
                 throw new ApiException(502, "browser_operation_failed", "The browser could not complete this operation.");
             }
         }
-        finally { session.Gate.Release(); }
+        finally
+        {
+            session.Gate.Release();
+        }
     }
 
     public Task<PageState> State(string pageId, CancellationToken token) => OnPage(pageId, async s =>
@@ -126,10 +173,17 @@ sealed partial class BrowserSessions(IConfiguration configuration, ILogger<Brows
 
     public Task<PageState> Navigate(string pageId, string url, CancellationToken token)
     {
-        if (url == "xpathed:welcome") url = fixtureUrl;
+        if (url == "xpathed:welcome")
+        {
+            url = fixtureUrl;
+        }
+
         if (url.Length > 8192 || !Uri.TryCreate(url, UriKind.Absolute, out var uri) ||
             uri.Scheme is not ("http" or "https") || !string.IsNullOrEmpty(uri.UserInfo))
+        {
             throw new ApiException(400, "invalid_url", "Enter an HTTP or HTTPS address without embedded credentials.");
+        }
+
         return OnPage(pageId, async s =>
         {
             await s.Page!.GotoAsync(url, new() { WaitUntil = WaitUntilState.DOMContentLoaded, Timeout = 20000 });
@@ -155,39 +209,63 @@ sealed partial class BrowserSessions(IConfiguration configuration, ILogger<Brows
 
     public async Task Close(string sessionId)
     {
-        if (!sessions.TryGetValue(sessionId, out var session)) return;
+        if (!sessions.TryGetValue(sessionId, out var session))
+        {
+            return;
+        }
+
         await session.Stop.CancelAsync();
         await session.Gate.WaitAsync();
-        try { await session.DisposeAsync(); sessions.TryRemove(sessionId, out _); }
-        finally { session.Gate.Release(); }
+        try
+        {
+            await session.DisposeAsync();
+            sessions.TryRemove(sessionId, out _);
+        }
+        finally
+        {
+            session.Gate.Release();
+        }
     }
 
     public async Task Reap(CancellationToken token)
     {
         using var timer = new PeriodicTimer(TimeSpan.FromSeconds(30));
         while (await timer.WaitForNextTickAsync(token))
+        {
             foreach (var session in sessions.Values.Where(s => s.Stop.IsCancellationRequested || s.LastSeen < DateTimeOffset.UtcNow.AddMinutes(-15)))
+            {
                 await Close(session.Id);
+            }
+        }
     }
 
-    Process Start(string name, params string[] args)
+    private Process Start(string name, params string[] args)
     {
         var info = new ProcessStartInfo(name) { RedirectStandardOutput = true, RedirectStandardError = true };
-        foreach (var arg in args) info.ArgumentList.Add(arg);
+        foreach (var arg in args)
+        {
+            info.ArgumentList.Add(arg);
+        }
+
         var process = Process.Start(info) ?? throw new InvalidOperationException($"Could not start {name}.");
         // Drain display logs without collecting visited page data.
-        process.BeginOutputReadLine(); process.BeginErrorReadLine();
+        process.BeginOutputReadLine();
+        process.BeginErrorReadLine();
         process.EnableRaisingEvents = true;
         process.Exited += (_, _) => DisplayExited(logger, name);
         return process;
     }
 
-    static Task WaitUntil(Func<bool> ready, CancellationToken token) => WaitUntil(() => Task.FromResult(ready()), token);
-    static async Task WaitUntil(Func<Task<bool>> ready, CancellationToken token)
+    private static Task WaitUntil(Func<bool> ready, CancellationToken token) => WaitUntil(() => Task.FromResult(ready()), token);
+    private static async Task WaitUntil(Func<Task<bool>> ready, CancellationToken token)
     {
         for (var i = 0; i < 100; i++)
         {
-            if (await ready()) return;
+            if (await ready())
+            {
+                return;
+            }
+
             await Task.Delay(50, token);
         }
         throw new ApiException(503, "display_unavailable", "The browser display could not start.");
@@ -195,7 +273,10 @@ sealed partial class BrowserSessions(IConfiguration configuration, ILogger<Brows
 
     public async ValueTask DisposeAsync()
     {
-        foreach (var id in sessions.Keys) await Close(id);
+        foreach (var id in sessions.Keys)
+        {
+            await Close(id);
+        }
     }
 
     [LoggerMessage(Level = LogLevel.Information, Message = "Display process {Process} exited")]
@@ -203,7 +284,7 @@ sealed partial class BrowserSessions(IConfiguration configuration, ILogger<Brows
 
 }
 
-sealed class Session(int slot) : IAsyncDisposable
+internal sealed class Session(int slot) : IAsyncDisposable
 {
     public string Id { get; } = Guid.NewGuid().ToString("N");
     public string PageId { get; } = Guid.NewGuid().ToString("N");
@@ -228,16 +309,30 @@ sealed class Session(int slot) : IAsyncDisposable
         await Stop.CancelAsync();
         if (Browser is not null)
         {
-            try { await Browser.CloseAsync(); } catch (PlaywrightException) { }
+            try
+            {
+                await Browser.CloseAsync();
+            }
+            catch (PlaywrightException) { }
             Browser = null;
         }
-        Playwright?.Dispose(); Playwright = null;
+        Playwright?.Dispose();
+        Playwright = null;
         foreach (var process in new[] { Vnc, Display })
         {
-            if (process is null) continue;
-            if (!process.HasExited) { process.Kill(true); await process.WaitForExitAsync(); }
+            if (process is null)
+            {
+                continue;
+            }
+
+            if (!process.HasExited)
+            {
+                process.Kill(true);
+                await process.WaitForExitAsync();
+            }
             process.Dispose();
         }
-        Vnc = null; Display = null;
+        Vnc = null;
+        Display = null;
     }
 }

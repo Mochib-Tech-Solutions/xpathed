@@ -21,7 +21,10 @@ public static partial class HttpBoundary
     {
         app.Use(async (context, next) =>
         {
-            try { await next(context); }
+            try
+            {
+                await next(context);
+            }
             catch (Exception error) when (!context.Response.HasStarted)
             {
                 var (status, code, message) = error switch
@@ -49,7 +52,9 @@ public static partial class HttpBoundary
         {
             request.Content = new StreamContent(context.Request.Body);
             if (context.Request.ContentType is { } contentType)
+            {
                 request.Content.Headers.TryAddWithoutValidation("Content-Type", contentType);
+            }
         }
         using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, context.RequestAborted);
         context.Response.StatusCode = (int)response.StatusCode;
@@ -66,8 +71,16 @@ public static partial class HttpBoundary
             while (!lifetime.IsCancellationRequested)
             {
                 var result = await socket.ReceiveAsync(buffer.AsMemory(), lifetime.Token);
-                if (result.MessageType == WebSocketMessageType.Close) return;
-                if (result.MessageType != WebSocketMessageType.Binary) throw new IOException("Binary VNC data required.");
+                if (result.MessageType == WebSocketMessageType.Close)
+                {
+                    return;
+                }
+
+                if (result.MessageType != WebSocketMessageType.Binary)
+                {
+                    throw new IOException("Binary VNC data required.");
+                }
+
                 await stream.WriteAsync(buffer.AsMemory(0, result.Count), lifetime.Token);
             }
         }
@@ -76,13 +89,18 @@ public static partial class HttpBoundary
             var buffer = new byte[16384];
             int count;
             while ((count = await stream.ReadAsync(buffer, lifetime.Token)) > 0)
+            {
                 await socket.SendAsync(buffer.AsMemory(0, count), WebSocketMessageType.Binary, true, lifetime.Token);
+            }
         }
         var sending = FromViewer();
         var receiving = ToViewer();
         await Task.WhenAny(sending, receiving);
         await lifetime.CancelAsync();
-        try { await Task.WhenAll(sending, receiving); }
+        try
+        {
+            await Task.WhenAll(sending, receiving);
+        }
         catch (Exception error) when (error is OperationCanceledException or WebSocketException or IOException) { }
         socket.Abort();
     }
