@@ -12,12 +12,7 @@ test("clean removes only build outputs and rejects parent symlinks outside the r
   await mkdir(join(root, "repo/scripts"), { recursive: true });
   const script = join(root, "repo/scripts/clean.mjs");
   await cp(new URL("./clean.mjs", import.meta.url), script);
-  for (const directory of [
-    "repo/src/Web/dist",
-    "repo/src/ClientApi/bin",
-    "repo/artifacts/smoke",
-    "outside/dist",
-  ]) {
+  for (const directory of ["repo/src/Web/dist", "repo/src/ClientApi/bin", "outside/dist"]) {
     await mkdir(join(root, directory), { recursive: true });
     await writeFile(join(root, directory, "result"), "output");
   }
@@ -25,11 +20,7 @@ test("clean removes only build outputs and rejects parent symlinks outside the r
   await writeFile(join(root, "repo/src/Web/source.ts"), "keep");
   const run = promisify(execFile);
   await run(process.execPath, [script]);
-  for (const output of [
-    "src/Web/dist/result",
-    "src/ClientApi/bin/result",
-    "artifacts/smoke/result",
-  ]) {
+  for (const output of ["src/Web/dist/result", "src/ClientApi/bin/result"]) {
     await assert.rejects(readFile(join(root, "repo", output)), { code: "ENOENT" });
   }
   assert.equal(await readFile(join(root, "repo/.env"), "utf8"), "keep");

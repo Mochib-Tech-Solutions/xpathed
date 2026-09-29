@@ -28,7 +28,7 @@ services:
     shm_size: 1gb
     security_opt: ["seccomp=./infra/browser-seccomp.json"]
     environment:
-      ViewerOrigins: http://localhost:${XPATHED_PORT:-8080},http://127.0.0.1:${XPATHED_PORT:-8080},http://web:8080
+      ViewerOrigins: http://localhost:${XPATHED_PORT:-8080},http://127.0.0.1:${XPATHED_PORT:-8080}
       MaxSessions: 4
       Logging__LogLevel__Default: Warning
     stop_grace_period: 20s
@@ -44,14 +44,5 @@ services:
       interval: 3s
       timeout: 3s
       retries: 20
-  smoke:
-    profiles: [test]
-    build: { context: ., dockerfile: infra/Dockerfile, target: smoke }
-    init: true
-    shm_size: 512mb
-    security_opt: ["seccomp=./infra/browser-seccomp.json"]
-    environment:
-      XPATHED_URL: http://web:8080
-    depends_on: [web]
 volumes:
   postgres:

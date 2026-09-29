@@ -4,9 +4,9 @@ A local chat and browser workspace for resolving web elements from English instr
 
 ## Project status
 
-The first runtime slice ([#2](https://github.com/Mochib-Tech-Solutions/thunders-assignment/issues/2)) provides one interactive Chromium page per session, reset/close controls, and inspection through a separate resolver service. noVNC shows the page without Chromium's tabs or address bar.
+The managed browser runtime ([#2](https://github.com/Mochib-Tech-Solutions/thunders-assignment/issues/2)) provides one interactive Chromium page per session and a reset control. noVNC shows the page without Chromium's tabs or address bar. Sessions start blank; you choose the website to open.
 
-Natural-language commands, XPath generation and highlighting start in #3. The chat composer is disabled until that slice is implemented. The **Inspect page** action currently verifies that the resolver sees changes made in the live browser.
+Natural-language commands, XPath generation and highlighting start in #3. The chat composer is disabled until that slice is implemented. The separate resolver service can inspect the live page through the API.
 
 ## Run with Docker
 
@@ -16,7 +16,7 @@ Requires Node 24.16.0 and Docker Engine with Compose and Buildx. The tested loca
 npm run docker:up
 ```
 
-Open [localhost:8080](http://localhost:8080). Click **Open browser**, type a marker in the test page, click **Update**, then **Inspect page**. Use the address bar to visit another website. **Reset session** clears the page, chat and browsing state.
+Open [localhost:8080](http://localhost:8080), click **Open browser**, then enter your website in the address bar. You can click, type and scroll within that page. **Reset session** asks for confirmation before clearing the page, chat and browsing state and starting blank again.
 
 Startup creates an ignored `.env` with a random database password. No model credentials are needed. Set `XPATHED_PORT` in the shell when using another port. Stop with `npm run docker:down`; PostgreSQL data remains in its named volume.
 
@@ -45,17 +45,17 @@ Run these from the repository root. `package.json` is the single command entry p
 | `npm run format` | Apply C#, frontend and configuration formatting |
 | `npm run format:check` | Verify formatting without writing files |
 | `npm run test:unit` | Run the small local script/proxy tests |
-| `npm test` | Build Docker images and run browser/lifecycle/restart smoke tests |
+| `npm test` | Run the local script and frontend tooling tests |
 | `npm run docker:up` | Build and start the entire Docker application |
-| `npm run docker:build` | Build all runtime and test images |
+| `npm run docker:build` | Build all runtime images |
 | `npm run docker:down` | Stop the project containers; preserve PostgreSQL data |
 | `npm run docker:logs` | Follow service logs |
 | `npm run docker:status` | Show container status |
-| `npm run clean` | Remove generated .NET output, frontend build and smoke screenshots |
+| `npm run clean` | Remove generated .NET output and frontend build |
 
 `clean` preserves source, `.env`, installed frontend dependencies and database volumes. Stop local development before cleaning, then rerun `setup` to restore .NET build inputs.
 
-The smoke run resets managed browser sessions and leaves the Docker stack running. Controlled-fixture screenshots go to ignored `artifacts/smoke/`. CI runs the quality and browser checks on pull requests and pushes to `main` without model credentials.
+CI runs formatting, lint, type checks, tooling tests, production builds and Docker builds on pull requests and pushes to `main`. No model credentials are needed.
 
 Development ports are 5173 (React), 5080 (client API), 5081 (resolver), 5082 (browser API) and 55432 (PostgreSQL), all bound to loopback. The frontend has hot reload; restart `dev` after backend changes. The browser retains its Linux display runtime in both modes.
 
@@ -64,6 +64,14 @@ Development ports are 5173 (React), 5080 (client API), 5081 (resolver), 5082 (br
 Every C# project, including tests and new projects under this repository, inherits `Directory.Build.props` and `.editorconfig`. The SDK's .NET 10 recommended analyzers run during builds and live analysis. Nullable checks and warnings as errors are enabled; code-style checks enforce braces, explicit accessibility, readonly fields where possible, file-scoped namespaces and consistent formatting.
 
 `npm run format` applies `dotnet format` to the whole solution. `npm run format:check` verifies it without changing files. `npm run lint` runs the analyzers, and `npm run check` includes both gates in CI. Add new projects to `Xpathed.slnx` so solution commands include them.
+
+### Frontend conventions
+
+The React app lives in `src/Web` and uses strict TypeScript and Tailwind CSS through the official Vite plugin. Layout and component styles use complete utility class names; shared colors and typography live in the CSS theme. Prettier sorts Tailwind classes using that theme. Keep custom CSS for base styles and the embedded noVNC canvas.
+
+Use small components for the chat, viewer and shared controls. Keep API contracts in `api.ts`, keep session state local to the workspace, and clean up listeners, timers and viewer connections in effects. Strict Mode exercises effect cleanup during development. ESLint checks typed code, React Hooks and DOM usage, including explicit button types. Keep native controls, accessible names, visible keyboard focus and responsive layouts when adding features.
+
+Frontend-only commands are available with `npm --prefix src/Web run check` and `npm --prefix src/Web run build`; the root commands include them.
 
 ## Design and contracts
 

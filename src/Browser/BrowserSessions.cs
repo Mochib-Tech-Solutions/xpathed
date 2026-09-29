@@ -2,7 +2,6 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Globalization;
 using System.Net.Sockets;
-using System.Text.Json;
 using Microsoft.Playwright;
 using Xpathed;
 
@@ -11,7 +10,6 @@ internal sealed partial class BrowserSessions(IConfiguration configuration, ILog
     private readonly ConcurrentDictionary<string, Session> sessions = new();
     private readonly SemaphoreSlim creation = new(1);
     private readonly int capacity = Math.Clamp(configuration.GetValue("MaxSessions", 4), 1, 16);
-    private readonly string fixtureUrl = configuration["FixtureUrl"] ?? "http://127.0.0.1:8080/fixture.html";
 
     public async Task<BrowserSession> Create(CancellationToken token)
     {
@@ -72,7 +70,6 @@ internal sealed partial class BrowserSessions(IConfiguration configuration, ILog
                 session.Page.Close += (_, _) => session.Stop.Cancel();
                 session.Browser.Disconnected += (_, _) => session.Stop.Cancel();
                 session.Page.SetDefaultTimeout(10000);
-                await session.Page.GotoAsync(fixtureUrl, new() { WaitUntil = WaitUntilState.DOMContentLoaded });
                 session.Vnc = Start("x11vnc", "-display", $":{session.DisplayNumber}", "-rfbport", session.Port.ToString(CultureInfo.InvariantCulture),
                     "-localhost", "-forever", "-shared", "-nopw", "-quiet", "-xkb");
                 await WaitUntil(async () =>
@@ -173,11 +170,6 @@ internal sealed partial class BrowserSessions(IConfiguration configuration, ILog
 
     public Task<PageState> Navigate(string pageId, string url, CancellationToken token)
     {
-        if (url == "xpathed:welcome")
-        {
-            url = fixtureUrl;
-        }
-
         if (url.Length > 8192 || !Uri.TryCreate(url, UriKind.Absolute, out var uri) ||
             uri.Scheme is not ("http" or "https") || !string.IsNullOrEmpty(uri.UserInfo))
         {
@@ -193,18 +185,8 @@ internal sealed partial class BrowserSessions(IConfiguration configuration, ILog
 
     public Task<PageInspection> Inspect(string pageId, CancellationToken token) => OnPage(pageId, async s =>
     {
-        // Only the controlled fixture exposes a marker; arbitrary form values are never captured.
-        var fixture = s.Page!.Url == fixtureUrl;
-        var data = await s.Page.EvaluateAsync<JsonElement>("""
-            fixture => ({
-              documentId: fixture ? document.documentElement.dataset.documentId ?? null : null,
-              marker: fixture ? document.querySelector('#marker')?.textContent?.slice(0, 160) ?? null : null,
-              scrollY: window.scrollY
-            })
-            """, fixture);
-        return new PageInspection(s.Id, s.PageId, s.Page.Url, await s.Page.TitleAsync(),
-            data.GetProperty("documentId").GetString(), data.GetProperty("marker").GetString(),
-            data.GetProperty("scrollY").GetDouble(), DateTimeOffset.UtcNow);
+        var scrollY = await s.Page!.EvaluateAsync<double>("window.scrollY");
+        return new PageInspection(s.Id, s.PageId, s.Page.Url, await s.Page.TitleAsync(), scrollY, DateTimeOffset.UtcNow);
     }, token);
 
     public async Task Close(string sessionId)

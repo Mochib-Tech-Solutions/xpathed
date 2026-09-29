@@ -16,7 +16,6 @@ app.Use(async (context, next) =>
     await next(context);
 });
 app.UseWebSockets();
-app.UseStaticFiles();
 app.MapGet("/health", () => Results.Ok(new { service = "browser" }));
 app.MapPost("/sessions", (BrowserSessions sessions, CancellationToken token) => sessions.Create(token));
 app.MapDelete("/sessions/{id}", async (string id, BrowserSessions sessions) =>
