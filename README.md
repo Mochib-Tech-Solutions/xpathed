@@ -4,7 +4,7 @@ A local chat and browser workspace for resolving web elements from English instr
 
 ## Project status
 
-The managed browser runtime ([#2](https://github.com/Mochib-Tech-Solutions/thunders-assignment/issues/2)) provides one interactive Chromium page per session and a reset control. noVNC shows the page without Chromium's tabs or address bar. Sessions start blank; you choose the website to open.
+The managed browser runtime ([#2](https://github.com/Mochib-Tech-Solutions/xpathed/issues/2)) provides one interactive Chromium page per session and a reset control. noVNC shows the page without Chromium's tabs or address bar. Sessions start blank; you choose the website to open.
 
 Natural-language commands, XPath generation and highlighting start in #3. The chat composer is disabled until that slice is implemented. The separate resolver service can inspect the live page through the API.
 
@@ -115,7 +115,7 @@ Add new C# projects to `Xpathed.slnx`, and add their affected-path rules to `scr
 
 - [Runtime, APIs and lifecycle](docs/runtime.md)
 
-- [Specification and accepted scope](https://github.com/Mochib-Tech-Solutions/thunders-assignment/issues/1)
+- [Specification and accepted scope](https://github.com/Mochib-Tech-Solutions/xpathed/issues/1)
 - [Domain glossary](CONTEXT.md)
 - [Architecture decisions](docs/adr/)
 - [Research and primary sources](docs/research/)
