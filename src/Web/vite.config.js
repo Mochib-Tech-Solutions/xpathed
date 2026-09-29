@@ -27,6 +27,7 @@ export default defineConfig({
     strictPort: true,
     proxy: {
       "/api": proxy(target),
+      "/health": proxy(target),
       "/view": proxy(process.env.XPATHED_BROWSER_URL ?? target, true),
     },
   },

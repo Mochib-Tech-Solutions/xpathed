@@ -67,7 +67,7 @@ Each affected component has its own job and separate restore, formatting, build/
 
 Documentation-only edits skip app builds. A final `check` job reports the combined result, including failures and cancellations, so required checks do not get stuck when other jobs are skipped. CI runs for PRs, pushes to `main`, merge queues and manual dispatches. No model credentials are needed.
 
-C# tests belong in `tests/<Project>.*Tests/`, for example `tests/Browser.Tests/Browser.Tests.csproj`. Relevant service jobs discover them automatically. There are currently no C# test projects; the script and frontend proxy tests run today.
+C# tests belong in `tests/<Project>.*Tests/`, for example `tests/Browser.Tests/Browser.Tests.csproj`. Relevant service jobs discover them automatically. Browser controller tests exercise HTTP contracts in process without launching Chromium. Script and frontend proxy tests run separately.
 
 Only the web entry point is published, on loopback. Services communicate over the Compose network in both modes. The browser retains its sandboxed Linux display runtime.
 
@@ -88,28 +88,43 @@ Frontend-only commands are available with `pnpm check:web` and `pnpm build:web`;
 ## Project structure
 
 ```text
+docker/
+  compose.yaml           Runtime services
+  compose.dev.yaml       Source watching and development targets
+  compose.sh             Compose entry point with canonical repository paths
+  browser/               Dockerfile, seccomp profile and license
+  client-api/            Dockerfile
+  resolver/              Dockerfile
+  web/                   Dockerfile and nginx configuration
 src/
   Common/
     Contracts/           Shared request and response records
     Http/                Shared API errors and error responses
   Browser/
-    Endpoints/           Session, page and viewer routes
+    Controllers/         Session, page, viewer and health routes
+    Middleware/          Browser-origin restrictions
     Sessions/            Session operations and browser/display lifetime
     Viewing/             noVNC transport
   ClientApi/
-    Endpoints/           Client-facing routes
+    Controllers/         Client-facing routes and readiness
+    Middleware/          Same-origin policy
     Data/                EF Core context
     Http/                Upstream request forwarding
   Resolver/
-    Endpoints/           Resolver routes
+    Controllers/         Inspection and health routes
+    Middleware/          Service-origin restrictions
   Web/src/
     components/          Shared UI controls
     features/workspace/  Workspace components, API types and session hook
 ```
 
-`Common` replaces the old `Contracts` project and is referenced by all three .NET services. Service-specific behavior stays in its owning service. Each API keeps composition in `Program.cs` and route definitions in `Endpoints/`. Each app has its own Dockerfile; changing one service does not rebuild unrelated service source.
+`Common` contains contracts and HTTP behavior shared by all three .NET services. Service-specific behavior stays in its owning service. Each API keeps composition in `Program.cs` and uses `ControllerBase`, attribute routes and constructor injection in `Controllers/`. Middleware owns cross-cutting request policies; a hosted service runs browser-session cleanup.
 
-Add new C# projects to `Xpathed.slnx`, and add their affected-path rules to `scripts/ci-changes.mjs`. Keep related React components and state within their feature folder. The [research notes](docs/research/2026-09-29-ci-and-project-structure.md) explain these choices and link the official guidance.
+Keep one named C# type per file, use the type name as the filename, and match namespaces to the project and folder. Group files by their responsibility; add a folder when it has a clear purpose. Keep controllers focused on HTTP and session operations in `Sessions/`.
+
+Each service has its own Dockerfile under `docker/<service>/`. The Compose wrapper resolves build contexts, source watches and `.env` from the repository root, including when invoked from a nested directory. `.dockerignore` stays at the root because that is the build context. Changing one service does not rebuild unrelated service source.
+
+Add new C# projects to `Xpathed.slnx`, and add their affected-path rules to `scripts/ci-changes.mjs`. Keep related React components and state within their feature folder. The [controller and Docker guidance](docs/research/2026-09-29-controllers-and-docker-layout.md) and [CI and frontend notes](docs/research/2026-09-29-ci-and-project-structure.md) explain these choices and link the official sources.
 
 ## Design and contracts
 

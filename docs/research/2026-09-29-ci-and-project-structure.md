@@ -14,7 +14,7 @@ The pnpm setup action reads the root package manager version. Install with the c
 
 ## .NET boundaries
 
-ASP.NET Core supports endpoint definitions outside `Program.cs` and route groups for related URLs. Each service keeps startup, dependency registration and the HTTP pipeline in `Program.cs`; its `Endpoints/` folder contains route mappings. This keeps the entry point readable without adding controllers, a mediator or a custom endpoint framework. [Minimal API endpoint organization](https://learn.microsoft.com/en-us/aspnet/core/fundamentals/minimal-apis?view=aspnetcore-10.0)
+The initial endpoint-mapping layout is superseded by the requested controller convention. Each service keeps startup, dependency registration and the HTTP pipeline in `Program.cs`; its `Controllers/` folder contains API controllers with explicit routes. Browser/session behavior remains in its service classes. See [controllers and Docker layout](2026-09-29-controllers-and-docker-layout.md) for the current conventions and framework behavior.
 
 `Common` is the shared library used by Browser, ClientApi and Resolver. Its `Contracts/` folder contains serialized request and response records; `Http/` contains the API exception and shared error response handling. The project name is a repository choice requested for clarity, not a .NET requirement. ClientApi-specific forwarding remains in `ClientApi/Http/`; browser-specific VNC relay remains in `Browser/Viewing/`. This keeps service implementation details out of the shared library.
 
@@ -30,7 +30,7 @@ Use explicit type-only imports with TypeScript's `verbatimModuleSyntax` and Tail
 
 ## Docker
 
-Each app has its own Dockerfile. Multi-stage builds copy published output into the runtime image; dependency manifests are copied before source to reuse restore layers. The Common source is shared by the three .NET services. This follows Docker's guidance on stages, context size, and caching. [Multi-stage builds](https://docs.docker.com/build/building/multi-stage/), [build practices](https://docs.docker.com/build/building/best-practices/)
+Each app has its own Dockerfile under `docker/<service>/`; Compose definitions and runtime configuration live under `docker/`. The repository root remains the build context. Multi-stage builds copy published output into the runtime image; dependency manifests are copied before source to reuse restore layers. The Common source is shared by the three .NET services. This follows Docker's guidance on stages, context size, and caching. [Multi-stage builds](https://docs.docker.com/build/building/multi-stage/), [build practices](https://docs.docker.com/build/building/best-practices/)
 
 Docker validation is independent of application builds. `docker compose config --quiet` validates merged settings; the base Compose file defines the path base for overrides. `docker buildx build --check` checks Dockerfiles without executing their build instructions. It can read registry metadata and needs a Docker builder; it does not build application images or start services. These checks cannot prove that an image runs successfully. Actual image builds and service startup remain explicit local/managed Docker operations. [Compose config](https://docs.docker.com/reference/cli/docker/compose/config/), [merging Compose files](https://docs.docker.com/compose/how-tos/multiple-compose-files/merge/), [Docker build checks](https://docs.docker.com/build/checks/)
 
