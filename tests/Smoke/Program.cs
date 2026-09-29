@@ -107,6 +107,11 @@ try
     foreign.Headers.Add("Origin", "https://unrelated.example");
     using var rejected = await client.SendAsync(foreign);
     Check(rejected.StatusCode == HttpStatusCode.Forbidden, "Cross-origin browser control must be rejected.");
+    using var rebound = new HttpRequestMessage(HttpMethod.Get, "http://client-api:8080/api/pages/unknown");
+    rebound.Headers.Host = "unrelated.example:5080";
+    rebound.Headers.Add("Origin", "http://unrelated.example:5080");
+    using var rejectedHost = await client.SendAsync(rebound);
+    Check(rejectedHost.StatusCode == HttpStatusCode.BadRequest, "A matching foreign Host and Origin must be rejected by the API itself.");
     using var foreignViewer = new HttpRequestMessage(HttpMethod.Get, first.GetProperty("viewPath").GetString());
     foreignViewer.Headers.Add("Origin", "https://unrelated.example");
     foreignViewer.Headers.Add("Connection", "Upgrade");

@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Xpathed;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Configuration["AllowedHosts"] = "localhost;127.0.0.1;client-api;web";
 builder.Services.AddDbContext<AppDbContext>(options => options.UseNpgsql(builder.Configuration.GetConnectionString("Database")));
 foreach (var service in new[] { "browser", "resolver" })
     builder.Services.AddHttpClient(service, client =>

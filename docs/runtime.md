@@ -73,7 +73,7 @@ Errors use `{code, message, traceId}`. Unknown, closed and previous-process page
 
 `npm run dev` applies `compose.dev.yaml` to publish only the browser API and PostgreSQL on loopback and launches the client API, resolver and Vite locally. `npm run docker:up` runs all five services in containers. Stop the previous mode with `npm run docker:down` before switching. Both use the same PostgreSQL volume.
 
-The default deployment is a local development tool. Session/page IDs are capabilities, not user authentication. Local HTTP/WebSocket origin checks prevent unrelated websites from controlling it. Browser/resolver control endpoints reject browser-originated requests; the client API checks same-origin requests, and the dev proxy preserves foreign origins for rejection. Hosted delivery requires authenticated access and network restrictions before exposing these endpoints. Only Chromium is implemented and validated; wire contracts contain no Chromium handles.
+The default deployment is a local development tool. Session/page IDs are capabilities, not user authentication. Local HTTP/WebSocket origin checks prevent unrelated websites from controlling it. Browser/resolver control endpoints reject browser-originated requests; the client API checks same-origin requests, restricts hostnames to localhost/127.0.0.1 and its Compose names, and the dev proxy preserves foreign origins for rejection. Hosted delivery requires authenticated access and network restrictions before exposing these endpoints. Only Chromium is implemented and validated; wire contracts contain no Chromium handles.
 
 ## Sandbox and supported environment
 
