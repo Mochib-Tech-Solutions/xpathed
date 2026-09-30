@@ -6,9 +6,16 @@ This context covers identifying a web element from a natural-language test instr
 
 **Test instruction**:
 A natural-language request describing an interaction and the element it concerns, such as “Hover over OK under Employee.”
+A test instruction can request several interactions, such as “Click all Approval buttons.”
 
 **Action**:
 The requested interaction, such as clicking, hovering, or selecting an option.
+
+**Action resolution**:
+The result of identifying one action's target in a particular page state, including absence or an unsupported scope. A found action resolution concerns one target and may include alternative XPath expressions for that same target.
+
+**Multi-action result**:
+The ordered action resolutions for one test instruction. Its partial-result summary distinguishes independently resolved actions from missing, unsupported, failed or non-interactable actions.
 
 **Target element**:
 The web element that the instruction intends the action to affect.
@@ -52,6 +59,12 @@ An element present in the current page content but outside the visible viewport.
 
 **Target state**:
 The observed condition of the selected element relevant to the requested action, such as whether it is rendered, in the viewport, enabled, or editable. Target state is separate from the element's identity.
+
+**Target eligibility**:
+Whether an element belongs to the supported inspection scope. Eligibility is distinct from whether the requested action is possible on that element.
+
+**Target interactability**:
+The observed suitability of a target for a particular requested action, including known limitations and unknown observations. It is distinct from finding the target or successfully executing the action.
 
 **Action execution**:
 The performance of the requested interaction on a resolved target element.

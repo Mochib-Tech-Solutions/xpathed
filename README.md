@@ -45,7 +45,7 @@ This builds and starts the runtime images at the same address. Use `pnpm docker:
 | -------------- | -------------------------------------------------------------------------- |
 | **Web**        | React interface and the HTTP/WebSocket entry point                         |
 | **ClientApi**  | Client-facing endpoints and ownership of the EF Core/PostgreSQL connection |
-| **Resolver**   | Stateless page inspection and instruction resolution                        |
+| **Resolver**   | Stateless page inspection and instruction resolution                       |
 | **Browser**    | Live Chromium sessions, page operations and the noVNC stream               |
 | **PostgreSQL** | Persistent storage for later history and configuration work                |
 
@@ -90,8 +90,8 @@ Root commands are defined in `package.json`. Host C# build and formatting comman
 | `pnpm lint`                                                   | Run analyzers, frontend lint and script syntax checks                |
 | `pnpm format` / `pnpm format:check`                           | Apply or verify shared formatting                                    |
 | `pnpm test`                                                   | Run the configured automated checks                                  |
-| `pnpm test:resolution` | Run the explicit deterministic Docker resolution checks |
-| `pnpm test:resolution:live` | Check the actual OpenRouter route with a configured API key |
+| `pnpm test:resolution`                                        | Run the explicit deterministic Docker resolution checks              |
+| `pnpm test:resolution:live`                                   | Check the actual OpenRouter route with a configured API key          |
 | `pnpm docker:up` / `pnpm docker:down`                         | Start runtime images or stop project containers                      |
 | `pnpm docker:build` / `pnpm docker:check`                     | Build runtime images or validate Docker definitions                  |
 | `pnpm docker:logs` / `pnpm docker:status`                     | Inspect running services                                             |
@@ -109,6 +109,7 @@ Docker definitions have a separate validation job. CI does not build application
 
 GitHub Issues hold the live requirements, dependencies and progress. The next capabilities are:
 
+- [Report action-specific interactability with accessibility-aware scope (#17)](https://github.com/Mochib-Tech-Solutions/xpathed/issues/17), then [resolve multiple current-page actions with partial results (#18)](https://github.com/Mochib-Tech-Solutions/xpathed/issues/18). The assignment replies supplied on 2026-09-30 changed the accepted scope to one target per action, while retaining manual browser interaction. These prerequisites precede #4/#5/#6; [ADR-0008](docs/adr/0008-resolve-multiple-current-page-actions.md) records the decision. The current API still resolves one action per request.
 - [Expand frame handling and target-state coverage (#4)](https://github.com/Mochib-Tech-Solutions/xpathed/issues/4).
 - [Persist history and export permitted diagnostics (#5)](https://github.com/Mochib-Tech-Solutions/xpathed/issues/5).
 - [Build independent evaluation (#6)](https://github.com/Mochib-Tech-Solutions/xpathed/issues/6), [adapt external datasets (#7)](https://github.com/Mochib-Tech-Solutions/xpathed/issues/7), [compare Stagehand (#8)](https://github.com/Mochib-Tech-Solutions/xpathed/issues/8) and [qualify fast model configurations (#9)](https://github.com/Mochib-Tech-Solutions/xpathed/issues/9).
