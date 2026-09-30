@@ -1,5 +1,7 @@
 # Resolve multiple actions against the current page
 
+Basic workspace scope is superseded by [ADR-0014](0014-resolve-one-action-across-current-page-targets.md): one action across multiple current-page targets. The version-2 behavior below remains supported for legacy callers.
+
 The assignment replies supplied on 2026-09-30 require multi-target prompts to be split into actions with an XPath for each target, superseding the earlier one-target-per-request boundary. The user confirmed an ordered set of current-page action resolutions with independent outcomes and a truthful partial-result summary, preserving one exact target and verified XPath alternatives per found action. This keeps useful independent results without executing earlier actions or guessing future page state; request/completion-owned usage and costs are counted once rather than copied into every action.
 
 The user also confirmed accessibility-aware hidden exclusions: accessibility exposure, visual rendering and action-specific interactability are distinct, using [WAI-ARIA tree rules](https://www.w3.org/TR/wai-aria-1.2/#tree_exclusion) and [accessible name computation](https://www.w3.org/TR/accname-1.2/#computation-steps) as primary references. Excluded targets receive scoped not-found results; eligible disabled, readonly, covered or off-screen targets can be found with supported observations, limitations or unknown readiness. The sanitized DOM and privacy boundaries remain; a raw accessibility tree is not a model input.

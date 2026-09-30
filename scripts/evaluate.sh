@@ -8,10 +8,11 @@ seed=1
 timeout=45000
 case_id=
 output=
+suite=
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --) shift; continue ;;
-    --mode|--repetitions|--seed|--timeout-ms|--case|--output)
+    --mode|--repetitions|--seed|--timeout-ms|--case|--output|--suite)
       if [ "$#" -lt 2 ]; then echo "Missing value for $1" >&2; exit 2; fi
       case "$1" in
         --mode) mode=$2 ;;
@@ -20,11 +21,24 @@ while [ "$#" -gt 0 ]; do
         --timeout-ms) timeout=$2 ;;
         --case) case_id=$2 ;;
         --output) output=$2 ;;
+        --suite) suite=$2 ;;
       esac
       shift 2 ;;
     *) echo "Unknown evaluation option: $1" >&2; exit 2 ;;
   esac
 done
+export XPATHED_EVALUATION_SUITE=
+if [ -n "$suite" ]; then
+  if [ "$mode" != deterministic ]; then echo "Custom suites support deterministic evaluation only" >&2; exit 2; fi
+  XPATHED_EVALUATION_SUITE=$(node --input-type=module -e '
+    import { realpathSync, statSync } from "node:fs";
+    import { relative, isAbsolute } from "node:path";
+    const path = realpathSync(process.argv[1]);
+    const rel = relative(realpathSync(process.cwd()), path);
+    if (!rel || rel.startsWith("..") || isAbsolute(rel) || !statSync(path).isFile() || statSync(path).size > 10000000) throw new Error("Suite must be a JSON file under this checkout, at most 10 MB");
+    process.stdout.write("/workspace/" + rel);
+  ' "$suite")
+fi
 set -- --mode "$mode" --repetitions "$repetitions" --seed "$seed" --timeout-ms "$timeout" --output /artifacts
 if [ -n "$case_id" ]; then set -- "$@" --case "$case_id"; fi
 # Reuse the runner's validation before starting services or creating artifacts.

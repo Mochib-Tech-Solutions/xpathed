@@ -1,13 +1,14 @@
 import { createHash, randomUUID } from "node:crypto";
-import { mkdir, readFile, writeFile, readdir, rm, rename } from "node:fs/promises";
+import { mkdir, readFile, writeFile, readdir, rm, rename, lstat, readlink } from "node:fs/promises";
 import { resolve, join } from "node:path";
+import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { setTimeout as delay } from "node:timers/promises";
 
 const directory = fileURLToPath(new URL(".", import.meta.url));
 const hash = (value) =>
   createHash("sha256")
-    .update(typeof value === "string" ? value : JSON.stringify(value))
+    .update(typeof value === "string" || Buffer.isBuffer(value) ? value : JSON.stringify(value))
     .digest("hex");
 const readJson = async (path) => JSON.parse(await readFile(path, "utf8"));
 const saveJson = async (path, value) =>
@@ -61,28 +62,48 @@ export function validateCases(manifest) {
   const ids = new Set(),
     families = new Map();
   for (const item of manifest.cases) {
+    const offline = item.track === "offline-selection";
     if (!/^[a-z0-9_-]+$/.test(item.id) || ids.has(item.id))
       throw new Error("Invalid or duplicate case id");
     ids.add(item.id);
-    if (!item.family || !["development", "regression", "held-out"].includes(item.split))
+    if (
+      !item.family ||
+      ![
+        "development",
+        "regression",
+        "held-out",
+        ...(item.dataset
+          ? ["train", "dev", "test", "test_task", "test_website", "test_domain"]
+          : []),
+      ].includes(item.split)
+    )
       throw new Error("Invalid family or split");
     if (families.has(item.family) && families.get(item.family) !== item.split)
       throw new Error("A family cannot cross split boundaries");
     families.set(item.family, item.split);
     if (!Array.isArray(item.expected?.actions)) throw new Error("Expected actions are required");
-    if (!item.instruction || !item.fixture || !item.setupRevision || !item.review || !item.category)
+    if (
+      !item.instruction ||
+      (!offline && !item.fixture) ||
+      !item.setupRevision ||
+      !item.review ||
+      !item.category
+    )
       throw new Error("Case provenance is incomplete");
-    if (item.viewport?.width !== 1280 || item.viewport?.height !== 800)
+    if (!offline && (item.viewport?.width !== 1280 || item.viewport?.height !== 800))
       throw new Error("Only the managed 1280x800 viewport is currently supported");
     for (const action of item.expected.actions) {
       if (
         !Number.isInteger(action.step) ||
         action.step < 1 ||
-        !action.action ||
+        (!offline && !action.action) ||
         !["found", "not_found", "unsupported", "error"].includes(action.outcome)
       )
         throw new Error("Invalid expected action");
-      if (action.outcome === "found" && !action.target?.selector)
+      if (
+        action.outcome === "found" &&
+        !(offline ? action.target?.candidateId : action.target?.selector)
+      )
         throw new Error("Found actions require an independent target mapping");
     }
   }
@@ -189,7 +210,7 @@ export function configurationRecord(trial) {
   };
 }
 
-async function retainConfigurations(output, manifest, trial) {
+export async function retainConfigurations(output, manifest, trial) {
   for (const attempt of [trial, trial.mutation?.fresh].filter(Boolean)) {
     const record = configurationRecord(attempt);
     if (
@@ -301,7 +322,11 @@ async function resolveTrial(spec, trial, session, page, options, services, chann
   try {
     const envelope = await request(
       `${services.resolver}/internal/pages/${session.pageId}/resolve`,
-      { instruction: spec.instruction, documentId: page.documentId, contractVersion: "2" },
+      {
+        instruction: spec.instruction,
+        documentId: page.documentId,
+        contractVersion: spec.contractVersion ?? "2",
+      },
       options.timeoutMs,
       { "X-Xpathed-Attempt-Id": trial.id },
     );
@@ -446,7 +471,7 @@ async function execute(spec, trial, options, services) {
   }
 }
 
-async function fingerprints() {
+export async function fingerprints() {
   const root = process.env.XPATHED_WORKSPACE ?? resolve(directory, "..");
   const paths = [
     "global.json",
@@ -457,6 +482,7 @@ async function fingerprints() {
     "src/Resolver/Services/CandidateSelectionStrategy.cs",
     "src/Resolver/Services/ActionSelectionStrategy.cs",
     "src/Resolver/Services/OpenRouterGateway.cs",
+    "src/Resolver/Services/OfflineSelectionEvaluation.cs",
     "docker/browser/Dockerfile",
     "docker/compose.yaml",
   ];
@@ -471,9 +497,53 @@ async function fingerprints() {
   for (const name of await readdir(directory))
     if (/\.(mjs|js|json)$/.test(name))
       files[`evaluation/${name}`] = hash(await readFile(join(directory, name), "utf8"));
+  for (const path of [
+    "src/Resolver/bin/Release/net10.0/Resolver.dll",
+    "src/Resolver/bin/Release/net10.0/Common.dll",
+  ]) {
+    try {
+      files[path] = hash(await readFile(join(root, path)));
+    } catch {
+      files[path] = "unavailable";
+    }
+  }
+  let revision = process.env.XPATHED_CODE_REVISION,
+    tree = process.env.XPATHED_TREE_HASH;
+  try {
+    revision ??= execFileSync("git", ["rev-parse", "HEAD"], {
+      cwd: root,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+    if (!tree) {
+      const paths = execFileSync(
+        "git",
+        ["ls-files", "-z", "--cached", "--others", "--exclude-standard"],
+        { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] },
+      )
+        .split("\0")
+        .filter(Boolean)
+        .sort();
+      const digest = createHash("sha256");
+      for (const path of new Set(paths)) {
+        digest.update(path + "\0");
+        try {
+          const full = join(root, path);
+          digest.update(
+            (await lstat(full)).isSymbolicLink() ? await readlink(full) : await readFile(full),
+          );
+        } catch (error) {
+          if (error.code !== "ENOENT") throw error;
+          digest.update("[deleted]");
+        }
+        digest.update("\0");
+      }
+      tree = digest.digest("hex");
+    }
+  } catch {}
   return {
-    revision: process.env.XPATHED_CODE_REVISION ?? "unavailable",
-    tree: process.env.XPATHED_TREE_HASH ?? "unavailable",
+    revision: revision ?? "unavailable",
+    tree: tree ?? "unavailable",
     node: process.version,
     files,
   };
@@ -544,7 +614,13 @@ export async function main(args = process.argv.slice(2)) {
     return summary.passed ? 0 : 1;
   }
   const { gradeTrial, summarize } = await import("./grader.mjs");
-  const suite = await readJson(join(directory, "cases.json"));
+  const suite = await readJson(
+    process.env.XPATHED_EVALUATION_SUITE || join(directory, "cases.json"),
+  );
+  if (process.env.XPATHED_EVALUATION_SUITE && options.mode !== "deterministic")
+    throw new Error(
+      "External reconstructed suites use deterministic browser validation; use the budgeted dataset runner for inference",
+    );
   let cases = validateCases(suite);
   if (options.caseId) cases = cases.filter((c) => c.id === options.caseId);
   if (options.mode === "live")
@@ -558,7 +634,11 @@ export async function main(args = process.argv.slice(2)) {
     createdAt: new Date().toISOString(),
     mode: options.mode,
     configurations: {},
-    cases,
+    cases: cases.map((item) =>
+      item.fixture?.kind === "derived-static-dom"
+        ? { ...item, fixture: { kind: item.fixture.kind, sha256: item.fixture.sha256 } }
+        : item,
+    ),
     plan,
     code: await fingerprints(),
     policy: {

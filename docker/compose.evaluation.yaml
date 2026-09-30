@@ -10,6 +10,7 @@ services:
       XPATHED_WORKSPACE: /workspace
       XPATHED_CODE_REVISION: ${XPATHED_CODE_REVISION:-unavailable}
       XPATHED_TREE_HASH: ${XPATHED_TREE_HASH:-unavailable}
+      XPATHED_EVALUATION_SUITE: ${XPATHED_EVALUATION_SUITE:-}
     volumes:
       - ./evaluation:/evaluation:ro
       - ./tests/resolution:/checks:ro
