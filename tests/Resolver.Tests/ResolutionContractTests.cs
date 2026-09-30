@@ -12,6 +12,92 @@ namespace Xpathed.Resolver.Tests;
 public sealed class ResolutionContractTests
 {
     [Fact]
+    public async Task CompactModelInputPreservesCandidatesAndMeaningWithoutDuplicateOrPrivateState()
+    {
+        var capture = JsonNode.Parse(new DeterministicServicesHandler().CaptureBody)!;
+        var candidates = capture["candidates"]!.AsArray();
+        var second = candidates[0]!.DeepClone();
+        second["id"] = "other-save";
+        second["text"] = "Save changes";
+        second["state"]!["enabled"] = false;
+        second["state"]!["readonly"] = true;
+        candidates.Add(second);
+        capture["coverage"]!["eligibleCount"] = 2;
+        capture["coverage"]!["capturedCount"] = 2;
+        var handler = new DeterministicServicesHandler { CaptureBody = capture.ToJsonString() };
+        await using var application = CreateApplication(handler);
+        using var client = application.CreateClient();
+        using var response = await client.PostAsJsonAsync("/pages/page-1/resolve", new { instruction = "Click Save in Profile", documentId = "document-1" });
+        var result = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("found", result.GetProperty("outcome").GetString());
+        using var input = JsonDocument.Parse(handler.ModelRequest.GetProperty("messages")[1].GetProperty("content").GetString()!);
+        var sent = input.RootElement.GetProperty("candidates");
+        Assert.Equal(2, sent.GetArrayLength());
+        Assert.Equal("button-save", sent[0].GetProperty("id").GetString());
+        Assert.Equal("Save", sent[0].GetProperty("label").GetString());
+        Assert.Equal("Profile", sent[0].GetProperty("scope")[0].GetString());
+        Assert.Equal(20, sent[0].GetProperty("geometry").GetProperty("x").GetDouble());
+        Assert.False(sent[0].TryGetProperty("text", out _));
+        Assert.False(sent[0].TryGetProperty("placeholder", out _));
+        Assert.False(sent[0].GetProperty("state").TryGetProperty("checked", out _));
+        Assert.False(sent[0].GetProperty("state").TryGetProperty("version", out _));
+        Assert.False(sent[0].GetProperty("state").GetProperty("editable").GetBoolean());
+        Assert.Equal("Save changes", sent[1].GetProperty("text").GetString());
+        Assert.False(sent[1].GetProperty("state").GetProperty("enabled").GetBoolean());
+        Assert.True(sent[1].GetProperty("state").GetProperty("readonly").GetBoolean());
+    }
+
+    [Theory]
+    [InlineData("1", false)]
+    [InlineData("2", false)]
+    [InlineData("1", true)]
+    [InlineData("2", true)]
+    public async Task FrameIdentityMustMatchTheCapturedCandidate(string version, bool mismatch)
+    {
+        var capture = JsonNode.Parse(new DeterministicServicesHandler().CaptureBody)!;
+        var frame = JsonNode.Parse("""{"id":"f2","documentId":"frame-document","chain":[{"frameId":"f1","xpath":"//iframe[@id='outer']","label":"Employee"},{"frameId":"f2","xpath":"//iframe[@id='inner']","label":"Payroll"}]}""")!;
+        capture["candidates"]![0]!["frame"] = frame.DeepClone();
+        var target = JsonNode.Parse("""{"candidateId":"button-save","tag":"button","label":"Save","xpaths":["//button"],"state":{"rendered":true,"inViewport":true,"enabled":true,"editable":false,"checked":null},"geometry":{"x":150,"y":150,"width":120,"height":40}}""")!;
+        target["frame"] = frame.DeepClone();
+        if (mismatch)
+        {
+            target["frame"]!["documentId"] = "another-document";
+        }
+        var selection = version == "1" ? new JsonObject { ["target"] = target } : new JsonObject
+        {
+            ["actions"] = new JsonArray(new JsonObject { ["actionId"] = "a1", ["target"] = target }),
+            ["inspectedActionId"] = "a1"
+        };
+        var handler = new DeterministicServicesHandler
+        {
+            CaptureBody = capture.ToJsonString(),
+            SelectionBody = selection.ToJsonString(),
+            ProviderBody = ProviderSelection(version == "1"
+                ? """{"outcome":"found","action":"click","candidateId":"button-save"}"""
+                : """{"complete":true,"actions":[{"step":1,"instruction":"Click Save in Payroll","outcome":"found","action":"click","candidateId":"button-save","limitation":"none"}]}""")
+        };
+        await using var application = CreateApplication(handler);
+        using var client = application.CreateClient();
+        using var response = await client.PostAsJsonAsync("/pages/page-1/resolve", new { instruction = "Click Save in Payroll", documentId = "document-1", contractVersion = version });
+        var result = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(mismatch ? "error" : "found", result.GetProperty("outcome").GetString());
+        if (mismatch)
+        {
+            Assert.Equal("invalid_browser_selection", result.GetProperty("diagnostics").GetProperty("code").GetString());
+        }
+        else
+        {
+            var action = version == "1" ? result : result.GetProperty("actions")[0];
+            Assert.Equal("f2", action.GetProperty("frameId").GetString());
+            Assert.Equal("frame-document", action.GetProperty("target").GetProperty("frame").GetProperty("documentId").GetString());
+            var modelInput = handler.ModelRequest.GetProperty("messages")[1].GetProperty("content").GetString()!;
+            Assert.Contains("Payroll", modelInput, StringComparison.Ordinal);
+            Assert.DoesNotContain("frame-document", modelInput, StringComparison.Ordinal);
+            Assert.DoesNotContain("//iframe", modelInput, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
     public async Task ANullBrowserActionIsAnOperationalErrorRatherThanAnUnhandledFailure()
     {
         var handler = new DeterministicServicesHandler

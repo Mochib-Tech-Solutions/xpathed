@@ -2,8 +2,12 @@ import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { on, once } from "node:events";
 import test from "node:test";
+import { networkInterfaces } from "node:os";
 
 const browserUrl = process.env.XPATHED_BROWSER_URL ?? "http://browser:8080";
+const fixtureAddress = Object.values(networkInterfaces())
+  .flat()
+  .find((address) => address.family === "IPv4" && !address.internal)?.address;
 const oracleCommands = new Map();
 const oracleObservers = new Map();
 const oracleScript = `<script>
@@ -11,7 +15,13 @@ const oracleScript = `<script>
       const endpoint = '?page=' + encodeURIComponent(location.pathname);
       const response = await fetch('/oracle' + endpoint);
       if (response.status === 204) return;
-      const { xpaths = [], replaceTarget, reload, click, open, focusPopup, close, cookie, scrollToY } = await response.json();
+      const { xpaths = [], replaceTarget, reload, click, open, focusPopup, close, cookie, scrollToY, slowFrame, mutateXpath } = await response.json();
+      if (mutateXpath) window.mutateXpathFixture();
+      if (slowFrame) {
+        const frame = document.querySelector('iframe');
+        const rect = frame.getBoundingClientRect.bind(frame);
+        frame.getBoundingClientRect = () => { const end = performance.now() + 2100; while (performance.now() < end) {} return rect(); };
+      }
       if (scrollToY !== undefined) scrollTo(0, scrollToY);
       if (cookie) document.cookie = cookie;
       if (click) document.querySelector(click).click();
@@ -25,6 +35,7 @@ const oracleScript = `<script>
       await fetch('/oracle-result' + endpoint, { method: 'POST', body: JSON.stringify({ matches, scrollY, clicks: document.querySelector('#expected-target')?.dataset.clicks ?? '0', nodeCount: document.querySelectorAll('*').length,
         cookie: document.cookie, openerPath: window.opener?.location.pathname ?? null, focused: document.hasFocus(),
         activeElement: document.activeElement?.id, events: window.observedEvents ?? {},
+        values: [...document.querySelectorAll('[data-observe-value]')].map(element => element.value),
         innerWidth, innerHeight, outerWidth, outerHeight, screenWidth: screen.width, screenHeight: screen.height }) });
       if (close) window.close();
       if (reload === 'hash') location.hash = 'changed';
@@ -820,6 +831,60 @@ test("The single preferred XPath escapes both quote types and uses meaningful co
   );
 });
 
+test("Saved semantic XPaths survive generated IDs, wrappers and reordered duplicate controls", async () => {
+  await withFixture(
+    `<label for="a1b2c3d4-e5f6-47a8-b9c0-d1e2f3a4b5c6">Country</label><input id="a1b2c3d4-e5f6-47a8-b9c0-d1e2f3a4b5c6" data-oracle="country">
+    <div id="contacts"><input name="contact" placeholder="Email" data-oracle="email"><input name="contact" placeholder="Phone"><input name="backup" placeholder="Email"></div>
+    <table><tr><td>Alice</td><td><button data-oracle="alice">Approve</button></td></tr><tr><td>Bob</td><td><button>Approve</button></td></tr></table>
+    <header><button>Help</button></header><footer><button data-oracle="footer">Help</button></footer>
+    <button data-test-id="stable-save" data-oracle="save">Save</button>
+    <script>window.mutateXpathFixture = () => {
+      const country = document.querySelector('[data-oracle="country"]');
+      country.id = 'new-generated-country'; document.querySelector('label').htmlFor = country.id;
+      const tbody = document.querySelector('tbody'); tbody.prepend(tbody.lastElementChild);
+      for (const selector of ['[data-oracle="country"]','[data-oracle="email"]','[data-oracle="footer"]','[data-oracle="save"]']) {
+        const node = document.querySelector(selector), wrapper = document.createElement('div');
+        node.before(wrapper); wrapper.append(node); node.className = 'changed-style';
+      }
+      document.querySelector('#contacts').prepend(document.querySelector('input[name="backup"]'));
+      const extra = document.createElement('button'); extra.textContent = 'Help'; document.querySelector('header').prepend(extra);
+      document.querySelector('[data-oracle="save"]').textContent = 'Save changes';
+    };</script>`,
+    async (session, page) => {
+      const capture = await request(`/pages/${page.pageId}/capture`, {
+        documentId: page.documentId,
+      });
+      const cases = [
+        ["country", (candidate) => candidate.label === "Country"],
+        ["email", (candidate) => candidate.tag === "input" && candidate.placeholder === "Email"],
+        [
+          "alice",
+          (candidate) =>
+            candidate.tag === "button" && candidate.scope.some((scope) => scope.includes("Alice")),
+        ],
+        ["footer", (candidate) => candidate.label === "Help" && candidate.scope.includes("footer")],
+        ["save", (candidate) => candidate.label === "Save"],
+      ];
+      const paths = [];
+      for (const [expected, matches] of cases) {
+        const candidate = capture.candidates.find(matches);
+        assert.ok(candidate, expected);
+        const { target } = await request(`/pages/${page.pageId}/selection`, {
+          documentId: page.documentId,
+          captureId: capture.captureId,
+          candidateId: candidate.id,
+          action: "inspect",
+        });
+        assert.equal(target.xpaths.length, 1);
+        paths.push(target.xpaths[0]);
+      }
+      const expected = cases.map(([id]) => [id]);
+      assert.deepEqual((await verify(paths)).matches, expected);
+      assert.deepEqual((await observe({ xpaths: paths, mutateXpath: true })).matches, expected);
+    },
+  );
+});
+
 test("Positional XPath is a verified last fallback when identical elements have no distinguishing context", async () => {
   await withFixture(
     `<div><span data-oracle="expected-target">Same</span><span>Same</span></div>`,
@@ -955,7 +1020,245 @@ test("Superseded captures, fabricated candidates, replaced nodes and manual relo
   });
 });
 
-test("Visible frame and open shadow boundaries are reported and never enter main-document candidates", async () => {
+test("Native date and time controls support passive fill and clear without typing or mutation", async () => {
+  const types = [
+    ["date", "2030-06-15"],
+    ["month", "2030-06"],
+    ["week", "2030-W24"],
+    ["time", "12:30"],
+    ["datetime-local", "2030-06-15T12:30"],
+  ];
+  const markup =
+    types
+      .flatMap(([type, value]) =>
+        [false, true].map(
+          (readonly) =>
+            `<input type="${type}" aria-label="${type} ${readonly ? "readonly" : "writable"}" value="${value}" data-observe-value ${readonly ? "readonly" : ""}>`,
+        ),
+      )
+      .join("") +
+    `<script>window.observedEvents={};for(const name of ['click','input','change','focusin','keydown','keyup'])document.addEventListener(name,()=>window.observedEvents[name]=(window.observedEvents[name]??0)+1,true);</script>`;
+  await withFixture(markup, async (session, page) => {
+    const before = await observe();
+    const capture = await request(`/pages/${page.pageId}/capture`, { documentId: page.documentId });
+    for (const [type] of types)
+      for (const readonly of [false, true]) {
+        const candidate = capture.candidates.find(
+          (entry) => entry.label === `${type} ${readonly ? "readonly" : "writable"}`,
+        );
+        assert.ok(candidate);
+        for (const action of ["fill", "clear", "type"]) {
+          const { target } = await request(`/pages/${page.pageId}/selection`, {
+            documentId: page.documentId,
+            captureId: capture.captureId,
+            candidateId: candidate.id,
+            action,
+          });
+          assert.equal(
+            target.interactability.checks.compatibleControl,
+            action === "type" ? "fail" : "pass",
+            `${type}: ${action}`,
+          );
+          assert.equal(target.interactability.checks.keyboard, "unknown");
+          assert.equal(target.state.editable, !readonly);
+          assert.equal(target.interactability.checks.writable, readonly ? "fail" : "pass");
+          assert.equal(
+            target.interactability.status,
+            action === "type" || readonly ? "blocked" : "unknown",
+          );
+        }
+      }
+    const after = await observe();
+    assert.deepEqual(after.values, before.values);
+    assert.deepEqual(after.events, before.events);
+    assert.equal(after.activeElement, before.activeElement);
+    assert.equal(after.scrollY, before.scrollY);
+  });
+});
+
+for (const framed of [false, true])
+  test(`Expanded action observations preserve identity, selected state and never execute (${framed ? "iframe" : "main"})`, async () => {
+    const markup = `<input id="expected-target" aria-label="Notes" readonly value="PRIVATE_VALUE">
+     <input type="file" aria-label="Upload document"><input type="file" hidden aria-label="Hidden upload">
+     <select aria-label="Countries" multiple><option selected>PRIVATE_SELECTION</option><option selected>PRIVATE_OTHER</option></select>
+     <div role="tab" tabindex="0" aria-selected="true" aria-label="Overview"></div>
+     <button disabled aria-label="Disabled"><span>Inside button</span></button>
+     <p id="help">Text help</p><svg><circle aria-label="Diagram node" cx="20" cy="20" r="10"/></svg>`;
+    await withFixture(
+      (path) =>
+        framed && path === "/fixture"
+          ? '<iframe title="Controls" src="/matrix" style="width:900px;height:650px"></iframe>'
+          : markup,
+      async (session, page) => {
+        if (framed) await observe({}, "/matrix");
+        const before = await observe();
+        const capture = await request(`/pages/${page.pageId}/capture`, {
+          documentId: page.documentId,
+        });
+        assert.doesNotMatch(JSON.stringify(capture), /PRIVATE_|Hidden upload/);
+        for (const [label, action, status, check, value] of [
+          ["Notes", "clear", "blocked", "writable", "fail"],
+          ["Notes", "press", "unknown", "keyboard", "unknown"],
+          ["Overview", "focus", "unknown", "keyboard", "unknown"],
+          ["Overview", "blur", "unknown", "keyboard", "unknown"],
+          ["Upload document", "upload", "unknown", "compatibleControl", "pass"],
+          ["Notes", "upload", "blocked", "compatibleControl", "fail"],
+          ["Disabled", "double_click", "blocked", "enabled", "fail"],
+          ["Disabled", "right_click", "blocked", "enabled", "fail"],
+          ["Disabled", "inspect", "ready", "enabled", "not_applicable"],
+          ["Text help", "hover", "ready", "enabled", "not_applicable"],
+          ["Diagram node", "inspect", "ready", "enabled", "not_applicable"],
+          ["Countries", "select", "unknown", "compatibleControl", "pass"],
+        ]) {
+          const candidate = capture.candidates.find(
+            (candidate) => (candidate.label || candidate.text) === label,
+          );
+          assert.ok(candidate, label);
+          const { target } = await request(`/pages/${page.pageId}/selection`, {
+            documentId: page.documentId,
+            captureId: capture.captureId,
+            candidateId: candidate.id,
+            action,
+          });
+          assert.equal(target.interactability.status, status, `${label}: ${action}`);
+          assert.equal(target.interactability.checks[check], value);
+          assert.equal(target.xpaths.length, 1);
+          if (label === "Countries") assert.equal(target.state.selectedOptionCount, 2);
+          if (label === "Overview") assert.equal(target.state.selected, true);
+          if (label === "Diagram node") assert.match(target.xpaths[0], /local-name\(\)/);
+        }
+        const after = await observe();
+        assert.equal(after.activeElement, before.activeElement);
+        assert.equal(after.clicks, before.clicks);
+        assert.equal(after.scrollY, before.scrollY);
+      },
+    );
+  });
+
+test("Nested frame targets retain document XPath identity and main viewport geometry", async () => {
+  await withFixture(
+    (path) =>
+      path === "/fixture"
+        ? `<style>body{margin:0;height:3000px}iframe{position:absolute;left:100px;top:80px;width:600px;height:400px;border:0}</style><button>Approval</button><iframe title="Employee" src="/outer"></iframe>`
+        : path === "/outer"
+          ? `<style>body{margin:0}iframe{position:absolute;left:30px;top:40px;width:400px;height:240px;border:0}</style><iframe title="Payroll" src="/inner"></iframe>`
+          : `<style>body{margin:0;height:1600px}button{position:absolute;left:20px;top:30px;width:120px;height:40px}</style><button id="expected-target">Approval</button>`,
+    async (session, page) => {
+      await observe({}, "/inner");
+      const capture = await request(`/pages/${page.pageId}/capture`, {
+        documentId: page.documentId,
+      });
+      const buttons = capture.candidates.filter((candidate) => candidate.tag === "button");
+      assert.equal(buttons.length, 2);
+      assert.ok(
+        capture.candidates.every(
+          (candidate) =>
+            candidate.frame?.id &&
+            candidate.frame.documentId &&
+            Array.isArray(candidate.frame.chain),
+        ),
+      );
+      const candidate = buttons.find((candidate) => candidate.frame?.chain.length === 2);
+      assert.ok(candidate, "Nested document candidates carry their frame chain");
+      assert.deepEqual(
+        candidate.frame.chain.map((frame) => frame.label),
+        ["Employee", "Payroll"],
+      );
+      const { target } = await request(`/pages/${page.pageId}/selection`, {
+        documentId: page.documentId,
+        captureId: capture.captureId,
+        candidateId: candidate.id,
+        action: "click",
+      });
+      assert.equal(target.frame.id, candidate.frame.id);
+      assert.deepEqual(target.xpaths, ["//button[@id='expected-target']"]);
+      assert.deepEqual(target.geometry, { x: 150, y: 150, width: 120, height: 40 });
+      assert.equal(target.interactability.status, "ready");
+      assert.deepEqual((await observe({ xpaths: target.xpaths }, "/inner")).matches, [
+        ["expected-target"],
+      ]);
+      assert.equal((await observe({}, "/fixture")).scrollY, 0);
+      assert.equal((await observe({}, "/inner")).clicks, "0");
+      await withFramebuffer(session, async (frame) => {
+        let blue = 0;
+        for (let attempt = 0; attempt < 20 && blue < 200; attempt++) {
+          const { pixels, width } = await frame();
+          blue = 0;
+          for (let y = 150; y < 190; y++)
+            for (let x = 150; x < 270; x++) {
+              const offset = (y * width + x) * 4;
+              if (
+                pixels[offset] > pixels[offset + 2] + 10 &&
+                pixels[offset + 1] > pixels[offset + 2] + 5
+              )
+                blue++;
+            }
+          if (blue < 200) await new Promise((resolve) => setTimeout(resolve, 50));
+        }
+        assert.ok(
+          blue >= 200,
+          `Expected nested target overlay at main viewport coordinates, got ${blue} blue pixels`,
+        );
+      });
+      await observe({ scrollToY: 20 }, "/inner");
+      await observe({ scrollToY: 50 }, "/fixture");
+      const moved = await request(`/pages/${page.pageId}/selection`, {
+        documentId: page.documentId,
+        captureId: capture.captureId,
+        candidateId: candidate.id,
+        action: "hover",
+      });
+      assert.equal(moved.target.geometry.y, 80);
+      assert.equal((await observe({}, "/inner")).scrollY, 20);
+      assert.equal((await observe({}, "/fixture")).scrollY, 50);
+    },
+  );
+});
+
+test("Cross-origin frame clipping and ancestor obstruction remain passive and frame navigation invalidates capture", async () => {
+  await withFixture(
+    (path) =>
+      path === "/fixture"
+        ? `<style>body{margin:0}#clip{position:absolute;left:100px;top:100px;width:200px;height:100px;overflow:hidden}iframe{width:400px;height:300px;border:0}#cover{position:absolute;left:100px;top:100px;width:160px;height:80px;background:black;z-index:2}</style>
+        <div id="clip"><iframe title="External" src="http://${fixtureAddress}:8070/external"></iframe></div><div id="cover"></div>`
+        : `<style>body{margin:0}button{position:absolute;left:20px;top:20px;width:120px;height:40px}#below{top:180px}</style><button id="expected-target">Covered child</button><button id="below">Clipped child</button>`,
+    async (session, page) => {
+      await observe({}, "/external");
+      const capture = await request(`/pages/${page.pageId}/capture`, {
+        documentId: page.documentId,
+      });
+      const covered = capture.candidates.find((candidate) => candidate.label === "Covered child");
+      const clipped = capture.candidates.find((candidate) => candidate.label === "Clipped child");
+      assert.ok(covered);
+      assert.ok(clipped);
+      const body = {
+        documentId: page.documentId,
+        captureId: capture.captureId,
+        candidateId: covered.id,
+        action: "click",
+      };
+      const { target } = await request(`/pages/${page.pageId}/selection`, body);
+      assert.equal(target.state.inViewport, true);
+      assert.equal(target.interactability.status, "blocked");
+      assert.ok(target.interactability.reasons.includes("ancestor_frame_obstructed"));
+      const other = await request(`/pages/${page.pageId}/selection`, {
+        ...body,
+        candidateId: clipped.id,
+      });
+      assert.equal(other.target.state.accessibilityExposed, true);
+      assert.equal(other.target.state.inViewport, false);
+      assert.equal(other.target.interactability.status, "blocked");
+      assert.deepEqual((await observe({ xpaths: target.xpaths }, "/external")).matches, [
+        ["expected-target"],
+      ]);
+      await observe({ reload: true }, "/external");
+      await observe({}, "/external");
+      await expectError(`/pages/${page.pageId}/selection`, body, 409, "stale_capture");
+    },
+  );
+});
+
+test("Exposed frames are captured while hidden frames and shadow contents stay excluded", async () => {
   await withFixture(
     `${targetMarkup}<iframe srcdoc="<button>FRAME_SECRET</button>"></iframe>
     <iframe hidden srcdoc="<button>HIDDEN_FRAME</button>"></iframe><div id="shadow"></div>
@@ -964,10 +1267,11 @@ test("Visible frame and open shadow boundaries are reported and never enter main
       const capture = await request(`/pages/${session.pageId}/capture`, {
         documentId: page.documentId,
       });
-      assert.equal(capture.unsupportedBoundaryCount, 2);
+      assert.equal(capture.unsupportedBoundaryCount, 1);
       assert.equal(capture.frameId, "main");
       assert.equal(capture.coverage.complete, true);
-      assert.ok(!JSON.stringify(capture.candidates).includes("SECRET"));
+      assert.ok(capture.candidates.some((candidate) => candidate.text === "FRAME_SECRET"));
+      assert.doesNotMatch(JSON.stringify(capture.candidates), /HIDDEN_FRAME|SHADOW_SECRET/);
       const absence = await request(`/pages/${session.pageId}/selection`, {
         documentId: page.documentId,
         captureId: capture.captureId,
@@ -975,6 +1279,192 @@ test("Visible frame and open shadow boundaries are reported and never enter main
         action: "unsupported",
       });
       assert.equal(absence.target, null);
+    },
+  );
+});
+
+test("Scaled clipping and section context survive iframe boundaries while reflections stay unsupported", async () => {
+  await withFixture(
+    (path) =>
+      path === "/fixture"
+        ? `<style>body{margin:0}#clip{position:absolute;left:10px;top:10px;width:200px;height:100px;overflow:hidden;transform:scale(2);transform-origin:top left}#scaled{position:absolute;left:150px;top:20px;width:40px;height:30px}</style>
+      <div id="clip"><button id="scaled">Scaled target</button></div>
+      <section aria-label="Employee" style="margin-top:240px"><iframe src="/employee"></iframe></section>
+      <section aria-label="Customer"><iframe src="/customer"></iframe></section>
+      <iframe style="scale:-1 1" src="/reflected"></iframe><div style="scale:-1 1"><iframe src="/ancestor-reflected"></iframe></div>`
+        : "<button>OK</button>",
+    async (session, page) => {
+      await observe({}, "/customer");
+      const capture = await request(`/pages/${page.pageId}/capture`, {
+        documentId: page.documentId,
+      });
+      const scaled = capture.candidates.find((candidate) => candidate.label === "Scaled target");
+      assert.equal(scaled.state.inViewport, true);
+      const { target } = await request(`/pages/${page.pageId}/selection`, {
+        documentId: page.documentId,
+        captureId: capture.captureId,
+        candidateId: scaled.id,
+        action: "click",
+      });
+      assert.deepEqual(target.geometry, { x: 310, y: 50, width: 80, height: 60 });
+      assert.equal(target.interactability.status, "ready");
+      const buttons = capture.candidates.filter((candidate) => candidate.label === "OK");
+      assert.equal(buttons.length, 2);
+      assert.ok(buttons[0].scope.includes("Employee"));
+      assert.ok(buttons[1].scope.includes("Customer"));
+      assert.equal(capture.unsupportedBoundaryCount, 2);
+    },
+  );
+});
+
+for (const [name, ancestorStyle, position, modal, visible] of [
+  ["fixed control escapes static overflow", "", "fixed", false, true],
+  ["absolute control escapes static overflow", "", "absolute", false, true],
+  [
+    "fixed control stays clipped by transformed ancestor",
+    "transform:translateX(0)",
+    "fixed",
+    false,
+    false,
+  ],
+  [
+    "absolute control stays clipped by positioned ancestor",
+    "position:relative",
+    "absolute",
+    false,
+    false,
+  ],
+  [
+    "modal escapes ancestor clipping in the top layer",
+    "transform:translateX(0)",
+    "fixed",
+    true,
+    true,
+  ],
+]) {
+  test(`Native viewport observations: ${name}`, async () => {
+    await withFixture(
+      `<div style="overflow:hidden;width:0;height:0;${ancestorStyle}">
+        ${modal ? "<dialog>" : `<header style="position:${position};left:20px;top:20px">`}
+        <button id="expected-target">Search</button>${modal ? "</dialog>" : "</header>"}</div>
+      <script>${modal ? "document.querySelector('dialog').showModal();" : ""}
+        const button = document.querySelector('#expected-target'); const rect = button.getBoundingClientRect();
+        window.observedEvents = { receivesPointer: document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2) === button };
+        for (const type of ['click', 'input', 'change']) button.addEventListener(type, () => window.observedEvents[type] = true);</script>`,
+      async (session, page) => {
+        const before = await observe();
+        assert.equal(before.events.receivesPointer, visible);
+        const capture = await request(`/pages/${page.pageId}/capture`, {
+          documentId: page.documentId,
+        });
+        assert.equal(capture.coverage.complete, true);
+        const candidate = capture.candidates.find((candidate) => candidate.label === "Search");
+        assert.ok(candidate);
+        assert.equal(candidate.state.inViewport, visible);
+        const { target } = await request(`/pages/${page.pageId}/selection`, {
+          documentId: page.documentId,
+          captureId: capture.captureId,
+          candidateId: candidate.id,
+          action: "click",
+        });
+        assert.equal(target.state.inViewport, visible);
+        assert.equal(target.interactability.status, visible ? "ready" : "blocked");
+        assert.equal(target.interactability.checks.pointerReception, visible ? "pass" : "unknown");
+        assert.deepEqual(target.interactability.reasons, visible ? [] : ["off_screen"]);
+        const after = await verify(target.xpaths);
+        assert.deepEqual(after.matches, [["expected-target"]]);
+        assert.deepEqual(after.events, before.events);
+        assert.equal(after.scrollY, before.scrollY);
+        assert.equal(after.activeElement, before.activeElement);
+      },
+    );
+  });
+}
+
+test("Slow frame geometry reports explicit capture and validation budget failures", async () => {
+  await withFixture(
+    '<button>Save</button><iframe srcdoc="<button>Child</button>"></iframe>',
+    async (session, page) => {
+      const capture = await request(`/pages/${page.pageId}/capture`, {
+        documentId: page.documentId,
+      });
+      const candidate = capture.candidates.find((candidate) => candidate.label === "Child");
+      await observe({ slowFrame: true });
+      await expectError(
+        `/pages/${page.pageId}/selection`,
+        {
+          documentId: page.documentId,
+          captureId: capture.captureId,
+          candidateId: candidate.id,
+          action: "click",
+        },
+        409,
+        "validation_budget_exceeded",
+      );
+      const incomplete = await request(`/pages/${page.pageId}/capture`, {
+        documentId: page.documentId,
+      });
+      assert.equal(incomplete.coverage.complete, false);
+      assert.equal(incomplete.coverage.errorCode, "capture_budget_exceeded");
+      assert.deepEqual(incomplete.candidates, []);
+    },
+  );
+});
+
+test("Frame exposure, unsupported transforms and aggregate budgets preserve honest capture coverage", async () => {
+  await withFixture(
+    (path) =>
+      path === "/fixture"
+        ? `<div aria-hidden="true"><iframe src="/hidden" title="Hidden"></iframe></div>
+        <div inert><iframe src="/inert"></iframe></div>
+        <iframe src="/rotated" style="transform:rotate(15deg)"></iframe>
+        <iframe src="/exposed" style="opacity:0" title="Transparent"></iframe>`
+        : `<button>${path}</button>`,
+    async (session, page) => {
+      await observe({}, "/exposed");
+      const capture = await request(`/pages/${page.pageId}/capture`, {
+        documentId: page.documentId,
+      });
+      assert.equal(capture.coverage.complete, true);
+      assert.equal(capture.unsupportedBoundaryCount, 1);
+      assert.doesNotMatch(JSON.stringify(capture.candidates), /\/hidden|\/inert|\/rotated/);
+      const target = capture.candidates.find((candidate) => candidate.text === "/exposed");
+      assert.equal(target.state.accessibilityExposed, true);
+      assert.equal(target.state.rendered, false);
+    },
+  );
+  await withFixture(
+    (path) =>
+      path === "/fixture"
+        ? '<iframe src="/large-one"></iframe><iframe src="/large-two"></iframe><iframe src="/large-three"></iframe>'
+        : "<button>Ordinary target</button>".repeat(750),
+    async (session, page) => {
+      await observe({}, "/large-three");
+      const capture = await request(`/pages/${page.pageId}/capture`, {
+        documentId: page.documentId,
+      });
+      assert.equal(capture.coverage.complete, false);
+      assert.equal(capture.coverage.errorCode, "capture_budget_exceeded");
+      assert.equal(capture.candidates.length, 0);
+      assert.equal(capture.coverage.capturedCount, 0);
+    },
+  );
+});
+
+test("Relational scope distinguishes table rows and header/footer duplicates without values", async () => {
+  await withFixture(
+    '<header><button>Help</button></header><table><tr><td>Employee Alice</td><td><button>Approve</button><input value="ROW_SECRET"></td></tr><tr><td>Employee Bob</td><td><button>Approve</button></td></tr></table><footer style="margin-top:2000px"><button>Help</button></footer>',
+    async (session, page) => {
+      const capture = await request(`/pages/${page.pageId}/capture`, {
+        documentId: page.documentId,
+      });
+      const buttons = capture.candidates.filter((candidate) => candidate.tag === "button");
+      assert.ok(buttons[0].scope.includes("header"));
+      assert.ok(buttons[1].scope.some((scope) => scope.includes("Employee Alice")));
+      assert.ok(buttons[2].scope.some((scope) => scope.includes("Employee Bob")));
+      assert.ok(buttons[3].scope.includes("footer"));
+      assert.equal(buttons[3].state.inViewport, false);
+      assert.doesNotMatch(JSON.stringify(capture), /ROW_SECRET/);
     },
   );
 });

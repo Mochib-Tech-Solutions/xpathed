@@ -15,16 +15,16 @@ async function json(url, method = "GET", body) {
   assert.equal(response.status, 200, `Service returned HTTP ${response.status}`);
   return response.json();
 }
-test("actual OpenRouter route resolves plural mixed actions and legacy absence without the client or database", async () => {
+test("actual OpenRouter route resolves scoped frames, offscreen context, expanded actions and legacy absence", async () => {
   const session = await json(`${browser}/sessions`, "POST");
   const run = randomUUID();
   let totalCostUsd = 0;
   try {
     for (const [path, contractVersion, instruction, outcome] of [
       [
-        "batch",
+        "frames",
         "2",
-        "Click all Approval buttons, fill Notes, and hover Contact. Also click Done after opening details.",
+        "Click all Approval buttons inside the Payroll frame, clear Notes in Payroll, fill Notes in Payroll, type into Notes in Payroll, double-click the first Approval button in Payroll, right-click the first Approval button in Payroll, and hover Help in the footer. Also pause for two seconds, navigate to example.com, and drag the first Approval button onto Help.",
         "partial",
       ],
       [
@@ -46,6 +46,13 @@ test("actual OpenRouter route resolves plural mixed actions and legacy absence w
         JSON.stringify({
           outcome: result.outcome,
           summary: result.summary,
+          actions: result.actions?.map((action) => ({
+            instruction: action.instruction,
+            action: action.action,
+            outcome: action.outcome,
+            code: action.code,
+            frame: action.target?.frame?.id,
+          })),
           code: result.diagnostics.code,
           configurationId: result.configurationId,
           capture: result.diagnostics.capture,
@@ -96,32 +103,73 @@ test("actual OpenRouter route resolves plural mixed actions and legacy absence w
         assert.equal(result.contractVersion, "2");
         assert.equal(
           result.actions.length,
-          5,
+          11,
           "All intended plural and compound actions must be represented",
         );
         assert.deepEqual(
           result.actions.map((action) => action.action),
-          ["click", "click", "fill", "hover", "click"],
+          [
+            "click",
+            "click",
+            "clear",
+            "fill",
+            "type",
+            "double_click",
+            "right_click",
+            "hover",
+            "unsupported",
+            "unsupported",
+            "unsupported",
+          ],
         );
         assert.deepEqual(
           result.actions.map((action) => action.outcome),
-          ["found", "found", "found", "not_found", "unsupported"],
+          [
+            "found",
+            "found",
+            "found",
+            "found",
+            "found",
+            "found",
+            "found",
+            "found",
+            "unsupported",
+            "unsupported",
+            "unsupported",
+          ],
         );
-        assert.equal(result.actions[4].code, "current_state_dependency");
-        assert.equal(result.summary.blocked, 2);
-        assert.equal(result.summary.readinessUnknown, 1);
+        assert.ok(result.actions.slice(8).every((action) => action.code === "unsupported_action"));
+        assert.ok(
+          result.actions.slice(0, 7).every((action) => action.target.frame.chain.length === 2),
+        );
+        assert.equal(result.actions[7].target.frame.id, "main");
+        assert.equal(result.actions[7].target.state.inViewport, false);
+        assert.equal(result.summary.blocked, 5);
+        assert.equal(result.summary.readinessUnknown, 0);
         assert.ok(
           result.actions.every(
             (action) => action.diagnosticsReference === result.attemptId && !action.diagnostics,
           ),
         );
-        const xpaths = result.actions.flatMap((action) => action.target?.xpaths ?? []);
-        const expected = result.actions
-          .slice(0, 3)
-          .flatMap((action, index) =>
-            action.target.xpaths.map(() => [["approval-first", "approval-second", "notes"][index]]),
-          );
-        await json(`${fixture}/oracle?run=${run}`, "POST", { xpaths });
+        const targets = result.actions.flatMap((action) =>
+          action.target
+            ? action.target.xpaths.map((xpath) => ({
+                xpath,
+                frameXpaths: action.target.frame.chain.map((frame) => frame.xpath),
+              }))
+            : [],
+        );
+        const expected = [
+          ["frame-approval-first"],
+          ["frame-approval-second"],
+          ["frame-notes"],
+          ["frame-notes"],
+          ["frame-notes"],
+          ["frame-approval-first"],
+          ["frame-approval-first"],
+          ["footer-help"],
+        ];
+        await json(`${fixture}/oracle?run=${run}`, "POST", { targets });
         let observed;
         for (let attempt = 0; attempt < 100; attempt++) {
           observed = await json(`${fixture}/observation?run=${run}`);

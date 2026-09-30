@@ -32,19 +32,19 @@ public sealed class OpenRouterGateway(IHttpClientFactory clients, IConfiguration
         }
     }
 
-    internal string ConfigurationId(string strategy, string prompt, JsonElement schema, int modelInputBudgetBytes, int outputTokens = 512, string promptVersion = "2") => Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new
+    internal string ConfigurationId(string strategy, string prompt, JsonElement schema, int modelInputBudgetBytes, int outputTokens, string promptVersion, int maximumActions) => Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new
     {
         strategy,
         promptVersion,
-        captureVersion = "2",
+        captureVersion = "4",
         stateVersion = "2",
         interactabilityVersion = "2",
-        xpathVersion = "2",
+        xpathVersion = "3",
         endpoint = Uri.TryCreate(endpoint, UriKind.Absolute, out var address) ? address.AbsoluteUri : endpoint,
         timeoutSeconds = timeoutSeconds.ToString("R", CultureInfo.InvariantCulture),
         modelInputBudgetBytes,
         responseCache = false,
-        maximumActions = promptVersion == "3" ? ActionSelectionStrategy.MaximumActions : 1,
+        maximumActions,
         request = CreateRequest(prompt, string.Empty, schema, outputTokens)
     }))));
 
