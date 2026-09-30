@@ -44,6 +44,15 @@ internal static class VncRelay
             await Task.WhenAll(sending, receiving);
         }
         catch (Exception error) when (error is OperationCanceledException or WebSocketException or IOException) { }
+        if (socket.State == WebSocketState.CloseReceived)
+        {
+            using var closing = new CancellationTokenSource(TimeSpan.FromSeconds(1));
+            try
+            {
+                await socket.CloseOutputAsync(WebSocketCloseStatus.NormalClosure, null, closing.Token);
+            }
+            catch (Exception error) when (error is OperationCanceledException or WebSocketException or IOException) { }
+        }
         socket.Abort();
     }
 }

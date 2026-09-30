@@ -1,20 +1,26 @@
-import { ArrowUp, Check, Copy, LoaderCircle } from "lucide-react";
+import { ArrowUp, Check, Copy, LoaderCircle, RotateCcw } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import type { Resolution } from "./api";
 import ResolutionCost from "./ResolutionCost";
 
 const interactionReasons: Record<string, string> = {
-  disabled: "The target is disabled for this action.",
-  readonly: "The target is readonly; its content cannot be changed.",
+  disabled: "This element is disabled.",
+  readonly: "This field is read-only.",
   incompatible_control: "This control does not support the requested action.",
-  off_screen: "The target is off-screen. Resolution did not scroll to it.",
+  off_screen: "This element is off-screen.",
   zero_area: "The target has no area for a pointer interaction.",
   not_visually_rendered: "The target is exposed to accessibility but is not visually rendered.",
   pointer_events_none: "The target does not receive pointer events at the inspected point.",
   obstructed_at_hit_point: "Another element or clipping blocks the inspected pointer point.",
-  custom_control_unverified:
-    "This custom control requires an interaction assessment outside the supported scope.",
+  custom_control_unverified: "Interaction with this custom control could not be verified.",
+};
+
+const instructionLimits: Record<string, string> = {
+  ambiguous: "Which element do you mean? Include its name or nearby text.",
+  current_state_dependency:
+    "This element depends on a page change. Make that change, then try again.",
+  unsupported_action: "This interaction is not supported yet.",
 };
 
 type Props = {
@@ -23,8 +29,10 @@ type Props = {
   ready: boolean;
   disabled: boolean;
   resolving: boolean;
+  resetDisabled: boolean;
   onInstructionChange: (instruction: string) => void;
   onResolve: () => void;
+  onReset: () => void;
   onInspect: (entryId: string, actionId: string) => void;
 };
 
@@ -34,8 +42,10 @@ export default function ChatPanel({
   ready,
   disabled,
   resolving,
+  resetDisabled,
   onInstructionChange,
   onResolve,
+  onReset,
   onInspect,
 }: Props) {
   const [copied, setCopied] = useState("");
@@ -76,8 +86,26 @@ export default function ChatPanel({
       className="flex h-[42%] min-h-56 min-w-0 flex-col border-t border-border bg-muted/40 sm:h-auto sm:min-h-0 sm:border-t-0 sm:border-r"
       aria-label="Chat"
     >
-      <div className="flex min-h-14 shrink-0 items-center border-b border-border px-4">
+      <div className="flex min-h-14 shrink-0 items-center justify-between border-b border-border px-4">
         <h1 className="font-medium">Chat</h1>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="size-7 text-muted-foreground"
+          aria-label="Reset chat"
+          title="Reset chat"
+          disabled={resetDisabled || (!history.length && !instruction)}
+          onClick={() => {
+            onReset();
+            followBottom.current = true;
+            setCopied("");
+            setCopyError(null);
+            composer.current?.focus();
+          }}
+        >
+          <RotateCcw aria-hidden="true" />
+        </Button>
       </div>
       <div
         ref={transcript}
@@ -115,6 +143,7 @@ export default function ChatPanel({
                     action: result.action,
                     outcome: result.outcome,
                     target: result.target,
+                    code: result.diagnostics.code,
                     message: result.diagnostics.message,
                   },
                 ];
@@ -129,7 +158,7 @@ export default function ChatPanel({
             <li key={xpath} className="rounded-lg border border-border bg-background p-3">
               <div className="mb-2 flex items-center justify-between gap-2">
                 <span className="text-xs font-medium text-muted-foreground">
-                  {index === 0 ? "Primary XPath" : `Alternative ${index}`}
+                  {index === 0 ? "XPath" : `Alternative ${index}`}
                 </span>
                 <Button
                   type="button"
@@ -156,22 +185,9 @@ export default function ChatPanel({
               <p className="rounded-xl bg-accent px-3 py-2.5 break-words whitespace-pre-wrap">
                 {resolution.instruction}
               </p>
-              <div className="space-y-1 text-xs text-muted-foreground">
-                <time
-                  dateTime={resolution.createdAt}
-                  title={new Date(resolution.createdAt).toLocaleString()}
-                >
-                  {new Date(resolution.createdAt).toLocaleTimeString([], {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })}
-                </time>
-                {resolution.pageTitle && (
-                  <p className="font-medium break-words">{resolution.pageTitle}</p>
-                )}
-                <p className="break-all">{resolution.pageUrl}</p>
-                {resolution.historical && <p>Earlier result · no current highlight</p>}
-              </div>
+              {resolution.historical && (
+                <p className="text-xs text-muted-foreground">Earlier result</p>
+              )}
               {resolution.error && (
                 <p role="alert" className="text-destructive">
                   {resolution.error}
@@ -180,43 +196,22 @@ export default function ChatPanel({
               {!result && !resolution.error && (
                 <p className="text-muted-foreground">Waiting for result…</p>
               )}
-              {duration && (
-                <p
-                  className="text-xs text-muted-foreground"
-                  title="Duration reported by the resolver"
-                >
-                  Resolution time: {duration}
+              {result?.summary && actions.length > 1 && (
+                <p className="text-xs text-muted-foreground">
+                  {[
+                    `${result.summary.found} target${result.summary.found === 1 ? "" : "s"} found`,
+                    result.summary.notFound ? `${result.summary.notFound} missing` : "",
+                    result.summary.unsupported ? `${result.summary.unsupported} unsupported` : "",
+                    result.summary.errors ? `${result.summary.errors} failed` : "",
+                    result.summary.blocked ? `${result.summary.blocked} blocked` : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
                 </p>
-              )}
-              {result && <ResolutionCost diagnostics={result.diagnostics} />}
-              {result?.summary && (
-                <div className="space-y-1">
-                  <p>
-                    {[
-                      `${result.summary.found} target${result.summary.found === 1 ? "" : "s"} found`,
-                      result.summary.notFound ? `${result.summary.notFound} missing` : "",
-                      result.summary.unsupported ? `${result.summary.unsupported} unsupported` : "",
-                      result.summary.blocked ? `${result.summary.blocked} blocked` : "",
-                      result.summary.readinessUnknown
-                        ? `${result.summary.readinessUnknown} readiness unknown`
-                        : "",
-                      result.summary.assessmentUnsupported
-                        ? `${result.summary.assessmentUnsupported} assessment unsupported`
-                        : "",
-                    ]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    No action was executed. Semantic completeness has not been independently
-                    verified.
-                  </p>
-                </div>
               )}
               {result?.outcome === "error" && (
                 <div role="alert" className="text-destructive">
-                  <p>Resolution failed</p>
-                  {result.diagnostics.message && <p>{result.diagnostics.message}</p>}
+                  <p>{result.diagnostics.message || "Something went wrong. Try again."}</p>
                 </div>
               )}
               {actions.map((action) => {
@@ -227,10 +222,17 @@ export default function ChatPanel({
                     className="space-y-3"
                     aria-label={`Action ${action.order}`}
                   >
-                    {result?.contractVersion === "2" && (
+                    {actions.length > 1 && (
+                      <p className="text-xs font-medium text-muted-foreground">
+                        {action.order}. {action.instruction}
+                      </p>
+                    )}
+                    {target && (
                       <div className="flex items-start justify-between gap-2">
-                        <p className="font-medium">{action.instruction}</p>
-                        {target && (
+                        <h2 className="text-base font-medium break-words">
+                          {target.label || target.tag}
+                        </h2>
+                        {result?.contractVersion === "2" && (
                           <Button
                             type="button"
                             variant="outline"
@@ -248,71 +250,59 @@ export default function ChatPanel({
                       </div>
                     )}
                     {action.outcome === "not_found" && (
-                      <p>No matching element found in the eligible current-page scope.</p>
+                      <p>I couldn’t find that element on this page.</p>
                     )}
                     {action.outcome === "unsupported" && (
-                      <div>
-                        <p>Unsupported instruction</p>
-                        {action.message && (
-                          <p className="text-muted-foreground">{action.message}</p>
-                        )}
-                      </div>
+                      <p>
+                        {instructionLimits[action.code ?? ""] ??
+                          action.message ??
+                          "This instruction is not supported yet."}
+                      </p>
                     )}
                     {action.outcome === "error" && result?.contractVersion === "2" && (
                       <div role="alert" className="text-destructive">
-                        <p>Action resolution failed</p>
-                        {action.message && <p>{action.message}</p>}
+                        <p>{action.message || "This target could not be resolved. Try again."}</p>
                       </div>
                     )}
                     {target && (
                       <>
-                        <div>
-                          <p className="mb-1 flex items-center gap-1.5 font-medium">
-                            <Check className="size-3.5" aria-hidden="true" /> Target found
+                        {target.interactability?.reasons.map((reason) => (
+                          <p key={reason} className="text-muted-foreground">
+                            {interactionReasons[reason] ??
+                              "An interaction limitation was observed."}
                           </p>
-                          <h2 className="text-base font-medium break-words">
-                            {target.label || target.tag}
-                          </h2>
-                          <p className="text-muted-foreground">
-                            {action.action} · {target.tag}
-                          </p>
-                        </div>
-                        <div className="space-y-1">
-                          <p>
+                        ))}
+                        <details className="text-xs text-muted-foreground">
+                          <summary className="cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                            State details
+                          </summary>
+                          <p className="mt-2">
                             {target.interactability?.status === "blocked"
-                              ? "Interaction blocked by observed state."
+                              ? "Interaction blocked."
                               : target.interactability?.status === "unsupported"
                                 ? "Interaction assessment unsupported."
                                 : target.interactability?.status === "unknown"
                                   ? "Interaction readiness unknown."
                                   : "Interaction readiness unavailable."}
                           </p>
-                          {target.interactability?.reasons.map((reason) => (
-                            <p key={reason} className="text-muted-foreground">
-                              {interactionReasons[reason] ??
-                                "An interaction limitation was observed."}
-                            </p>
-                          ))}
-                          <p className="text-xs text-muted-foreground">
-                            Event delivery and action success were not tested.
-                          </p>
-                        </div>
-                        <div className="flex flex-wrap gap-1.5 text-xs text-muted-foreground [&>span]:rounded-md [&>span]:border [&>span]:bg-background [&>span]:px-2 [&>span]:py-0.5">
-                          <span>{target.state.inViewport ? "In viewport" : "Off-screen"}</span>
-                          <span>{target.state.enabled ? "Enabled" : "Disabled"}</span>
-                          {(target.state.editable ||
-                            action.action === "fill" ||
-                            action.action === "type") && (
-                            <span>{target.state.editable ? "Editable" : "Not editable"}</span>
-                          )}
-                          {target.state.checked !== null && (
-                            <span>{target.state.checked ? "Checked" : "Unchecked"}</span>
-                          )}
-                        </div>
-                        <p className="text-xs text-muted-foreground">No action was executed.</p>
+                          <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
+                            <span>{target.state.inViewport ? "In viewport" : "Off-screen"}</span>
+                            <span>{target.state.enabled ? "Enabled" : "Disabled"}</span>
+                            {(target.state.editable ||
+                              action.action === "fill" ||
+                              action.action === "type") && (
+                              <span>{target.state.editable ? "Editable" : "Not editable"}</span>
+                            )}
+                            {target.state.checked !== null && (
+                              <span>{target.state.checked ? "Checked" : "Unchecked"}</span>
+                            )}
+                          </div>
+                        </details>
                         <details open={!resolution.historical} className="group">
                           <summary className="mb-2 cursor-pointer text-xs font-medium text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                            Verified XPaths
+                            {resolution.historical
+                              ? "XPath from earlier result"
+                              : "Verified XPaths"}
                           </summary>
                           <ol className="space-y-2.5" aria-label="Verified XPath alternatives">
                             {target.xpaths
@@ -354,6 +344,16 @@ export default function ChatPanel({
                   </section>
                 );
               })}
+              {result && (
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-1 text-xs text-muted-foreground">
+                  {duration && (
+                    <span title="Duration reported by the resolver">
+                      Resolution time: {duration}
+                    </span>
+                  )}
+                  <ResolutionCost diagnostics={result.diagnostics} />
+                </div>
+              )}
             </article>
           );
         })}

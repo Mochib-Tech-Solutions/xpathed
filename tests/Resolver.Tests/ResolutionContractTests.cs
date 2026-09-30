@@ -291,10 +291,26 @@ public sealed class ResolutionContractTests
     }
 
     [Fact]
+    public async Task RepresentationAboveTheOldBudgetReachesInferenceWithoutTruncation()
+    {
+        var capture = JsonNode.Parse(new DeterministicServicesHandler().CaptureBody)!;
+        capture["candidates"]![0]!["text"] = new string('x', 100000);
+        var handler = new DeterministicServicesHandler { CaptureBody = capture.ToJsonString() };
+        await using var application = CreateApplication(handler);
+        using var client = application.CreateClient();
+        using var response = await client.PostAsJsonAsync("/pages/page-1/resolve", new { instruction = "Click Save", documentId = "document-1" });
+
+        var result = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("found", result.GetProperty("outcome").GetString());
+        Assert.True(result.GetProperty("diagnostics").GetProperty("modelInputBytes").GetInt32() > 100000);
+        Assert.Equal(1, handler.ProviderRequestCount);
+    }
+
+    [Fact]
     public async Task OversizedRepresentationFailsWithoutTruncationOrInference()
     {
         var capture = JsonNode.Parse(new DeterministicServicesHandler().CaptureBody)!;
-        capture["candidates"]![0]!["text"] = new string('x', 64000);
+        capture["candidates"]![0]!["text"] = new string('x', 512000);
         var handler = new DeterministicServicesHandler { CaptureBody = capture.ToJsonString() };
         await using var application = CreateApplication(handler);
         using var client = application.CreateClient();
@@ -305,7 +321,7 @@ public sealed class ResolutionContractTests
         var diagnostics = result.GetProperty("diagnostics");
         Assert.Equal("model_input_budget_exceeded", diagnostics.GetProperty("code").GetString());
         Assert.True(diagnostics.GetProperty("capture").GetProperty("complete").GetBoolean());
-        Assert.True(diagnostics.GetProperty("modelInputBytes").GetInt32() > 64000);
+        Assert.True(diagnostics.GetProperty("modelInputBytes").GetInt32() > 512000);
         Assert.Equal(0, diagnostics.GetProperty("modelCalls").GetInt32());
         Assert.Equal(0, handler.ProviderRequestCount);
     }
