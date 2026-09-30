@@ -1,8 +1,55 @@
 import { ArrowUp, Check, Copy, LoaderCircle, RotateCcw } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
-import type { Resolution } from "./api";
+import type { Resolution, ResolutionResult } from "./api";
 import ResolutionCost from "./ResolutionCost";
+
+function MessageTime({ value, label }: { value: string; label: string }) {
+  const date = new Date(value);
+  return (
+    <time
+      dateTime={value}
+      title={`${label} ${date.toLocaleString()}`}
+      aria-label={`${label} ${date.toLocaleString()}`}
+      className="shrink-0 text-xs text-muted-foreground tabular-nums"
+    >
+      {date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+    </time>
+  );
+}
+
+function elementType(target: NonNullable<ResolutionResult["target"]>) {
+  const names: Record<string, string> = {
+    img: "Image",
+    button: "Button",
+    link: "Link",
+    textbox: "Text field",
+    searchbox: "Search field",
+    combobox: "Dropdown",
+    listbox: "List box",
+    checkbox: "Checkbox",
+    radio: "Radio button",
+    spinbutton: "Number field",
+    slider: "Slider",
+    switch: "Switch",
+    tab: "Tab",
+    a: "Anchor",
+    input: "Input",
+    textarea: "Text field",
+    select: "Dropdown",
+    svg: "Graphic",
+    video: "Video",
+    audio: "Audio",
+    canvas: "Canvas",
+    iframe: "Frame",
+  };
+  const role =
+    target.role && !["none", "presentation", "generic"].includes(target.role) ? target.role : null;
+  return (
+    names[role ?? target.tag] ??
+    (role ? role[0]!.toUpperCase() + role.slice(1) : `Element <${target.tag}>`)
+  );
+}
 
 const interactionReasons: Record<string, string> = {
   disabled: "This element is disabled.",
@@ -108,7 +155,7 @@ export default function ChatPanel({
       </div>
       <div
         ref={transcript}
-        className="min-h-0 flex-1 overflow-y-auto px-4 py-4"
+        className="min-h-0 flex-1 [scrollbar-width:thin] [scrollbar-color:var(--input)_transparent] overflow-y-auto px-3 py-4"
         role="log"
         aria-label="Chat history"
         aria-live="polite"
@@ -154,8 +201,8 @@ export default function ChatPanel({
                 ? `${Math.round(totalMs)} ms`
                 : `${(totalMs / 1000).toFixed(2)} s`
               : null;
-          const xpathItem = (xpath: string, actionId: string) => (
-            <div className="rounded-lg border border-border bg-background p-3">
+          const xpathItem = (xpath: string, actionId: string, order: number) => (
+            <div className="min-w-0 rounded-lg border border-border/70 bg-muted/60 p-3">
               <div className="mb-2 flex items-center justify-between gap-2">
                 <span className="text-xs font-medium text-muted-foreground">XPath</span>
                 <Button
@@ -163,7 +210,7 @@ export default function ChatPanel({
                   variant="ghost"
                   size="icon"
                   className="-my-1 size-7"
-                  aria-label="Copy XPath 1"
+                  aria-label={`Copy XPath ${order}`}
                   onClick={() => {
                     void copy(xpath, `${resolution.id}:${actionId}`);
                   }}
@@ -179,197 +226,252 @@ export default function ChatPanel({
             </div>
           );
           return (
-            <article key={resolution.id} className="mb-6 space-y-3 text-sm leading-relaxed">
-              <p className="rounded-xl bg-accent px-3 py-2.5 break-words whitespace-pre-wrap">
-                {resolution.instruction}
-              </p>
-              {resolution.historical && (
-                <p className="text-xs text-muted-foreground">Earlier result</p>
-              )}
-              {resolution.error && (
-                <p role="alert" className="text-destructive">
-                  {resolution.error}
+            <article key={resolution.id} className="mb-6 space-y-4 text-sm leading-relaxed">
+              <div className="ml-6 flex flex-col items-end gap-1.5" aria-label="Sent message">
+                <p className="max-w-full rounded-2xl rounded-br-sm bg-accent px-3.5 py-2.5 break-words whitespace-pre-wrap">
+                  {resolution.instruction}
                 </p>
-              )}
-              {!result && !resolution.error && (
-                <p className="text-muted-foreground">Waiting for result…</p>
-              )}
-              {sharedAction && result.action && result.action !== "unsupported" && (
-                <p className="text-xs text-muted-foreground">
-                  Action: {result.action.replaceAll("_", "-")}
-                </p>
-              )}
-              {result?.summary && actions.length > 1 && (
-                <p className="text-xs text-muted-foreground">
-                  {[
-                    `${result.summary.found} target${result.summary.found === 1 ? "" : "s"} found`,
-                    result.summary.notFound ? `${result.summary.notFound} missing` : "",
-                    result.summary.unsupported ? `${result.summary.unsupported} unsupported` : "",
-                    result.summary.errors ? `${result.summary.errors} failed` : "",
-                    result.summary.blocked ? `${result.summary.blocked} blocked` : "",
-                  ]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </p>
-              )}
-              {result?.outcome === "error" && (
-                <div role="alert" className="text-destructive">
-                  <p>{result.diagnostics.message || "Something went wrong. Try again."}</p>
+                <div className="flex items-center gap-2 px-1 text-xs text-muted-foreground">
+                  <span>You</span>
+                  <MessageTime value={resolution.createdAt} label="Sent" />
                 </div>
-              )}
-              {actions.map((action) => {
-                const target = action.target;
-                const checks = target?.interactability?.checks;
-                const verified = [
-                  checks?.compatibleControl === "pass" &&
-                    !["click", "double_click", "right_click", "hover", "inspect"].includes(
-                      action.action ?? "",
-                    ) &&
-                    "compatible control type",
-                  checks?.enabled === "pass" && "enabled",
-                  checks?.writable === "pass" && "not read-only",
-                  checks?.viewport === "pass" && "in view",
-                  checks?.pointerReception === "pass" && "unobstructed at the checked point",
-                ]
-                  .filter(Boolean)
-                  .join(", ");
-                return (
-                  <section
-                    key={action.actionId}
-                    className="space-y-3"
-                    aria-label={`${sharedAction ? "Target" : "Action"} ${action.order}`}
-                  >
-                    {actions.length > 1 && (!sharedAction || !target) && (
-                      <p className="text-xs font-medium text-muted-foreground">
-                        {action.order}. {action.instruction}
-                      </p>
-                    )}
-                    {target && (
-                      <h2 className="text-base font-medium break-words">
-                        {target.label || target.tag}
-                      </h2>
-                    )}
-                    {action.outcome === "not_found" && (
-                      <p>I couldn’t find that element on this page.</p>
-                    )}
-                    {action.outcome === "unsupported" && (
-                      <p>
-                        {sharedAction && action.code === "unsupported_action"
-                          ? (action.message ??
-                            "Use one action per command. You can target several elements on this page.")
-                          : (instructionLimits[action.code ?? ""] ??
-                            action.message ??
-                            "This instruction is not supported yet.")}
-                      </p>
-                    )}
-                    {action.outcome === "error" && result?.contractVersion !== "1" && (
-                      <div role="alert" className="text-destructive">
-                        <p>{action.message || "This target could not be resolved. Try again."}</p>
-                      </div>
-                    )}
-                    {target && (
-                      <>
-                        {target.interactability?.reasons.map((reason) => (
-                          <p key={reason} className="text-muted-foreground">
-                            {interactionReasons[reason] ??
-                              "An interaction limitation was observed."}
-                          </p>
-                        ))}
-                        <div className="space-y-2 text-xs text-muted-foreground">
-                          {!sharedAction && action.action && (
-                            <p>Action: {action.action.replaceAll("_", "-")}</p>
-                          )}
-                          {verified && <p>Verified: {verified}.</p>}
-                          <p>
-                            {target.interactability?.status === "ready"
-                              ? action.action === "inspect"
-                                ? "Target identified; no interaction requested."
-                                : verified
-                                  ? "No action was performed; movement and page response are untested."
-                                  : "Detailed interaction checks are unavailable."
-                              : target.interactability?.status === "blocked"
-                                ? "Interaction blocked."
-                                : target.interactability?.status === "unsupported"
-                                  ? "Interaction assessment unsupported."
-                                  : target.interactability?.status === "unknown"
-                                    ? checks?.keyboard === "unknown"
-                                      ? "Keyboard behavior is untested; no action was performed."
-                                      : "Interaction readiness unknown."
-                                    : "Interaction readiness unavailable."}
-                          </p>
-                          <div className="flex flex-wrap gap-x-3 gap-y-1">
-                            {checks?.viewport !== "pass" && (
-                              <span>{target.state.inViewport ? "In viewport" : "Off-screen"}</span>
-                            )}
-                            {checks?.enabled !== "pass" && (
-                              <span>{target.state.enabled ? "Enabled" : "Disabled"}</span>
-                            )}
-                            {(target.state.editable ||
-                              action.action === "fill" ||
-                              action.action === "type") && (
-                              <span>{target.state.editable ? "Editable" : "Not editable"}</span>
-                            )}
-                            {target.state.checked !== null && (
-                              <span>{target.state.checked ? "Checked" : "Unchecked"}</span>
-                            )}
-                            {target.state.selected != null && (
-                              <span>{target.state.selected ? "Selected" : "Not selected"}</span>
-                            )}
-                            {target.state.selectedOptionCount != null && (
-                              <span>{target.state.selectedOptionCount} options selected</span>
-                            )}
-                          </div>
-                        </div>
-                        {!!target.frame?.chain.length && (
-                          <div className="space-y-1 text-xs text-muted-foreground">
-                            <p>
-                              Frame:{" "}
-                              {target.frame.chain
-                                .map((frame) => frame.label || frame.frameId)
-                                .join(" → ")}
-                            </p>
-                            {target.frame.chain.map((frame) => (
-                              <code key={frame.frameId} className="block break-all">
-                                {frame.xpath}
-                              </code>
-                            ))}
-                          </div>
-                        )}
-                        {target.xpaths[0] && xpathItem(target.xpaths[0], action.actionId)}
-                        {copied.startsWith(`${resolution.id}:${action.actionId}:`) && (
-                          <p role="status" className="text-muted-foreground">
-                            Copied
-                          </p>
-                        )}
-                        {copyError?.entryId === `${resolution.id}:${action.actionId}` && (
-                          <p role="alert" className="text-destructive">
-                            {copyError.message}
-                          </p>
-                        )}
-                      </>
-                    )}
-                  </section>
-                );
-              })}
-              {result && (
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-1 text-xs text-muted-foreground">
-                  {duration && (
-                    <span title="Duration reported by the resolver">
-                      Resolution time: {duration}
-                    </span>
+              </div>
+              <div className="mr-2 min-w-0 space-y-1.5" aria-label="Response message">
+                <p className="px-1 text-xs font-medium text-muted-foreground">xpathed</p>
+                <div className="space-y-3 rounded-2xl rounded-tl-sm border border-border bg-background p-3.5 shadow-sm">
+                  {resolution.historical && (
+                    <p className="text-xs text-muted-foreground">Earlier result</p>
                   )}
-                  <ResolutionCost diagnostics={result.diagnostics} />
+                  {resolution.error && (
+                    <p role="alert" className="text-destructive">
+                      {resolution.error}
+                    </p>
+                  )}
+                  {!result && !resolution.error && (
+                    <p role="status" className="flex items-center gap-2 text-muted-foreground">
+                      <LoaderCircle
+                        className="size-3.5 motion-safe:animate-spin"
+                        aria-hidden="true"
+                      />
+                      Resolving…
+                    </p>
+                  )}
+                  {result?.summary && actions.length > 1 && (
+                    <p className="text-xs text-muted-foreground">
+                      {[
+                        `${result.summary.found} target${result.summary.found === 1 ? "" : "s"} found`,
+                        result.summary.notFound ? `${result.summary.notFound} missing` : "",
+                        result.summary.unsupported
+                          ? `${result.summary.unsupported} unsupported`
+                          : "",
+                        result.summary.errors ? `${result.summary.errors} failed` : "",
+                        result.summary.blocked ? `${result.summary.blocked} blocked` : "",
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </p>
+                  )}
+                  {sharedAction &&
+                    actions.length > 1 &&
+                    result.action &&
+                    result.action !== "unsupported" && (
+                      <p className="w-fit rounded-md bg-accent px-2 py-1 text-xs font-medium">
+                        Action: {result.action.replaceAll("_", "-")}
+                      </p>
+                    )}
+                  {result?.outcome === "error" && (
+                    <div role="alert" className="text-destructive">
+                      <p>{result.diagnostics.message || "Something went wrong. Try again."}</p>
+                    </div>
+                  )}
+                  {actions.map((action) => {
+                    const target = action.target;
+                    const checks = target?.interactability?.checks;
+                    const verified = [
+                      checks?.compatibleControl === "pass" &&
+                        !["click", "double_click", "right_click", "hover", "inspect"].includes(
+                          action.action ?? "",
+                        ) &&
+                        "compatible control type",
+                      checks?.enabled === "pass" && "enabled",
+                      checks?.writable === "pass" && "not read-only",
+                      checks?.viewport === "pass" && "in view",
+                      checks?.pointerReception === "pass" && "unobstructed at the checked point",
+                    ]
+                      .filter(Boolean)
+                      .join(", ");
+                    return (
+                      <section
+                        key={action.actionId}
+                        className={
+                          actions.length > 1
+                            ? "space-y-3 rounded-xl border border-border bg-muted/20 p-3"
+                            : "space-y-3"
+                        }
+                        aria-label={`${sharedAction ? "Target" : "Action"} ${action.order}`}
+                      >
+                        {actions.length > 1 && (
+                          <p className="text-xs font-medium text-muted-foreground">
+                            Target {action.order}
+                          </p>
+                        )}
+                        {actions.length > 1 && (!sharedAction || !target) && (
+                          <p className="text-xs font-medium text-muted-foreground">
+                            {action.order}. {action.instruction}
+                          </p>
+                        )}
+                        {target && (
+                          <div className="space-y-1">
+                            <h2 className="text-base font-semibold break-words">
+                              {elementType(target)}
+                            </h2>
+                            {(target.accessibleName ?? target.label) ? (
+                              <p className="break-words">
+                                <bdi>{target.accessibleName ?? target.label}</bdi>
+                              </p>
+                            ) : (
+                              <p className="text-xs text-muted-foreground">No accessible name</p>
+                            )}
+                          </div>
+                        )}
+                        {action.action &&
+                          action.action !== "unsupported" &&
+                          (!sharedAction || actions.length === 1) && (
+                            <p className="w-fit rounded-md bg-accent px-2 py-1 text-xs font-medium">
+                              Action:{" "}
+                              {(sharedAction ? result.action : action.action)?.replaceAll("_", "-")}
+                            </p>
+                          )}
+                        {action.outcome === "not_found" && (
+                          <p>I couldn’t find that element on this page.</p>
+                        )}
+                        {action.outcome === "unsupported" && (
+                          <p>
+                            {sharedAction && action.code === "unsupported_action"
+                              ? (action.message ??
+                                "Use one action per command. You can target several elements on this page.")
+                              : (instructionLimits[action.code ?? ""] ??
+                                action.message ??
+                                "This instruction is not supported yet.")}
+                          </p>
+                        )}
+                        {action.outcome === "error" && result?.contractVersion !== "1" && (
+                          <div role="alert" className="text-destructive">
+                            <p>
+                              {action.message || "This target could not be resolved. Try again."}
+                            </p>
+                          </div>
+                        )}
+                        {target && (
+                          <>
+                            {!!target.frame?.chain.length && (
+                              <div className="space-y-1 text-xs text-muted-foreground">
+                                <p>
+                                  Frame:{" "}
+                                  {target.frame.chain
+                                    .map((frame) => frame.label || frame.frameId)
+                                    .join(" → ")}
+                                </p>
+                                {target.frame.chain.map((frame) => (
+                                  <code key={frame.frameId} className="block break-all">
+                                    {frame.xpath}
+                                  </code>
+                                ))}
+                              </div>
+                            )}
+                            {target.xpaths[0] &&
+                              xpathItem(target.xpaths[0], action.actionId, action.order)}
+                            {copied.startsWith(`${resolution.id}:${action.actionId}:`) && (
+                              <p role="status" className="text-muted-foreground">
+                                Copied
+                              </p>
+                            )}
+                            {copyError?.entryId === `${resolution.id}:${action.actionId}` && (
+                              <p role="alert" className="text-destructive">
+                                {copyError.message}
+                              </p>
+                            )}
+                            <div className="space-y-2 border-t border-border/70 pt-3">
+                              <h3 className="text-xs font-medium">Verification</h3>
+                              {target.interactability?.reasons.map((reason) => (
+                                <p key={reason} className="text-muted-foreground">
+                                  {interactionReasons[reason] ??
+                                    "An interaction limitation was observed."}
+                                </p>
+                              ))}
+                              <div className="space-y-2 text-xs text-muted-foreground">
+                                {verified && <p>Verified: {verified}.</p>}
+                                {(target.interactability?.status !== "ready" ||
+                                  (!verified && action.action !== "inspect")) && (
+                                  <p>
+                                    {target.interactability?.status === "ready"
+                                      ? "Detailed interaction checks are unavailable."
+                                      : target.interactability?.status === "blocked"
+                                        ? "Interaction blocked."
+                                        : target.interactability?.status === "unsupported"
+                                          ? "Interaction assessment unsupported."
+                                          : target.interactability?.status === "unknown"
+                                            ? checks?.keyboard === "unknown"
+                                              ? "Keyboard readiness unknown."
+                                              : "Interaction readiness unknown."
+                                            : "Interaction readiness unavailable."}
+                                  </p>
+                                )}
+                                <div className="flex flex-wrap gap-x-3 gap-y-1">
+                                  {checks?.viewport !== "pass" && (
+                                    <span>
+                                      {target.state.inViewport ? "In viewport" : "Off-screen"}
+                                    </span>
+                                  )}
+                                  {checks?.enabled !== "pass" && (
+                                    <span>{target.state.enabled ? "Enabled" : "Disabled"}</span>
+                                  )}
+                                  {(target.state.editable ||
+                                    action.action === "fill" ||
+                                    action.action === "type") && (
+                                    <span>
+                                      {target.state.editable ? "Editable" : "Not editable"}
+                                    </span>
+                                  )}
+                                  {target.state.checked !== null && (
+                                    <span>{target.state.checked ? "Checked" : "Unchecked"}</span>
+                                  )}
+                                  {target.state.selected != null && (
+                                    <span>
+                                      {target.state.selected ? "Selected" : "Not selected"}
+                                    </span>
+                                  )}
+                                  {target.state.selectedOptionCount != null && (
+                                    <span>{target.state.selectedOptionCount} options selected</span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </>
+                        )}
+                      </section>
+                    );
+                  })}
                 </div>
-              )}
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 px-1 text-xs text-muted-foreground">
+                  {resolution.respondedAt && (
+                    <MessageTime value={resolution.respondedAt} label="Received" />
+                  )}
+                  {result && (
+                    <>
+                      {duration && (
+                        <span title="Duration reported by the resolver">
+                          Resolution time: {duration}
+                        </span>
+                      )}
+                      <ResolutionCost diagnostics={result.diagnostics} />
+                    </>
+                  )}
+                </div>
+              </div>
             </article>
           );
         })}
-        {resolving && (
-          <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground">
-            <LoaderCircle className="size-4 motion-safe:animate-spin" aria-hidden="true" />
-            Resolving…
-          </p>
-        )}
       </div>
       <form
         className="m-3 shrink-0 overflow-hidden rounded-xl border border-input bg-background shadow-sm transition-shadow focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/15"
@@ -419,10 +521,9 @@ export default function ChatPanel({
             Use 4,000 characters or fewer.
           </p>
         )}
-        <div className="flex items-center justify-between gap-3 border-t border-border/60 bg-muted/30 px-3 py-2">
+        <div className="flex items-center justify-between gap-3 px-3 pb-2">
           <p id="instruction-hint" className="min-w-0 text-xs leading-4 text-muted-foreground">
-            <span className="block">Enter to send</span>
-            <span className="block">Ctrl+Enter for a new line</span>
+            Enter to send · Ctrl+Enter for a new line
           </p>
           <Button
             type="submit"

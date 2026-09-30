@@ -46,6 +46,8 @@ export type ResolutionResult = {
   target: {
     candidateId: string;
     tag: string;
+    role?: string | null;
+    accessibleName?: string | null;
     label: string;
     xpaths: string[];
     frame?: {
@@ -119,6 +121,7 @@ export type Resolution = {
   id: string;
   instruction: string;
   createdAt: string;
+  respondedAt: string | null;
   pageUrl: string;
   pageTitle: string;
   documentId: string;
