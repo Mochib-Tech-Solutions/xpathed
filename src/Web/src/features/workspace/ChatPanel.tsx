@@ -2,6 +2,7 @@ import { ArrowUp, Check, Copy, LoaderCircle } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import type { Resolution } from "./api";
+import ResolutionCost from "./ResolutionCost";
 
 type Props = {
   instruction: string;
@@ -158,6 +159,7 @@ export default function ChatPanel({
                   Resolution time: {duration}
                 </p>
               )}
+              {result && <ResolutionCost diagnostics={result.diagnostics} />}
               {result?.outcome === "not_found" && <p>No matching element found.</p>}
               {result?.outcome === "unsupported" && (
                 <div>

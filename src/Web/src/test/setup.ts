@@ -4,6 +4,13 @@ import { afterEach, vi } from "vitest";
 
 configure({ reactStrictMode: true });
 
+// jsdom hides popovers but does not implement the native show method.
+if (!HTMLElement.prototype.showPopover) {
+  HTMLElement.prototype.showPopover = function () {
+    this.style.display = "block";
+  };
+}
+
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();

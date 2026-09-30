@@ -44,6 +44,7 @@ test("actual OpenRouter route resolves a known target and genuine absence withou
           generationId: result.diagnostics.generationId,
           finishReason: result.diagnostics.finishReason,
           usage: result.diagnostics.usage,
+          costEstimate: result.diagnostics.costEstimate,
           timingsMs: result.diagnostics.timingsMs,
         }),
       );
@@ -64,6 +65,18 @@ test("actual OpenRouter route resolves a known target and genuine absence withou
       );
       totalCostUsd += cost;
       assert.ok(totalCostUsd < 0.01, "The two-call smoke check must cost less than one cent");
+      const estimate = result.diagnostics.costEstimate;
+      assert.equal(
+        estimate?.currency,
+        "USD",
+        "Live cost estimate must use the actual model/provider rates",
+      );
+      assert.ok(Number.isFinite(estimate.totalCost) && estimate.totalCost >= 0);
+      assert.ok(
+        Math.abs(
+          estimate.totalCost - estimate.inputCost - estimate.outputCost - estimate.requestCost,
+        ) < 1e-12,
+      );
       assert.equal(result.sessionId, session.sessionId);
       assert.equal(result.pageId, session.pageId);
       assert.equal(result.documentId, page.documentId);

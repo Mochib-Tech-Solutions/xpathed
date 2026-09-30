@@ -49,11 +49,19 @@ The first operating configuration limits capture to 20,000 visited elements, 2,0
 
 Diagnostics also include `stage`, safe `code`/`message`, `modelCalls`, `strategy`, `promptVersion`, model/provider/generation identifiers, finish reason, usage, and stage timings in milliseconds. Usage includes input/output/total/reasoning/cached tokens and cost when reported. Missing usage is null, never an invented zero. Logs contain correlation and failure codes rather than raw page context, instructions, credentials or provider response bodies. Persistence belongs to [#5](https://github.com/Mochib-Tech-Solutions/xpathed/issues/5).
 
+## Cost estimates
+
+`diagnostics.costEstimate` is an additive nullable version 1 field. After a completion reports model/provider identity and input/output token counts, Resolver fetches that model’s [OpenRouter endpoint rates](https://openrouter.ai/docs/api/api-reference/endpoints/list-all-endpoints-for-a-model). The lookup has a two-second timeout and never makes another inference call. Missing, invalid or ambiguous rates, time-based pricing overrides and lookup failures leave the estimate unavailable without discarding the resolution or reported usage. Caller cancellation still propagates.
+
+The structured estimate contains `currency: "USD"`, `inputPricePerMillion`, `outputPricePerMillion`, `inputCost`, `outputCost`, `requestCost`, `totalCost` and `pricingFetchedAt`. Input/output subtotals multiply reported native token counts by the matching provider’s listed per-token rates; the total adds any listed per-request fee. Reasoning tokens are already included in output tokens and are not charged twice. These are rates fetched after the call, not a locked quote or billing guarantee. The estimate uses normal input rates before cache discounts; special cache pricing, discounts and billing adjustments can make it differ from the reported charge. `diagnostics.usage.cost` remains the independently reported OpenRouter charge. Missing estimates/usage are null, never an invented zero.
+
+Chat exposes these fields on cost hover or keyboard focus, with Escape dismissal. It includes model/provider and token counts, labels estimates separately from reported cost, and retains each attempt’s original cost data in its tab history.
+
 ## Model configuration
 
 `OpenRouterGateway` handles transport/provider responses; `CandidateSelectionStrategy` defines the prompt, selection contract and validation. This keeps model configuration distinct from resolution strategy without adding unused gateway adapters.
 
-The initial route is `deepseek/deepseek-v4.1-flash` via OpenRouter's `wafer` provider with reasoning disabled, strict JSON schema, 512 output tokens and no fallback, context compression, response healing or tools. Provider prices are capped at $0.06 per million input tokens and $0.45 per million output tokens, with no per-request fee; a route above those limits must fail. The public route research and settings are in [the OpenRouter note](research/2026-09-29-openrouter-resolution.md). The live smoke pins this cheap route, makes at most two small requests, and stops if reported cost is missing or exceeds half a cent per call; total cost must remain below one cent. The dated research note records the authenticated two-case smoke check and its actual usage; this does not qualify other workloads or models.
+The initial route is `deepseek/deepseek-v4.1-flash` via OpenRouter's `wafer` provider with reasoning disabled, strict JSON schema, 512 output tokens and no fallback, context compression, response healing or tools. Runtime requests do not include a provider price filter. The public route research and settings are in [the OpenRouter note](research/2026-09-29-openrouter-resolution.md). The live smoke pins this cheap route, makes at most two small requests, and stops if reported cost is missing or exceeds half a cent per call; total cost must remain below one cent. The dated research note records the authenticated two-case smoke check and its actual usage; this does not qualify other workloads or models.
 
 | Setting | Purpose |
 | --- | --- |

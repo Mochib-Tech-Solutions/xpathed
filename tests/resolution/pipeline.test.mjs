@@ -53,6 +53,13 @@ test("instruction resolves through client, resolver, provider and managed browse
     assert.equal(result.diagnostics.capture.complete, true);
     assert.equal(result.diagnostics.modelInputComplete, true);
     assert.equal(result.diagnostics.modelInputCount, result.diagnostics.capture.capturedCount);
+    assert.equal(result.diagnostics.costEstimate.currency, "USD");
+    assert.equal(result.diagnostics.costEstimate.inputPricePerMillion, 0.0749);
+    assert.equal(result.diagnostics.costEstimate.outputPricePerMillion, 0.44);
+    assert.equal(result.diagnostics.costEstimate.totalCost, 0.000022235);
+    assert.equal(result.diagnostics.usage.cost, null);
+    const providerRequest = await json(`${fixture}/provider-request`);
+    assert.equal(providerRequest.provider.max_price, undefined);
   } finally {
     await fetch(`${client}/api/sessions/${session.sessionId}`, { method: "DELETE" });
   }

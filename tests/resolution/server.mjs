@@ -77,6 +77,17 @@ const server = createServer(async (request, response) => {
       targetText = body.targetText ?? "About us";
       providerRequest = null;
       output = { ok: true };
+    } else if (path === "/api/v1/models/deepseek/deepseek-v4.1-flash/endpoints") {
+      output = {
+        data: {
+          endpoints: [
+            {
+              provider_name: "Wafer",
+              pricing: { prompt: "0.0000000749", completion: "0.00000044" },
+            },
+          ],
+        },
+      };
     } else if (path === "/api/v1/chat/completions") {
       providerRequest = body;
       const input = JSON.parse(body.messages.find((message) => message.role === "user").content);
