@@ -1,10 +1,10 @@
-import { ArrowRight, X } from "lucide-react";
+import { Globe2, X } from "lucide-react";
 import { lazy, Suspense } from "react";
 import { Button } from "@/components/ui/button";
 import ThemeToggle from "../theme/ThemeToggle";
 import BrowserToolbar from "./BrowserToolbar";
+import BrowserTabs from "./BrowserTabs";
 import ChatPanel from "./ChatPanel";
-import ResetSessionButton from "./ResetSessionButton";
 import useWorkspace from "./useWorkspace";
 
 const BrowserViewer = lazy(() => import("./BrowserViewer"));
@@ -13,23 +13,30 @@ export default function Workspace() {
   const {
     session,
     page,
+    pages,
+    resolving,
+    newTab,
+    selectTab,
+    closeTab,
     address,
+    addressFocus,
+    instruction,
+    history,
     busy,
     error,
     pollError,
-    start,
+    closeAllTabs,
     navigate,
+    resolve,
+    setInstruction,
     setAddress,
     dismissError,
   } = useWorkspace();
   return (
     <div className="flex h-dvh min-h-80 flex-col">
-      <header className="flex h-[54px] shrink-0 items-center justify-between border-b border-border px-4">
+      <header className="flex h-14 shrink-0 items-center justify-between border-b border-border px-4">
         <span className="text-xl font-semibold tracking-[-1px]">xpathed</span>
-        <div className="flex items-center gap-2">
-          <ThemeToggle />
-          <ResetSessionButton disabled={!session || !!busy} onConfirm={start} />
-        </div>
+        <ThemeToggle />
       </header>
       {error && (
         <div
@@ -57,29 +64,55 @@ export default function Workspace() {
           {pollError}
         </div>
       )}
-      {!!page?.blockedPopups && (
+      {!!page?.blockedPopups && pages.length >= 8 && (
         <div
           className="flex min-h-9 shrink-0 items-center justify-between border-b border-border bg-muted px-4 py-1.5 text-sm text-muted-foreground"
           role="status"
         >
-          New windows aren’t supported.
+          The tab limit was reached. Close a tab to open another.
         </div>
       )}
-      <main className="flex min-h-0 flex-1 flex-col sm:grid sm:grid-cols-[270px_minmax(0,1fr)] md:grid-cols-[320px_minmax(0,1fr)]">
-        <ChatPanel />
+      <main className="flex min-h-0 flex-1 flex-col sm:grid sm:grid-cols-[300px_minmax(0,1fr)] md:grid-cols-[360px_minmax(0,1fr)]">
+        <ChatPanel
+          key={page?.pageId ?? "closed"}
+          instruction={instruction}
+          history={history}
+          ready={!!page && /^https?:\/\//i.test(page.url)}
+          disabled={!page || !/^https?:\/\//i.test(page.url) || !!busy}
+          resolving={resolving}
+          onInstructionChange={setInstruction}
+          onResolve={resolve}
+        />
         <section
           className="order-first flex min-h-0 min-w-0 flex-1 flex-col bg-background sm:order-none"
           aria-label="Browser workspace"
         >
+          {session && (
+            <BrowserTabs
+              pages={pages}
+              activePageId={page?.pageId}
+              busy={!!busy}
+              onNew={newTab}
+              onSelect={selectTab}
+              onClose={closeTab}
+              onCloseAll={closeAllTabs}
+            />
+          )}
           <BrowserToolbar
             sessionId={session?.sessionId}
             pageUrl={page?.url}
             address={address}
+            focusRequest={addressFocus}
             busy={!!busy}
             onAddressChange={setAddress}
             onNavigate={navigate}
           />
-          <div className="relative min-h-0 flex-1 overflow-hidden bg-muted/50">
+          <div
+            id="browser-panel"
+            role={page ? "tabpanel" : undefined}
+            aria-labelledby={page ? `tab-${page.pageId}` : undefined}
+            className="relative min-h-0 flex-1 overflow-hidden bg-muted/50"
+          >
             {session ? (
               <Suspense
                 fallback={
@@ -94,11 +127,9 @@ export default function Workspace() {
                 <BrowserViewer key={session.sessionId} session={session} />
               </Suspense>
             ) : (
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <Button type="button" onClick={start} disabled={!!busy}>
-                  {busy || "Open browser"}
-                  <ArrowRight aria-hidden="true" />
-                </Button>
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 px-6 text-center text-muted-foreground">
+                <Globe2 className="size-8 stroke-1" aria-hidden="true" />
+                <p role="status">{busy || "Enter a website address above to begin."}</p>
               </div>
             )}
           </div>

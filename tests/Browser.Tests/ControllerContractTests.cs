@@ -33,6 +33,20 @@ public sealed class ControllerContractTests(WebApplicationFactory<HealthControll
     }
 
     [Theory]
+    [InlineData("GET", "/sessions/missing", "session_not_found")]
+    [InlineData("POST", "/sessions/missing/pages", "session_not_found")]
+    [InlineData("POST", "/pages/missing/activate", "page_not_found")]
+    [InlineData("DELETE", "/pages/missing", "page_not_found")]
+    public async Task UnknownSessionOrTabOperationReturnsAnError(string method, string path, string code)
+    {
+        using var client = application.CreateClient();
+        using var request = new HttpRequestMessage(new HttpMethod(method), path);
+        using var response = await client.SendAsync(request);
+
+        await AssertErrorAsync(response, HttpStatusCode.NotFound, code);
+    }
+
+    [Theory]
     [InlineData("")]
     [InlineData("{")]
     [InlineData("{}")]
@@ -55,6 +69,29 @@ public sealed class ControllerContractTests(WebApplicationFactory<HealthControll
         using var response = await client.PostAsJsonAsync("/pages/missing/navigate", new { url });
 
         await AssertErrorAsync(response, HttpStatusCode.BadRequest, "invalid_url");
+    }
+
+    [Theory]
+    [InlineData("capture", "{}")]
+    [InlineData("capture", "{\"documentId\":null}")]
+    [InlineData("selection", "{}")]
+    [InlineData("selection", "{\"documentId\":\"document\",\"captureId\":\"capture\"}")]
+    public async Task InvalidResolutionBodyReturnsBadRequest(string operation, string body)
+    {
+        using var client = application.CreateClient();
+        using var content = new StringContent(body, Encoding.UTF8, "application/json");
+        using var response = await client.PostAsync($"/pages/missing/{operation}", content);
+
+        await AssertErrorAsync(response, HttpStatusCode.BadRequest, "invalid_request");
+    }
+
+    [Fact]
+    public async Task UnsupportedActionIsRejectedBeforePageLookup()
+    {
+        using var client = application.CreateClient();
+        using var response = await client.PostAsJsonAsync("/pages/missing/selection", new { documentId = "document", captureId = "capture", candidateId = "candidate", action = "execute" });
+
+        await AssertErrorAsync(response, HttpStatusCode.BadRequest, "invalid_action");
     }
 
     [Theory]
