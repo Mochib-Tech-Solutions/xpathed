@@ -92,6 +92,91 @@ async function submitInstruction(user: ReturnType<typeof userEvent.setup>) {
 }
 
 describe("Workspace resolution", () => {
+  it("shows structured cost details on hover and keyboard focus without mixing estimates and charges", async () => {
+    mockApi(() =>
+      Promise.resolve(
+        Response.json({
+          ...found,
+          diagnostics: {
+            ...found.diagnostics,
+            model: "deepseek/deepseek-v4.1-flash",
+            provider: "Wafer",
+            usage: {
+              inputTokens: 140,
+              outputTokens: 15,
+              totalTokens: 155,
+              reasoningTokens: 0,
+              cachedTokens: null,
+              cost: 0.0000215,
+            },
+            costEstimate: {
+              currency: "USD",
+              inputPricePerMillion: 0.0749,
+              outputPricePerMillion: 0.44,
+              inputCost: 0.000010486,
+              outputCost: 0.0000066,
+              requestCost: 0,
+              totalCost: 0.000017086,
+              pricingFetchedAt: "2026-09-30T09:00:00Z",
+            },
+          },
+        }),
+      ),
+    );
+    const user = await openWorkspace();
+    await submitInstruction(user);
+    const cost = await screen.findByRole("button", { name: "Estimated cost: $0.00001709" });
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+    await user.hover(cost);
+    const tooltip = screen.getByRole("tooltip");
+    expect(within(tooltip).getByText("$0.0749")).toBeInTheDocument();
+    expect(within(tooltip).getByText("$0.44")).toBeInTheDocument();
+    expect(within(tooltip).getByText("$0.0000215")).toBeInTheDocument();
+    expect(within(tooltip).getByText("140")).toBeInTheDocument();
+    expect(within(tooltip).getByText("Unavailable")).toBeInTheDocument();
+    await user.unhover(cost);
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+    act(() => cost.focus());
+    expect(screen.getByRole("tooltip")).toBeInTheDocument();
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+    expect(cost).toHaveFocus();
+  });
+
+  it("shows a reported zero charge when rates are missing and unavailable when usage is missing", async () => {
+    let attempt = 0;
+    mockApi(() =>
+      Promise.resolve(
+        Response.json({
+          ...found,
+          diagnostics: {
+            ...found.diagnostics,
+            costEstimate: null,
+            usage:
+              ++attempt === 1
+                ? {
+                    inputTokens: null,
+                    outputTokens: null,
+                    totalTokens: null,
+                    reasoningTokens: null,
+                    cachedTokens: null,
+                    cost: 0,
+                  }
+                : null,
+          },
+        }),
+      ),
+    );
+    const user = await openWorkspace();
+    await submitInstruction(user);
+    const cost = await screen.findByRole("button", { name: "Reported cost: $0.00" });
+    await user.hover(cost);
+    expect(within(screen.getByRole("tooltip")).getAllByText("Unavailable")).toHaveLength(12);
+    await user.unhover(cost);
+    await user.click(screen.getByRole("button", { name: "Resolve instruction" }));
+    expect(await screen.findByRole("button", { name: "Cost unavailable" })).toBeInTheDocument();
+  });
+
   it("reports a clipboard failure only on the history entry being copied", async () => {
     mockApi();
     const user = await openWorkspace();

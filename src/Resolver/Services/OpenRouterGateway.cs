@@ -50,7 +50,7 @@ public sealed class OpenRouterGateway(IHttpClientFactory clients, IConfiguration
         stream = false,
         max_tokens = 512,
         reasoning = new { enabled = false },
-        provider = new { only = new[] { Provider }, order = new[] { Provider }, allow_fallbacks = false, require_parameters = true, max_price = new { prompt = 0.06m, completion = 0.45m, request = 0m } },
+        provider = new { only = new[] { Provider }, order = new[] { Provider }, allow_fallbacks = false, require_parameters = true },
         plugins = new[] { new { id = "context-compression", enabled = false } },
         messages = new[]
         {
@@ -123,8 +123,71 @@ public sealed class OpenRouterGateway(IHttpClientFactory clients, IConfiguration
                 ? "provider_malformed_response"
             : string.IsNullOrWhiteSpace(content) ? "provider_empty_response"
             : null;
-        return new ProviderCompletion(content, diagnostics with { Code = code });
+        return new ProviderCompletion(content, diagnostics with
+        {
+            Code = code,
+            CostEstimate = await EstimateCostAsync(diagnostics, cancellationToken)
+        });
     }
+
+    private async Task<ModelCostEstimate?> EstimateCostAsync(ResolutionDiagnostics diagnostics, CancellationToken cancellationToken)
+    {
+        if (diagnostics.Usage is not { InputTokens: { } inputTokens, OutputTokens: { } outputTokens } ||
+            diagnostics.Model?.Split('/') is not { Length: 2 } model || string.IsNullOrWhiteSpace(diagnostics.Provider))
+        {
+            return null;
+        }
+        try
+        {
+            using var client = clients.CreateClient("openrouter");
+            client.BaseAddress = new Uri(endpoint);
+            client.Timeout = TimeSpan.FromSeconds(2);
+            using var request = new HttpRequestMessage(HttpMethod.Get,
+                $"models/{Uri.EscapeDataString(model[0])}/{Uri.EscapeDataString(model[1])}/endpoints");
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+            using var response = await client.SendAsync(request, cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                return null;
+            }
+            var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+            var endpoints = Property(Property(body, "data"), "endpoints");
+            if (endpoints.ValueKind != JsonValueKind.Array)
+            {
+                return null;
+            }
+            var prices = endpoints.EnumerateArray()
+                .Where(route => string.Equals(ReadString(route, "provider_name"), diagnostics.Provider, StringComparison.OrdinalIgnoreCase))
+                .Select(route => Property(route, "pricing"))
+                .ToArray();
+            if (prices.Length == 0 || prices.Any(price => Property(price, "overrides").ValueKind == JsonValueKind.Array))
+            {
+                return null;
+            }
+            var rates = prices.Select(price => (
+                Input: ReadPrice(price, "prompt"), Output: ReadPrice(price, "completion"),
+                Request: Property(price, "request").ValueKind == JsonValueKind.Undefined ? 0m : ReadPrice(price, "request")))
+                .Distinct().ToArray();
+            if (rates is not [{ Input: { } inputRate, Output: { } outputRate, Request: { } requestRate }])
+            {
+                return null;
+            }
+            // ponytail: listed token rates before cache discounts; reported usage cost remains authoritative.
+            var inputCost = inputTokens * inputRate;
+            var outputCost = outputTokens * outputRate;
+            return new ModelCostEstimate(inputRate * 1_000_000, outputRate * 1_000_000,
+                inputCost, outputCost, requestRate, inputCost + outputCost + requestRate, DateTimeOffset.UtcNow);
+        }
+        catch (Exception error) when (error is HttpRequestException or JsonException or OverflowException ||
+            error is OperationCanceledException && !cancellationToken.IsCancellationRequested)
+        {
+            // Optional pricing must not discard a completed selection or its reported usage.
+            return null;
+        }
+    }
+
+    private static decimal? ReadPrice(JsonElement pricing, string name) =>
+        decimal.TryParse(ReadString(pricing, name), NumberStyles.Float, CultureInfo.InvariantCulture, out var value) && value >= 0 ? value : null;
 
     private static string ErrorCode(int status, JsonElement error)
     {
