@@ -54,6 +54,7 @@ export default function useWorkspace() {
   const chat = page ? (tabs[page.pageId] ?? emptyChat) : emptyChat;
   const [busy, setBusy] = useState("");
   const [addressFocus, setAddressFocus] = useState(0);
+  const closing = busy === "Closing tabs…";
   const [error, setError] = useState("");
   const [pollError, setPollError] = useState("");
   const pending = useRef(false);
@@ -79,7 +80,7 @@ export default function useWorkspace() {
   }, [session]);
 
   useEffect(() => {
-    if (!session) return;
+    if (!session || closing) return;
     let active = true;
     let timer: ReturnType<typeof setTimeout>;
     async function refresh() {
@@ -115,7 +116,7 @@ export default function useWorkspace() {
       active = false;
       clearTimeout(timer);
     };
-  }, [session]);
+  }, [session, closing]);
 
   async function perform(label: string, action: (isCurrent: () => boolean) => Promise<void>) {
     if (pending.current) return;
@@ -150,15 +151,11 @@ export default function useWorkspace() {
     if (isCurrent()) applySnapshot(next);
     return next;
   }
-  function start() {
-    void perform("Opening browser…", async (isCurrent) => {
-      if (session) await request(`/sessions/${session.sessionId}`, "DELETE");
-      if (!isCurrent()) return;
-      setWorkspace(emptyWorkspace);
-      const next = await request<Session>("/sessions", "POST");
-      if (!isCurrent()) return;
-      setWorkspace({ ...emptyWorkspace, session: next });
-      await readSession(next.sessionId, isCurrent);
+  function closeAllTabs() {
+    if (!session) return;
+    void perform("Closing tabs…", async (isCurrent) => {
+      await request(`/sessions/${session.sessionId}`, "DELETE");
+      if (isCurrent()) setWorkspace(emptyWorkspace);
     });
   }
   function navigate(url: string) {
@@ -186,10 +183,7 @@ export default function useWorkspace() {
     });
   }
   function newTab() {
-    if (!session) {
-      start();
-      return;
-    }
+    if (!session) return;
     void perform("Opening tab…", async (isCurrent) => {
       const next = await request<SessionState>(`/sessions/${session.sessionId}/pages`, "POST");
       if (isCurrent()) {
@@ -319,7 +313,7 @@ export default function useWorkspace() {
     error,
     pollError,
     resolving: busy === "Resolving…" && chat.history.some((entry) => !entry.result && !entry.error),
-    start,
+    closeAllTabs,
     navigate,
     newTab,
     selectTab,

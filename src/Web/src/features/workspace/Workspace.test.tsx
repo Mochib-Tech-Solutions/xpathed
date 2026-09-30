@@ -303,20 +303,68 @@ describe("Workspace resolution", () => {
     expect(screen.getByText(/Earlier result/)).toBeInTheDocument();
   });
 
-  it("clears the instruction and result after a confirmed session reset", async () => {
+  it("closes all tabs and clears chat without creating a replacement session", async () => {
     mockApi();
     const user = await openWorkspace();
     await submitInstruction(user);
     await screen.findByRole("heading", { name: "Pay now" });
-    await user.click(screen.getByRole("button", { name: "Reset session" }));
+    expect(
+      within(screen.getByRole("banner")).queryByRole("button", { name: /reset|close all/i }),
+    ).not.toBeInTheDocument();
     await user.click(
-      within(screen.getByRole("alertdialog")).getByRole("button", { name: "Reset session" }),
+      within(screen.getByRole("region", { name: "Browser workspace" })).getByRole("button", {
+        name: "Close all tabs",
+      }),
+    );
+    await user.click(
+      within(screen.getByRole("alertdialog")).getByRole("button", { name: "Close all tabs" }),
     );
 
     await waitFor(() =>
       expect(screen.queryByRole("heading", { name: "Pay now" })).not.toBeInTheDocument(),
     );
     expect(screen.getByRole("textbox", { name: "Describe an element" })).toHaveValue("");
+    expect(screen.getByRole("textbox", { name: "Describe an element" })).toBeDisabled();
+    expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Page address" })).toHaveValue("");
+    expect(screen.getByRole("textbox", { name: "Page address" })).toHaveFocus();
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      "/api/sessions/session-1",
+      expect.objectContaining({ method: "DELETE" }),
+    );
+    expect(
+      vi.mocked(globalThis.fetch).mock.calls.filter(([input]) => input === "/api/sessions"),
+    ).toHaveLength(1);
+  });
+
+  it("keeps the tabs and chat available if closing the session fails", async () => {
+    mockApi();
+    const user = await openWorkspace();
+    await submitInstruction(user);
+    await screen.findByRole("heading", { name: "Pay now" });
+    const originalFetch = globalThis.fetch;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn<typeof globalThis.fetch>((input, options) =>
+        options?.method === "DELETE"
+          ? Promise.resolve(
+              Response.json({ message: "Unable to close the browser." }, { status: 503 }),
+            )
+          : originalFetch(input, options),
+      ),
+    );
+    await user.click(screen.getByRole("button", { name: "Close all tabs" }));
+    await user.click(
+      within(screen.getByRole("alertdialog")).getByRole("button", { name: "Close all tabs" }),
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Unable to close the browser.");
+    expect(screen.getByRole("tab", { name: "Checkout" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Pay now" })).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Describe an element" })).toHaveValue(
+      "Click Pay now",
+    );
+    expect(screen.getByRole("button", { name: "Close all tabs" })).toBeEnabled();
   });
 
   it("prevents duplicate resolution and navigation while a request is pending", async () => {
@@ -333,7 +381,7 @@ describe("Workspace resolution", () => {
     expect(screen.getByRole("textbox", { name: "Describe an element" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Resolve instruction" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Reload page" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Reset session" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Close all tabs" })).toBeDisabled();
     await user.click(screen.getByRole("button", { name: "Resolve instruction" }));
     expect(resolve).toHaveBeenCalledTimes(1);
     await act(async () => {

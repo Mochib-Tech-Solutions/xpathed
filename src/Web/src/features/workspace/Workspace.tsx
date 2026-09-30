@@ -5,7 +5,6 @@ import ThemeToggle from "../theme/ThemeToggle";
 import BrowserToolbar from "./BrowserToolbar";
 import BrowserTabs from "./BrowserTabs";
 import ChatPanel from "./ChatPanel";
-import ResetSessionButton from "./ResetSessionButton";
 import useWorkspace from "./useWorkspace";
 
 const BrowserViewer = lazy(() => import("./BrowserViewer"));
@@ -26,7 +25,7 @@ export default function Workspace() {
     busy,
     error,
     pollError,
-    start,
+    closeAllTabs,
     navigate,
     resolve,
     setInstruction,
@@ -37,10 +36,7 @@ export default function Workspace() {
     <div className="flex h-dvh min-h-80 flex-col">
       <header className="flex h-14 shrink-0 items-center justify-between border-b border-border px-4">
         <span className="text-xl font-semibold tracking-[-1px]">xpathed</span>
-        <div className="flex items-center gap-2">
-          <ThemeToggle />
-          <ResetSessionButton disabled={!session || !!busy} onConfirm={start} />
-        </div>
+        <ThemeToggle />
       </header>
       {error && (
         <div
@@ -99,6 +95,7 @@ export default function Workspace() {
               onNew={newTab}
               onSelect={selectTab}
               onClose={closeTab}
+              onCloseAll={closeAllTabs}
             />
           )}
           <BrowserToolbar

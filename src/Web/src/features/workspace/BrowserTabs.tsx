@@ -2,6 +2,7 @@ import { Plus, X } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import type { PageState } from "./api";
+import CloseAllTabsButton from "./CloseAllTabsButton";
 
 type Props = {
   pages: PageState[];
@@ -10,6 +11,7 @@ type Props = {
   onNew: () => void;
   onSelect: (id: string) => void;
   onClose: (id: string) => void;
+  onCloseAll: () => void;
 };
 export default function BrowserTabs({
   pages,
@@ -18,6 +20,7 @@ export default function BrowserTabs({
   onNew,
   onSelect,
   onClose,
+  onCloseAll,
 }: Props) {
   const strip = useRef<HTMLDivElement>(null);
   const restoreFocus = useRef(false);
@@ -112,6 +115,7 @@ export default function BrowserTabs({
       >
         <Plus aria-hidden="true" />
       </Button>
+      <CloseAllTabsButton disabled={busy} onConfirm={onCloseAll} />
     </div>
   );
 }
