@@ -36,7 +36,7 @@ public sealed class OpenRouterGateway(IHttpClientFactory clients, IConfiguration
     {
         strategy,
         promptVersion,
-        captureVersion = "2",
+        captureVersion = "3",
         stateVersion = "2",
         interactabilityVersion = "2",
         xpathVersion = "2",
@@ -44,7 +44,7 @@ public sealed class OpenRouterGateway(IHttpClientFactory clients, IConfiguration
         timeoutSeconds = timeoutSeconds.ToString("R", CultureInfo.InvariantCulture),
         modelInputBudgetBytes,
         responseCache = false,
-        maximumActions = promptVersion == "3" ? ActionSelectionStrategy.MaximumActions : 1,
+        maximumActions = promptVersion is "3" or "5" ? ActionSelectionStrategy.MaximumActions : 1,
         request = CreateRequest(prompt, string.Empty, schema, outputTokens)
     }))));
 

@@ -14,6 +14,7 @@ const interactionReasons: Record<string, string> = {
   pointer_events_none: "The target does not receive pointer events at the inspected point.",
   obstructed_at_hit_point: "Another element or clipping blocks the inspected pointer point.",
   custom_control_unverified: "Interaction with this custom control could not be verified.",
+  ancestor_frame_obstructed: "An overlay or clipping blocks the target’s containing frame.",
 };
 
 const instructionLimits: Record<string, string> = {
@@ -274,8 +275,29 @@ export default function ChatPanel({
                             {target.state.checked !== null && (
                               <span>{target.state.checked ? "Checked" : "Unchecked"}</span>
                             )}
+                            {target.state.selected != null && (
+                              <span>{target.state.selected ? "Selected" : "Not selected"}</span>
+                            )}
+                            {target.state.selectedOptionCount != null && (
+                              <span>{target.state.selectedOptionCount} options selected</span>
+                            )}
                           </div>
                         </div>
+                        {!!target.frame?.chain.length && (
+                          <div className="space-y-1 text-xs text-muted-foreground">
+                            <p>
+                              Frame:{" "}
+                              {target.frame.chain
+                                .map((frame) => frame.label || frame.frameId)
+                                .join(" → ")}
+                            </p>
+                            {target.frame.chain.map((frame) => (
+                              <code key={frame.frameId} className="block break-all">
+                                {frame.xpath}
+                              </code>
+                            ))}
+                          </div>
+                        )}
                         {target.xpaths[0] && xpathItem(target.xpaths[0], action.actionId)}
                         {copied.startsWith(`${resolution.id}:${action.actionId}:`) && (
                           <p role="status" className="text-muted-foreground">

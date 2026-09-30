@@ -6,6 +6,82 @@ import { setTimeout as delay } from "node:timers/promises";
 const client = "http://client-api:8080";
 const fixture = "http://resolution-fixture:8090";
 
+test("Client results preserve nested frame chains and expanded actions through the complete pipeline", async () => {
+  await json(`${fixture}/scenario`, "POST", {
+    name: "batch",
+    actions: [
+      {
+        step: 1,
+        instruction: "Click Approval in Payroll",
+        action: "double_click",
+        outcome: "found",
+        label: "Approval",
+        frameLabel: "Payroll",
+      },
+      {
+        step: 2,
+        instruction: "Clear Notes",
+        action: "clear",
+        outcome: "found",
+        label: "Notes",
+        tag: "input",
+      },
+      { step: 3, instruction: "Wait for missing element", action: "inspect", outcome: "not_found" },
+      {
+        step: 4,
+        instruction: "Pause",
+        action: "unsupported",
+        outcome: "unsupported",
+        limitation: "unsupported_action",
+      },
+    ],
+  });
+  const session = await json(`${client}/api/sessions`, "POST");
+  const run = randomUUID();
+  try {
+    const page = await json(`${client}/api/pages/${session.pageId}/navigate`, "POST", {
+      url: `${fixture}/frames?run=${run}`,
+    });
+    const result = await json(`${client}/api/pages/${page.pageId}/resolve`, "POST", {
+      instruction: "Double click Approval in Payroll, clear Notes, wait for Missing and pause.",
+      documentId: page.documentId,
+      contractVersion: "2",
+    });
+    assert.equal(result.outcome, "partial", JSON.stringify(result));
+    assert.deepEqual(
+      result.actions.map((action) => action.outcome),
+      ["found", "found", "not_found", "unsupported"],
+    );
+    assert.deepEqual(
+      result.actions[0].target.frame.chain.map((frame) => frame.label),
+      ["Employee", "Payroll"],
+    );
+    assert.equal(result.actions[0].frameId, result.actions[0].target.frame.id);
+    assert.equal(result.actions[1].target.interactability.status, "blocked");
+    assert.equal(result.diagnostics.modelCalls, 1);
+    const targets = result.actions.slice(0, 2).map((action) => ({
+      xpath: action.target.xpaths[0],
+      frameXpaths: action.target.frame.chain.map((frame) => frame.xpath),
+    }));
+    await json(`${fixture}/oracle?run=${run}`, "POST", { targets });
+    let observation;
+    for (let attempt = 0; attempt < 100 && !observation; attempt++) {
+      observation = await json(`${fixture}/observation?run=${run}`);
+      if (!observation) await delay(50);
+    }
+    assert.deepEqual(observation?.matches, [["frame-approval-first"], ["frame-notes"]]);
+    assert.equal(observation.clicks, 0);
+    assert.equal(observation.scrollY, 0);
+    const provider = await json(`${fixture}/provider-request`);
+    assert.doesNotMatch(
+      provider.messages[1].content,
+      /PRIVATE_FRAME_VALUE|frame-notes|frame-approval-first|\/\/iframe/,
+    );
+  } finally {
+    await fetch(`${client}/api/sessions/${session.sessionId}`, { method: "DELETE" });
+  }
+});
+
 test("A plural current-page prompt keeps independent targets, blocked state, missing and dependent actions", async () => {
   await json(`${fixture}/scenario`, "POST", {
     name: "batch",
@@ -83,7 +159,7 @@ test("A plural current-page prompt keeps independent targets, blocked state, mis
       assessmentUnsupported: 0,
     });
     assert.equal(result.diagnostics.modelCalls, 1);
-    assert.equal(result.diagnostics.promptVersion, "3");
+    assert.equal(result.diagnostics.promptVersion, "5");
     assert.ok(
       result.actions.every(
         (action) =>
@@ -278,7 +354,7 @@ test("ClientApi preserves disabled, off-screen and hover assessments and scopes 
         assert.equal(result.target.interactability.status, status);
         assert.equal(result.target.interactability.action, action);
         assert.equal(result.target.state.version, "2");
-        assert.equal(result.diagnostics.promptVersion, "2");
+        assert.equal(result.diagnostics.promptVersion, "4");
         assert.equal(result.target.xpaths.length, 1);
       } else assert.match(result.diagnostics.message, /eligible current-page scope/);
       const input = JSON.stringify(await json(`${fixture}/provider-request`));

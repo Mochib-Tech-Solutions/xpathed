@@ -92,6 +92,36 @@ async function submitInstruction(user: ReturnType<typeof userEvent.setup>) {
 }
 
 describe("Workspace resolution", () => {
+  it("shows the frame chain separately from the document XPath and selected state", async () => {
+    mockApi(() =>
+      Promise.resolve(
+        Response.json({
+          ...found,
+          target: {
+            ...found.target,
+            frame: {
+              id: "f2",
+              documentId: "child-document",
+              chain: [
+                { frameId: "f1", label: "Employee", xpath: "//iframe[@id='employee']" },
+                { frameId: "f2", label: "Payroll", xpath: "//iframe[@id='payroll']" },
+              ],
+            },
+            state: { ...found.target.state, selected: true, selectedOptionCount: 2 },
+          },
+        }),
+      ),
+    );
+    const user = await openWorkspace();
+    await submitInstruction(user);
+    expect(await screen.findByText("Frame: Employee → Payroll")).toBeInTheDocument();
+    expect(screen.getByText("//iframe[@id='employee']")).toBeInTheDocument();
+    expect(screen.getByText("//iframe[@id='payroll']")).toBeInTheDocument();
+    expect(screen.getByText("//*[@data-testid='pay']")).toBeInTheDocument();
+    expect(screen.getByText("Selected")).toBeInTheDocument();
+    expect(screen.getByText("2 options selected")).toBeInTheDocument();
+  });
+
   it("shows a direct single-target reply without repeated instructions or technical boilerplate", async () => {
     mockApi(() =>
       Promise.resolve(

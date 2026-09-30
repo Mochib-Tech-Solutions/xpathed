@@ -2,8 +2,12 @@ import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { on, once } from "node:events";
 import test from "node:test";
+import { networkInterfaces } from "node:os";
 
 const browserUrl = process.env.XPATHED_BROWSER_URL ?? "http://browser:8080";
+const fixtureAddress = Object.values(networkInterfaces())
+  .flat()
+  .find((address) => address.family === "IPv4" && !address.internal)?.address;
 const oracleCommands = new Map();
 const oracleObservers = new Map();
 const oracleScript = `<script>
@@ -11,7 +15,12 @@ const oracleScript = `<script>
       const endpoint = '?page=' + encodeURIComponent(location.pathname);
       const response = await fetch('/oracle' + endpoint);
       if (response.status === 204) return;
-      const { xpaths = [], replaceTarget, reload, click, open, focusPopup, close, cookie, scrollToY } = await response.json();
+      const { xpaths = [], replaceTarget, reload, click, open, focusPopup, close, cookie, scrollToY, slowFrame } = await response.json();
+      if (slowFrame) {
+        const frame = document.querySelector('iframe');
+        const rect = frame.getBoundingClientRect.bind(frame);
+        frame.getBoundingClientRect = () => { const end = performance.now() + 2100; while (performance.now() < end) {} return rect(); };
+      }
       if (scrollToY !== undefined) scrollTo(0, scrollToY);
       if (cookie) document.cookie = cookie;
       if (click) document.querySelector(click).click();
@@ -955,7 +964,189 @@ test("Superseded captures, fabricated candidates, replaced nodes and manual relo
   });
 });
 
-test("Visible frame and open shadow boundaries are reported and never enter main-document candidates", async () => {
+for (const framed of [false, true])
+  test(`Expanded action observations preserve identity, selected state and never execute (${framed ? "iframe" : "main"})`, async () => {
+    const markup = `<input id="expected-target" aria-label="Notes" readonly value="PRIVATE_VALUE">
+     <input type="file" aria-label="Upload document"><input type="file" hidden aria-label="Hidden upload">
+     <select aria-label="Countries" multiple><option selected>PRIVATE_SELECTION</option><option selected>PRIVATE_OTHER</option></select>
+     <div role="tab" tabindex="0" aria-selected="true" aria-label="Overview"></div>
+     <button disabled aria-label="Disabled"><span>Inside button</span></button>
+     <p id="help">Text help</p><svg><circle aria-label="Diagram node" cx="20" cy="20" r="10"/></svg>`;
+    await withFixture(
+      (path) =>
+        framed && path === "/fixture"
+          ? '<iframe title="Controls" src="/matrix" style="width:900px;height:650px"></iframe>'
+          : markup,
+      async (session, page) => {
+        if (framed) await observe({}, "/matrix");
+        const before = await observe();
+        const capture = await request(`/pages/${page.pageId}/capture`, {
+          documentId: page.documentId,
+        });
+        assert.doesNotMatch(JSON.stringify(capture), /PRIVATE_|Hidden upload/);
+        for (const [label, action, status, check, value] of [
+          ["Notes", "clear", "blocked", "writable", "fail"],
+          ["Notes", "press", "unknown", "keyboard", "unknown"],
+          ["Overview", "focus", "unknown", "keyboard", "unknown"],
+          ["Overview", "blur", "unknown", "keyboard", "unknown"],
+          ["Upload document", "upload", "unknown", "compatibleControl", "pass"],
+          ["Notes", "upload", "blocked", "compatibleControl", "fail"],
+          ["Disabled", "double_click", "blocked", "enabled", "fail"],
+          ["Disabled", "right_click", "blocked", "enabled", "fail"],
+          ["Disabled", "inspect", "ready", "enabled", "not_applicable"],
+          ["Text help", "hover", "ready", "enabled", "not_applicable"],
+          ["Diagram node", "inspect", "ready", "enabled", "not_applicable"],
+          ["Countries", "select", "unknown", "compatibleControl", "pass"],
+        ]) {
+          const candidate = capture.candidates.find(
+            (candidate) => (candidate.label || candidate.text) === label,
+          );
+          assert.ok(candidate, label);
+          const { target } = await request(`/pages/${page.pageId}/selection`, {
+            documentId: page.documentId,
+            captureId: capture.captureId,
+            candidateId: candidate.id,
+            action,
+          });
+          assert.equal(target.interactability.status, status, `${label}: ${action}`);
+          assert.equal(target.interactability.checks[check], value);
+          assert.equal(target.xpaths.length, 1);
+          if (label === "Countries") assert.equal(target.state.selectedOptionCount, 2);
+          if (label === "Overview") assert.equal(target.state.selected, true);
+          if (label === "Diagram node") assert.match(target.xpaths[0], /local-name\(\)/);
+        }
+        const after = await observe();
+        assert.equal(after.activeElement, before.activeElement);
+        assert.equal(after.clicks, before.clicks);
+        assert.equal(after.scrollY, before.scrollY);
+      },
+    );
+  });
+
+test("Nested frame targets retain document XPath identity and main viewport geometry", async () => {
+  await withFixture(
+    (path) =>
+      path === "/fixture"
+        ? `<style>body{margin:0;height:3000px}iframe{position:absolute;left:100px;top:80px;width:600px;height:400px;border:0}</style><button>Approval</button><iframe title="Employee" src="/outer"></iframe>`
+        : path === "/outer"
+          ? `<style>body{margin:0}iframe{position:absolute;left:30px;top:40px;width:400px;height:240px;border:0}</style><iframe title="Payroll" src="/inner"></iframe>`
+          : `<style>body{margin:0;height:1600px}button{position:absolute;left:20px;top:30px;width:120px;height:40px}</style><button id="expected-target">Approval</button>`,
+    async (session, page) => {
+      await observe({}, "/inner");
+      const capture = await request(`/pages/${page.pageId}/capture`, {
+        documentId: page.documentId,
+      });
+      const buttons = capture.candidates.filter((candidate) => candidate.tag === "button");
+      assert.equal(buttons.length, 2);
+      assert.ok(
+        capture.candidates.every(
+          (candidate) =>
+            candidate.frame?.id &&
+            candidate.frame.documentId &&
+            Array.isArray(candidate.frame.chain),
+        ),
+      );
+      const candidate = buttons.find((candidate) => candidate.frame?.chain.length === 2);
+      assert.ok(candidate, "Nested document candidates carry their frame chain");
+      assert.deepEqual(
+        candidate.frame.chain.map((frame) => frame.label),
+        ["Employee", "Payroll"],
+      );
+      const { target } = await request(`/pages/${page.pageId}/selection`, {
+        documentId: page.documentId,
+        captureId: capture.captureId,
+        candidateId: candidate.id,
+        action: "click",
+      });
+      assert.equal(target.frame.id, candidate.frame.id);
+      assert.deepEqual(target.xpaths, ["//button[@id='expected-target']"]);
+      assert.deepEqual(target.geometry, { x: 150, y: 150, width: 120, height: 40 });
+      assert.equal(target.interactability.status, "ready");
+      assert.deepEqual((await observe({ xpaths: target.xpaths }, "/inner")).matches, [
+        ["expected-target"],
+      ]);
+      assert.equal((await observe({}, "/fixture")).scrollY, 0);
+      assert.equal((await observe({}, "/inner")).clicks, "0");
+      await withFramebuffer(session, async (frame) => {
+        let blue = 0;
+        for (let attempt = 0; attempt < 20 && blue < 200; attempt++) {
+          const { pixels, width } = await frame();
+          blue = 0;
+          for (let y = 150; y < 190; y++)
+            for (let x = 150; x < 270; x++) {
+              const offset = (y * width + x) * 4;
+              if (
+                pixels[offset] > pixels[offset + 2] + 10 &&
+                pixels[offset + 1] > pixels[offset + 2] + 5
+              )
+                blue++;
+            }
+          if (blue < 200) await new Promise((resolve) => setTimeout(resolve, 50));
+        }
+        assert.ok(
+          blue >= 200,
+          `Expected nested target overlay at main viewport coordinates, got ${blue} blue pixels`,
+        );
+      });
+      await observe({ scrollToY: 20 }, "/inner");
+      await observe({ scrollToY: 50 }, "/fixture");
+      const moved = await request(`/pages/${page.pageId}/selection`, {
+        documentId: page.documentId,
+        captureId: capture.captureId,
+        candidateId: candidate.id,
+        action: "hover",
+      });
+      assert.equal(moved.target.geometry.y, 80);
+      assert.equal((await observe({}, "/inner")).scrollY, 20);
+      assert.equal((await observe({}, "/fixture")).scrollY, 50);
+    },
+  );
+});
+
+test("Cross-origin frame clipping and ancestor obstruction remain passive and frame navigation invalidates capture", async () => {
+  await withFixture(
+    (path) =>
+      path === "/fixture"
+        ? `<style>body{margin:0}#clip{position:absolute;left:100px;top:100px;width:200px;height:100px;overflow:hidden}iframe{width:400px;height:300px;border:0}#cover{position:absolute;left:100px;top:100px;width:160px;height:80px;background:black;z-index:2}</style>
+        <div id="clip"><iframe title="External" src="http://${fixtureAddress}:8070/external"></iframe></div><div id="cover"></div>`
+        : `<style>body{margin:0}button{position:absolute;left:20px;top:20px;width:120px;height:40px}#below{top:180px}</style><button id="expected-target">Covered child</button><button id="below">Clipped child</button>`,
+    async (session, page) => {
+      await observe({}, "/external");
+      const capture = await request(`/pages/${page.pageId}/capture`, {
+        documentId: page.documentId,
+      });
+      const covered = capture.candidates.find((candidate) => candidate.label === "Covered child");
+      const clipped = capture.candidates.find((candidate) => candidate.label === "Clipped child");
+      assert.ok(covered);
+      assert.ok(clipped);
+      const body = {
+        documentId: page.documentId,
+        captureId: capture.captureId,
+        candidateId: covered.id,
+        action: "click",
+      };
+      const { target } = await request(`/pages/${page.pageId}/selection`, body);
+      assert.equal(target.state.inViewport, true);
+      assert.equal(target.interactability.status, "blocked");
+      assert.ok(target.interactability.reasons.includes("ancestor_frame_obstructed"));
+      const other = await request(`/pages/${page.pageId}/selection`, {
+        ...body,
+        candidateId: clipped.id,
+      });
+      assert.equal(other.target.state.accessibilityExposed, true);
+      assert.equal(other.target.state.inViewport, false);
+      assert.equal(other.target.interactability.status, "blocked");
+      assert.deepEqual((await observe({ xpaths: target.xpaths }, "/external")).matches, [
+        ["expected-target"],
+      ]);
+      await observe({ reload: true }, "/external");
+      await observe({}, "/external");
+      await expectError(`/pages/${page.pageId}/selection`, body, 409, "stale_capture");
+    },
+  );
+});
+
+test("Exposed frames are captured while hidden frames and shadow contents stay excluded", async () => {
   await withFixture(
     `${targetMarkup}<iframe srcdoc="<button>FRAME_SECRET</button>"></iframe>
     <iframe hidden srcdoc="<button>HIDDEN_FRAME</button>"></iframe><div id="shadow"></div>
@@ -964,10 +1155,11 @@ test("Visible frame and open shadow boundaries are reported and never enter main
       const capture = await request(`/pages/${session.pageId}/capture`, {
         documentId: page.documentId,
       });
-      assert.equal(capture.unsupportedBoundaryCount, 2);
+      assert.equal(capture.unsupportedBoundaryCount, 1);
       assert.equal(capture.frameId, "main");
       assert.equal(capture.coverage.complete, true);
-      assert.ok(!JSON.stringify(capture.candidates).includes("SECRET"));
+      assert.ok(capture.candidates.some((candidate) => candidate.text === "FRAME_SECRET"));
+      assert.doesNotMatch(JSON.stringify(capture.candidates), /HIDDEN_FRAME|SHADOW_SECRET/);
       const absence = await request(`/pages/${session.pageId}/selection`, {
         documentId: page.documentId,
         captureId: capture.captureId,
@@ -975,6 +1167,128 @@ test("Visible frame and open shadow boundaries are reported and never enter main
         action: "unsupported",
       });
       assert.equal(absence.target, null);
+    },
+  );
+});
+
+test("Scaled clipping and section context survive iframe boundaries while reflections stay unsupported", async () => {
+  await withFixture(
+    (path) =>
+      path === "/fixture"
+        ? `<style>body{margin:0}#clip{position:absolute;left:10px;top:10px;width:200px;height:100px;overflow:hidden;transform:scale(2);transform-origin:top left}#scaled{position:absolute;left:150px;top:20px;width:40px;height:30px}</style>
+      <div id="clip"><button id="scaled">Scaled target</button></div>
+      <section aria-label="Employee" style="margin-top:240px"><iframe src="/employee"></iframe></section>
+      <section aria-label="Customer"><iframe src="/customer"></iframe></section>
+      <iframe style="scale:-1 1" src="/reflected"></iframe><div style="scale:-1 1"><iframe src="/ancestor-reflected"></iframe></div>`
+        : "<button>OK</button>",
+    async (session, page) => {
+      await observe({}, "/customer");
+      const capture = await request(`/pages/${page.pageId}/capture`, {
+        documentId: page.documentId,
+      });
+      const scaled = capture.candidates.find((candidate) => candidate.label === "Scaled target");
+      assert.equal(scaled.state.inViewport, true);
+      const { target } = await request(`/pages/${page.pageId}/selection`, {
+        documentId: page.documentId,
+        captureId: capture.captureId,
+        candidateId: scaled.id,
+        action: "click",
+      });
+      assert.deepEqual(target.geometry, { x: 310, y: 50, width: 80, height: 60 });
+      assert.equal(target.interactability.status, "ready");
+      const buttons = capture.candidates.filter((candidate) => candidate.label === "OK");
+      assert.equal(buttons.length, 2);
+      assert.ok(buttons[0].scope.includes("Employee"));
+      assert.ok(buttons[1].scope.includes("Customer"));
+      assert.equal(capture.unsupportedBoundaryCount, 2);
+    },
+  );
+});
+
+test("Slow frame geometry reports explicit capture and validation budget failures", async () => {
+  await withFixture(
+    '<button>Save</button><iframe srcdoc="<button>Child</button>"></iframe>',
+    async (session, page) => {
+      const capture = await request(`/pages/${page.pageId}/capture`, {
+        documentId: page.documentId,
+      });
+      const candidate = capture.candidates.find((candidate) => candidate.label === "Child");
+      await observe({ slowFrame: true });
+      await expectError(
+        `/pages/${page.pageId}/selection`,
+        {
+          documentId: page.documentId,
+          captureId: capture.captureId,
+          candidateId: candidate.id,
+          action: "click",
+        },
+        409,
+        "validation_budget_exceeded",
+      );
+      const incomplete = await request(`/pages/${page.pageId}/capture`, {
+        documentId: page.documentId,
+      });
+      assert.equal(incomplete.coverage.complete, false);
+      assert.equal(incomplete.coverage.errorCode, "capture_budget_exceeded");
+      assert.deepEqual(incomplete.candidates, []);
+    },
+  );
+});
+
+test("Frame exposure, unsupported transforms and aggregate budgets preserve honest capture coverage", async () => {
+  await withFixture(
+    (path) =>
+      path === "/fixture"
+        ? `<div aria-hidden="true"><iframe src="/hidden" title="Hidden"></iframe></div>
+        <div inert><iframe src="/inert"></iframe></div>
+        <iframe src="/rotated" style="transform:rotate(15deg)"></iframe>
+        <iframe src="/exposed" style="opacity:0" title="Transparent"></iframe>`
+        : `<button>${path}</button>`,
+    async (session, page) => {
+      await observe({}, "/exposed");
+      const capture = await request(`/pages/${page.pageId}/capture`, {
+        documentId: page.documentId,
+      });
+      assert.equal(capture.coverage.complete, true);
+      assert.equal(capture.unsupportedBoundaryCount, 1);
+      assert.doesNotMatch(JSON.stringify(capture.candidates), /\/hidden|\/inert|\/rotated/);
+      const target = capture.candidates.find((candidate) => candidate.text === "/exposed");
+      assert.equal(target.state.accessibilityExposed, true);
+      assert.equal(target.state.rendered, false);
+    },
+  );
+  await withFixture(
+    (path) =>
+      path === "/fixture"
+        ? '<iframe src="/large-one"></iframe><iframe src="/large-two"></iframe><iframe src="/large-three"></iframe>'
+        : "<button>Ordinary target</button>".repeat(750),
+    async (session, page) => {
+      await observe({}, "/large-three");
+      const capture = await request(`/pages/${page.pageId}/capture`, {
+        documentId: page.documentId,
+      });
+      assert.equal(capture.coverage.complete, false);
+      assert.equal(capture.coverage.errorCode, "capture_budget_exceeded");
+      assert.equal(capture.candidates.length, 0);
+      assert.equal(capture.coverage.capturedCount, 0);
+    },
+  );
+});
+
+test("Relational scope distinguishes table rows and header/footer duplicates without values", async () => {
+  await withFixture(
+    '<header><button>Help</button></header><table><tr><td>Employee Alice</td><td><button>Approve</button><input value="ROW_SECRET"></td></tr><tr><td>Employee Bob</td><td><button>Approve</button></td></tr></table><footer style="margin-top:2000px"><button>Help</button></footer>',
+    async (session, page) => {
+      const capture = await request(`/pages/${page.pageId}/capture`, {
+        documentId: page.documentId,
+      });
+      const buttons = capture.candidates.filter((candidate) => candidate.tag === "button");
+      assert.ok(buttons[0].scope.includes("header"));
+      assert.ok(buttons[1].scope.some((scope) => scope.includes("Employee Alice")));
+      assert.ok(buttons[2].scope.some((scope) => scope.includes("Employee Bob")));
+      assert.ok(buttons[3].scope.includes("footer"));
+      assert.equal(buttons[3].state.inViewport, false);
+      assert.doesNotMatch(JSON.stringify(capture), /ROW_SECRET/);
     },
   );
 });

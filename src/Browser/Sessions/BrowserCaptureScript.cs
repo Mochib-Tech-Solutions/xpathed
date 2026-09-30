@@ -4,10 +4,12 @@ internal static class BrowserCaptureScript
 {
     public const string Capture = """
         identity => {
+          let environment = JSON.parse(identity.environment);
+          const frame = JSON.parse(identity.frame);
           const capturedDocument = document;
           const capturedRoot = document.documentElement;
           const budgetExceeded = {};
-          let deadline = performance.now() + 2000;
+          let deadline = performance.now() + (identity.budgetMs ?? 2000);
           const checkBudget = () => { if (performance.now() > deadline) throw budgetExceeded; };
           let styleCache = new WeakMap();
           let textCache = new WeakMap();
@@ -49,10 +51,10 @@ internal static class BrowserCaptureScript
             }
             return allowed;
           };
-          const accessibilityExposed = element => (!modal || modal.contains(element)) && exposed(element) && !['hidden', 'collapse'].includes(cssFor(element).visibility);
+          const accessibilityExposed = element => environment.exposed && (!modal || modal.contains(element)) && exposed(element) && !['hidden', 'collapse'].includes(cssFor(element).visibility);
           const rendered = element => {
             const rect = element.getBoundingClientRect();
-            if (rect.width <= 0 || rect.height <= 0 || !accessibilityExposed(element)) return false;
+            if (!environment.rendered || rect.width <= 0 || rect.height <= 0 || !accessibilityExposed(element)) return false;
             for (let current = element; current; current = current.parentElement) {
               checkBudget();
               if (Number(cssFor(current).opacity) === 0) return false;
@@ -108,7 +110,7 @@ internal static class BrowserCaptureScript
             const scopes = [];
             for (let ancestor = element.parentElement; ancestor && ancestor !== document.body; ancestor = ancestor.parentElement) {
               checkBudget();
-              const context = label(ancestor) || text(ancestor.querySelector(':scope > legend,:scope > h1,:scope > h2,:scope > h3,:scope > h4,:scope > h5,:scope > h6'));
+              const context = label(ancestor) || (ancestor.matches('tr,[role=row]') ? text(ancestor) : '') || (ancestor.matches('header,footer,nav,main,aside') ? ancestor.localName : '') || text(ancestor.querySelector(':scope > legend,:scope > h1,:scope > h2,:scope > h3,:scope > h4,:scope > h5,:scope > h6'));
               if (context && !scopes.includes(context)) scopes.push(context);
             }
             return scopes;
@@ -129,43 +131,78 @@ internal static class BrowserCaptureScript
             element.localName === 'input' && ['text','search','email','url','tel','password','number'].includes(element.type);
           const geometry = element => {
             const { x, y, width, height } = element.getBoundingClientRect();
-            return { x, y, width, height };
+            return { x: environment.x + x * environment.scaleX, y: environment.y + y * environment.scaleY,
+              width: width * environment.scaleX, height: height * environment.scaleY };
+          };
+          const intersection = (a, b) => ({ left: Math.max(a.left, b.left), top: Math.max(a.top, b.top), right: Math.min(a.right, b.right), bottom: Math.min(a.bottom, b.bottom) });
+          const visibleRect = element => {
+            const rect = geometry(element);
+            let clip = intersection({ left: rect.x, top: rect.y, right: rect.x + rect.width, bottom: rect.y + rect.height },
+              intersection(environment.clip, { left: environment.x, top: environment.y, right: environment.x + innerWidth * environment.scaleX, bottom: environment.y + innerHeight * environment.scaleY }));
+            for (let ancestor = element.parentElement; ancestor; ancestor = ancestor.parentElement) {
+              checkBudget();
+              const css = cssFor(ancestor), box = geometry(ancestor);
+              const scaleX = ancestor.offsetWidth ? box.width / ancestor.offsetWidth : environment.scaleX;
+              const scaleY = ancestor.offsetHeight ? box.height / ancestor.offsetHeight : environment.scaleY;
+              if (['hidden','clip','scroll','auto'].includes(css.overflowX)) {
+                clip.left = Math.max(clip.left, box.x + ancestor.clientLeft * scaleX);
+                clip.right = Math.min(clip.right, box.x + (ancestor.clientLeft + ancestor.clientWidth) * scaleX);
+              }
+              if (['hidden','clip','scroll','auto'].includes(css.overflowY)) {
+                clip.top = Math.max(clip.top, box.y + ancestor.clientTop * scaleY);
+                clip.bottom = Math.min(clip.bottom, box.y + (ancestor.clientTop + ancestor.clientHeight) * scaleY);
+              }
+            }
+            return clip;
+          };
+          const pointFor = element => { const clip = visibleRect(element); return { x: (clip.left + clip.right) / 2, y: (clip.top + clip.bottom) / 2 }; };
+          const receivesPoint = (element, point) => {
+            const hit = document.elementFromPoint((point.x - environment.x) / environment.scaleX, (point.y - environment.y) / environment.scaleY);
+            return !!hit && (hit === element || element.contains(hit));
+          };
+          const reset = budgetMs => {
+            deadline = performance.now() + budgetMs;
+            styleCache = new WeakMap(); textCache = new WeakMap(); labelCache = new WeakMap(); exposureCache = new WeakMap();
+            modal = currentModal();
           };
           const state = element => {
-            const rect = geometry(element);
+            const rect = visibleRect(element);
             return {
               version: '2', accessibilityExposed: accessibilityExposed(element), readonly: (element.localName === 'textarea' ||
                 element.localName === 'input' && ['text','search','email','url','tel','password','number','date','month','week','time','datetime-local'].includes(element.type)) && element.readOnly ||
                 ['textbox','searchbox','spinbutton','combobox','listbox','checkbox','slider'].includes(role(element)) && element.getAttribute('aria-readonly') === 'true',
               rendered: rendered(element),
-              inViewport: rect.width > 0 && rect.height > 0 && rect.x < innerWidth && rect.y < innerHeight && rect.x + rect.width > 0 && rect.y + rect.height > 0,
-              enabled: !element.matches(':disabled') && !element.closest('[aria-disabled="true"]'),
+              inViewport: rect.right > rect.left && rect.bottom > rect.top,
+              enabled: environment.enabled !== false && !element.matches(':disabled') && !element.closest('[aria-disabled="true"]'),
               editable: textControl(element) && !element.readOnly && element.getAttribute('aria-readonly') !== 'true',
+              selected: ({ true: true, false: false }[element.getAttribute('aria-selected')] ?? null),
+              selectedOptionCount: element.localName === 'select' ? element.selectedOptions.length : null,
               checked: element.matches('input[type=checkbox],input[type=radio]') ? element.checked : ({ true: true, false: false }[element.getAttribute('aria-checked')] ?? null)
             };
           };
           const interactability = (element, action) => {
             const observed = state(element);
-            const pointer = ['click', 'hover', 'check', 'uncheck'].includes(action);
-            const editable = ['fill', 'type'].includes(action);
+            const pointer = ['click', 'double_click', 'right_click', 'hover', 'check', 'uncheck'].includes(action);
+            const editable = ['fill', 'type', 'clear'].includes(action);
+            const keyboard = editable || ['select', 'press', 'focus', 'blur', 'upload'].includes(action);
             const rect = geometry(element);
-            const point = { x: Math.max(0, rect.x) + (Math.min(innerWidth, rect.x + rect.width) - Math.max(0, rect.x)) / 2,
-              y: Math.max(0, rect.y) + (Math.min(innerHeight, rect.y + rect.height) - Math.max(0, rect.y)) / 2 };
-            const hit = pointer && observed.inViewport ? document.elementFromPoint(point.x, point.y) : null;
+            const hit = pointer && observed.inViewport && receivesPoint(element, pointFor(element));
             const semanticRole = role(element);
             const custom = editable ? !element.isContentEditable && !element.matches('input,textarea') && ['textbox','searchbox','spinbutton'].includes(semanticRole) :
               action === 'select' ? element.localName !== 'select' && ['combobox','listbox'].includes(semanticRole) :
               ['check','uncheck'].includes(action) ? !element.matches('input[type=checkbox],input[type=radio]') && ['checkbox','radio','switch'].includes(semanticRole) : false;
             const compatible = custom || (editable ? textControl(element) :
               action === 'select' ? element.localName === 'select' :
+              action === 'upload' ? element.matches('input[type=file]') :
+              ['focus', 'blur', 'press'].includes(action) ? element.isContentEditable || element.matches('input,textarea,select,button,a[href],summary,[tabindex]') :
               ['check', 'uncheck'].includes(action) ? element.matches('input[type=checkbox],input[type=radio]') && !(action === 'uncheck' && element.type === 'radio') : true);
             const checks = {
               compatibleControl: custom ? 'unknown' : compatible ? 'pass' : 'fail',
-              enabled: action === 'hover' ? 'not_applicable' : observed.enabled ? 'pass' : 'fail',
+              enabled: ['hover', 'inspect', 'blur'].includes(action) ? 'not_applicable' : observed.enabled ? 'pass' : 'fail',
               writable: editable ? observed.readonly ? 'fail' : 'pass' : 'not_applicable',
               viewport: pointer ? observed.inViewport ? 'pass' : 'fail' : 'not_applicable',
-              pointerReception: !pointer ? 'not_applicable' : !observed.inViewport ? 'unknown' : hit && (hit === element || element.contains(hit)) ? 'pass' : 'fail',
-              keyboard: editable || action === 'select' ? 'unknown' : 'not_applicable',
+              pointerReception: !pointer ? 'not_applicable' : !observed.inViewport ? 'unknown' : hit ? 'pass' : 'fail',
+              keyboard: keyboard ? 'unknown' : 'not_applicable',
               stability: 'unknown', eventOutcome: 'unknown'
             };
             const reasons = [];
@@ -188,11 +225,12 @@ internal static class BrowserCaptureScript
               (!element.closest('button,a,textarea,select,[contenteditable]:not([contenteditable="false"])') && [...element.childNodes].some(node => node.nodeType === Node.TEXT_NODE && normalize(node.textContent)));
           };
           const describe = (element, index) => ({
-            id: `c${index + 1}`, tag: element.localName, role: role(element), text: text(element),
-            label: label(element), placeholder: normalize(element.getAttribute('placeholder')), scope: scope(element),
-            state: { ...state(element), checked: null }, geometry: geometry(element)
+            id: `${frame.id}:c${index + 1}`, frame, tag: element.localName, role: role(element), text: text(element),
+            label: label(element), placeholder: normalize(element.getAttribute('placeholder')), scope: [...new Set([...scope(element), ...(environment.scope ?? [])])],
+            state: { ...state(element), checked: null, selected: null, selectedOptionCount: null }, geometry: geometry(element)
           });
           const nodes = [];
+          const frameElements = [];
           const candidates = [];
           let scannedCount = 0, eligibleCount = 0, unsupportedBoundaryCount = 0, bytes = 2, complete = !modalityUnknown;
           const walker = document.createTreeWalker(document, NodeFilter.SHOW_ELEMENT);
@@ -202,7 +240,8 @@ internal static class BrowserCaptureScript
               if (scannedCount === 20000) throw budgetExceeded;
               scannedCount++;
               const element = walker.currentNode;
-              if ((element.localName === 'iframe' || element.shadowRoot) && accessibilityExposed(element)) unsupportedBoundaryCount++;
+              if (element.shadowRoot && accessibilityExposed(element)) unsupportedBoundaryCount++;
+              if (element.matches('iframe,frame') && accessibilityExposed(element)) frameElements.push(element);
               if (!eligible(element)) continue;
               eligibleCount++;
               if (eligibleCount > 2000) complete = false;
@@ -266,21 +305,43 @@ internal static class BrowserCaptureScript
             return xpaths;
           };
           return {
-            data: { ...identity, frameId: 'main', capturedAt: new Date().toISOString(), candidates,
-              coverage: { scannedCount, eligibleCount, capturedCount: candidates.length, complete, errorCode: complete ? null : modalityUnknown ? 'capture_exposure_unknown' : 'capture_budget_exceeded' }, unsupportedBoundaryCount },
-            selectActions(actions) {
-              deadline = performance.now() + 2000;
-              const validated = [];
-              for (const action of actions) {
-                const result = this.select(action.candidateId, action.action, false);
-                if (result.errorCode) return result;
-                validated.push({ actionId: action.actionId, target: result.target });
-              }
-              return { actions: validated, inspectedActionId: validated.find(action => action.target)?.actionId ?? null };
+            frameElements,
+            updateEnvironment(value, budgetMs) {
+              environment = value ? JSON.parse(value) : { x:0, y:0, scaleX:1, scaleY:1, exposed:true, rendered:true, clip:{left:0,top:0,right:innerWidth,bottom:innerHeight} };
+              reset(budgetMs);
             },
-            select(candidateId, action, resetBudget = true) {
+            receivesPoint(element, point, budgetMs) { reset(budgetMs); return receivesPoint(element, point); },
+            point(candidateId, budgetMs) {
+              try { reset(budgetMs); return pointFor(nodes[candidates.findIndex(candidate => candidate.id === candidateId)]); }
+              catch (error) { if (error === budgetExceeded) return { errorCode: 'validation_budget_exceeded' }; throw error; }
+            },
+            frameInfo(element, budgetMs) {
               try {
-              if (resetBudget) deadline = performance.now() + 2000;
+              reset(budgetMs);
+              if (!element.isConnected || element.ownerDocument !== document || !frameElements.includes(element)) throw new Error('stale_frame');
+              const rect = geometry(element);
+              const scaleX = element.offsetWidth ? rect.width / element.offsetWidth : environment.scaleX;
+              const scaleY = element.offsetHeight ? rect.height / element.offsetHeight : environment.scaleY;
+              let geometrySupported = true;
+              for (let current = element; current; current = current.parentElement) {
+                checkBudget();
+                const css = cssFor(current);
+                const individualScale = css.scale === 'none' ? [] : css.scale.split(/\s+/u).map(Number);
+                const matrix = css.transform === 'none' ? null : new DOMMatrixReadOnly(css.transform);
+                if (matrix && (!matrix.is2D || matrix.b !== 0 || matrix.c !== 0 || matrix.a <= 0 || matrix.d <= 0) || css.perspective !== 'none' || css.rotate !== 'none' || individualScale.some(value => !Number.isFinite(value) || value <= 0)) geometrySupported = false;
+              }
+              return { xpath: xpathsFor(element)[0], label: label(element),
+                environment: { scope: [...new Set([...scope(element), ...(environment.scope ?? [])])], x: rect.x + element.clientLeft * scaleX, y: rect.y + element.clientTop * scaleY, scaleX: scaleX || 1, scaleY: scaleY || 1,
+                  clip: intersection(visibleRect(element), { left: rect.x + element.clientLeft * scaleX, top: rect.y + element.clientTop * scaleY,
+                    right: rect.x + (element.clientLeft + element.clientWidth) * scaleX, bottom: rect.y + (element.clientTop + element.clientHeight) * scaleY }),
+                  exposed: accessibilityExposed(element), rendered: rendered(element), enabled: state(element).enabled, geometrySupported } };
+              } catch (error) { if (error === budgetExceeded) return { errorCode: 'capture_budget_exceeded' }; throw error; }
+            },
+            data: { sessionId: identity.sessionId, pageId: identity.pageId, documentId: identity.documentId, captureId: identity.captureId, frameId: frame.id, capturedAt: new Date().toISOString(), candidates,
+              coverage: { scannedCount, eligibleCount, capturedCount: candidates.length, complete, errorCode: complete ? null : modalityUnknown ? 'capture_exposure_unknown' : 'capture_budget_exceeded' }, unsupportedBoundaryCount },
+            select(candidateId, action, budgetMs = 2000) {
+              try {
+              deadline = performance.now() + budgetMs;
               styleCache = new WeakMap(); textCache = new WeakMap(); labelCache = new WeakMap(); exposureCache = new WeakMap();
               modal = currentModal();
               if (modalityUnknown) return { errorCode: 'capture_exposure_unknown' };
@@ -294,7 +355,7 @@ internal static class BrowserCaptureScript
               if (!element.isConnected || !accessibilityExposed(element)) return { errorCode: 'stale_capture' };
               const xpaths = xpathsFor(element);
               if (!xpaths.length) return { errorCode: 'xpath_validation_failed' };
-              return { target: { candidateId, tag: element.localName, label: candidates[index].label || candidates[index].text,
+              return { target: { candidateId, frame, tag: element.localName, label: candidates[index].label || candidates[index].text,
                 xpaths, state: state(element), geometry: geometry(element), interactability: interactability(element, action) } };
               } catch (error) {
                 if (error === budgetExceeded) return { errorCode: 'validation_budget_exceeded' };
