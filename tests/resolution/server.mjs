@@ -19,8 +19,10 @@ setInterval(async () => {
  const response = await fetch('/oracle' + runQuery);
  const command = await response.json();
  if (!command) return;
- const matches = command.xpaths.map(xpath => {
-   const result = document.evaluate(xpath, document, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE);
+ const matches = (command.targets ?? command.xpaths.map(xpath => ({xpath,frameXpaths:[]}))).map(({xpath,frameXpaths}) => {
+   let scope = document;
+   for (const frameXpath of frameXpaths) scope = scope.evaluate(frameXpath, scope, null, XPathResult.FIRST_ORDERED_NODE_TYPE).singleNodeValue.contentDocument;
+   const result = scope.evaluate(xpath, scope, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE);
    return Array.from({length:result.snapshotLength}, (_,i) => result.snapshotItem(i).getAttribute('data-oracle') ?? result.snapshotItem(i).id ?? 'wrong-target');
  });
  await fetch('/observation' + runQuery,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({matches,clicks,scrollY,events})});
@@ -47,9 +49,15 @@ const server = createServer(async (request, response) => {
         "/hidden-only",
         "/offscreen",
         "/batch",
+        "/frames",
       ].includes(path)
     ) {
       let html = fixture;
+      if (path === "/frames")
+        html = html.replace(
+          "</nav>",
+          `</nav><button>Approval</button><iframe id="employee" title="Employee" src="/frame-outer?run=${encodeURIComponent(run)}" style="width:650px;height:350px"></iframe><footer style="margin-top:1800px"><span data-oracle="footer-help">Help</span></footer>`,
+        );
       if (path === "/offscreen")
         html = html.replace(
           "<nav",
@@ -98,6 +106,15 @@ const server = createServer(async (request, response) => {
         html = html.replace("</nav>", "</nav>" + "<button>Extra</button>".repeat(2100));
       response.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
       response.end(html);
+      return;
+    }
+    if (path === "/frame-outer" || path === "/frame-inner") {
+      response.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+      response.end(
+        path === "/frame-outer"
+          ? `<!doctype html><iframe id="payroll" title="Payroll" src="/frame-inner?run=${encodeURIComponent(run)}" style="width:550px;height:250px"></iframe>`
+          : `<!doctype html><section aria-label="Payroll approvals"><button data-oracle="frame-approval-first">Approval</button><button data-oracle="frame-approval-second" disabled>Approval</button><label>Notes<input data-oracle="frame-notes" readonly value="PRIVATE_FRAME_VALUE"></label></section>`,
+      );
       return;
     }
     if (path === "/health") output = { ready: true };
@@ -168,6 +185,8 @@ const server = createServer(async (request, response) => {
                               candidates.filter(
                                 (candidate) =>
                                   (!item.tag || candidate.tag === item.tag) &&
+                                  (!item.frameLabel ||
+                                    candidate.frame?.labels.includes(item.frameLabel)) &&
                                   (candidate.label === item.label || candidate.text === item.label),
                               )[item.index ?? 0]?.id ??
                               null)

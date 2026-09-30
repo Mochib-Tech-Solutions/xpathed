@@ -3,16 +3,19 @@ namespace Xpathed.Browser.Sessions;
 internal static class BrowserCaptureScript
 {
     public const string Capture = """
-        identity => {
+        async identity => {
+          let environment = JSON.parse(identity.environment);
+          const frame = JSON.parse(identity.frame);
           const capturedDocument = document;
           const capturedRoot = document.documentElement;
           const budgetExceeded = {};
-          let deadline = performance.now() + 2000;
+          let deadline = performance.now() + (identity.budgetMs ?? 2000);
           const checkBudget = () => { if (performance.now() > deadline) throw budgetExceeded; };
           let styleCache = new WeakMap();
           let textCache = new WeakMap();
           let labelCache = new WeakMap();
           let exposureCache = new WeakMap();
+          let intersections = new WeakMap();
           let modalityUnknown = false;
           const currentModal = () => {
             const modals = [...document.querySelectorAll('dialog:modal')];
@@ -49,10 +52,10 @@ internal static class BrowserCaptureScript
             }
             return allowed;
           };
-          const accessibilityExposed = element => (!modal || modal.contains(element)) && exposed(element) && !['hidden', 'collapse'].includes(cssFor(element).visibility);
+          const accessibilityExposed = element => environment.exposed && (!modal || modal.contains(element)) && exposed(element) && !['hidden', 'collapse'].includes(cssFor(element).visibility);
           const rendered = element => {
             const rect = element.getBoundingClientRect();
-            if (rect.width <= 0 || rect.height <= 0 || !accessibilityExposed(element)) return false;
+            if (!environment.rendered || rect.width <= 0 || rect.height <= 0 || !accessibilityExposed(element)) return false;
             for (let current = element; current; current = current.parentElement) {
               checkBudget();
               if (Number(cssFor(current).opacity) === 0) return false;
@@ -108,7 +111,7 @@ internal static class BrowserCaptureScript
             const scopes = [];
             for (let ancestor = element.parentElement; ancestor && ancestor !== document.body; ancestor = ancestor.parentElement) {
               checkBudget();
-              const context = label(ancestor) || text(ancestor.querySelector(':scope > legend,:scope > h1,:scope > h2,:scope > h3,:scope > h4,:scope > h5,:scope > h6'));
+              const context = label(ancestor) || (ancestor.matches('tr,[role=row]') ? text(ancestor) : '') || (ancestor.matches('header,footer,nav,main,aside') ? ancestor.localName : '') || text(ancestor.querySelector(':scope > legend,:scope > h1,:scope > h2,:scope > h3,:scope > h4,:scope > h5,:scope > h6'));
               if (context && !scopes.includes(context)) scopes.push(context);
             }
             return scopes;
@@ -127,45 +130,90 @@ internal static class BrowserCaptureScript
           };
           const textControl = element => element.isContentEditable || element.localName === 'textarea' ||
             element.localName === 'input' && ['text','search','email','url','tel','password','number'].includes(element.type);
+          const fillControl = element => textControl(element) || element.localName === 'input' &&
+            ['date','month','week','time','datetime-local'].includes(element.type);
           const geometry = element => {
             const { x, y, width, height } = element.getBoundingClientRect();
-            return { x, y, width, height };
+            return { x: environment.x + x * environment.scaleX, y: environment.y + y * environment.scaleY,
+              width: width * environment.scaleX, height: height * environment.scaleY };
+          };
+          const intersection = (a, b) => ({ left: Math.max(a.left, b.left), top: Math.max(a.top, b.top), right: Math.min(a.right, b.right), bottom: Math.min(a.bottom, b.bottom) });
+          const observeIntersections = async elements => {
+            const pending = new Set(elements);
+            intersections = new WeakMap();
+            if (!pending.size) return;
+            checkBudget();
+            let observer, timeout;
+            try {
+              await new Promise((resolve, reject) => {
+                timeout = setTimeout(() => reject(budgetExceeded), Math.max(0, deadline - performance.now()));
+                observer = new IntersectionObserver(entries => {
+                  for (const entry of entries) {
+                    const { x, y, width, height } = entry.intersectionRect;
+                    intersections.set(entry.target, { x, y, width, height });
+                    pending.delete(entry.target);
+                  }
+                  if (!pending.size) resolve();
+                }, { root: document });
+                for (const element of pending) observer.observe(element);
+              });
+              checkBudget();
+            } finally { clearTimeout(timeout); observer?.disconnect(); }
+          };
+          const visibleRect = element => {
+            const rect = intersections.get(element);
+            if (!rect || rect.width <= 0 || rect.height <= 0) return { left:0, top:0, right:0, bottom:0 };
+            return intersection(environment.clip, { left: environment.x + rect.x * environment.scaleX, top: environment.y + rect.y * environment.scaleY,
+              right: environment.x + (rect.x + rect.width) * environment.scaleX, bottom: environment.y + (rect.y + rect.height) * environment.scaleY });
+          };
+          const pointFor = element => { const clip = visibleRect(element); return { x: (clip.left + clip.right) / 2, y: (clip.top + clip.bottom) / 2 }; };
+          const receivesPoint = (element, point) => {
+            const hit = document.elementFromPoint((point.x - environment.x) / environment.scaleX, (point.y - environment.y) / environment.scaleY);
+            return !!hit && (hit === element || element.contains(hit));
+          };
+          const reset = budgetMs => {
+            deadline = performance.now() + budgetMs;
+            styleCache = new WeakMap(); textCache = new WeakMap(); labelCache = new WeakMap(); exposureCache = new WeakMap();
+            modal = currentModal();
           };
           const state = element => {
-            const rect = geometry(element);
+            const rect = visibleRect(element);
             return {
               version: '2', accessibilityExposed: accessibilityExposed(element), readonly: (element.localName === 'textarea' ||
                 element.localName === 'input' && ['text','search','email','url','tel','password','number','date','month','week','time','datetime-local'].includes(element.type)) && element.readOnly ||
                 ['textbox','searchbox','spinbutton','combobox','listbox','checkbox','slider'].includes(role(element)) && element.getAttribute('aria-readonly') === 'true',
               rendered: rendered(element),
-              inViewport: rect.width > 0 && rect.height > 0 && rect.x < innerWidth && rect.y < innerHeight && rect.x + rect.width > 0 && rect.y + rect.height > 0,
-              enabled: !element.matches(':disabled') && !element.closest('[aria-disabled="true"]'),
-              editable: textControl(element) && !element.readOnly && element.getAttribute('aria-readonly') !== 'true',
+              inViewport: rect.right > rect.left && rect.bottom > rect.top,
+              enabled: environment.enabled !== false && !element.matches(':disabled') && !element.closest('[aria-disabled="true"]'),
+              editable: fillControl(element) && !element.readOnly && element.getAttribute('aria-readonly') !== 'true',
+              selected: ({ true: true, false: false }[element.getAttribute('aria-selected')] ?? null),
+              selectedOptionCount: element.localName === 'select' ? element.selectedOptions.length : null,
               checked: element.matches('input[type=checkbox],input[type=radio]') ? element.checked : ({ true: true, false: false }[element.getAttribute('aria-checked')] ?? null)
             };
           };
           const interactability = (element, action) => {
             const observed = state(element);
-            const pointer = ['click', 'hover', 'check', 'uncheck'].includes(action);
-            const editable = ['fill', 'type'].includes(action);
+            const pointer = ['click', 'double_click', 'right_click', 'hover', 'check', 'uncheck'].includes(action);
+            const editable = ['fill', 'type', 'clear'].includes(action);
+            const keyboard = editable || ['select', 'press', 'focus', 'blur', 'upload'].includes(action);
             const rect = geometry(element);
-            const point = { x: Math.max(0, rect.x) + (Math.min(innerWidth, rect.x + rect.width) - Math.max(0, rect.x)) / 2,
-              y: Math.max(0, rect.y) + (Math.min(innerHeight, rect.y + rect.height) - Math.max(0, rect.y)) / 2 };
-            const hit = pointer && observed.inViewport ? document.elementFromPoint(point.x, point.y) : null;
+            const hit = pointer && observed.inViewport && receivesPoint(element, pointFor(element));
             const semanticRole = role(element);
             const custom = editable ? !element.isContentEditable && !element.matches('input,textarea') && ['textbox','searchbox','spinbutton'].includes(semanticRole) :
               action === 'select' ? element.localName !== 'select' && ['combobox','listbox'].includes(semanticRole) :
               ['check','uncheck'].includes(action) ? !element.matches('input[type=checkbox],input[type=radio]') && ['checkbox','radio','switch'].includes(semanticRole) : false;
-            const compatible = custom || (editable ? textControl(element) :
+            const compatible = custom || (editable ? (action === 'type' ? textControl(element) : fillControl(element)) :
               action === 'select' ? element.localName === 'select' :
+              action === 'upload' ? element.matches('input[type=file]') :
+              ['focus', 'blur', 'press'].includes(action) ? element.isContentEditable || element.matches('input,textarea,select,button,a[href],summary,[tabindex]') :
               ['check', 'uncheck'].includes(action) ? element.matches('input[type=checkbox],input[type=radio]') && !(action === 'uncheck' && element.type === 'radio') : true);
             const checks = {
               compatibleControl: custom ? 'unknown' : compatible ? 'pass' : 'fail',
-              enabled: action === 'hover' ? 'not_applicable' : observed.enabled ? 'pass' : 'fail',
+              enabled: ['hover', 'inspect', 'blur'].includes(action) ? 'not_applicable' : observed.enabled ? 'pass' : 'fail',
               writable: editable ? observed.readonly ? 'fail' : 'pass' : 'not_applicable',
               viewport: pointer ? observed.inViewport ? 'pass' : 'fail' : 'not_applicable',
-              pointerReception: !pointer ? 'not_applicable' : !observed.inViewport ? 'unknown' : hit && (hit === element || element.contains(hit)) ? 'pass' : 'fail',
-              keyboard: editable || action === 'select' ? 'unknown' : 'not_applicable',
+              pointerReception: !pointer ? 'not_applicable' : !observed.inViewport ? 'unknown' : hit ? 'pass' : 'fail',
+              keyboard: keyboard ? 'unknown' : 'not_applicable',
               stability: 'unknown', eventOutcome: 'unknown'
             };
             const reasons = [];
@@ -188,11 +236,12 @@ internal static class BrowserCaptureScript
               (!element.closest('button,a,textarea,select,[contenteditable]:not([contenteditable="false"])') && [...element.childNodes].some(node => node.nodeType === Node.TEXT_NODE && normalize(node.textContent)));
           };
           const describe = (element, index) => ({
-            id: `c${index + 1}`, tag: element.localName, role: role(element), text: text(element),
-            label: label(element), placeholder: normalize(element.getAttribute('placeholder')), scope: scope(element),
-            state: { ...state(element), checked: null }, geometry: geometry(element)
+            id: `${frame.id}:c${index + 1}`, frame, tag: element.localName, role: role(element), text: text(element),
+            label: label(element), placeholder: normalize(element.getAttribute('placeholder')), scope: [...new Set([...scope(element), ...(environment.scope ?? [])])],
+            state: { ...state(element), checked: null, selected: null, selectedOptionCount: null }, geometry: geometry(element)
           });
           const nodes = [];
+          const frameElements = [];
           const candidates = [];
           let scannedCount = 0, eligibleCount = 0, unsupportedBoundaryCount = 0, bytes = 2, complete = !modalityUnknown;
           const walker = document.createTreeWalker(document, NodeFilter.SHOW_ELEMENT);
@@ -202,16 +251,23 @@ internal static class BrowserCaptureScript
               if (scannedCount === 20000) throw budgetExceeded;
               scannedCount++;
               const element = walker.currentNode;
-              if ((element.localName === 'iframe' || element.shadowRoot) && accessibilityExposed(element)) unsupportedBoundaryCount++;
+              if (element.shadowRoot && accessibilityExposed(element)) unsupportedBoundaryCount++;
+              if (element.matches('iframe,frame') && accessibilityExposed(element)) frameElements.push(element);
               if (!eligible(element)) continue;
               eligibleCount++;
               if (eligibleCount > 2000) complete = false;
               if (!complete) continue;
-              const candidate = describe(element, candidates.length);
-              bytes += new TextEncoder().encode(JSON.stringify(candidate)).length + 1;
-              if (bytes > 512000) { complete = false; continue; }
               nodes.push(element);
-              candidates.push(candidate);
+            }
+            if (complete) {
+              await observeIntersections([...nodes, ...frameElements]);
+              for (const element of nodes) {
+                checkBudget();
+                const candidate = describe(element, candidates.length);
+                bytes += new TextEncoder().encode(JSON.stringify(candidate)).length + 1;
+                if (bytes > 512000) { complete = false; break; }
+                candidates.push(candidate);
+              }
             }
           } catch (error) {
             if (error !== budgetExceeded) throw error;
@@ -220,15 +276,16 @@ internal static class BrowserCaptureScript
           if (!complete) { nodes.length = 0; candidates.length = 0; }
           const literal = value => !value.includes("'") ? `'${value}'` : !value.includes('"') ? `"${value}"` : `concat(${value.split("'").map(part => `'${part}'`).join(`,"'",`)})`;
           const tag = element => element.namespaceURI === 'http://www.w3.org/1999/xhtml' ? element.localName : `*[local-name()=${literal(element.localName)}]`;
-          const testAttributes = ['data-testid', 'data-test', 'data-cy', 'data-qa'];
+          const testAttributes = ['data-testid', 'data-test-id', 'data-test', 'data-cy', 'data-qa'];
           const stableAttributes = ['id', 'name', 'aria-label', 'placeholder', 'alt', 'title'];
           const attributes = (element, names) => names.filter(name => {
             const value = element.getAttribute(name);
-            return value && !/https?:\/\//u.test(value) && (name !== 'id' || !/(?:[a-f\d]{16}|\d{5}|^:|^\d+$)/iu.test(value));
+            return value && !/https?:\/\//u.test(value) && (name !== 'id' || !/(?:[a-f\d]{16}|\d{5}|^:|^\d+$|[a-f\d]{8}-[a-f\d]{4}-[a-f\d]{4}-[a-f\d]{4}-[a-f\d]{12})/iu.test(value));
           }).map(name => `@${name}=${literal(element.getAttribute(name))}`);
           const xpathsFor = element => {
             const xpaths = [];
             const add = xpath => {
+              checkBudget();
               const matches = document.evaluate(xpath, document, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
               if (matches.snapshotLength !== 1 || matches.snapshotItem(0) !== element) return false;
               xpaths.push(xpath);
@@ -245,14 +302,28 @@ internal static class BrowserCaptureScript
               if (labelText && element.id && associatedLabel.htmlFor === element.id && add(`//${tag(element)}[@id=//label[normalize-space(.)=${literal(labelText)}]/@for]`)) return xpaths;
             }
             for (const predicate of semanticPredicates) if (add(`//${tag(element)}[${predicate}]`)) return xpaths;
+            const targetPredicates = [...testPredicates, ...stablePredicates];
+            for (let first = 0; first < targetPredicates.length; first++) {
+              for (let second = first + 1; second < targetPredicates.length; second++) {
+                if (add(`//${tag(element)}[${targetPredicates[first]} and ${targetPredicates[second]}]`)) return xpaths;
+              }
+            }
             for (let ancestor = element.parentElement; ancestor && ancestor !== document.body; ancestor = ancestor.parentElement) {
               checkBudget();
               const predicates = [...attributes(ancestor, testAttributes), ...attributes(ancestor, stableAttributes)];
               const heading = ancestor.querySelector(':scope > legend,:scope > h1,:scope > h2,:scope > h3,:scope > h4,:scope > h5,:scope > h6');
               if (heading && text(heading)) predicates.push(`${tag(heading)}[normalize-space(.)=${literal(text(heading))}]`);
-              for (const context of predicates) {
-                for (const predicate of [...testPredicates, ...stablePredicates, ...semanticPredicates]) if (add(`//${tag(ancestor)}[${context}]//${tag(element)}[${predicate}]`)) return xpaths;
-                if (add(`//${tag(ancestor)}[${context}]//${tag(element)}`)) return xpaths;
+              if (ancestor.matches('tr,[role=row]')) {
+                for (const cell of ancestor.children) {
+                  if (cell.matches('td,th,[role=cell],[role=rowheader],[role=gridcell]') && text(cell))
+                    predicates.push(`${tag(cell)}[normalize-space(.)=${literal(text(cell))}]`);
+                }
+              }
+              const prefixes = predicates.map(context => `//${tag(ancestor)}[${context}]`);
+              if (ancestor.matches('header,footer,nav,main,aside')) prefixes.push(`//${tag(ancestor)}`);
+              for (const prefix of prefixes) {
+                for (const predicate of [...targetPredicates, ...semanticPredicates]) if (add(`${prefix}//${tag(element)}[${predicate}]`)) return xpaths;
+                if (add(`${prefix}//${tag(element)}`)) return xpaths;
               }
             }
             if (!xpaths.length) {
@@ -266,21 +337,47 @@ internal static class BrowserCaptureScript
             return xpaths;
           };
           return {
-            data: { ...identity, frameId: 'main', capturedAt: new Date().toISOString(), candidates,
-              coverage: { scannedCount, eligibleCount, capturedCount: candidates.length, complete, errorCode: complete ? null : modalityUnknown ? 'capture_exposure_unknown' : 'capture_budget_exceeded' }, unsupportedBoundaryCount },
-            selectActions(actions) {
-              deadline = performance.now() + 2000;
-              const validated = [];
-              for (const action of actions) {
-                const result = this.select(action.candidateId, action.action, false);
-                if (result.errorCode) return result;
-                validated.push({ actionId: action.actionId, target: result.target });
-              }
-              return { actions: validated, inspectedActionId: validated.find(action => action.target)?.actionId ?? null };
-            },
-            select(candidateId, action, resetBudget = true) {
+            frameElements,
+            async updateEnvironment(value, budgetMs) {
               try {
-              if (resetBudget) deadline = performance.now() + 2000;
+                environment = value ? JSON.parse(value) : { x:0, y:0, scaleX:1, scaleY:1, exposed:true, rendered:true, clip:{left:0,top:0,right:innerWidth,bottom:innerHeight} };
+                reset(budgetMs);
+                await observeIntersections([...nodes, ...frameElements]);
+                return {};
+              } catch (error) { if (error === budgetExceeded) return { errorCode: 'validation_budget_exceeded' }; throw error; }
+            },
+            receivesPoint(element, point, budgetMs) { reset(budgetMs); return receivesPoint(element, point); },
+            point(candidateId, budgetMs) {
+              try { reset(budgetMs); return pointFor(nodes[candidates.findIndex(candidate => candidate.id === candidateId)]); }
+              catch (error) { if (error === budgetExceeded) return { errorCode: 'validation_budget_exceeded' }; throw error; }
+            },
+            frameInfo(element, budgetMs) {
+              try {
+              reset(budgetMs);
+              if (!element.isConnected || element.ownerDocument !== document || !frameElements.includes(element)) throw new Error('stale_frame');
+              const rect = geometry(element);
+              const scaleX = element.offsetWidth ? rect.width / element.offsetWidth : environment.scaleX;
+              const scaleY = element.offsetHeight ? rect.height / element.offsetHeight : environment.scaleY;
+              let geometrySupported = true;
+              for (let current = element; current; current = current.parentElement) {
+                checkBudget();
+                const css = cssFor(current);
+                const individualScale = css.scale === 'none' ? [] : css.scale.split(/\s+/u).map(Number);
+                const matrix = css.transform === 'none' ? null : new DOMMatrixReadOnly(css.transform);
+                if (matrix && (!matrix.is2D || matrix.b !== 0 || matrix.c !== 0 || matrix.a <= 0 || matrix.d <= 0) || css.perspective !== 'none' || css.rotate !== 'none' || individualScale.some(value => !Number.isFinite(value) || value <= 0)) geometrySupported = false;
+              }
+              return { xpath: xpathsFor(element)[0], label: label(element),
+                environment: { scope: [...new Set([...scope(element), ...(environment.scope ?? [])])], x: rect.x + element.clientLeft * scaleX, y: rect.y + element.clientTop * scaleY, scaleX: scaleX || 1, scaleY: scaleY || 1,
+                  clip: intersection(visibleRect(element), { left: rect.x + element.clientLeft * scaleX, top: rect.y + element.clientTop * scaleY,
+                    right: rect.x + (element.clientLeft + element.clientWidth) * scaleX, bottom: rect.y + (element.clientTop + element.clientHeight) * scaleY }),
+                  exposed: accessibilityExposed(element), rendered: rendered(element), enabled: state(element).enabled, geometrySupported } };
+              } catch (error) { if (error === budgetExceeded) return { errorCode: 'capture_budget_exceeded' }; throw error; }
+            },
+            data: { sessionId: identity.sessionId, pageId: identity.pageId, documentId: identity.documentId, captureId: identity.captureId, frameId: frame.id, capturedAt: new Date().toISOString(), candidates,
+              coverage: { scannedCount, eligibleCount, capturedCount: candidates.length, complete, errorCode: complete ? null : modalityUnknown ? 'capture_exposure_unknown' : 'capture_budget_exceeded' }, unsupportedBoundaryCount },
+            select(candidateId, action, budgetMs = 2000) {
+              try {
+              deadline = performance.now() + budgetMs;
               styleCache = new WeakMap(); textCache = new WeakMap(); labelCache = new WeakMap(); exposureCache = new WeakMap();
               modal = currentModal();
               if (modalityUnknown) return { errorCode: 'capture_exposure_unknown' };
@@ -294,7 +391,7 @@ internal static class BrowserCaptureScript
               if (!element.isConnected || !accessibilityExposed(element)) return { errorCode: 'stale_capture' };
               const xpaths = xpathsFor(element);
               if (!xpaths.length) return { errorCode: 'xpath_validation_failed' };
-              return { target: { candidateId, tag: element.localName, label: candidates[index].label || candidates[index].text,
+              return { target: { candidateId, frame, tag: element.localName, label: candidates[index].label || candidates[index].text,
                 xpaths, state: state(element), geometry: geometry(element), interactability: interactability(element, action) } };
               } catch (error) {
                 if (error === budgetExceeded) return { errorCode: 'validation_budget_exceeded' };

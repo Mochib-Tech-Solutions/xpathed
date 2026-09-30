@@ -17,8 +17,8 @@ public sealed partial class ResolutionService(IHttpClientFactory clients, OpenRo
         var schema = multiple ? ActionSelectionStrategy.Schema : CandidateSelectionStrategy.Schema;
         var outputTokens = multiple ? ActionSelectionStrategy.OutputTokens : 512;
         var strategy = configuration["Resolution:Strategy"] ?? "candidate-selection-v1";
-        var diagnostics = new ResolutionDiagnostics { Stage = "configuration", Strategy = strategy, PromptVersion = multiple ? "3" : "2" };
-        var configurationId = gateway.ConfigurationId(strategy, prompt, schema, diagnostics.ModelInputBudgetBytes, outputTokens, diagnostics.PromptVersion);
+        var diagnostics = new ResolutionDiagnostics { Stage = "configuration", Strategy = strategy, PromptVersion = multiple ? "6" : "5" };
+        var configurationId = gateway.ConfigurationId(strategy, prompt, schema, diagnostics.ModelInputBudgetBytes, outputTokens, diagnostics.PromptVersion, multiple ? ActionSelectionStrategy.MaximumActions : 1);
         try
         {
             if (strategy != "candidate-selection-v1")
@@ -51,7 +51,7 @@ public sealed partial class ResolutionService(IHttpClientFactory clients, OpenRo
                 capture.Coverage.ScannedCount < capture.Candidates.Length || capture.Candidates.Any(candidate =>
                     candidate is null || string.IsNullOrWhiteSpace(candidate.Id) || candidate.Id.Length > 80 ||
                     candidate.Tag is null || candidate.Role is null || candidate.Text is null || candidate.Label is null ||
-                    candidate.Placeholder is null || candidate.Scope is null || candidate.State is null || candidate.Geometry is null) ||
+                    candidate.Placeholder is null || candidate.Scope is null || candidate.State is null || candidate.Geometry is null || !ValidFrame(candidate.Frame, request.DocumentId)) ||
                 capture.Candidates.Select(candidate => candidate.Id).Distinct(StringComparer.Ordinal).Count() != capture.Candidates.Length)
             {
                 throw new ApiException(502, "invalid_browser_capture", "The browser returned inconsistent candidates or coverage.");
@@ -102,7 +102,7 @@ public sealed partial class ResolutionService(IHttpClientFactory clients, OpenRo
                 {
                     var verified = validation.Actions[index];
                     if (verified is null || verified.ActionId != requestedActions[index].ActionId ||
-                        (item.Outcome == "found" ? !ValidTarget(verified.Target, item.CandidateId, item.Action) : verified.Target is not null))
+                        (item.Outcome == "found" ? !ValidTarget(verified.Target, item.CandidateId, item.Action, capture.Candidates.Single(candidate => candidate.Id == item.CandidateId).Frame) : verified.Target is not null))
                     {
                         throw new ApiException(502, "invalid_browser_selection", "The browser did not verify every action's target.");
                     }
@@ -116,7 +116,7 @@ public sealed partial class ResolutionService(IHttpClientFactory clients, OpenRo
                         _ => item.Outcome == "not_found" ? "No matching element found in the eligible current-page scope." : null
                     };
                     return new ActionResolution(verified.ActionId, index + 1, item.Step, item.Instruction, item.Action,
-                        unsupportedScope ? "unsupported" : item.Outcome, verified.Target, capture.FrameId, attemptId, code, message);
+                        unsupportedScope ? "unsupported" : item.Outcome, verified.Target, verified.Target?.Frame?.Id ?? capture.FrameId, attemptId, code, message);
                 }).ToArray();
                 var inspected = results.FirstOrDefault(item => item.Target is not null)?.ActionId;
                 if (validation.InspectedActionId != inspected)
@@ -142,7 +142,7 @@ public sealed partial class ResolutionService(IHttpClientFactory clients, OpenRo
             var validated = await selectionResponse.Content.ReadFromJsonAsync<SelectionValidation>(cancellationToken)
                 ?? throw new ApiException(502, "invalid_upstream_response", "The browser returned an invalid selection.");
             if (selection.Outcome == "found"
-                ? !ValidTarget(validated.Target, selection.CandidateId, selection.Action)
+                ? !ValidTarget(validated.Target, selection.CandidateId, selection.Action, capture.Candidates.Single(candidate => candidate.Id == selection.CandidateId).Frame)
                 : validated.Target is not null)
             {
                 throw new ApiException(502, "invalid_browser_selection", "The browser did not verify the selected target.");
@@ -188,7 +188,7 @@ public sealed partial class ResolutionService(IHttpClientFactory clients, OpenRo
         {
             diagnostics.TimingsMs["total"] = timer.Elapsed.TotalMilliseconds;
             return new ResolutionResult(request.ContractVersion, outcome, capture?.SessionId, pageId, request.DocumentId,
-                capture?.CaptureId, capture?.FrameId, traceId, attemptId, configurationId,
+                capture?.CaptureId, target?.Frame?.Id ?? capture?.FrameId, traceId, attemptId, configurationId,
                 action, target, diagnostics, multiple ? [] : null);
         }
     }
@@ -196,9 +196,19 @@ public sealed partial class ResolutionService(IHttpClientFactory clients, OpenRo
     [LoggerMessage(Level = LogLevel.Warning, Message = "Resolution failed: {Code} {TraceId} {AttemptId}")]
     private static partial void LogFailure(ILogger logger, string code, string traceId, string attemptId);
 
-    private static bool ValidTarget(ResolvedTarget? target, string? candidateId, string action) =>
-        target is not null && target.CandidateId == candidateId && target.Xpaths is { Length: 1 } &&
+    private static bool ValidTarget(ResolvedTarget? target, string? candidateId, string action, TargetFrame? frame) =>
+        target is not null && SameFrame(target.Frame, frame) && target.CandidateId == candidateId && target.Xpaths is { Length: 1 } &&
         !target.Xpaths.Any(string.IsNullOrWhiteSpace) && target.State is not null && target.Geometry is not null && ValidInteractability(target, action);
+
+    private static bool ValidFrame(TargetFrame? frame, string documentId) => frame is null ||
+        !string.IsNullOrWhiteSpace(frame.Id) && !string.IsNullOrWhiteSpace(frame.DocumentId) && frame.Chain is { Length: <= 63 } &&
+        (frame.Id == "main" ? frame.Chain.Length == 0 && frame.DocumentId == documentId : frame.Chain.Length > 0 && frame.Chain[^1]?.FrameId == frame.Id) &&
+        frame.Chain.All(ancestor => ancestor is not null && !string.IsNullOrWhiteSpace(ancestor.FrameId) && !string.IsNullOrWhiteSpace(ancestor.Xpath) && ancestor.Label is not null) &&
+        frame.Chain.Select(ancestor => ancestor.FrameId).Distinct(StringComparer.Ordinal).Count() == frame.Chain.Length;
+
+    private static bool SameFrame(TargetFrame? actual, TargetFrame? expected) => actual is null ? expected is null :
+        expected is not null && actual.Id == expected.Id && actual.DocumentId == expected.DocumentId &&
+        actual.Chain is not null && actual.Chain.SequenceEqual(expected.Chain);
 
     private static bool ValidInteractability(ResolvedTarget target, string action)
     {

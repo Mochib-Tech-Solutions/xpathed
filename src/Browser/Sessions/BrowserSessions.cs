@@ -1,5 +1,4 @@
 using System.Collections.Concurrent;
-using System.Text.Json;
 using Microsoft.Playwright;
 using Xpathed.Common.Contracts;
 using Xpathed.Common.Http;
@@ -11,7 +10,6 @@ public sealed class BrowserSessions(IConfiguration configuration, ILogger<Browse
     private readonly ConcurrentDictionary<string, BrowserSessionRuntime> sessions = new();
     private readonly SemaphoreSlim creation = new(1);
     private readonly int capacity = Math.Clamp(configuration.GetValue("MaxSessions", 4), 1, 16);
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     public async Task<BrowserSession> CreateAsync(CancellationToken token)
     {
@@ -182,21 +180,15 @@ public sealed class BrowserSessions(IConfiguration configuration, ILogger<Browse
         await page.ClearCaptureAsync();
         page.CaptureId = Guid.NewGuid().ToString("N");
         var captureId = page.CaptureId;
-        page.Capture = await page.Page.EvaluateHandleAsync(BrowserCaptureScript.Capture, new
-        {
-            sessionId = s.Id,
-            pageId = page.Id,
-            documentId = request.DocumentId,
-            captureId
-        });
-        var result = await page.Capture.EvaluateAsync<JsonElement>("capture => capture.data");
+        page.Capture = new BrowserPageCapture(page);
+        var result = await page.Capture.CaptureAsync(s.Id, request.DocumentId, captureId);
         await RequireFocusedDocumentAsync(s, page, request.DocumentId);
         if (page.CaptureId != captureId)
         {
             throw new ApiException(409, "stale_capture", "This capture is no longer current.");
         }
 
-        return result.Deserialize<CandidateCapture>(JsonOptions)!;
+        return result;
     }, token);
 
     public Task<SelectionValidation> SelectAsync(string pageId, SelectionRequest request, CancellationToken token)
@@ -205,9 +197,9 @@ public sealed class BrowserSessions(IConfiguration configuration, ILogger<Browse
         return OnPageAsync(pageId, async (session, page) =>
         {
             page.ActionSelections = null;
-            var result = await EvaluateCaptureAsync(session, page, request.DocumentId, request.CaptureId,
-                "(capture, selection) => capture.select(selection.candidateId, selection.action)", new { candidateId = request.CandidateId, action = request.Action });
-            var selection = result.Deserialize<SelectionValidation>(JsonOptions)!;
+            var result = await ValidateActionsAsync(session, page, request.DocumentId, request.CaptureId,
+                [new ActionSelection("single", request.CandidateId, request.Action)]);
+            var selection = new SelectionValidation(result.Actions[0].Target);
             await HighlightTargetAsync(session, page, request.DocumentId, request.CaptureId, selection.Target);
             return selection;
         }, token);
@@ -230,10 +222,7 @@ public sealed class BrowserSessions(IConfiguration configuration, ILogger<Browse
         return OnPageAsync(pageId, async (session, page) =>
         {
             page.ActionSelections = null;
-            var actions = request.Actions.Select(action => new { actionId = action.ActionId, candidateId = action.CandidateId, action = action.Action }).ToArray();
-            var result = await EvaluateCaptureAsync(session, page, request.DocumentId, request.CaptureId,
-                "(capture, actions) => capture.selectActions(actions)", actions);
-            var validation = result.Deserialize<ActionSelectionValidation>(JsonOptions)!;
+            var validation = await ValidateActionsAsync(session, page, request.DocumentId, request.CaptureId, request.Actions);
             await HighlightTargetAsync(session, page, request.DocumentId, request.CaptureId, validation.Actions.FirstOrDefault(action => action.Target is not null)?.Target);
             page.ActionSelections = request.Actions.ToDictionary(action => action.ActionId, StringComparer.Ordinal);
             return validation;
@@ -247,16 +236,15 @@ public sealed class BrowserSessions(IConfiguration configuration, ILogger<Browse
         {
             throw new ApiException(409, "unknown_action", "This action has no verified target in the current capture.");
         }
-        var result = await EvaluateCaptureAsync(session, page, request.DocumentId, request.CaptureId,
-            "(capture, selection) => capture.select(selection.candidateId, selection.action)", new { candidateId = action.CandidateId, action = action.Action });
-        var selection = result.Deserialize<SelectionValidation>(JsonOptions)!;
+        var result = await ValidateActionsAsync(session, page, request.DocumentId, request.CaptureId, [action]);
+        var selection = new SelectionValidation(result.Actions[0].Target);
         await HighlightTargetAsync(session, page, request.DocumentId, request.CaptureId, selection.Target);
         return new ValidatedAction(action.ActionId, selection.Target);
     }, token);
 
     private static void RequireAction(string action)
     {
-        if (action is not ("click" or "hover" or "fill" or "type" or "select" or "check" or "uncheck" or "unsupported"))
+        if (action is not ("click" or "double_click" or "right_click" or "hover" or "fill" or "type" or "clear" or "select" or "check" or "uncheck" or "press" or "focus" or "blur" or "upload" or "inspect" or "unsupported"))
         {
             throw new ApiException(400, "invalid_action", "The requested action is not supported.");
         }
@@ -271,64 +259,34 @@ public sealed class BrowserSessions(IConfiguration configuration, ILogger<Browse
         }
     }
 
-    private static async Task<JsonElement> EvaluateCaptureAsync(BrowserSessionRuntime session, BrowserPageRuntime page, string documentId, string captureId, string expression, object argument)
+    private static async Task<ActionSelectionValidation> ValidateActionsAsync(BrowserSessionRuntime session, BrowserPageRuntime page, string documentId, string captureId, ActionSelection[] actions)
     {
         await RequireCaptureAsync(session, page, documentId, captureId);
-        var result = await page.Capture!.EvaluateAsync<JsonElement>(expression, argument);
-        await RequireCaptureAsync(session, page, documentId, captureId);
-        if (result.TryGetProperty("errorCode", out var error))
+        try
+        {
+            var result = await page.Capture!.SelectAsync(actions);
+            await RequireCaptureAsync(session, page, documentId, captureId);
+            return result;
+        }
+        catch
         {
             await page.ClearHighlightAsync();
-            throw new ApiException(409, error.GetString()!, "The selected target is no longer valid in this capture.");
+            throw;
         }
-        return result;
     }
 
     private static async Task HighlightTargetAsync(BrowserSessionRuntime session, BrowserPageRuntime page, string documentId, string captureId, ResolvedTarget? target)
     {
         await page.ClearHighlightAsync();
-        if (target is not null)
-        {
-            var resolved = await page.Highlight!.SendAsync("Runtime.evaluate", new Dictionary<string, object>
-            {
-                ["expression"] = "(() => { const nodes = document.evaluate(" + JsonSerializer.Serialize(target.Xpaths[0]) +
-                    ", document, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null); return nodes.snapshotLength === 1 ? nodes.snapshotItem(0) : null; })()"
-            });
-            if (!resolved!.Value.GetProperty("result").TryGetProperty("objectId", out var objectId))
-            {
-                throw new ApiException(409, "stale_capture", "The selected target is no longer available to highlight.");
-            }
-            try
-            {
-                var revalidated = await EvaluateCaptureAsync(session, page, documentId, captureId,
-                    "(capture, selection) => capture.select(selection.candidateId, selection.action)",
-                    new { candidateId = target.CandidateId, action = target.Interactability!.Action });
-                var currentTarget = revalidated.Deserialize<SelectionValidation>(JsonOptions)!.Target;
-                if (currentTarget?.Xpaths[0] != target.Xpaths[0])
-                {
-                    throw new ApiException(409, "stale_capture", "The selected target changed before it could be highlighted.");
-                }
-                await page.Highlight.SendAsync("Overlay.highlightNode", new Dictionary<string, object>
-                {
-                    ["objectId"] = objectId.GetString()!,
-                    ["highlightConfig"] = new
-                    {
-                        showInfo = false,
-                        contentColor = new { r = 59, g = 130, b = 246, a = 0.18 },
-                        borderColor = new { r = 37, g = 99, b = 235, a = 1 }
-                    }
-                });
-            }
-            finally
-            {
-                try
-                { await page.Highlight.SendAsync("Runtime.releaseObject", new Dictionary<string, object> { ["objectId"] = objectId.GetString()! }); }
-                catch (PlaywrightException) { }
-            }
-        }
         try
-        { await RequireCaptureAsync(session, page, documentId, captureId); }
-        catch (ApiException)
+        {
+            if (target is not null)
+            {
+                await page.Capture!.HighlightAsync(target);
+            }
+            await RequireCaptureAsync(session, page, documentId, captureId);
+        }
+        catch
         {
             await page.ClearHighlightAsync();
             throw;

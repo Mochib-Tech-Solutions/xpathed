@@ -48,6 +48,11 @@ export type ResolutionResult = {
     tag: string;
     label: string;
     xpaths: string[];
+    frame?: {
+      id: string;
+      documentId: string;
+      chain: { frameId: string; xpath: string; label: string }[];
+    } | null;
     state: {
       rendered: boolean;
       inViewport: boolean;
@@ -57,6 +62,8 @@ export type ResolutionResult = {
       version?: "1" | "2";
       accessibilityExposed?: boolean | null;
       readonly?: boolean | null;
+      selected?: boolean | null;
+      selectedOptionCount?: number | null;
     };
     interactability?: {
       version: "1" | "2";

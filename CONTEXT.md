@@ -54,8 +54,14 @@ The ordered record of instructions and their results for a managed page, includi
 **Page document**:
 The current document within a managed page. Navigation can replace the document while keeping the managed page itself.
 
+**Frame document**:
+A document embedded within a page or another frame. Its target locations are relative to that document.
+
+**Frame chain**:
+The ordered containing frames from the main page to a target's frame document.
+
 **Candidate capture**:
-A temporary inventory of eligible candidate elements from one page document. Its candidate identities refer only to that captured inventory.
+A temporary inventory of eligible candidate elements from a page and its supported frame documents. Its candidate identities refer only to that captured inventory.
 
 **Off-screen element**:
 An element present in the current page content but outside the visible viewport. This is distinct from an element concealed by the application's display state.
