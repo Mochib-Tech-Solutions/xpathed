@@ -135,10 +135,18 @@ describe("Workspace resolution", () => {
     ).not.toBeInTheDocument();
     expect(within(transcript).queryByText(/1 target found/)).not.toBeInTheDocument();
     expect(within(transcript).getByText(found.target.xpaths[0]!)).toBeVisible();
-    expect(within(transcript).getByRole("button", { name: "Inspect action 1" })).toBeEnabled();
+    expect(
+      within(transcript).queryByRole("button", { name: /Inspect action/ }),
+    ).not.toBeInTheDocument();
+    expect(within(transcript).queryByText(found.target.xpaths[1]!)).not.toBeInTheDocument();
+    expect(
+      within(transcript).queryByText(/Verified XPaths|alternative XPath|State details/),
+    ).not.toBeInTheDocument();
+    expect(within(transcript).getByText("Interaction readiness unknown.")).toBeVisible();
+    expect(within(transcript).getByText("Off-screen")).toBeVisible();
   });
 
-  it("renders independent action results and inspects a target with one request cost", async () => {
+  it("renders independent action results with one request cost and no inspection control", async () => {
     const batch = {
       ...found,
       contractVersion: "2",
@@ -194,20 +202,7 @@ describe("Workspace resolution", () => {
     expect(screen.getByText(/Hover Contact/)).toBeInTheDocument();
     expect(screen.getByText("I couldn’t find that element on this page.")).toBeInTheDocument();
     expect(screen.getAllByText("Cost unavailable")).toHaveLength(1);
-    await user.click(screen.getByRole("button", { name: "Inspect action 1" }));
-    await waitFor(() =>
-      expect(fetch).toHaveBeenCalledWith(
-        "/api/pages/page-1/highlight",
-        expect.objectContaining({
-          method: "POST",
-          body: JSON.stringify({
-            documentId: "document-1",
-            captureId: "capture-1",
-            actionId: "a1",
-          }),
-        }),
-      ),
-    );
+    expect(screen.queryByRole("button", { name: /Inspect action/ })).not.toBeInTheDocument();
     expect(fetch).toHaveBeenCalledWith(
       "/api/pages/page-1/resolve",
       expect.objectContaining({
@@ -221,6 +216,7 @@ describe("Workspace resolution", () => {
   });
 
   it.each([
+    ["ready", [], "Interaction checks passed."],
     ["blocked", ["disabled", "off_screen"], "Interaction blocked."],
     ["unknown", [], "Interaction readiness unknown."],
     ["unsupported", ["custom_control_unverified"], "Interaction assessment unsupported."],
@@ -234,7 +230,7 @@ describe("Workspace resolution", () => {
             target: {
               ...found.target,
               interactability: {
-                version: "1",
+                version: status === "ready" ? "2" : "1",
                 action: "click",
                 status,
                 reasons,
@@ -247,9 +243,7 @@ describe("Workspace resolution", () => {
       );
       const user = await openWorkspace();
       await submitInstruction(user);
-      expect(await screen.findByText(message)).not.toBeVisible();
-      await user.click(screen.getByText("State details"));
-      expect(screen.getByText(message)).toBeVisible();
+      expect(await screen.findByText(message)).toBeVisible();
       expect(screen.getByRole("heading", { name: "Pay now" })).toBeInTheDocument();
       expect(screen.getByText("Resolution time: 125 ms")).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Copy XPath 1" })).toBeInTheDocument();
@@ -559,6 +553,9 @@ describe("Workspace resolution", () => {
 
     expect(screen.getByRole("heading", { name: "Pay now" })).toBeInTheDocument();
     expect(screen.getByText(/Earlier result/)).toBeInTheDocument();
+    expect(screen.getByText(found.target.xpaths[0]!)).toBeVisible();
+    expect(screen.queryByText(found.target.xpaths[1]!)).not.toBeInTheDocument();
+    expect(screen.getByText("Interaction readiness unavailable.")).toBeVisible();
   });
 
   it("closes all tabs and clears chat without creating a replacement session", async () => {
@@ -876,12 +873,10 @@ describe("Workspace resolution", () => {
     expect(
       await screen.findByText("I couldn’t find that element on this page."),
     ).toBeInTheDocument();
-    expect(
-      screen.queryByRole("list", { name: "Verified XPath alternatives" }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Copy XPath 1" })).not.toBeInTheDocument();
   });
 
-  it("resolves the managed page and displays one target with ordered copyable XPaths and state", async () => {
+  it("resolves the managed page and displays one copyable XPath with inline state", async () => {
     const user = userEvent.setup();
     const fetch = vi.fn<typeof globalThis.fetch>((input, options) => {
       const path =
@@ -917,12 +912,9 @@ describe("Workspace resolution", () => {
     await user.click(screen.getByRole("button", { name: "Resolve instruction" }));
 
     expect(await screen.findByRole("heading", { name: "Pay now" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Copy XPath 2" })).not.toBeVisible();
-    await user.click(screen.getByText("1 alternative XPath"));
-    expect(screen.getByRole("button", { name: "Copy XPath 2" })).toBeVisible();
-    expect(
-      screen.getAllByRole("listitem").map((item) => item.querySelector("code")?.textContent),
-    ).toEqual(found.target.xpaths);
+    expect(screen.queryByRole("button", { name: "Copy XPath 2" })).not.toBeInTheDocument();
+    expect(screen.queryByText(found.target.xpaths[1]!)).not.toBeInTheDocument();
+    expect(screen.queryByText("1 alternative XPath")).not.toBeInTheDocument();
     expect(screen.getByText("Off-screen")).toBeInTheDocument();
     expect(screen.getByText("Disabled")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Copy XPath 1" }));

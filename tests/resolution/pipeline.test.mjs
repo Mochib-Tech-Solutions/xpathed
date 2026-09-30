@@ -79,7 +79,7 @@ test("A plural current-page prompt keeps independent targets, blocked state, mis
       unsupported: 1,
       errors: 0,
       blocked: 2,
-      readinessUnknown: 1,
+      readinessUnknown: 0,
       assessmentUnsupported: 0,
     });
     assert.equal(result.diagnostics.modelCalls, 1);
@@ -200,7 +200,7 @@ test("instruction resolves through client, resolver, provider and managed browse
     assert.equal(result.pageId, session.pageId);
     assert.equal(result.documentId, page.documentId);
     assert.equal(result.action, "click");
-    assert.ok(result.target.xpaths.length > 0);
+    assert.equal(result.target.xpaths.length, 1);
     assert.match(result.target.xpaths[0], /@data-testid='about-us'/);
     await json(`${fixture}/oracle?run=${run}`, "POST", { xpaths: result.target.xpaths });
     let observed;
@@ -252,12 +252,13 @@ test("genuine absence is a semantic not_found after full capture and current-doc
   }
 });
 
-test("ClientApi preserves disabled click and hover assessments and scopes hidden-only absence", async () => {
+test("ClientApi preserves disabled, off-screen and hover assessments and scopes hidden-only absence", async () => {
   const session = await json(`${client}/api/sessions`, "POST");
   try {
     for (const [path, action, outcome, status] of [
       ["state", "click", "found", "blocked"],
-      ["state", "hover", "found", "unknown"],
+      ["state", "hover", "found", "ready"],
+      ["offscreen", "click", "found", "blocked"],
       ["hidden-only", "click", "not_found", null],
     ]) {
       await json(`${fixture}/scenario`, "POST", {
@@ -278,7 +279,7 @@ test("ClientApi preserves disabled click and hover assessments and scopes hidden
         assert.equal(result.target.interactability.action, action);
         assert.equal(result.target.state.version, "2");
         assert.equal(result.diagnostics.promptVersion, "2");
-        assert.ok(result.target.xpaths.length > 0);
+        assert.equal(result.target.xpaths.length, 1);
       } else assert.match(result.diagnostics.message, /eligible current-page scope/);
       const input = JSON.stringify(await json(`${fixture}/provider-request`));
       assert.doesNotMatch(input, /HIDDEN_DUPLICATE|PRIVATE_REFERENCE_VALUE/);
@@ -330,7 +331,7 @@ test("private form values and browser secrets never reach the model while Unicod
   }
 });
 
-test("duplicate test attributes and both quote types still yield unique same-node XPath alternatives", async () => {
+test("duplicate test attributes and both quote types still yield one unique same-node XPath", async () => {
   await json(`${fixture}/scenario`, "POST", { name: "found" });
   const session = await json(`${client}/api/sessions`, "POST");
   const run = randomUUID();
@@ -410,7 +411,7 @@ test("ClientApi tab routes preserve active-page resolution and one stable sessio
     assert.equal(result.pageId, page.pageId);
     assert.equal(result.documentId, page.documentId);
     assert.equal(result.target.label, targetText);
-    assert.ok(result.target.xpaths.length > 0);
+    assert.equal(result.target.xpaths.length, 1);
     await json(`${fixture}/oracle?run=${run}`, "POST", { xpaths: result.target.xpaths });
     let observation;
     for (let attempt = 0; attempt < 100; attempt++) {
