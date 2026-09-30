@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
-import { once } from "node:events";
+import { on, once } from "node:events";
 import test from "node:test";
 
 const browserUrl = process.env.XPATHED_BROWSER_URL ?? "http://browser:8080";
@@ -11,7 +11,8 @@ const oracleScript = `<script>
       const endpoint = '?page=' + encodeURIComponent(location.pathname);
       const response = await fetch('/oracle' + endpoint);
       if (response.status === 204) return;
-      const { xpaths = [], replaceTarget, reload, click, open, focusPopup, close, cookie } = await response.json();
+      const { xpaths = [], replaceTarget, reload, click, open, focusPopup, close, cookie, scrollToY } = await response.json();
+      if (scrollToY !== undefined) scrollTo(0, scrollToY);
       if (cookie) document.cookie = cookie;
       if (click) document.querySelector(click).click();
       if (open) window.fixturePopup = window.open(open.url, open.name ?? '_blank', open.features ?? '');
@@ -33,6 +34,72 @@ const oracleScript = `<script>
 const targetMarkup = `<section aria-label="Employee"><h2>Employee</h2>
   <button id="expected-target" data-testid="about-us" onclick="this.dataset.clicks = '1'">About us</button>
 </section>`;
+
+// Read-only RFB 3.8 client for the public viewer seam; requests raw pixels, never input events.
+async function withFramebuffer(session, check) {
+  const socket = new WebSocket(`${browserUrl.replace("http", "ws")}${session.viewPath}`, {
+    headers: { Origin: process.env.XPATHED_VIEWER_ORIGIN ?? "http://localhost:8081" },
+  });
+  socket.binaryType = "arraybuffer";
+  const messages = on(socket, "message", { signal: AbortSignal.timeout(15000) });
+  let buffered = Buffer.alloc(0);
+  async function read(size) {
+    while (buffered.length < size) {
+      const {
+        value: [message],
+      } = await messages.next();
+      buffered = Buffer.concat([buffered, Buffer.from(message.data)]);
+    }
+    const result = buffered.subarray(0, size);
+    buffered = buffered.subarray(size);
+    return result;
+  }
+  try {
+    assert.equal((await read(12)).toString(), "RFB 003.008\n");
+    socket.send(Buffer.from("RFB 003.008\n"));
+    const securityTypes = await read((await read(1))[0]);
+    assert.ok(securityTypes.includes(1));
+    socket.send(Uint8Array.of(1));
+    assert.equal((await read(4)).readUInt32BE(), 0);
+    socket.send(Uint8Array.of(1));
+    const initialization = await read(24);
+    const width = initialization.readUInt16BE(0),
+      height = initialization.readUInt16BE(2);
+    await read(initialization.readUInt32BE(20));
+    socket.send(
+      Uint8Array.from([0, 0, 0, 0, 32, 24, 0, 1, 0, 255, 0, 255, 0, 255, 16, 8, 0, 0, 0, 0]),
+    );
+    socket.send(Uint8Array.from([2, 0, 0, 1, 0, 0, 0, 0]));
+    let firstFrame = true;
+    const pixels = Buffer.alloc(width * height * 4);
+    await check(async () => {
+      const update = Buffer.alloc(10);
+      update[0] = 3;
+      update[1] = firstFrame ? 0 : 1;
+      firstFrame = false;
+      update.writeUInt16BE(width, 6);
+      update.writeUInt16BE(height, 8);
+      socket.send(update);
+      const header = await read(4);
+      assert.equal(header[0], 0);
+      for (let index = 0; index < header.readUInt16BE(2); index++) {
+        const rectangle = await read(12);
+        const x = rectangle.readUInt16BE(0),
+          y = rectangle.readUInt16BE(2);
+        const w = rectangle.readUInt16BE(4),
+          h = rectangle.readUInt16BE(6);
+        assert.equal(rectangle.readInt32BE(8), 0);
+        const data = await read(w * h * 4);
+        for (let row = 0; row < h; row++)
+          data.copy(pixels, ((y + row) * width + x) * 4, row * w * 4, (row + 1) * w * 4);
+      }
+      return { pixels, width, height };
+    });
+  } finally {
+    await messages.return();
+    socket.close();
+  }
+}
 
 test("Viewer disconnect completes its WebSocket close handshake and can reconnect", async () => {
   await withFixture(targetMarkup, async (session) => {
@@ -268,7 +335,7 @@ test("Browser captures and highlights the independently identified target withou
       candidateId: candidate.id,
       action: "click",
     });
-    assert.ok(selection.target.xpaths.length > 0);
+    assert.deepEqual(selection.target.xpaths, ["//button[@data-testid='about-us']"]);
     const after = await verify(selection.target.xpaths);
     assert.deepEqual(
       after.matches,
@@ -280,6 +347,8 @@ test("Browser captures and highlights the independently identified target withou
     assert.equal(selection.target.state.rendered, true);
     assert.equal(selection.target.state.enabled, true);
     assert.equal(selection.target.state.inViewport, true);
+    assert.equal(selection.target.interactability.status, "ready");
+    assert.equal(selection.target.interactability.checks.eventOutcome, "unknown");
   });
 });
 
@@ -293,7 +362,7 @@ test("Disabled click and hover keep the same target with different action readin
       const candidate = capture.candidates.find((entry) => entry.text === "Disabled action");
       for (const [action, status] of [
         ["click", "blocked"],
-        ["hover", "unknown"],
+        ["hover", "ready"],
       ]) {
         const { target } = await request(`/pages/${session.pageId}/selection`, {
           documentId: page.documentId,
@@ -302,7 +371,7 @@ test("Disabled click and hover keep the same target with different action readin
           action,
         });
         assert.equal(target.state.version, "2");
-        assert.equal(target.interactability.version, "1");
+        assert.equal(target.interactability.version, "2");
         assert.equal(target.interactability.action, action);
         assert.equal(target.interactability.status, status);
         assert.equal(
@@ -315,6 +384,92 @@ test("Disabled click and hover keep the same target with different action readin
           target.xpaths.map(() => ["expected-target"]),
         );
       }
+    },
+  );
+});
+
+test("An offscreen target retains one verified path without moving the page and becomes ready after user scrolling", async () => {
+  await withFixture(
+    '<button id="expected-target" style="position:absolute;top:2200px;width:240px;height:100px">Footer gallery</button>',
+    async (session, page) => {
+      const capture = await request(`/pages/${page.pageId}/capture`, {
+        documentId: page.documentId,
+      });
+      const candidate = capture.candidates.find((entry) => entry.label === "Footer gallery");
+      const selection = {
+        documentId: page.documentId,
+        captureId: capture.captureId,
+        candidateId: candidate.id,
+        action: "click",
+      };
+      const before = await observe();
+      const { target } = await request(`/pages/${page.pageId}/selection`, selection);
+      assert.equal(target.xpaths.length, 1);
+      assert.equal(target.state.inViewport, false);
+      assert.equal(target.interactability.status, "blocked");
+      assert.ok(target.interactability.reasons.includes("off_screen"));
+      assert.equal((await observe()).scrollY, before.scrollY);
+      const scrolled = await observe({ scrollToY: 2100, xpaths: target.xpaths });
+      assert.ok(scrolled.scrollY > before.scrollY);
+      assert.deepEqual(scrolled.matches, [["expected-target"]]);
+      assert.equal(scrolled.nodeCount, before.nodeCount);
+      const current = await request(`/pages/${page.pageId}/selection`, selection);
+      assert.equal(current.target.state.inViewport, true);
+      assert.equal(current.target.interactability.status, "ready");
+      assert.equal((await observe()).scrollY, scrolled.scrollY);
+    },
+  );
+});
+
+test("The public viewer paints an offscreen target highlight after scrolling and clears it on a new capture", async () => {
+  await withFixture(
+    '<style>body { margin:0; background:white; height:3200px; } button { position:absolute; top:2200px; left:100px; width:240px; height:100px; background:white; border:0; }</style><button id="expected-target">Footer gallery</button>',
+    async (session, page) => {
+      const capture = await request(`/pages/${page.pageId}/capture`, {
+        documentId: page.documentId,
+      });
+      const candidate = capture.candidates.find((entry) => entry.label === "Footer gallery");
+      await request(`/pages/${page.pageId}/selection`, {
+        documentId: page.documentId,
+        captureId: capture.captureId,
+        candidateId: candidate.id,
+        action: "click",
+      });
+      assert.equal((await observe()).scrollY, 0);
+      await withFramebuffer(session, async (frame) => {
+        const bluePixels = ({ pixels, width }, top) => {
+          let count = 0;
+          for (let y = top + 10; y < top + 40; y++)
+            for (let x = 110; x < 330; x++) {
+              const offset = (y * width + x) * 4;
+              if (
+                pixels[offset] > pixels[offset + 2] + 15 &&
+                pixels[offset + 1] > pixels[offset + 2] + 5
+              )
+                count++;
+            }
+          return count;
+        };
+        assert.equal(bluePixels(await frame(), 100), 0);
+        await observe({ scrollToY: 2100 });
+        let highlighted = 0;
+        for (let attempt = 0; attempt < 20 && highlighted < 500; attempt++) {
+          highlighted = bluePixels(await frame(), 100);
+          if (highlighted < 500) await new Promise((resolve) => setTimeout(resolve, 50));
+        }
+        assert.ok(
+          highlighted >= 500,
+          `Expected blue target pixels after scrolling, got ${highlighted}`,
+        );
+        await request(`/pages/${page.pageId}/capture`, { documentId: page.documentId });
+        let remaining = highlighted;
+        for (let attempt = 0; attempt < 20 && remaining; attempt++) {
+          remaining = bluePixels(await frame(), 100);
+          if (remaining) await new Promise((resolve) => setTimeout(resolve, 50));
+        }
+        assert.equal(remaining, 0);
+        assert.equal((await observe()).scrollY, 2100);
+      });
     },
   );
 });
@@ -408,13 +563,13 @@ test("Action readiness explains readonly, incompatible, covered, pointer and cus
       for (const [name, action, status, reason] of [
         ["Readonly field", "fill", "blocked", "readonly"],
         ["Readonly field", "type", "blocked", "readonly"],
-        ["Readonly field", "click", "unknown", null],
+        ["Readonly field", "click", "ready", null],
         ["Plain button", "fill", "blocked", "incompatible_control"],
         ["Blocked pointer", "hover", "blocked", "pointer_events_none"],
         ["Covered", "click", "blocked", "obstructed_at_hit_point"],
         ["Select country", "select", "unknown", null],
-        ["Check choice", "check", "unknown", null],
-        ["Check choice", "uncheck", "unknown", null],
+        ["Check choice", "check", "ready", null],
+        ["Check choice", "uncheck", "ready", null],
         ["Radio choice", "uncheck", "blocked", "incompatible_control"],
         ["Custom select", "select", "unsupported", "custom_control_unverified"],
         ["Custom editor", "fill", "blocked", "readonly"],
@@ -611,11 +766,12 @@ test("Capture preserves control labels, Unicode, scope and observed state withou
   );
 });
 
-test("XPath alternatives escape both quote types and use meaningful context for duplicate attributes", async () => {
+test("The single preferred XPath escapes both quote types and uses meaningful context for duplicate attributes", async () => {
   await withFixture(
     `<section aria-label="Employee"><button data-oracle="expected-target" data-testid="shared">OK</button></section>
     <section aria-label="Other"><button data-testid="shared">OK</button></section>
-    <button data-oracle="quoted-target" data-testid="He said &quot;don't&quot;">Quoted</button>`,
+    <button data-oracle="quoted-target" data-testid="He said &quot;don't&quot;">Quoted</button>
+    <div id="app"><a href="#unique" data-oracle="unique-target">Unique gallery</a></div>`,
     async (session, page) => {
       const capture = await request(`/pages/${session.pageId}/capture`, {
         documentId: page.documentId,
@@ -630,6 +786,7 @@ test("XPath alternatives escape both quote types and use meaningful context for 
         action: "click",
       });
       assert.ok(selection.target.xpaths[0].includes("Employee"));
+      assert.equal(selection.target.xpaths.length, 1);
       assert.ok(
         selection.target.xpaths.every((xpath) => !xpath.includes("[@data-testid='shared'][1]")),
       );
@@ -645,10 +802,20 @@ test("XPath alternatives escape both quote types and use meaningful context for 
         action: "click",
       });
       assert.ok(quotedSelection.target.xpaths[0].includes("concat("));
+      assert.equal(quotedSelection.target.xpaths.length, 1);
       assert.deepEqual(
         (await verify(quotedSelection.target.xpaths)).matches,
         quotedSelection.target.xpaths.map(() => ["quoted-target"]),
       );
+      const unique = capture.candidates.find((candidate) => candidate.tag === "a");
+      const uniqueSelection = await request(`/pages/${session.pageId}/selection`, {
+        documentId: page.documentId,
+        captureId: capture.captureId,
+        candidateId: unique.id,
+        action: "click",
+      });
+      assert.deepEqual(uniqueSelection.target.xpaths, ["//a[normalize-space(.)='Unique gallery']"]);
+      assert.deepEqual((await verify(uniqueSelection.target.xpaths)).matches, [["unique-target"]]);
     },
   );
 });
@@ -1116,9 +1283,14 @@ test("Native new-window links and feature popups become fullscreen tabs with the
       await waitForSession(session.sessionId, (state) =>
         state.pages.some((entry) => entry.pageId === popupId && entry.url.endsWith("?reused=1")),
       );
-      // Request focus after navigation replaces the popup document, avoiding its focus reset.
-      await observe({}, "/feature-popup");
-      await observe({ focusPopup: true });
+      // Chromium may ignore focus while a reused native window is settling.
+      // Establish native focus first, then independently check managed-page routing.
+      let nativeFocused = false;
+      for (let attempt = 0; attempt < 20 && !nativeFocused; attempt++) {
+        await observe({ focusPopup: true });
+        nativeFocused = (await observe({}, "/feature-popup")).focused;
+      }
+      assert.equal(nativeFocused, true, "Reused popup did not receive native focus");
       const reused = await waitForSession(
         session.sessionId,
         (state) =>

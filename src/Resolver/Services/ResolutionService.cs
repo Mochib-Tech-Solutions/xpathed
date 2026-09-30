@@ -197,7 +197,7 @@ public sealed partial class ResolutionService(IHttpClientFactory clients, OpenRo
     private static partial void LogFailure(ILogger logger, string code, string traceId, string attemptId);
 
     private static bool ValidTarget(ResolvedTarget? target, string? candidateId, string action) =>
-        target is not null && target.CandidateId == candidateId && target.Xpaths is { Length: > 0 } &&
+        target is not null && target.CandidateId == candidateId && target.Xpaths is { Length: 1 } &&
         !target.Xpaths.Any(string.IsNullOrWhiteSpace) && target.State is not null && target.Geometry is not null && ValidInteractability(target, action);
 
     private static bool ValidInteractability(ResolvedTarget target, string action)
@@ -211,13 +211,15 @@ public sealed partial class ResolutionService(IHttpClientFactory clients, OpenRo
         {
             return false;
         }
-        string[] values = [checks.CompatibleControl, checks.Enabled, checks.Writable, checks.Viewport, checks.PointerReception, checks.Keyboard, checks.Stability, checks.EventOutcome];
+        string[] readiness = [checks.CompatibleControl, checks.Enabled, checks.Writable, checks.Viewport, checks.PointerReception, checks.Keyboard];
+        string[] values = [.. readiness, checks.Stability, checks.EventOutcome];
         return target.State.Version == "2" && target.State.AccessibilityExposed == true && target.State.Readonly is not null &&
-            assessment is { Version: "1", Reasons: not null, Checks: not null } && assessment.Action == action &&
-            assessment.Status is "blocked" or "unknown" or "unsupported" &&
+            assessment is { Version: "1" or "2", Reasons: not null, Checks: not null } && assessment.Action == action &&
+            (assessment.Status is "blocked" or "unknown" or "unsupported" || assessment is { Version: "2", Status: "ready" }) &&
             assessment.Reasons.All(reason => !string.IsNullOrWhiteSpace(reason)) &&
             values.All(value => value is "pass" or "fail" or "unknown" or "not_applicable") &&
             checks.EventOutcome == "unknown" &&
+            (assessment.Status != "ready" || readiness.All(value => value is "pass" or "not_applicable") && readiness.Contains("pass", StringComparer.Ordinal)) &&
             (assessment.Status == "blocked") == values.Contains("fail", StringComparer.Ordinal);
     }
 
