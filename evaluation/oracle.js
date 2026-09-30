@@ -4,6 +4,84 @@
   if (window.top !== window) return;
   const query = `?trial=${encodeURIComponent(new URL(location.href).searchParams.get("trial"))}`;
   let baseline;
+  const nodeIds = new WeakMap();
+  let nextNodeId = 1;
+  function nodeId(node) {
+    if (!nodeIds.has(node)) nodeIds.set(node, `node-${nextNodeId++}`);
+    return nodeIds.get(node);
+  }
+  function eligible(node) {
+    if (node?.nodeType !== 1 || !node.isConnected) return false;
+    const doc = node.ownerDocument;
+    const view = doc.defaultView;
+    const modal = doc.querySelector("dialog:modal");
+    if (modal && !modal.contains(node)) return false;
+    if (["hidden", "collapse"].includes(view.getComputedStyle(node).visibility)) return false;
+    for (let current = node; current; current = current.parentElement) {
+      const css = view.getComputedStyle(current);
+      if (
+        current.matches("script,style,noscript,template,input[type=hidden]") ||
+        current.hasAttribute("inert") ||
+        (current.getAttribute("aria-hidden")?.toLowerCase() === "true" &&
+          !current.contains(doc.activeElement)) ||
+        css.display === "none" ||
+        css.contentVisibility === "hidden"
+      )
+        return false;
+      if (
+        current.parentElement?.matches("details:not([open])") &&
+        current !== current.parentElement.querySelector(":scope > summary")
+      )
+        return false;
+    }
+    return !view.frameElement || eligible(view.frameElement);
+  }
+  // Controlled fixture parity only; this is not a security or privacy hash.
+  // The Node runner records source integrity separately with SHA-256.
+  function checksum(value) {
+    let result = 2166136261;
+    for (let index = 0; index < value.length; index++)
+      result = Math.imul(result ^ value.charCodeAt(index), 16777619);
+    return `fnv1a32-utf16:${(result >>> 0).toString(16).padStart(8, "0")}`;
+  }
+  function environment() {
+    const docs = documents();
+    const identify = (node) => (node ? { tag: node.localName, id: node.id || null } : null);
+    return {
+      viewport: { width: innerWidth, height: innerHeight },
+      userAgent: navigator.userAgent,
+      language: navigator.language,
+      languages: [...navigator.languages],
+      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      initialState: docs.map((doc) => ({
+        scroll: [doc.defaultView.scrollX, doc.defaultView.scrollY],
+        active: identify(doc.activeElement),
+        fields: [...doc.querySelectorAll("input,textarea,select,[contenteditable]")].map(
+          (node) => ({
+            ...identify(node),
+            type: node.type ?? null,
+            checked: node.checked ?? null,
+            selectedIndex: node.selectedIndex ?? null,
+            fieldStateChecksum: checksum(
+              JSON.stringify({
+                value: node.value ?? node.textContent,
+                selected: node.options ? [...node.options].map((option) => option.selected) : null,
+              }),
+            ),
+          }),
+        ),
+      })),
+      documentChecksum: docs.map((doc) => {
+        const clone = doc.documentElement.cloneNode(true);
+        for (const node of clone.querySelectorAll("input,textarea,select,[contenteditable]")) {
+          node.removeAttribute("value");
+          if (node.matches("textarea,[contenteditable]")) node.textContent = "";
+        }
+        const html = clone.outerHTML.replace(/([?&](?:amp;)?trial=)[^&#"'<> ]*/gu, "$1normalized");
+        return checksum(html);
+      }),
+    };
+  }
   function documents() {
     const list = [document];
     for (let i = 0; i < list.length; i++)
@@ -20,6 +98,7 @@
         node.value ?? node.textContent,
         node.checked,
         node.selectedIndex,
+        node.options ? JSON.stringify([...node.options].map((option) => option.selected)) : null,
       ]),
     }));
   }
@@ -68,9 +147,25 @@
       matches: (action.target?.xpaths ?? []).map((xpath) => {
         try {
           const nodes = matches(action.target, xpath);
-          return { count: nodes.length, intended: nodes.length === 1 && nodes[0] === expected[i] };
+          return {
+            count: nodes.length,
+            intended: nodes.length === 1 && nodes[0] === expected[i],
+            expectedIndices:
+              nodes.length === 1
+                ? expected.flatMap((node, index) => (node === nodes[0] ? [index] : []))
+                : [],
+            nodeId: nodes.length === 1 ? nodeId(nodes[0]) : null,
+            eligible: nodes.length === 1 && eligible(nodes[0]),
+          };
         } catch {
-          return { count: 0, intended: false, invalid: true };
+          return {
+            count: 0,
+            intended: false,
+            expectedIndices: [],
+            nodeId: null,
+            eligible: false,
+            invalid: true,
+          };
         }
       }),
     }));
@@ -161,10 +256,7 @@
               requestAnimationFrame(() => requestAnimationFrame(resolve)),
             );
             baseline = state();
-            result = {
-              viewport: { width: innerWidth, height: innerHeight },
-              userAgent: navigator.userAgent,
-            };
+            result = environment();
           } else if (command.kind === "mutate") {
             mutate(command.mutation);
             baseline = state();

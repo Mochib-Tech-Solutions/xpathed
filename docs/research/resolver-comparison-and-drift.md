@@ -1,5 +1,7 @@
 # Resolver comparisons and provider drift
 
+This is historical design research. The implemented, pinned v4 comparison and current serving/budget decisions are documented in the [Stagehand comparison report](stagehand-comparison-report.md) and [evaluation contract](../evaluation.md). Older v3 or gateway proposals below are not runtime configuration.
+
 Research checked 2026-09-29. Recommendations below are proposed evaluation design, not implemented behavior or measured results.
 
 The accepted gateway is OpenRouter only. Zen references below preserve earlier research and do not call for a Zen adapter or gateway comparison. See specification issue #1 and the OpenRouter section of [model selection research](fast-model-selection.md).
@@ -16,10 +18,10 @@ Use the same fixture revision, prepared state, viewport, scroll position, locale
 
 Two comparisons answer different questions:
 
-| Comparison | Hold fixed | What it answers |
-| --- | --- | --- |
-| Controlled | Provider endpoint/model, supported inference parameters, task limits, browser state | How the resolution strategies differ under comparable model access |
-| Native configuration | Cases, grading, browser state; disclose each strategy's selected model/settings | Which complete configuration gives the best quality, latency, and cost |
+| Comparison           | Hold fixed                                                                          | What it answers                                                        |
+| -------------------- | ----------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| Controlled           | Provider endpoint/model, supported inference parameters, task limits, browser state | How the resolution strategies differ under comparable model access     |
+| Native configuration | Cases, grading, browser state; disclose each strategy's selected model/settings     | Which complete configuration gives the best quality, latency, and cost |
 
 Stagehand supports provider/model configuration, custom endpoints, and an AI SDK client integration. Validate the chosen Zen protocol/model combination before declaring it supported. If an inference setting cannot be matched, disclose it rather than claiming a controlled comparison. [Model configuration](https://docs.stagehand.dev/v3/configuration/models)
 

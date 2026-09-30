@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { reserveCharge, makeCase, lexicalSelection } from "./dataset-run.mjs";
+import {
+  assertReconciledCharges,
+  reserveCharge,
+  makeCase,
+  lexicalSelection,
+} from "./dataset-run.mjs";
 import { gradeTrial } from "./grader.mjs";
 
 test("the shared spending ceiling includes reservations and refuses the next unaffordable call", () => {
@@ -16,6 +21,20 @@ test("the shared spending ceiling includes reservations and refuses the next una
   assert.throws(() => reserveCharge(ledger, 0.6, "next"), /budget/i);
   assert.equal(ledger.entries.length, 3);
   assert.throws(() => reserveCharge(ledger, NaN, "invalid"), /charge/i);
+});
+
+test("both live runners block unknown and excessive retained charges until reconciliation", () => {
+  for (const reportedUsd of [null, undefined, 0.011]) {
+    assert.throws(
+      () => assertReconciledCharges({ entries: [{ reservedUsd: 0.01, reportedUsd }] }),
+      /Unreconciled prior attempt/,
+    );
+  }
+  assert.doesNotThrow(() => assertReconciledCharges({ entries: [] }));
+  for (const reportedUsd of [0, 0.005, 0.01])
+    assert.doesNotThrow(() =>
+      assertReconciledCharges({ entries: [{ reservedUsd: 0.01, reportedUsd }] }),
+    );
 });
 
 test("source-only labels measure target identity without inventing annotated actions or browser state", () => {
