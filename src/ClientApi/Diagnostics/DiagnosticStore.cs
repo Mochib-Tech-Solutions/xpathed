@@ -412,6 +412,7 @@ public sealed class DiagnosticStore(AppDbContext database, TimeProvider clock, I
                 }
                 if (
                     name == "capture"
+                    && property.Value.ValueKind != JsonValueKind.Number
                     && (
                         property.Value.ValueKind != JsonValueKind.Object
                         || property

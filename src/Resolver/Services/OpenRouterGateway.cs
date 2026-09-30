@@ -69,27 +69,44 @@ public sealed class OpenRouterGateway(IHttpClientFactory clients, IConfiguration
             SHA256.HashData(
                 Encoding.UTF8.GetBytes(
                     JsonSerializer.Serialize(
-                        new
-                        {
+                        DescribeConfiguration(
                             strategy,
-                            promptVersion,
-                            captureVersion = "4",
-                            stateVersion = "2",
-                            interactabilityVersion = "2",
-                            xpathVersion = "3",
-                            endpoint = Uri.TryCreate(endpoint, UriKind.Absolute, out var address)
-                                ? address.AbsoluteUri
-                                : endpoint,
-                            timeoutSeconds = timeoutSeconds.ToString("R", CultureInfo.InvariantCulture),
+                            prompt,
+                            schema,
                             modelInputBudgetBytes,
-                            responseCache = false,
-                            maximumActions,
-                            request = CreateRequest(prompt, string.Empty, schema, outputTokens),
-                        }
+                            outputTokens,
+                            promptVersion,
+                            maximumActions
+                        )
                     )
                 )
             )
         );
+
+    internal object DescribeConfiguration(
+        string strategy,
+        string prompt,
+        JsonElement schema,
+        int modelInputBudgetBytes,
+        int outputTokens,
+        string promptVersion,
+        int maximumActions
+    ) =>
+        new
+        {
+            strategy,
+            promptVersion,
+            captureVersion = "4",
+            stateVersion = "2",
+            interactabilityVersion = "2",
+            xpathVersion = "3",
+            endpoint = Uri.TryCreate(endpoint, UriKind.Absolute, out var address) ? address.AbsoluteUri : endpoint,
+            timeoutSeconds = timeoutSeconds.ToString("R", CultureInfo.InvariantCulture),
+            modelInputBudgetBytes,
+            responseCache = false,
+            maximumActions,
+            request = CreateRequest(prompt, string.Empty, schema, outputTokens),
+        };
 
     private object CreateRequest(string prompt, string input, JsonElement schema, int outputTokens) =>
         new

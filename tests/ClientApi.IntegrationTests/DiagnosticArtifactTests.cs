@@ -8,6 +8,38 @@ namespace Xpathed.ClientApi.IntegrationTests;
 
 public sealed class DiagnosticArtifactTests(PersistenceFixture database) : IClassFixture<PersistenceFixture>
 {
+    [Fact]
+    public async Task EvaluationCaptureTimingsSurviveImportAndExport()
+    {
+        await using var app = database.Create(new ResolverHandler());
+        using var client = app.CreateClient();
+        var id = Guid.NewGuid().ToString("N");
+        var artifact = Artifact(id, DateTimeOffset.UtcNow);
+        artifact["kind"] = "evaluation";
+        artifact["result"]!["diagnostics"] = new JsonObject { ["timingsMs"] = new JsonObject { ["capture"] = 12.5 } };
+        artifact["result"]!["grade"] = new JsonObject
+        {
+            ["metrics"] = new JsonObject { ["stageTimingsMs"] = new JsonObject { ["capture"] = 12.5 } },
+        };
+        using var imported = await client.PostAsJsonAsync("/internal/diagnostics/import", artifact);
+        Assert.Equal(HttpStatusCode.OK, imported.StatusCode);
+        var exported = await client.GetFromJsonAsync<JsonElement>($"/internal/diagnostics/{id}");
+        var result = exported.GetProperty("result");
+        Assert.Equal(
+            12.5,
+            result.GetProperty("diagnostics").GetProperty("timingsMs").GetProperty("capture").GetDouble()
+        );
+        Assert.Equal(
+            12.5,
+            result
+                .GetProperty("grade")
+                .GetProperty("metrics")
+                .GetProperty("stageTimingsMs")
+                .GetProperty("capture")
+                .GetDouble()
+        );
+    }
+
     [Theory]
     [InlineData("modelInput", "{\"candidates\":[{\"value\":\"violet-cactus-782\"}]}")]
     [InlineData("configurationJson", "{\"apiKey\":\"violet-cactus-782\"}")]
@@ -97,6 +129,20 @@ public sealed class DiagnosticArtifactTests(PersistenceFixture database) : IClas
         request.Headers.Add("Origin", "http://localhost");
         using var forbidden = await client.SendAsync(request);
         Assert.Equal(HttpStatusCode.Forbidden, forbidden.StatusCode);
+    }
+
+    [Theory]
+    [InlineData("\"page-only-label\"")]
+    [InlineData("[\"page-only-label\"]")]
+    [InlineData("{\"label\":\"page-only-label\"}")]
+    public async Task NonMetricCapturePayloadCannotBypassEvidenceRetention(string payload)
+    {
+        await using var app = database.Create(new ResolverHandler());
+        using var client = app.CreateClient();
+        var artifact = Artifact(Guid.NewGuid().ToString("N"), DateTimeOffset.UtcNow);
+        artifact["result"]!["capture"] = JsonNode.Parse(payload);
+        using var response = await client.PostAsJsonAsync("/internal/diagnostics/import", artifact);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
     [Theory]

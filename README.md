@@ -70,6 +70,7 @@ src/Web/src/
   lib/                   Shared frontend helpers
 docs/                    Runtime contracts, decisions and research
 scripts/                 Workspace commands and CI change selection
+evaluation/              Independent fixtures, case manifest, runner and grading
 ```
 
 Each .NET API uses controller classes with attribute routes and constructor injection. `Program.cs` composes services and middleware. Keep one named C# type per matching file, namespaces aligned with folders, and service behavior in the owning project. `Common` contains only code shared across services. New projects belong in `Xpathed.slnx` and the affected-path rules in `scripts/ci-changes.mjs`.
@@ -96,6 +97,8 @@ Root commands are defined in `package.json`. Host C# build and formatting comman
 | `pnpm diagnostics -- <command>`                               | Inspect/export/import internal records; see [diagnostics](docs/diagnostics.md) |
 | `pnpm test:resolution`                                        | Run the explicit deterministic Docker resolution checks                        |
 | `pnpm test:resolution:live`                                   | Check the actual OpenRouter route with a configured API key                    |
+| `pnpm evaluate` / `pnpm evaluate:live`                         | Run independent deterministic or explicitly paid resolution evaluation          |
+| `pnpm evaluate:replay RUN_DIRECTORY`                          | Regrade saved evaluation evidence without a browser or provider                  |
 | `pnpm docker:up` / `pnpm docker:down`                         | Start runtime images or stop project containers                                |
 | `pnpm docker:build` / `pnpm docker:check`                     | Build runtime images or validate Docker definitions                            |
 | `pnpm docker:logs` / `pnpm docker:status`                     | Inspect running services                                                       |
@@ -107,13 +110,15 @@ Root commands are defined in `package.json`. Host C# build and formatting comman
 
 GitHub Actions selects affected .NET projects, Web and repository tooling from changed paths. Shared code selects its consumers; documentation-only changes skip application builds. Solution changes also build `Xpathed.slnx`. Formatting, lint, build and validation failures feed one final `check` result.
 
-Docker definitions have a separate validation job. A dedicated persistence job starts only an isolated PostgreSQL service and joins the aggregate `check` result. CI does not build application images or start the full application stack. Branch-protection availability depends on the private repository account plan; a green workflow alone does not establish enforced merge protection. The live check pins DeepSeek V4.1 Flash through Wafer with reasoning disabled, a 4,096-token output cap for action lists and 512 for legacy calls. Runtime requests have no provider price filter. It makes at most two requests and checks reported cost against a one-cent total. The explicit resolution checks start a separate `xpathed-resolution` stack on loopback port 8081 and stop its containers afterward; the live check runs Browser and Resolver without ClientApi or PostgreSQL. Live model evaluation, release qualification and verified branch/review controls are later roadmap work.
+Docker definitions have a separate validation job. A dedicated persistence job starts only an isolated PostgreSQL service and joins the aggregate `check` result. CI does not build application images or start the full application stack. Branch-protection availability depends on the private repository account plan; a green workflow alone does not establish enforced merge protection. The live resolution check pins DeepSeek V4.1 Flash through Wafer with reasoning disabled, a 4,096-token output cap for action lists and 512 for legacy calls. Runtime requests have no provider price filter. That narrow check makes at most two requests and checks reported cost against a one-cent total. The explicit resolution checks start a separate `xpathed-resolution` stack on loopback port 8081 and stop its containers afterward; the live check runs Browser and Resolver without ClientApi or PostgreSQL.
+
+The [independent evaluator](docs/evaluation.md) uses a separate `xpathed-evaluation` project with Browser, Resolver and labelled fixtures. It records every trial and separates intended-target grading from XPath validity. Deterministic runner/fixture/grader tests run in the tooling CI job; browser evaluations and paid live runs remain explicit. Saved reports can be regraded without services. Numerical qualification thresholds and a genuine held-out suite remain unset, so passing the initial suite does not approve a release.
 
 ## Roadmap
 
 GitHub Issues hold the live requirements, dependencies and progress. The next capabilities are:
 
-- [Build independent evaluation (#6)](https://github.com/Mochib-Tech-Solutions/xpathed/issues/6), [adapt external datasets (#7)](https://github.com/Mochib-Tech-Solutions/xpathed/issues/7), [compare Stagehand (#8)](https://github.com/Mochib-Tech-Solutions/xpathed/issues/8) and [qualify fast model configurations (#9)](https://github.com/Mochib-Tech-Solutions/xpathed/issues/9).
+- [Adapt external datasets (#7)](https://github.com/Mochib-Tech-Solutions/xpathed/issues/7), [compare Stagehand (#8)](https://github.com/Mochib-Tech-Solutions/xpathed/issues/8) and [qualify fast model configurations (#9)](https://github.com/Mochib-Tech-Solutions/xpathed/issues/9).
 - [Extend verified PR/post-merge controls (#10)](https://github.com/Mochib-Tech-Solutions/xpathed/issues/10) and [add release promotion, rollback and drift monitoring (#11)](https://github.com/Mochib-Tech-Solutions/xpathed/issues/11).
 
 These links describe planned work, not available features. Hosting and presentation work are deferred. Consult the live tickets before starting a slice; research notes may describe alternatives that were not adopted.
@@ -121,6 +126,7 @@ These links describe planned work, not available features. Hosting and presentat
 ## Reference
 
 - [Runtime, API contracts and configuration](docs/runtime.md)
+- [Independent evaluation, artifacts and replay](docs/evaluation.md)
 - [Domain vocabulary](CONTEXT.md) and [architecture decisions](docs/adr/)
 - [Controller and Docker conventions](docs/research/2026-09-29-controllers-and-docker-layout.md)
 - [UI and repository guidance sources](docs/research/2026-09-29-ui-and-repository-guidance.md)

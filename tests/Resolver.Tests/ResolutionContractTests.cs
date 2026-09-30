@@ -12,6 +12,84 @@ namespace Xpathed.Resolver.Tests;
 public sealed class ResolutionContractTests
 {
     [Theory]
+    [InlineData("1", 512, 1, "5")]
+    [InlineData("2", 4096, 16, "6")]
+    public async Task DiagnosticConfigurationDescribesEffectiveSettingsWithoutCredentialsOrPageInput(
+        string version,
+        int outputTokens,
+        int maximumActions,
+        string promptVersion
+    )
+    {
+        var handler = new DeterministicServicesHandler
+        {
+            ProviderBody =
+                version == "2"
+                    ? ProviderSelection(
+                        """{"complete":true,"actions":[{"step":1,"instruction":"Click Save","action":"click","outcome":"found","candidateId":"button-save","limitation":"none"}]}"""
+                    )
+                    : null,
+        };
+        await using var application = CreateApplication(
+            handler,
+            new Dictionary<string, string?>
+            {
+                ["OpenRouter:BaseUrl"] = "http://configured-provider.test/api/v1",
+                ["OpenRouter:Model"] = "configured/model",
+                ["OpenRouter:Provider"] = "configured-route",
+                ["OpenRouter:TimeoutSeconds"] = "47",
+                ["OpenRouter:ApiKey"] = "configuration-secret-canary",
+            }
+        );
+        using var client = application.CreateClient();
+        client.DefaultRequestHeaders.Add("X-Xpathed-Attempt-Id", Guid.NewGuid().ToString("N"));
+        using var response = await client.PostAsJsonAsync(
+            "/internal/pages/page-1/resolve",
+            new
+            {
+                instruction = "Click the unique instruction-canary",
+                documentId = "document-1",
+                contractVersion = version,
+            }
+        );
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var envelope = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("found", envelope.GetProperty("result").GetProperty("outcome").GetString());
+        using var configuration = JsonDocument.Parse(
+            envelope.GetProperty("evidence").GetProperty("configurationJson").GetString()!
+        );
+        var effective = configuration.RootElement.GetProperty("effective");
+        Assert.Equal("http://configured-provider.test/api/v1/", effective.GetProperty("endpoint").GetString());
+        Assert.Equal("47", effective.GetProperty("timeoutSeconds").GetString());
+        Assert.Equal(maximumActions, effective.GetProperty("maximumActions").GetInt32());
+        Assert.Equal(promptVersion, effective.GetProperty("promptVersion").GetString());
+        Assert.False(effective.GetProperty("responseCache").GetBoolean());
+        var request = effective.GetProperty("request");
+        Assert.Equal("configured/model", request.GetProperty("model").GetString());
+        Assert.Equal("configured-route", request.GetProperty("provider").GetProperty("only")[0].GetString());
+        Assert.Equal(outputTokens, request.GetProperty("max_tokens").GetInt32());
+        Assert.False(request.GetProperty("reasoning").GetProperty("enabled").GetBoolean());
+        Assert.Equal(string.Empty, request.GetProperty("messages")[1].GetProperty("content").GetString());
+        Assert.Equal(
+            envelope.GetProperty("evidence").GetProperty("systemPrompt").GetString(),
+            request.GetProperty("messages")[0].GetProperty("content").GetString()
+        );
+        Assert.DoesNotContain(
+            "configuration-secret-canary",
+            configuration.RootElement.GetRawText(),
+            StringComparison.Ordinal
+        );
+        Assert.DoesNotContain("instruction-canary", configuration.RootElement.GetRawText(), StringComparison.Ordinal);
+        Assert.DoesNotContain("button-save", configuration.RootElement.GetRawText(), StringComparison.Ordinal);
+        Assert.Equal(
+            envelope.GetProperty("result").GetProperty("configurationId").GetString(),
+            Convert.ToHexStringLower(
+                System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(effective.GetRawText()))
+            )
+        );
+    }
+
+    [Theory]
     [InlineData(0)]
     [InlineData(1)]
     [InlineData(2)]

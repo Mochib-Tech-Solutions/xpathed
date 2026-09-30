@@ -62,6 +62,15 @@ public sealed partial class ResolutionService(
                         result.Diagnostics.PromptVersion,
                         result.Diagnostics.ModelInputBudgetBytes,
                         outputTokens = multiple ? ActionSelectionStrategy.OutputTokens : 512,
+                        effective = gateway.DescribeConfiguration(
+                            result.Diagnostics.Strategy,
+                            multiple ? ActionSelectionStrategy.Prompt : CandidateSelectionStrategy.Prompt,
+                            multiple ? ActionSelectionStrategy.Schema : CandidateSelectionStrategy.Schema,
+                            result.Diagnostics.ModelInputBudgetBytes,
+                            multiple ? ActionSelectionStrategy.OutputTokens : 512,
+                            result.Diagnostics.PromptVersion,
+                            multiple ? ActionSelectionStrategy.MaximumActions : 1
+                        ),
                     }
                 )
             )

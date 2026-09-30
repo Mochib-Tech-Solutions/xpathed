@@ -27,6 +27,9 @@ const sharedDotnet = { ...none, dotnet: projects, persistence: true };
 
 for (const [path, expected] of [
   ["README.md", none],
+  ["evaluation/run.mjs", { ...none, tooling: true }],
+  ["evaluation/grader.test.mjs", { ...none, tooling: true }],
+  ["evaluation/cases.json", { ...none, tooling: true }],
   ["tests/resolution/pipeline.test.mjs", { ...none, tooling: true }],
   ["tests/Resolver.Tests/ResolutionContractTests.cs", { ...none, dotnet: ["Resolver"] }],
   ["docs/runtime.md", none],
