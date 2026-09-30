@@ -6,7 +6,7 @@
 
 xpathed is a local chat and managed-browser workspace for resolving English instructions to verified XPath expressions. Read [README.md](README.md) for setup and the current feature boundary; use [docs/runtime.md](docs/runtime.md) when changing API or browser behavior.
 
-The implemented foundation is the managed browser in [issue #2](https://github.com/Mochib-Tech-Solutions/xpathed/issues/2). Sessions start blank, users open their own websites, and noVNC displays one page without browser chrome. Keep the UI full-page and minimal: chat, browser, essential navigation and a confirmed reset. The chat composer stays disabled until [#3](https://github.com/Mochib-Tech-Solutions/xpathed/issues/3) delivers real resolution.
+The implemented foundation is the managed browser in [issue #2](https://github.com/Mochib-Tech-Solutions/xpathed/issues/2). Submitting a website address creates the browser session and navigates to that site; noVNC displays one page without browser chrome. Keep the initial address field enabled and use it as the entry point. Manage tabs in the client workspace, keeping Chromium chrome hidden in the fullscreen noVNC view. Chat drafts and session history belong to their managed page; resolution always targets the active page. Keep the UI full-page and minimal: chat, tabs, browser, essential navigation and a confirmed **Close all tabs** action in the tab strip. The chat composer resolves instructions through OpenRouter under the [versioned contract](docs/resolution.md). Keep the browser-owned document/capture identities and XPath same-node verification intact.
 
 Accepted follow-ups removed the bundled fixture website, browser Smoke project, manual Inspect button and duplicate close control. Do not restore them from the older #2 wording. Future evaluation work has its own explicit scope. Resolution selects and highlights a target; it does not execute the instruction or add autonomous browsing.
 
@@ -23,12 +23,12 @@ GitHub is the live source of requirements and progress. These files are maintain
 ## Architecture and ownership
 
 - **Browser** owns live Playwright objects, session/page identity, serialized operations and display cleanup. Other services exchange records from **Common**, never browser handles.
-- **Resolver** is stateless between requests and independent of the client database. **ClientApi** owns EF Core/PostgreSQL persistence; history and schema work begins in #5.
+- **Resolver** is stateless between requests and independent of the client database. **ClientApi** owns EF Core/PostgreSQL persistence; durable history and schema work begins in #5. Current per-tab chat history lives in the Web workspace session.
 - **Web** owns the React workspace. Keep shared shadcn/ui controls in `components/ui/`, feature state in `features/`, and common helpers in `lib/`. Use semantic CSS theme tokens, strict types and effect cleanup.
 - All three .NET APIs use `ControllerBase`, explicit attribute routes and constructor injection. Keep `Program.cs` for composition, middleware for request policies, and service behavior outside controllers. One named C# type belongs in a matching file with a folder-aligned namespace.
 - All five local services run in Docker. Compose and per-service Dockerfiles live in `docker/`; use the root commands or `docker/compose.sh` so relative paths remain correct.
 
-Keep session isolation, popup blocking, cancellation semantics, origin checks and the Chromium sandbox intact. Reset must invalidate the previous page and clear its browser state. Treat page content and future model output as untrusted data; keep cookies, credentials, passwords and unrelated form values out of logs and model inputs.
+Keep session isolation, cancellation semantics, origin checks and the Chromium sandbox intact. Adopt new-tab links and popup windows as managed pages in the same session, within the tab limit. Keep the viewer and resolver on the active page, invalidating captures and highlights on tab switches. Closing all tabs must end the session, invalidate every previous page, clear its browser state and return to the initial address field. Treat page content and future model output as untrusted data; keep cookies, credentials, passwords and unrelated form values out of logs and model inputs.
 
 ## Commands and verification
 
@@ -37,6 +37,7 @@ Run commands from the repository root, using the RTK prefix required above. `pac
 - `pnpm run setup` prepares configuration and workspace dependencies; `pnpm dev` runs Docker development mode.
 - `pnpm check:dotnet`, `pnpm check:web` and `pnpm check:tooling` validate the affected area. `pnpm check` is the full local gate.
 - `pnpm format` applies formatting; `pnpm format:check` verifies it. C# builds enforce the shared recommended analyzers and warnings as errors.
+- `pnpm test:resolution` runs deterministic real-browser resolution checks in an isolated Docker stack; `pnpm test:resolution:live` explicitly exercises OpenRouter with the local API key. These remain outside CI service startup. Keep live tests on the documented cheap route, retain price/output limits and report actual cost; use deterministic responses for other checks.
 - `pnpm docker:check` validates Docker definitions. `pnpm docker:build` builds images, and `pnpm docker:down` stops project containers without deleting database data.
 
 Keep CI jobs independent and selected by relevant changes. Docker image builds and service startup remain explicit operations outside CI. Update `Xpathed.slnx` and `scripts/ci-changes.mjs` when adding projects. Validate behavior at the appropriate boundary; report actual checks rather than inferring success from configuration alone.

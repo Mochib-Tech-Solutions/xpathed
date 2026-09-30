@@ -21,6 +21,9 @@ services:
     build: { context: ., dockerfile: docker/resolver/Dockerfile, target: runtime }
     environment:
       BrowserUrl: http://browser:8080
+      OpenRouter__ApiKey: ${OPENROUTER_API_KEY:-}
+      OpenRouter__Model: ${OPENROUTER_MODEL:-deepseek/deepseek-v4.1-flash}
+      OpenRouter__Provider: ${OPENROUTER_PROVIDER:-wafer}
       Logging__LogLevel__Default: Warning
     depends_on: [browser]
   browser:

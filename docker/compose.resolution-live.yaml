@@ -1,0 +1,7 @@
+services:
+  resolver:
+    environment:
+      OpenRouter__BaseUrl: https://openrouter.ai/api/v1/
+      OpenRouter__Model: deepseek/deepseek-v4.1-flash
+      OpenRouter__Provider: wafer
+      OpenRouter__ApiKey: ${OPENROUTER_API_KEY:?Set OPENROUTER_API_KEY in the ignored .env file}
