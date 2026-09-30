@@ -28,6 +28,7 @@ export default function Workspace() {
     closeAllTabs,
     navigate,
     resolve,
+    inspectAction,
     setInstruction,
     setAddress,
     dismissError,
@@ -82,6 +83,7 @@ export default function Workspace() {
           resolving={resolving}
           onInstructionChange={setInstruction}
           onResolve={resolve}
+          onInspect={inspectAction}
         />
         <section
           className="order-first flex min-h-0 min-w-0 flex-1 flex-col bg-background sm:order-none"

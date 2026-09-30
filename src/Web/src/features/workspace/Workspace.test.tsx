@@ -92,6 +92,90 @@ async function submitInstruction(user: ReturnType<typeof userEvent.setup>) {
 }
 
 describe("Workspace resolution", () => {
+  it("renders independent action results and inspects a target with one request cost", async () => {
+    const batch = {
+      ...found,
+      contractVersion: "2",
+      outcome: "partial",
+      action: null,
+      target: null,
+      inspectedActionId: "a1",
+      summary: {
+        processingComplete: true,
+        semanticCompleteness: "unverified",
+        total: 2,
+        found: 1,
+        notFound: 1,
+        unsupported: 0,
+        errors: 0,
+        blocked: 1,
+        readinessUnknown: 0,
+        assessmentUnsupported: 0,
+      },
+      actions: [
+        {
+          actionId: "a1",
+          order: 1,
+          step: 1,
+          instruction: "Click Pay now",
+          action: "click",
+          outcome: "found",
+          target: found.target,
+          frameId: "main",
+          diagnosticsReference: "attempt-1",
+          code: null,
+          message: null,
+        },
+        {
+          actionId: "a2",
+          order: 2,
+          step: 2,
+          instruction: "Hover Contact",
+          action: "hover",
+          outcome: "not_found",
+          target: null,
+          frameId: "main",
+          diagnosticsReference: "attempt-1",
+          code: null,
+          message: "No matching element found in the eligible current-page scope.",
+        },
+      ],
+    };
+    mockApi(() => Promise.resolve(Response.json(batch)));
+    const user = await openWorkspace();
+    await submitInstruction(user);
+    expect(await screen.findByText("1 target found · 1 missing · 1 blocked")).toBeInTheDocument();
+    expect(screen.getByText("Hover Contact")).toBeInTheDocument();
+    expect(
+      screen.getByText("No matching element found in the eligible current-page scope."),
+    ).toBeInTheDocument();
+    expect(screen.getAllByText("Cost unavailable")).toHaveLength(1);
+    await user.click(screen.getByRole("button", { name: "Inspect action 1" }));
+    await waitFor(() =>
+      expect(fetch).toHaveBeenCalledWith(
+        "/api/pages/page-1/highlight",
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({
+            documentId: "document-1",
+            captureId: "capture-1",
+            actionId: "a1",
+          }),
+        }),
+      ),
+    );
+    expect(fetch).toHaveBeenCalledWith(
+      "/api/pages/page-1/resolve",
+      expect.objectContaining({
+        body: JSON.stringify({
+          instruction: "Click Pay now",
+          documentId: "document-1",
+          contractVersion: "2",
+        }),
+      }),
+    );
+  });
+
   it.each([
     ["blocked", ["disabled", "off_screen"], "Interaction blocked by observed state."],
     ["unknown", [], "Interaction readiness unknown."],
@@ -681,6 +765,7 @@ describe("Workspace resolution", () => {
         expect(JSON.parse(typeof options?.body === "string" ? options.body : "null")).toEqual({
           instruction: "Click Pay now",
           documentId: "document-1",
+          contractVersion: "2",
         });
         return Promise.resolve(Response.json(found));
       }

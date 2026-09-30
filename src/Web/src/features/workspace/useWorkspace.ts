@@ -236,6 +236,7 @@ export default function useWorkspace() {
         result = await request<ResolutionResult>(`/pages/${page.pageId}/resolve`, "POST", {
           instruction: text,
           documentId: page.documentId,
+          contractVersion: "2",
         });
         if (!isCurrent()) return;
         await readSession(session.sessionId, isCurrent);
@@ -284,6 +285,54 @@ export default function useWorkspace() {
       });
     });
   }
+  function inspectAction(entryId: string, actionId: string) {
+    const entry = chat.history.find((item) => item.id === entryId);
+    const result = entry?.result;
+    if (
+      !page ||
+      !session ||
+      !entry ||
+      entry.historical ||
+      !result?.captureId ||
+      !result.actions?.some((action) => action.actionId === actionId && action.target)
+    )
+      return;
+    void perform("Inspecting target…", async (isCurrent) => {
+      await request(`/pages/${page.pageId}/highlight`, "POST", {
+        documentId: result.documentId,
+        captureId: result.captureId,
+        actionId,
+      });
+      if (!isCurrent()) return;
+      await readSession(session.sessionId, isCurrent);
+      if (!isCurrent()) return;
+      setWorkspace((previous) => {
+        const origin = previous.tabs[page.pageId];
+        if (
+          !origin ||
+          previous.snapshot?.activePageId !== page.pageId ||
+          previous.snapshot.activationVersion !== snapshot?.activationVersion ||
+          previous.snapshot.pages.find((current) => current.pageId === page.pageId)?.documentId !==
+            result.documentId
+        )
+          return previous;
+        return {
+          ...previous,
+          tabs: {
+            ...previous.tabs,
+            [page.pageId]: {
+              ...origin,
+              history: origin.history.map((old) =>
+                old.id === entryId && !old.historical && old.result
+                  ? { ...old, result: { ...old.result, inspectedActionId: actionId } }
+                  : old,
+              ),
+            },
+          },
+        };
+      });
+    });
+  }
   function setInstruction(instruction: string) {
     if (page)
       setWorkspace((previous) => ({
@@ -319,6 +368,7 @@ export default function useWorkspace() {
     selectTab,
     closeTab,
     resolve,
+    inspectAction,
     setInstruction,
     setAddress,
     dismissError: () => setError(""),

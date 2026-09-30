@@ -15,25 +15,37 @@ async function json(url, method = "GET", body) {
   assert.equal(response.status, 200, `Service returned HTTP ${response.status}`);
   return response.json();
 }
-test("actual OpenRouter route resolves a known target and genuine absence without the client or database", async () => {
+test("actual OpenRouter route resolves plural mixed actions and legacy absence without the client or database", async () => {
   const session = await json(`${browser}/sessions`, "POST");
   const run = randomUUID();
   let totalCostUsd = 0;
   try {
-    const page = await json(`${browser}/pages/${session.pageId}/navigate`, "POST", {
-      url: `${fixture}/fixture?run=${run}`,
-    });
-    for (const [instruction, outcome] of [
-      ["Click on About us.", "found"],
-      ["Click the Contact button. Return not_found if it does not exist.", "not_found"],
+    for (const [path, contractVersion, instruction, outcome] of [
+      [
+        "batch",
+        "2",
+        "Click all Approval buttons, fill Notes, and hover Contact. Also click Done after opening details.",
+        "partial",
+      ],
+      [
+        "fixture",
+        "1",
+        "Click the Contact button. Return not_found if it does not exist.",
+        "not_found",
+      ],
     ]) {
+      const page = await json(`${browser}/pages/${session.pageId}/navigate`, "POST", {
+        url: `${fixture}/${path}?run=${run}`,
+      });
       const result = await json(`${resolver}/pages/${session.pageId}/resolve`, "POST", {
         instruction,
         documentId: page.documentId,
+        contractVersion,
       });
       console.log(
         JSON.stringify({
           outcome: result.outcome,
+          summary: result.summary,
           code: result.diagnostics.code,
           configurationId: result.configurationId,
           capture: result.diagnostics.capture,
@@ -80,9 +92,36 @@ test("actual OpenRouter route resolves a known target and genuine absence withou
       assert.equal(result.sessionId, session.sessionId);
       assert.equal(result.pageId, session.pageId);
       assert.equal(result.documentId, page.documentId);
-      if (outcome === "found") {
-        assert.ok(result.target.xpaths.length > 0, "Found requires verified XPath alternatives");
-        await json(`${fixture}/oracle?run=${run}`, "POST", { xpaths: result.target.xpaths });
+      if (contractVersion === "2") {
+        assert.equal(result.contractVersion, "2");
+        assert.equal(
+          result.actions.length,
+          5,
+          "All intended plural and compound actions must be represented",
+        );
+        assert.deepEqual(
+          result.actions.map((action) => action.action),
+          ["click", "click", "fill", "hover", "click"],
+        );
+        assert.deepEqual(
+          result.actions.map((action) => action.outcome),
+          ["found", "found", "found", "not_found", "unsupported"],
+        );
+        assert.equal(result.actions[4].code, "current_state_dependency");
+        assert.equal(result.summary.blocked, 2);
+        assert.equal(result.summary.readinessUnknown, 1);
+        assert.ok(
+          result.actions.every(
+            (action) => action.diagnosticsReference === result.attemptId && !action.diagnostics,
+          ),
+        );
+        const xpaths = result.actions.flatMap((action) => action.target?.xpaths ?? []);
+        const expected = result.actions
+          .slice(0, 3)
+          .flatMap((action, index) =>
+            action.target.xpaths.map(() => [["approval-first", "approval-second", "notes"][index]]),
+          );
+        await json(`${fixture}/oracle?run=${run}`, "POST", { xpaths });
         let observed;
         for (let attempt = 0; attempt < 100; attempt++) {
           observed = await json(`${fixture}/observation?run=${run}`);
@@ -90,13 +129,13 @@ test("actual OpenRouter route resolves a known target and genuine absence withou
           await delay(50);
         }
         assert.ok(observed, "Live selection must be checked by independent fixture oracle");
-        assert.deepEqual(
-          observed.matches,
-          result.target.xpaths.map(() => ["expected-target"]),
-        );
+        assert.deepEqual(observed.matches, expected);
         assert.equal(observed.clicks, 0);
         assert.equal(observed.scrollY, 0);
-      } else assert.equal(result.target, null);
+      } else {
+        assert.equal(result.contractVersion, "1");
+        assert.equal(result.target, null);
+      }
     }
     console.log(JSON.stringify({ requests: 2, totalCostUsd }));
   } finally {
