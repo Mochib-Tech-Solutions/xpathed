@@ -40,7 +40,17 @@ export type ResolutionResult = {
       enabled: boolean;
       editable: boolean;
       checked: boolean | null;
+      version?: "1" | "2";
+      accessibilityExposed?: boolean | null;
+      readonly?: boolean | null;
     };
+    interactability?: {
+      version: "1";
+      action: string;
+      status: "blocked" | "unknown" | "unsupported";
+      reasons: string[];
+      checks: Record<string, "pass" | "fail" | "unknown" | "not_applicable">;
+    } | null;
     geometry: { x: number; y: number; width: number; height: number };
   } | null;
   diagnostics: {

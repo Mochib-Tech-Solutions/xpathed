@@ -4,6 +4,19 @@ import { Button } from "@/components/ui/button";
 import type { Resolution } from "./api";
 import ResolutionCost from "./ResolutionCost";
 
+const interactionReasons: Record<string, string> = {
+  disabled: "The target is disabled for this action.",
+  readonly: "The target is readonly; its content cannot be changed.",
+  incompatible_control: "This control does not support the requested action.",
+  off_screen: "The target is off-screen. Resolution did not scroll to it.",
+  zero_area: "The target has no area for a pointer interaction.",
+  not_visually_rendered: "The target is exposed to accessibility but is not visually rendered.",
+  pointer_events_none: "The target does not receive pointer events at the inspected point.",
+  obstructed_at_hit_point: "Another element or clipping blocks the inspected pointer point.",
+  custom_control_unverified:
+    "This custom control requires an interaction assessment outside the supported scope.",
+};
+
 type Props = {
   instruction: string;
   history: Resolution[];
@@ -160,7 +173,9 @@ export default function ChatPanel({
                 </p>
               )}
               {result && <ResolutionCost diagnostics={result.diagnostics} />}
-              {result?.outcome === "not_found" && <p>No matching element found.</p>}
+              {result?.outcome === "not_found" && (
+                <p>No matching element found in the eligible current-page scope.</p>
+              )}
               {result?.outcome === "unsupported" && (
                 <div>
                   <p>Unsupported instruction</p>
@@ -186,6 +201,25 @@ export default function ChatPanel({
                     </h2>
                     <p className="text-muted-foreground">
                       {result?.action} · {target.tag}
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <p>
+                      {target.interactability?.status === "blocked"
+                        ? "Interaction blocked by observed state."
+                        : target.interactability?.status === "unsupported"
+                          ? "Interaction assessment unsupported."
+                          : target.interactability?.status === "unknown"
+                            ? "Interaction readiness unknown."
+                            : "Interaction readiness unavailable."}
+                    </p>
+                    {target.interactability?.reasons.map((reason) => (
+                      <p key={reason} className="text-muted-foreground">
+                        {interactionReasons[reason] ?? "An interaction limitation was observed."}
+                      </p>
+                    ))}
+                    <p className="text-xs text-muted-foreground">
+                      Event delivery and action success were not tested.
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-1.5 text-xs text-muted-foreground [&>span]:rounded-md [&>span]:border [&>span]:bg-background [&>span]:px-2 [&>span]:py-0.5">

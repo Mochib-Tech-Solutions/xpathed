@@ -11,6 +11,40 @@ namespace Xpathed.Resolver.Tests;
 
 public sealed class ResolutionContractTests
 {
+    [Theory]
+    [InlineData("click", "blocked", "found")]
+    [InlineData("hover", "blocked", "error")]
+    [InlineData("click", "ready", "error")]
+    public async Task VersionedReadinessMustBelongToTheSelectedAction(string assessedAction, string status, string outcome)
+    {
+        var handler = new DeterministicServicesHandler
+        {
+            SelectionBody = """
+                {"target":{"candidateId":"button-save","tag":"button","label":"Save","xpaths":["//button"],
+                  "state":{"version":"2","accessibilityExposed":true,"rendered":true,"inViewport":true,"enabled":false,"editable":false,"readonly":false,"checked":null},
+                  "geometry":{"x":20,"y":40,"width":90,"height":30},
+                  "interactability":{"version":"1","action":"ACTION","status":"STATUS","reasons":["disabled"],
+                    "checks":{"compatibleControl":"pass","enabled":"fail","writable":"not_applicable","viewport":"pass",
+                      "pointerReception":"pass","keyboard":"not_applicable","stability":"unknown","eventOutcome":"unknown"}}}}
+                """.Replace("ACTION", assessedAction, StringComparison.Ordinal).Replace("STATUS", status, StringComparison.Ordinal)
+        };
+        await using var application = CreateApplication(handler);
+        using var client = application.CreateClient();
+        using var response = await client.PostAsJsonAsync("/pages/page-1/resolve", new { instruction = "Click Save", documentId = "document-1" });
+        var result = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(outcome, result.GetProperty("outcome").GetString());
+        if (outcome == "found")
+        {
+            Assert.Equal("1", result.GetProperty("contractVersion").GetString());
+            Assert.Equal("blocked", result.GetProperty("target").GetProperty("interactability").GetProperty("status").GetString());
+            Assert.Equal(1, result.GetProperty("diagnostics").GetProperty("modelCalls").GetInt32());
+        }
+        else
+        {
+            Assert.Equal("invalid_browser_selection", result.GetProperty("diagnostics").GetProperty("code").GetString());
+        }
+    }
+
     [Fact]
     public async Task ResolvesAnInstructionToTheVerifiedTargetOnTheManagedPage()
     {
