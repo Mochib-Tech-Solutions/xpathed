@@ -338,6 +338,13 @@ internal static class BrowserCaptureScript
           };
           return {
             frameElements,
+            highlightNodes(ids) {
+              return ids.map(id => {
+                const node = nodes[candidates.findIndex(candidate => candidate.id === id)];
+                if (!node?.isConnected || node.ownerDocument !== document) throw new Error('stale_capture');
+                return node;
+              });
+            },
             async updateEnvironment(value, budgetMs) {
               try {
                 environment = value ? JSON.parse(value) : { x:0, y:0, scaleX:1, scaleY:1, exposed:true, rendered:true, clip:{left:0,top:0,right:innerWidth,bottom:innerHeight} };

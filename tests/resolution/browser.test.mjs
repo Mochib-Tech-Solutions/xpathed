@@ -15,7 +15,12 @@ const oracleScript = `<script>
       const endpoint = '?page=' + encodeURIComponent(location.pathname);
       const response = await fetch('/oracle' + endpoint);
       if (response.status === 204) return;
-      const { xpaths = [], replaceTarget, reload, click, open, focusPopup, close, cookie, scrollToY, slowFrame, mutateXpath } = await response.json();
+      const { xpaths = [], replaceTarget, reload, click, open, focusPopup, close, cookie, scrollToY, slowFrame, mutateXpath, staleInput } = await response.json();
+      if (staleInput) {
+        const binding = Object.keys(window).find(key => key.startsWith('xpathedInput') && typeof window[key] === 'function');
+        if (!binding) throw new Error('Missing input notification binding');
+        await window[binding](0);
+      }
       if (mutateXpath) window.mutateXpathFixture();
       if (slowFrame) {
         const frame = document.querySelector('iframe');
@@ -35,7 +40,7 @@ const oracleScript = `<script>
       await fetch('/oracle-result' + endpoint, { method: 'POST', body: JSON.stringify({ matches, scrollY, clicks: document.querySelector('#expected-target')?.dataset.clicks ?? '0', nodeCount: document.querySelectorAll('*').length,
         cookie: document.cookie, openerPath: window.opener?.location.pathname ?? null, focused: document.hasFocus(),
         activeElement: document.activeElement?.id, events: window.observedEvents ?? {},
-        values: [...document.querySelectorAll('[data-observe-value]')].map(element => element.value),
+        targetMarkup: document.querySelector("#expected-target")?.outerHTML, values: [...document.querySelectorAll('[data-observe-value]')].map(element => element.value),
         innerWidth, innerHeight, outerWidth, outerHeight, screenWidth: screen.width, screenHeight: screen.height }) });
       if (close) window.close();
       if (reload === 'hash') location.hash = 'changed';
@@ -46,7 +51,7 @@ const targetMarkup = `<section aria-label="Employee"><h2>Employee</h2>
   <button id="expected-target" data-testid="about-us" onclick="this.dataset.clicks = '1'">About us</button>
 </section>`;
 
-// Read-only RFB 3.8 client for the public viewer seam; requests raw pixels, never input events.
+// RFB 3.8 client exercises rendered pixels and trusted input through the public viewer seam.
 async function withFramebuffer(session, check) {
   const socket = new WebSocket(`${browserUrl.replace("http", "ws")}${session.viewPath}`, {
     headers: { Origin: process.env.XPATHED_VIEWER_ORIGIN ?? "http://localhost:8081" },
@@ -83,29 +88,48 @@ async function withFramebuffer(session, check) {
     socket.send(Uint8Array.from([2, 0, 0, 1, 0, 0, 0, 0]));
     let firstFrame = true;
     const pixels = Buffer.alloc(width * height * 4);
-    await check(async () => {
-      const update = Buffer.alloc(10);
-      update[0] = 3;
-      update[1] = firstFrame ? 0 : 1;
-      firstFrame = false;
-      update.writeUInt16BE(width, 6);
-      update.writeUInt16BE(height, 8);
-      socket.send(update);
-      const header = await read(4);
-      assert.equal(header[0], 0);
-      for (let index = 0; index < header.readUInt16BE(2); index++) {
-        const rectangle = await read(12);
-        const x = rectangle.readUInt16BE(0),
-          y = rectangle.readUInt16BE(2);
-        const w = rectangle.readUInt16BE(4),
-          h = rectangle.readUInt16BE(6);
-        assert.equal(rectangle.readInt32BE(8), 0);
-        const data = await read(w * h * 4);
-        for (let row = 0; row < h; row++)
-          data.copy(pixels, ((y + row) * width + x) * 4, row * w * 4, (row + 1) * w * 4);
-      }
-      return { pixels, width, height };
-    });
+    await check(
+      async () => {
+        const update = Buffer.alloc(10);
+        update[0] = 3;
+        update[1] = firstFrame ? 0 : 1;
+        firstFrame = false;
+        update.writeUInt16BE(width, 6);
+        update.writeUInt16BE(height, 8);
+        socket.send(update);
+        const header = await read(4);
+        assert.equal(header[0], 0);
+        for (let index = 0; index < header.readUInt16BE(2); index++) {
+          const rectangle = await read(12);
+          const x = rectangle.readUInt16BE(0),
+            y = rectangle.readUInt16BE(2);
+          const w = rectangle.readUInt16BE(4),
+            h = rectangle.readUInt16BE(6);
+          assert.equal(rectangle.readInt32BE(8), 0);
+          const data = await read(w * h * 4);
+          for (let row = 0; row < h; row++)
+            data.copy(pixels, ((y + row) * width + x) * 4, row * w * 4, (row + 1) * w * 4);
+        }
+        return { pixels, width, height };
+      },
+      {
+        pointer(x, y, buttons = 0) {
+          const event = Buffer.alloc(6);
+          event[0] = 5;
+          event[1] = buttons;
+          event.writeUInt16BE(x, 2);
+          event.writeUInt16BE(y, 4);
+          socket.send(event);
+        },
+        key(key, down) {
+          const event = Buffer.alloc(8);
+          event[0] = 4;
+          event[1] = down ? 1 : 0;
+          event.writeUInt32BE(key, 4);
+          socket.send(event);
+        },
+      },
+    );
   } finally {
     await messages.return();
     socket.close();
@@ -401,7 +425,8 @@ test("Browser captures and highlights the independently identified target withou
     );
     assert.equal(after.clicks, "0");
     assert.equal(after.scrollY, before.scrollY);
-    assert.equal(after.nodeCount, before.nodeCount);
+    assert.equal(after.nodeCount, before.nodeCount + 1, "Only the inert highlight host is added");
+    assert.equal(after.targetMarkup, before.targetMarkup);
     assert.equal(selection.target.state.rendered, true);
     assert.equal(selection.target.state.enabled, true);
     assert.equal(selection.target.state.inViewport, true);
@@ -470,7 +495,7 @@ test("An offscreen target retains one verified path without moving the page and 
       const scrolled = await observe({ scrollToY: 2100, xpaths: target.xpaths });
       assert.ok(scrolled.scrollY > before.scrollY);
       assert.deepEqual(scrolled.matches, [["expected-target"]]);
-      assert.equal(scrolled.nodeCount, before.nodeCount);
+      assert.equal(scrolled.nodeCount, before.nodeCount + 1);
       const current = await request(`/pages/${page.pageId}/selection`, selection);
       assert.equal(current.target.state.inViewport, true);
       assert.equal(current.target.interactability.status, "ready");
@@ -510,6 +535,7 @@ test("The public viewer paints an offscreen target highlight after scrolling and
         };
         assert.equal(bluePixels(await frame(), 100), 0);
         await observe({ scrollToY: 2100 });
+        await new Promise((resolve) => setTimeout(resolve, 200));
         let highlighted = 0;
         for (let attempt = 0; attempt < 20 && highlighted < 500; attempt++) {
           highlighted = bluePixels(await frame(), 100);
@@ -531,6 +557,199 @@ test("The public viewer paints an offscreen target highlight after scrolling and
     },
   );
 });
+
+function blueTargetPixels({ pixels, width }, left, top) {
+  let count = 0;
+  for (let y = top + 10; y < top + 40; y++)
+    for (let x = left + 10; x < left + 230; x++) {
+      const offset = (y * width + x) * 4;
+      if (pixels[offset] > pixels[offset + 2] + 15 && pixels[offset + 1] > pixels[offset + 2] + 5)
+        count++;
+    }
+  return count;
+}
+
+async function expectHighlights(frame, locations, visible) {
+  let counts;
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const image = await frame();
+    counts = locations.map(([left, top]) => blueTargetPixels(image, left, top));
+    if (counts.every((count) => (visible ? count >= 500 : count === 0))) return;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  assert.fail(
+    `Expected highlights ${visible ? "visible" : "cleared"} at ${JSON.stringify(locations)}; blue pixels: ${counts}`,
+  );
+}
+
+async function waitForFixtureEvent(type) {
+  for (let attempt = 0; attempt < 50; attempt++) {
+    if ((await observe()).events[type]) return;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  assert.fail(`Viewer did not deliver trusted ${type}`);
+}
+
+const highlightFixture = `<style>body {margin:0;background:white} button {position:absolute;left:100px;top:100px;width:240px;height:100px;background:white;border:0} #second-target {left:500px}</style>
+<button id="expected-target">First approval</button><button id="second-target">Second approval</button>
+<script>window.observedEvents = {}; for (const type of ['pointermove','pointerdown','keydown']) addEventListener(type, event => { if(event.isTrusted) window.observedEvents[type] = (window.observedEvents[type] ?? 0) + 1; });</script>`;
+
+async function selectHighlights(page, plural = false) {
+  const capture = await request(`/pages/${page.pageId}/capture`, { documentId: page.documentId });
+  const buttons = capture.candidates.filter((entry) => entry.tag === "button");
+  const batch = {
+    documentId: page.documentId,
+    captureId: capture.captureId,
+    actions: (plural ? buttons : buttons.slice(0, 1)).map((candidate, index) => ({
+      actionId: `a${index}`,
+      candidateId: candidate.id,
+      action: "click",
+    })),
+  };
+  await request(`/pages/${page.pageId}/selections`, batch);
+  return batch;
+}
+
+test("Viewer highlights every selected target simultaneously", async () => {
+  await withFixture(highlightFixture, async (session, page) => {
+    await selectHighlights(page, true);
+    await observe({ staleInput: true });
+    await withFramebuffer(session, async (frame) => {
+      await expectHighlights(
+        frame,
+        [
+          [100, 100],
+          [500, 100],
+        ],
+        true,
+      );
+    });
+  });
+});
+
+test("Viewer preserves highlights on mouse movement and clears them on click or key input", async () => {
+  await withFixture(highlightFixture, async (session, page) => {
+    const batch = await selectHighlights(page);
+    await withFramebuffer(session, async (frame, input) => {
+      await expectHighlights(frame, [[100, 100]], true);
+      input.pointer(20, 20);
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      input.pointer(180, 140);
+      await expectHighlights(frame, [[100, 100]], true);
+
+      input.pointer(180, 140, 1);
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      input.pointer(180, 140, 0);
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      await expectHighlights(frame, [[100, 100]], false);
+      await waitForFixtureEvent("pointerdown");
+      await expectError(`/pages/${page.pageId}/selections`, batch, 409, "stale_capture");
+      await selectHighlights(page);
+      await expectHighlights(frame, [[100, 100]], true);
+      input.key(0xffe1, true);
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      input.key(0xffe1, false);
+      await expectHighlights(frame, [[100, 100]], false);
+    });
+  });
+});
+
+for (const crossOrigin of [false, true])
+  test(`Viewer highlights main and ${crossOrigin ? "cross-origin" : "same-origin"} frame targets and clears all on frame input`, async () => {
+    await withFixture(
+      (path) =>
+        path === "/fixture"
+          ? `${highlightFixture}<iframe title="Approval frame" src="${crossOrigin ? `http://${fixtureAddress}:8070` : ""}/highlight-frame" style="position:absolute;left:100px;top:300px;width:800px;height:300px;border:0"></iframe>`
+          : `<style>body{margin:0;background:white}button{position:absolute;left:100px;top:20px;width:240px;height:100px;background:white;border:0}</style><button id="expected-target">Frame approval</button>`,
+      async (session, page) => {
+        await observe({}, "/highlight-frame");
+        const batch = await selectHighlights(page, true);
+        await withFramebuffer(session, async (frame, input) => {
+          await expectHighlights(
+            frame,
+            [
+              [100, 100],
+              [500, 100],
+              [200, 320],
+            ],
+            true,
+          );
+          input.pointer(280, 350);
+          await new Promise((resolve) => setTimeout(resolve, 100));
+          await expectHighlights(
+            frame,
+            [
+              [100, 100],
+              [500, 100],
+              [200, 320],
+            ],
+            true,
+          );
+          input.pointer(280, 350, 1);
+          await new Promise((resolve) => setTimeout(resolve, 100));
+          input.pointer(280, 350, 0);
+          await expectHighlights(
+            frame,
+            [
+              [100, 100],
+              [500, 100],
+              [200, 320],
+            ],
+            false,
+          );
+          await expectError(`/pages/${page.pageId}/selections`, batch, 409, "stale_capture");
+        });
+      },
+    );
+  });
+
+test("Input in an unsupported transformed frame invalidates main-document highlights", async () => {
+  await withFixture(
+    (path) =>
+      path === "/fixture"
+        ? `${highlightFixture}<iframe src="/unsupported-input" style="position:absolute;left:500px;top:350px;width:400px;height:200px;transform:rotate(2deg)"></iframe>`
+        : '<button style="width:100%;height:150px">Frame input</button>',
+    async (session, page) => {
+      await observe({}, "/unsupported-input");
+      const batch = await selectHighlights(page);
+      await withFramebuffer(session, async (frame, input) => {
+        await expectHighlights(frame, [[100, 100]], true);
+        input.pointer(650, 430, 1);
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        input.pointer(650, 430, 0);
+        await expectHighlights(frame, [[100, 100]], false);
+        await expectError(`/pages/${page.pageId}/selections`, batch, 409, "stale_capture");
+      });
+    },
+  );
+});
+
+for (const mode of ["popover", "dialog"])
+  test(`Highlights paint above a transformed ${mode} without changing its state`, async () => {
+    await withFixture(
+      `<style>body{margin:0;background:white}::backdrop{background:rgb(255,0,0)}#surface{position:fixed;left:100px;top:100px;margin:0;width:600px;height:300px;border:0;padding:0;background:white;transform:translate(30px,20px)}button{position:absolute;left:50px;top:50px;width:240px;height:100px;background:white;border:0}</style>
+    <${mode === "dialog" ? "dialog" : 'div popover="manual"'} id="surface"><button id="expected-target">Surface action</button></${mode === "dialog" ? "dialog" : "div"}>
+    <script>document.querySelector('#surface').${mode === "dialog" ? "showModal" : "showPopover"}();</script>`,
+      async (session, page) => {
+        const before = await observe();
+        await selectHighlights(page);
+        const after = await observe();
+        assert.equal(after.activeElement, before.activeElement);
+        assert.equal(after.targetMarkup, before.targetMarkup);
+        await withFramebuffer(session, async (frame) => {
+          await expectHighlights(frame, [[180, 170]], true);
+          const image = await frame();
+          // The existing surface stays white; our full-viewport host adds no red backdrop.
+          const offset = (400 * image.width + 650) * 4;
+          assert.ok(
+            image.pixels[offset] > 240 &&
+              image.pixels[offset + 1] > 240 &&
+              image.pixels[offset + 2] > 240,
+          );
+        });
+      },
+    );
+  });
 
 test("Accessibility eligibility keeps exposed visual limitations and computes safe hidden names", async () => {
   await withFixture(
