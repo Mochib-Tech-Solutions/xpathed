@@ -14,6 +14,7 @@ const interactionReasons: Record<string, string> = {
   pointer_events_none: "The target does not receive pointer events at the inspected point.",
   obstructed_at_hit_point: "Another element or clipping blocks the inspected pointer point.",
   custom_control_unverified: "Interaction with this custom control could not be verified.",
+  ancestor_frame_obstructed: "An overlay or clipping blocks the target’s containing frame.",
 };
 
 const instructionLimits: Record<string, string> = {
@@ -212,6 +213,20 @@ export default function ChatPanel({
               )}
               {actions.map((action) => {
                 const target = action.target;
+                const checks = target?.interactability?.checks;
+                const verified = [
+                  checks?.compatibleControl === "pass" &&
+                    !["click", "double_click", "right_click", "hover", "inspect"].includes(
+                      action.action ?? "",
+                    ) &&
+                    "compatible control type",
+                  checks?.enabled === "pass" && "enabled",
+                  checks?.writable === "pass" && "not read-only",
+                  checks?.viewport === "pass" && "in view",
+                  checks?.pointerReception === "pass" && "unobstructed at the checked point",
+                ]
+                  .filter(Boolean)
+                  .join(", ");
                 return (
                   <section
                     key={action.actionId}
@@ -252,20 +267,32 @@ export default function ChatPanel({
                           </p>
                         ))}
                         <div className="space-y-2 text-xs text-muted-foreground">
+                          {action.action && <p>Action: {action.action.replaceAll("_", "-")}</p>}
+                          {verified && <p>Verified: {verified}.</p>}
                           <p>
                             {target.interactability?.status === "ready"
-                              ? "Interaction checks passed."
+                              ? action.action === "inspect"
+                                ? "Target identified; no interaction requested."
+                                : verified
+                                  ? "No action was performed; movement and page response are untested."
+                                  : "Detailed interaction checks are unavailable."
                               : target.interactability?.status === "blocked"
                                 ? "Interaction blocked."
                                 : target.interactability?.status === "unsupported"
                                   ? "Interaction assessment unsupported."
                                   : target.interactability?.status === "unknown"
-                                    ? "Interaction readiness unknown."
+                                    ? checks?.keyboard === "unknown"
+                                      ? "Keyboard behavior is untested; no action was performed."
+                                      : "Interaction readiness unknown."
                                     : "Interaction readiness unavailable."}
                           </p>
                           <div className="flex flex-wrap gap-x-3 gap-y-1">
-                            <span>{target.state.inViewport ? "In viewport" : "Off-screen"}</span>
-                            <span>{target.state.enabled ? "Enabled" : "Disabled"}</span>
+                            {checks?.viewport !== "pass" && (
+                              <span>{target.state.inViewport ? "In viewport" : "Off-screen"}</span>
+                            )}
+                            {checks?.enabled !== "pass" && (
+                              <span>{target.state.enabled ? "Enabled" : "Disabled"}</span>
+                            )}
                             {(target.state.editable ||
                               action.action === "fill" ||
                               action.action === "type") && (
@@ -274,8 +301,29 @@ export default function ChatPanel({
                             {target.state.checked !== null && (
                               <span>{target.state.checked ? "Checked" : "Unchecked"}</span>
                             )}
+                            {target.state.selected != null && (
+                              <span>{target.state.selected ? "Selected" : "Not selected"}</span>
+                            )}
+                            {target.state.selectedOptionCount != null && (
+                              <span>{target.state.selectedOptionCount} options selected</span>
+                            )}
                           </div>
                         </div>
+                        {!!target.frame?.chain.length && (
+                          <div className="space-y-1 text-xs text-muted-foreground">
+                            <p>
+                              Frame:{" "}
+                              {target.frame.chain
+                                .map((frame) => frame.label || frame.frameId)
+                                .join(" → ")}
+                            </p>
+                            {target.frame.chain.map((frame) => (
+                              <code key={frame.frameId} className="block break-all">
+                                {frame.xpath}
+                              </code>
+                            ))}
+                          </div>
+                        )}
                         {target.xpaths[0] && xpathItem(target.xpaths[0], action.actionId)}
                         {copied.startsWith(`${resolution.id}:${action.actionId}:`) && (
                           <p role="status" className="text-muted-foreground">

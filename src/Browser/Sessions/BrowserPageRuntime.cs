@@ -13,7 +13,7 @@ internal sealed class BrowserPageRuntime(IPage page, long order)
     public IPage Page { get; } = page;
     public string DocumentId { get; private set; } = Guid.NewGuid().ToString("N");
     public string? CaptureId { get; set; }
-    public IJSHandle? Capture { get; set; }
+    public BrowserPageCapture? Capture { get; set; }
     public Dictionary<string, ActionSelection>? ActionSelections { get; set; }
     public ICDPSession? Highlight { get; private set; }
 
@@ -26,10 +26,13 @@ internal sealed class BrowserPageRuntime(IPage page, long order)
             {
                 DocumentId = Guid.NewGuid().ToString("N");
                 focusContextId = null;
-                InvalidateCapture();
-                _ = ClearHighlightAsync();
+
             }
+            InvalidateCapture();
+            _ = ClearHighlightAsync();
         };
+        Page.FrameDetached += (_, _) => { InvalidateCapture(); _ = ClearHighlightAsync(); };
+        Page.FrameAttached += (_, _) => { InvalidateCapture(); _ = ClearHighlightAsync(); };
         Highlight = await context.NewCDPSessionAsync(Page);
         await Highlight.SendAsync("DOM.enable");
         await Highlight.SendAsync("Overlay.enable");
@@ -126,6 +129,10 @@ internal sealed class BrowserPageRuntime(IPage page, long order)
 
     public async Task ClearHighlightAsync()
     {
+        if (Capture is not null)
+        {
+            await Capture.ClearHighlightAsync();
+        }
         if (Highlight is not null)
         {
             try
