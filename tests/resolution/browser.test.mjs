@@ -1317,30 +1317,69 @@ test("Scaled clipping and section context survive iframe boundaries while reflec
   );
 });
 
-test("A visible fixed-position search control escapes a non-containing overflow ancestor", async () => {
-  await withFixture(
-    `<div style="overflow:hidden;width:0;height:0"><header style="position:fixed;left:20px;top:20px">
-      <button id="expected-target">Search</button></header></div>
-    <script>const button = document.querySelector('#expected-target'); const rect = button.getBoundingClientRect();
-      window.observedEvents = { receivesPointer: document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2) === button };</script>`,
-    async (session, page) => {
-      assert.equal((await observe()).events.receivesPointer, true);
-      const capture = await request(`/pages/${page.pageId}/capture`, {
-        documentId: page.documentId,
-      });
-      const candidate = capture.candidates.find((candidate) => candidate.label === "Search");
-      const { target } = await request(`/pages/${page.pageId}/selection`, {
-        documentId: page.documentId,
-        captureId: capture.captureId,
-        candidateId: candidate.id,
-        action: "click",
-      });
-      assert.equal(target.state.inViewport, true);
-      assert.equal(target.interactability.status, "ready");
-      assert.equal(target.interactability.checks.pointerReception, "pass");
-    },
-  );
-});
+for (const [name, ancestorStyle, position, modal, visible] of [
+  ["fixed control escapes static overflow", "", "fixed", false, true],
+  ["absolute control escapes static overflow", "", "absolute", false, true],
+  [
+    "fixed control stays clipped by transformed ancestor",
+    "transform:translateX(0)",
+    "fixed",
+    false,
+    false,
+  ],
+  [
+    "absolute control stays clipped by positioned ancestor",
+    "position:relative",
+    "absolute",
+    false,
+    false,
+  ],
+  [
+    "modal escapes ancestor clipping in the top layer",
+    "transform:translateX(0)",
+    "fixed",
+    true,
+    true,
+  ],
+]) {
+  test(`Native viewport observations: ${name}`, async () => {
+    await withFixture(
+      `<div style="overflow:hidden;width:0;height:0;${ancestorStyle}">
+        ${modal ? "<dialog>" : `<header style="position:${position};left:20px;top:20px">`}
+        <button id="expected-target">Search</button>${modal ? "</dialog>" : "</header>"}</div>
+      <script>${modal ? "document.querySelector('dialog').showModal();" : ""}
+        const button = document.querySelector('#expected-target'); const rect = button.getBoundingClientRect();
+        window.observedEvents = { receivesPointer: document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2) === button };
+        for (const type of ['click', 'input', 'change']) button.addEventListener(type, () => window.observedEvents[type] = true);</script>`,
+      async (session, page) => {
+        const before = await observe();
+        assert.equal(before.events.receivesPointer, visible);
+        const capture = await request(`/pages/${page.pageId}/capture`, {
+          documentId: page.documentId,
+        });
+        assert.equal(capture.coverage.complete, true);
+        const candidate = capture.candidates.find((candidate) => candidate.label === "Search");
+        assert.ok(candidate);
+        assert.equal(candidate.state.inViewport, visible);
+        const { target } = await request(`/pages/${page.pageId}/selection`, {
+          documentId: page.documentId,
+          captureId: capture.captureId,
+          candidateId: candidate.id,
+          action: "click",
+        });
+        assert.equal(target.state.inViewport, visible);
+        assert.equal(target.interactability.status, visible ? "ready" : "blocked");
+        assert.equal(target.interactability.checks.pointerReception, visible ? "pass" : "unknown");
+        assert.deepEqual(target.interactability.reasons, visible ? [] : ["off_screen"]);
+        const after = await verify(target.xpaths);
+        assert.deepEqual(after.matches, [["expected-target"]]);
+        assert.deepEqual(after.events, before.events);
+        assert.equal(after.scrollY, before.scrollY);
+        assert.equal(after.activeElement, before.activeElement);
+      },
+    );
+  });
+}
 
 test("Slow frame geometry reports explicit capture and validation budget failures", async () => {
   await withFixture(

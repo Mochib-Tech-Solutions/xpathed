@@ -213,6 +213,20 @@ export default function ChatPanel({
               )}
               {actions.map((action) => {
                 const target = action.target;
+                const checks = target?.interactability?.checks;
+                const verified = [
+                  checks?.compatibleControl === "pass" &&
+                    !["click", "double_click", "right_click", "hover", "inspect"].includes(
+                      action.action ?? "",
+                    ) &&
+                    "compatible control type",
+                  checks?.enabled === "pass" && "enabled",
+                  checks?.writable === "pass" && "not read-only",
+                  checks?.viewport === "pass" && "in view",
+                  checks?.pointerReception === "pass" && "unobstructed at the checked point",
+                ]
+                  .filter(Boolean)
+                  .join(", ");
                 return (
                   <section
                     key={action.actionId}
@@ -254,20 +268,31 @@ export default function ChatPanel({
                         ))}
                         <div className="space-y-2 text-xs text-muted-foreground">
                           {action.action && <p>Action: {action.action.replaceAll("_", "-")}</p>}
+                          {verified && <p>Verified: {verified}.</p>}
                           <p>
                             {target.interactability?.status === "ready"
-                              ? "Interaction checks passed."
+                              ? action.action === "inspect"
+                                ? "Target identified; no interaction requested."
+                                : verified
+                                  ? "No action was performed; movement and page response are untested."
+                                  : "Detailed interaction checks are unavailable."
                               : target.interactability?.status === "blocked"
                                 ? "Interaction blocked."
                                 : target.interactability?.status === "unsupported"
                                   ? "Interaction assessment unsupported."
                                   : target.interactability?.status === "unknown"
-                                    ? "Interaction readiness unknown."
+                                    ? checks?.keyboard === "unknown"
+                                      ? "Keyboard behavior is untested; no action was performed."
+                                      : "Interaction readiness unknown."
                                     : "Interaction readiness unavailable."}
                           </p>
                           <div className="flex flex-wrap gap-x-3 gap-y-1">
-                            <span>{target.state.inViewport ? "In viewport" : "Off-screen"}</span>
-                            <span>{target.state.enabled ? "Enabled" : "Disabled"}</span>
+                            {checks?.viewport !== "pass" && (
+                              <span>{target.state.inViewport ? "In viewport" : "Off-screen"}</span>
+                            )}
+                            {checks?.enabled !== "pass" && (
+                              <span>{target.state.enabled ? "Enabled" : "Disabled"}</span>
+                            )}
                             {(target.state.editable ||
                               action.action === "fill" ||
                               action.action === "type") && (

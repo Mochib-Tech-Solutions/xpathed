@@ -266,7 +266,7 @@ describe("Workspace resolution", () => {
   });
 
   it.each([
-    ["ready", [], "Interaction checks passed."],
+    ["ready", [], "Verified: enabled, in view, unobstructed at the checked point."],
     ["blocked", ["disabled", "off_screen"], "Interaction blocked."],
     ["unknown", [], "Interaction readiness unknown."],
     ["unsupported", ["custom_control_unverified"], "Interaction assessment unsupported."],
@@ -284,7 +284,12 @@ describe("Workspace resolution", () => {
                 action: "click",
                 status,
                 reasons,
-                checks: { eventOutcome: "unknown" },
+                checks: {
+                  enabled: status === "ready" ? "pass" : "fail",
+                  viewport: status === "ready" ? "pass" : "fail",
+                  pointerReception: status === "ready" ? "pass" : "unknown",
+                  eventOutcome: "unknown",
+                },
               },
             },
             diagnostics: { ...found.diagnostics, timingsMs: { total: 125 } },
@@ -302,6 +307,73 @@ describe("Workspace resolution", () => {
       expect(
         screen.queryByText("Event delivery and action success were not tested."),
       ).not.toBeInTheDocument();
+    },
+  );
+
+  it.each([
+    {
+      action: "hover",
+      status: "ready",
+      checks: { enabled: "not_applicable", viewport: "pass", pointerReception: "pass" },
+      message: "Verified: in view, unobstructed at the checked point.",
+      limit: "No action was performed; movement and page response are untested.",
+    },
+    {
+      action: "fill",
+      status: "unknown",
+      checks: { compatibleControl: "pass", enabled: "pass", writable: "pass", keyboard: "unknown" },
+      message: "Verified: compatible control type, enabled, not read-only.",
+      limit: "Keyboard behavior is untested; no action was performed.",
+    },
+    {
+      action: "click",
+      status: "blocked",
+      checks: { enabled: "fail", viewport: "pass", pointerReception: "pass" },
+      message: "Verified: in view, unobstructed at the checked point.",
+      limit: "Interaction blocked.",
+    },
+    {
+      action: "select",
+      status: "unsupported",
+      checks: { compatibleControl: "unknown", enabled: "pass", keyboard: "unknown" },
+      message: "Verified: enabled.",
+      limit: "Interaction assessment unsupported.",
+    },
+    {
+      action: "inspect",
+      status: "ready",
+      checks: { compatibleControl: "pass", enabled: "not_applicable", viewport: "not_applicable" },
+      message: "Target identified; no interaction requested.",
+      limit: "Target identified; no interaction requested.",
+    },
+    {
+      action: "click",
+      status: "ready",
+      checks: {},
+      message: "Detailed interaction checks are unavailable.",
+      limit: "Detailed interaction checks are unavailable.",
+    },
+  ])(
+    "explains $action/$status from the actual checks",
+    async ({ action, status, checks, message, limit }) => {
+      mockApi(() =>
+        Promise.resolve(
+          Response.json({
+            ...found,
+            action,
+            target: {
+              ...found.target,
+              interactability: { version: "2", action, status, reasons: [], checks },
+            },
+          }),
+        ),
+      );
+      const user = await openWorkspace();
+      await submitInstruction(user);
+      expect(await screen.findByText(message)).toBeVisible();
+      expect(screen.getByText(limit)).toBeVisible();
+      expect(screen.queryByText("Interaction checks passed.")).not.toBeInTheDocument();
+      expect(screen.queryByText(/clickable|successfully clicked/i)).not.toBeInTheDocument();
     },
   );
 
