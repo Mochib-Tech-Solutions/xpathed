@@ -6,7 +6,7 @@ A local browser workspace for turning English instructions into verified XPath e
 
 The managed browser foundation ([#2](https://github.com/Mochib-Tech-Solutions/xpathed/issues/2)) is implemented. Open your own website, interact with one Chromium page, and reset its session when you want to start again. The full-page workspace keeps chat beside the page; noVNC displays page content without Chromium's tabs or address bar. The theme menu offers System, Light and Dark modes and remembers your choice.
 
-Enter an English instruction to resolve one target on the current page through OpenRouter. Chat shows verified XPath alternatives and observed state; a browser overlay highlights the target without executing the instruction. Resolution covers ordinary controls in the main document. History is not persisted. See the [versioned resolution contract](docs/resolution.md) for supported scope and error handling.
+Enter an English instruction to resolve one target on the current page through OpenRouter. Press Enter to send or Ctrl+Enter for a new line. Chat shows ranked verified XPath alternatives, observed state and the reported resolution time; a browser overlay highlights the target without executing the instruction. Resolution covers ordinary controls in the main document. History is not persisted. See the [versioned resolution contract](docs/resolution.md) for supported scope and error handling.
 
 ## Setup and run
 
@@ -24,7 +24,7 @@ pnpm dev
 
 All five services run in Docker: the web app, client API, resolver, browser and PostgreSQL. A host .NET SDK is not needed to run them. Compose watches source files; Vite refreshes React and `dotnet watch` reloads the APIs. Dependency changes rebuild the affected image.
 
-Open [localhost:8080](http://localhost:8080), choose **Open browser**, and enter your website. Click, type and scroll directly in the managed page. **Reset session** asks for confirmation before discarding the current page and browsing state and opening a blank session. Additional windows are blocked so the target page stays consistent.
+Open [localhost:8080](http://localhost:8080), enter a website address and press Enter. This starts the browser and opens your website. Click, type and scroll directly in the managed page. **Reset session** asks for confirmation before discarding the current page and browsing state and opening a blank session. Additional windows are blocked so the target page stays consistent.
 
 Setup creates an ignored `.env` with a random database password. Add `OPENROUTER_API_KEY` to that file for instruction resolution; manual browsing works without a model key. Set `XPATHED_PORT` in your shell to choose another loopback port. Ctrl+C stops the development services; `pnpm docker:down` removes their containers while preserving PostgreSQL data.
 

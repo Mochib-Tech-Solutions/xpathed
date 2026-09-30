@@ -12,7 +12,7 @@
 
 Each browser session owns a Chromium process, an isolated browser context, one managed page, one Xvfb display and one loopback-only x11vnc listener. ASP.NET bridges binary WebSocket traffic directly to VNC; no debugging or raw VNC port is published. CDP is used internally to put Chromium in fullscreen before the viewer connects. No browser objects cross an HTTP boundary.
 
-The resolver receives the same `pageId` as the client. It asks the browser service for an inspection without opening or navigating a page. New sessions start at `about:blank`; the user provides the website through the address bar.
+The resolver receives the same `pageId` as the client. It asks the browser service for an inspection without opening or navigating a page. The initial workspace creates no session. Submitting the address bar creates a session at `about:blank` and immediately navigates to the supplied website. Later submissions reuse that session; a failed navigation keeps it available for retry.
 
 ## Client API
 
@@ -33,7 +33,7 @@ Navigation accepts absolute HTTP/HTTPS URLs without embedded credentials. The Re
 
 An inspection contains `sessionId`, `pageId`, `url`, `title`, `scrollY` and `capturedAt`. Current form values, passwords, cookies and storage contents are not captured.
 
-The inspection endpoint remains available through the API; the workspace has no manual inspection control. Instruction resolution uses the separate resolve endpoint and displays its result in chat. The [resolution contract](resolution.md) documents capture, model selection, XPath validation, highlight and diagnostics.
+The inspection endpoint remains available through the API; the workspace has no manual inspection control. Instruction resolution uses the separate resolve endpoint and displays its result in chat. Enter submits an instruction; Ctrl+Enter inserts a new line. Results show the reported total resolution time from `diagnostics.timingsMs.total` when available. This server duration excludes client network and display time. The [resolution contract](resolution.md) documents capture, model selection, XPath validation, highlight and diagnostics.
 
 ## Internal API
 

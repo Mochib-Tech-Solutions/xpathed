@@ -35,7 +35,11 @@ export type ResolutionResult = {
     };
     geometry: { x: number; y: number; width: number; height: number };
   } | null;
-  diagnostics: { code: string | null; message: string | null };
+  diagnostics: {
+    code: string | null;
+    message: string | null;
+    timingsMs?: { total?: number };
+  };
 };
 
 export type Resolution = { instruction: string; result: ResolutionResult };

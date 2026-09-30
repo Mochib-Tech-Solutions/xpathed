@@ -1,4 +1,4 @@
-import { ArrowRight, X } from "lucide-react";
+import { Globe2, X } from "lucide-react";
 import { lazy, Suspense } from "react";
 import { Button } from "@/components/ui/button";
 import ThemeToggle from "../theme/ThemeToggle";
@@ -28,7 +28,7 @@ export default function Workspace() {
   } = useWorkspace();
   return (
     <div className="flex h-dvh min-h-80 flex-col">
-      <header className="flex h-[54px] shrink-0 items-center justify-between border-b border-border px-4">
+      <header className="flex h-14 shrink-0 items-center justify-between border-b border-border px-4">
         <span className="text-xl font-semibold tracking-[-1px]">xpathed</span>
         <div className="flex items-center gap-2">
           <ThemeToggle />
@@ -69,11 +69,12 @@ export default function Workspace() {
           New windows aren’t supported.
         </div>
       )}
-      <main className="flex min-h-0 flex-1 flex-col sm:grid sm:grid-cols-[270px_minmax(0,1fr)] md:grid-cols-[320px_minmax(0,1fr)]">
+      <main className="flex min-h-0 flex-1 flex-col sm:grid sm:grid-cols-[300px_minmax(0,1fr)] md:grid-cols-[360px_minmax(0,1fr)]">
         <ChatPanel
           key={session?.sessionId ?? "closed"}
           instruction={instruction}
           resolution={resolution}
+          ready={!!page && /^https?:\/\//i.test(page.url)}
           disabled={!page || !/^https?:\/\//i.test(page.url) || !!busy}
           resolving={busy === "Resolving…"}
           onInstructionChange={setInstruction}
@@ -106,11 +107,9 @@ export default function Workspace() {
                 <BrowserViewer key={session.sessionId} session={session} />
               </Suspense>
             ) : (
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <Button type="button" onClick={start} disabled={!!busy}>
-                  {busy || "Open browser"}
-                  <ArrowRight aria-hidden="true" />
-                </Button>
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 px-6 text-center text-muted-foreground">
+                <Globe2 className="size-8 stroke-1" aria-hidden="true" />
+                <p role="status">{busy || "Enter a website address above to begin."}</p>
               </div>
             )}
           </div>

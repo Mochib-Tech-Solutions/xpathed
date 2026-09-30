@@ -6,7 +6,7 @@
 
 xpathed is a local chat and managed-browser workspace for resolving English instructions to verified XPath expressions. Read [README.md](README.md) for setup and the current feature boundary; use [docs/runtime.md](docs/runtime.md) when changing API or browser behavior.
 
-The implemented foundation is the managed browser in [issue #2](https://github.com/Mochib-Tech-Solutions/xpathed/issues/2). Sessions start blank, users open their own websites, and noVNC displays one page without browser chrome. Keep the UI full-page and minimal: chat, browser, essential navigation and a confirmed reset. The chat composer resolves instructions through OpenRouter under the [versioned contract](docs/resolution.md). Keep the browser-owned document/capture identities and XPath same-node verification intact.
+The implemented foundation is the managed browser in [issue #2](https://github.com/Mochib-Tech-Solutions/xpathed/issues/2). Submitting a website address creates the browser session and navigates to that site; noVNC displays one page without browser chrome. Keep the initial address field enabled and use it as the entry point. Keep the UI full-page and minimal: chat, browser, essential navigation and a confirmed reset. The chat composer resolves instructions through OpenRouter under the [versioned contract](docs/resolution.md). Keep the browser-owned document/capture identities and XPath same-node verification intact.
 
 Accepted follow-ups removed the bundled fixture website, browser Smoke project, manual Inspect button and duplicate close control. Do not restore them from the older #2 wording. Future evaluation work has its own explicit scope. Resolution selects and highlights a target; it does not execute the instruction or add autonomous browsing.
 

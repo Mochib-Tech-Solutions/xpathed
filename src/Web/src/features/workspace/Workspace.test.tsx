@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { mockSystemTheme } from "@/test/systemTheme";
@@ -69,7 +69,7 @@ function mockApi(resolve = () => Promise.resolve(Response.json(found)), currentP
 async function openWorkspace() {
   const user = userEvent.setup();
   renderWorkspace();
-  await user.click(screen.getByRole("button", { name: "Open browser" }));
+  await user.type(screen.getByRole("textbox", { name: "Page address" }), `${page.url}{Enter}`);
   await waitFor(() =>
     expect(screen.getByRole("textbox", { name: "Describe an element" })).toBeEnabled(),
   );
@@ -82,6 +82,110 @@ async function submitInstruction(user: ReturnType<typeof userEvent.setup>) {
 }
 
 describe("Workspace resolution", () => {
+  it("sends an instruction with Enter", async () => {
+    mockApi();
+    const user = await openWorkspace();
+    const instruction = screen.getByRole("textbox", { name: "Describe an element" });
+    await user.type(instruction, "Click Pay now{Enter}");
+
+    expect(await screen.findByRole("heading", { name: "Pay now" })).toBeInTheDocument();
+    expect(instruction).toHaveValue("Click Pay now");
+  });
+
+  it("returns focus to the composer when a sent request completes", async () => {
+    let finish!: (response: Response) => void;
+    const pending = new Promise<Response>((resolve) => {
+      finish = resolve;
+    });
+    mockApi(() => pending);
+    const user = await openWorkspace();
+    await submitInstruction(user);
+    await act(async () => {
+      finish(Response.json(found));
+      await pending;
+    });
+
+    await screen.findByRole("heading", { name: "Pay now" });
+    expect(screen.getByRole("textbox", { name: "Describe an element" })).toHaveFocus();
+  });
+
+  it("keeps focus on another control when a sent request completes", async () => {
+    let finish!: (response: Response) => void;
+    const pending = new Promise<Response>((resolve) => {
+      finish = resolve;
+    });
+    mockApi(() => pending);
+    const user = await openWorkspace();
+    await submitInstruction(user);
+    const theme = screen.getByRole("button", { name: /^Theme:/ });
+    await user.click(theme);
+    await user.keyboard("{Escape}");
+    await act(async () => {
+      finish(Response.json(found));
+      await pending;
+    });
+
+    await screen.findByRole("heading", { name: "Pay now" });
+    expect(theme).toHaveFocus();
+  });
+
+  it("inserts a Ctrl+Enter newline at the selected text and keeps the caret there", async () => {
+    const resolve = vi.fn(() => Promise.resolve(Response.json(found)));
+    mockApi(resolve);
+    const user = await openWorkspace();
+    const instruction = screen.getByRole<HTMLTextAreaElement>("textbox", {
+      name: "Describe an element",
+    });
+    await user.type(instruction, "Click the Pay now button");
+    instruction.setSelectionRange(9, 18);
+    await user.keyboard("{Control>}{Enter}{/Control}");
+
+    expect(instruction).toHaveValue("Click the\nbutton");
+    expect(instruction.selectionStart).toBe(10);
+    expect(instruction.selectionEnd).toBe(10);
+    expect(resolve).not.toHaveBeenCalled();
+    await user.keyboard("primary ");
+    expect(instruction).toHaveValue("Click the\nprimary button");
+  });
+
+  it("does not submit Enter while an IME composition is active", async () => {
+    const resolve = vi.fn(() => Promise.resolve(Response.json(found)));
+    mockApi(resolve);
+    const user = await openWorkspace();
+    const instruction = screen.getByRole("textbox", { name: "Describe an element" });
+    await user.type(instruction, "Click 確認");
+    fireEvent.keyDown(instruction, { key: "Enter", isComposing: true });
+    fireEvent.keyDown(instruction, { key: "Enter", keyCode: 229 });
+
+    expect(resolve).not.toHaveBeenCalled();
+    await user.keyboard("{Enter}");
+    expect(await screen.findByRole("heading", { name: "Pay now" })).toBeInTheDocument();
+  });
+
+  it("shows the resolver's reported duration beside the result", async () => {
+    mockApi(() =>
+      Promise.resolve(
+        Response.json({
+          ...found,
+          diagnostics: { ...found.diagnostics, timingsMs: { total: 1260 } },
+        }),
+      ),
+    );
+    const user = await openWorkspace();
+    await submitInstruction(user);
+
+    expect(await screen.findByText("Resolution time: 1.26 s")).toBeInTheDocument();
+  });
+
+  it("omits duration when the resolver did not report one", async () => {
+    mockApi();
+    const user = await openWorkspace();
+    await submitInstruction(user);
+
+    await screen.findByRole("heading", { name: "Pay now" });
+    expect(screen.queryByText(/Resolution time:/)).not.toBeInTheDocument();
+  });
+
   it("reports a noneditable fill target as found with its observed state", async () => {
     mockApi(() =>
       Promise.resolve(
@@ -192,7 +296,7 @@ describe("Workspace resolution", () => {
     renderWorkspace();
     expect(screen.getByRole("textbox", { name: "Describe an element" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Resolve instruction" })).toBeDisabled();
-    await user.click(screen.getByRole("button", { name: "Open browser" }));
+    await user.type(screen.getByRole("textbox", { name: "Page address" }), `${page.url}{Enter}`);
     await waitFor(() =>
       expect(screen.getByRole("textbox", { name: "Describe an element" })).toBeEnabled(),
     );
@@ -340,7 +444,7 @@ describe("Workspace resolution", () => {
     vi.stubGlobal("fetch", fetch);
     renderWorkspace();
 
-    await user.click(screen.getByRole("button", { name: "Open browser" }));
+    await user.type(screen.getByRole("textbox", { name: "Page address" }), `${page.url}{Enter}`);
     const instruction = screen.getByRole("textbox", { name: "Describe an element" });
     await waitFor(() => expect(instruction).toBeEnabled());
     await user.type(instruction, "Click Pay now");

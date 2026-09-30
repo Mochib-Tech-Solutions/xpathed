@@ -78,7 +78,7 @@ export default function useWorkspace() {
           active = false;
           revision.current += 1;
           setWorkspace(emptyWorkspace);
-          setError("Your browser session has ended. Open a new browser to continue.");
+          setError("Your browser session has ended. Enter a website address to start again.");
           setPollError("");
         } else {
           setPollError("Unable to refresh the page. Retrying…");
@@ -131,10 +131,14 @@ export default function useWorkspace() {
   }
 
   function navigate(url: string) {
-    if (!session) return;
-    void perform("Navigating", async (isCurrent) => {
+    void perform("Opening website…", async (isCurrent) => {
       setWorkspace((previous) => ({ ...previous, resolution: null }));
-      const next = await request<PageState>(`/pages/${session.pageId}/navigate`, "POST", { url });
+      const currentSession = session ?? (await request<Session>("/sessions", "POST"));
+      if (!isCurrent()) return;
+      if (!session) setWorkspace((previous) => ({ ...previous, session: currentSession }));
+      const next = await request<PageState>(`/pages/${currentSession.pageId}/navigate`, "POST", {
+        url,
+      });
       if (isCurrent())
         setWorkspace((previous) => ({
           ...previous,
