@@ -23,7 +23,8 @@ internal sealed partial class BrowserSessionRuntime(int slot, ILogger logger) : 
     public string ActivePageId => Volatile.Read(ref activePageId);
     public long ActivationVersion => Interlocked.Read(ref activationVersion);
     public string ViewPath => $"/view/{Id}";
-    public bool HasPendingPages => !pendingPages.IsEmpty || Interlocked.Read(ref focusRevision) != Interlocked.Read(ref synchronizedFocusRevision);
+    public bool HasPendingPages =>
+        !pendingPages.IsEmpty || Interlocked.Read(ref focusRevision) != Interlocked.Read(ref synchronizedFocusRevision);
     public int Slot { get; } = slot;
     private int DisplayNumber => 100 + Slot;
     public int Port => 5900 + Slot;
@@ -43,19 +44,19 @@ internal sealed partial class BrowserSessionRuntime(int slot, ILogger logger) : 
         Display = Start("Xvfb", $":{DisplayNumber}", "-screen", "0", "1280x800x24", "-nolisten", "tcp", "-ac");
         await WaitUntilAsync(() => File.Exists($"/tmp/.X11-unix/X{DisplayNumber}"), token);
         Playwright = await Microsoft.Playwright.Playwright.CreateAsync();
-        Browser = await Playwright.Chromium.LaunchAsync(new()
-        {
-            Headless = false,
-            ChromiumSandbox = true,
-            Env = new Dictionary<string, string> { ["DISPLAY"] = $":{DisplayNumber}" },
-            Args = ["--kiosk", "--window-position=0,0", "--window-size=1280,800"],
-            Timeout = 20000
-        });
-        Context = await Browser.NewContextAsync(new()
-        {
-            ViewportSize = ViewportSize.NoViewport,
-            AcceptDownloads = false
-        });
+        Browser = await Playwright.Chromium.LaunchAsync(
+            new()
+            {
+                Headless = false,
+                ChromiumSandbox = true,
+                Env = new Dictionary<string, string> { ["DISPLAY"] = $":{DisplayNumber}" },
+                Args = ["--kiosk", "--window-position=0,0", "--window-size=1280,800"],
+                Timeout = 20000,
+            }
+        );
+        Context = await Browser.NewContextAsync(
+            new() { ViewportSize = ViewportSize.NoViewport, AcceptDownloads = false }
+        );
         await ActivateAsync(await RegisterAsync(await Context.NewPageAsync()));
         Context.Page += (_, page) =>
         {
@@ -68,21 +69,35 @@ internal sealed partial class BrowserSessionRuntime(int slot, ILogger logger) : 
             _ = AcceptPageAsync(page);
         };
         Browser.Disconnected += (_, _) => Stop.Cancel();
-        Vnc = Start("x11vnc", "-display", $":{DisplayNumber}", "-rfbport", Port.ToString(CultureInfo.InvariantCulture),
-            "-localhost", "-forever", "-shared", "-nopw", "-quiet", "-xkb");
-        await WaitUntilAsync(async () =>
-        {
-            try
+        Vnc = Start(
+            "x11vnc",
+            "-display",
+            $":{DisplayNumber}",
+            "-rfbport",
+            Port.ToString(CultureInfo.InvariantCulture),
+            "-localhost",
+            "-forever",
+            "-shared",
+            "-nopw",
+            "-quiet",
+            "-xkb"
+        );
+        await WaitUntilAsync(
+            async () =>
             {
-                using var tcp = new TcpClient();
-                await tcp.ConnectAsync("127.0.0.1", Port, token);
-                return true;
-            }
-            catch (SocketException)
-            {
-                return false;
-            }
-        }, token);
+                try
+                {
+                    using var tcp = new TcpClient();
+                    await tcp.ConnectAsync("127.0.0.1", Port, token);
+                    return true;
+                }
+                catch (SocketException)
+                {
+                    return false;
+                }
+            },
+            token
+        );
         token.ThrowIfCancellationRequested();
         Ready = true;
     }
@@ -159,11 +174,19 @@ internal sealed partial class BrowserSessionRuntime(int slot, ILogger logger) : 
         {
             await Gate.WaitAsync(Stop.Token);
             try
-            { await RefreshFocusAsync(); }
-            finally { Gate.Release(); }
+            {
+                await RefreshFocusAsync();
+            }
+            finally
+            {
+                Gate.Release();
+            }
         }
         catch (OperationCanceledException) when (Stop.IsCancellationRequested) { }
-        catch (PlaywrightException) { await Stop.CancelAsync(); }
+        catch (PlaywrightException)
+        {
+            await Stop.CancelAsync();
+        }
     }
 
     private async Task RefreshFocusAsync()
@@ -233,7 +256,9 @@ internal sealed partial class BrowserSessionRuntime(int slot, ILogger logger) : 
             {
                 if (!page.Page.IsClosed)
                 {
-                    pages.Add(new(Id, page.Id, page.Page.Url, await page.Page.TitleAsync(), BlockedPopups, page.DocumentId));
+                    pages.Add(
+                        new(Id, page.Id, page.Page.Url, await page.Page.TitleAsync(), BlockedPopups, page.DocumentId)
+                    );
                 }
             }
             if (!HasPendingPages && pages.Any(page => page.PageId == ActivePageId))
@@ -253,10 +278,16 @@ internal sealed partial class BrowserSessionRuntime(int slot, ILogger logger) : 
             {
                 await AdoptPageAsync(page);
             }
-            finally { Gate.Release(); }
+            finally
+            {
+                Gate.Release();
+            }
         }
         catch (OperationCanceledException) when (Stop.IsCancellationRequested) { }
-        finally { pendingPages.TryRemove(page, out _); }
+        finally
+        {
+            pendingPages.TryRemove(page, out _);
+        }
     }
 
     private async Task AdoptPageAsync(IPage page)
@@ -308,7 +339,10 @@ internal sealed partial class BrowserSessionRuntime(int slot, ILogger logger) : 
                 await Stop.CancelAsync();
             }
         }
-        finally { pendingPages.TryRemove(page, out _); }
+        finally
+        {
+            pendingPages.TryRemove(page, out _);
+        }
     }
 
     private async Task RemoveClosedPageAsync(BrowserPageRuntime page)
@@ -323,7 +357,10 @@ internal sealed partial class BrowserSessionRuntime(int slot, ILogger logger) : 
                     await ClosePageAsync(page);
                 }
             }
-            finally { Gate.Release(); }
+            finally
+            {
+                Gate.Release();
+            }
         }
         catch (OperationCanceledException) when (Stop.IsCancellationRequested) { }
         catch (PlaywrightException)
@@ -349,7 +386,9 @@ internal sealed partial class BrowserSessionRuntime(int slot, ILogger logger) : 
         return process;
     }
 
-    private static Task WaitUntilAsync(Func<bool> ready, CancellationToken token) => WaitUntilAsync(() => Task.FromResult(ready()), token);
+    private static Task WaitUntilAsync(Func<bool> ready, CancellationToken token) =>
+        WaitUntilAsync(() => Task.FromResult(ready()), token);
+
     private static async Task WaitUntilAsync(Func<Task<bool>> ready, CancellationToken token)
     {
         for (var i = 0; i < 100; i++)
