@@ -274,9 +274,9 @@ describe("Browser tabs and chat", () => {
     await waitFor(() =>
       expect(screen.getByRole("textbox", { name: "Describe an element" })).toBeEnabled(),
     );
-    expect(screen.queryByRole("heading", { name: "First target" })).not.toBeInTheDocument();
+    expect(screen.queryByText("First target", { selector: "bdi" })).not.toBeInTheDocument();
     await user.click(screen.getByRole("tab", { name: "First" }));
-    expect(await screen.findByRole("heading", { name: "First target" })).toBeInTheDocument();
+    expect(await screen.findByText("First target", { selector: "bdi" })).toBeInTheDocument();
     expect(screen.getByText(/Earlier result/)).toBeInTheDocument();
     expect(
       within(screen.getByRole("log")).queryByText("https://first.test"),
@@ -291,13 +291,13 @@ describe("Browser tabs and chat", () => {
       screen.getByRole("textbox", { name: "Describe an element" }),
       "Click First{Enter}",
     );
-    await screen.findByRole("heading", { name: "First target" });
+    await screen.findByText("First target", { selector: "bdi" });
     await user.click(screen.getByRole("button", { name: "Close First tab and clear its chat" }));
     expect(await screen.findByRole("tab", { name: "New tab" })).toHaveAttribute(
       "aria-selected",
       "true",
     );
-    expect(screen.queryByRole("heading", { name: "First target" })).not.toBeInTheDocument();
+    expect(screen.queryByText("First target", { selector: "bdi" })).not.toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: "Page address" })).toHaveValue("");
     expect(screen.getByRole("textbox", { name: "Describe an element" })).toBeDisabled();
   });
@@ -308,15 +308,15 @@ describe("Browser tabs and chat", () => {
     await openFirst(user);
     const composer = () => screen.getByRole("textbox", { name: "Describe an element" });
     await user.type(composer(), "Click First{Enter}");
-    await screen.findByRole("heading", { name: "First target" });
+    await screen.findByText("First target", { selector: "bdi" });
     await user.click(screen.getByRole("button", { name: "New tab" }));
     await waitFor(() => expect(composer()).toBeDisabled());
     await user.type(screen.getByRole("textbox", { name: "Page address" }), "second.test{Enter}");
     await waitFor(() => expect(composer()).toBeEnabled());
     await user.type(composer(), "Click Second{Enter}");
-    await screen.findByRole("heading", { name: "Second target" });
+    await screen.findByText("Second target", { selector: "bdi" });
     await user.click(screen.getByRole("button", { name: "Reset chat" }));
-    expect(screen.queryByRole("heading", { name: "Second target" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Second target", { selector: "bdi" })).not.toBeInTheDocument();
     expect(composer()).toHaveValue("");
     expect(composer()).toHaveFocus();
     expect(screen.getByRole("textbox", { name: "Page address" })).toHaveValue(
@@ -328,7 +328,7 @@ describe("Browser tabs and chat", () => {
       false,
     );
     await user.click(screen.getByRole("tab", { name: "First" }));
-    expect(await screen.findByRole("heading", { name: "First target" })).toBeInTheDocument();
+    expect(await screen.findByText("First target", { selector: "bdi" })).toBeInTheDocument();
     expect(composer()).toHaveValue("Click First");
   });
 
@@ -338,7 +338,7 @@ describe("Browser tabs and chat", () => {
     await openFirst(user);
     const composer = () => screen.getByRole("textbox", { name: "Describe an element" });
     await user.type(composer(), "Click First{Enter}");
-    await screen.findByRole("heading", { name: "First target" });
+    await screen.findByText("First target", { selector: "bdi" });
     await user.clear(composer());
     await user.type(composer(), "Draft for First");
     await user.click(screen.getByRole("button", { name: "New tab" }));
@@ -346,7 +346,7 @@ describe("Browser tabs and chat", () => {
     await user.type(screen.getByRole("textbox", { name: "Page address" }), "second.test{Enter}");
     await waitFor(() => expect(composer()).toBeEnabled());
     await user.type(composer(), "Click Second{Enter}");
-    await screen.findByRole("heading", { name: "Second target" });
+    await screen.findByText("Second target", { selector: "bdi" });
     expect(screen.queryByText("Click First", { selector: "p" })).not.toBeInTheDocument();
     await user.click(screen.getByRole("tab", { name: "First" }));
     expect(await screen.findByText("Click First", { selector: "p" })).toBeInTheDocument();

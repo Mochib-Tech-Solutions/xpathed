@@ -92,6 +92,98 @@ async function submitInstruction(user: ReturnType<typeof userEvent.setup>) {
 }
 
 describe("Workspace resolution", () => {
+  it.each([
+    ["input", "button", "Search", "Button"],
+    ["img", "img", "Product photo", "Image"],
+    ["img", "img", "", "Image"],
+    ["div", "button", "Close", "Button"],
+    ["div", "group", "", "Group"],
+  ])("describes %s role=%s with accessible name '%s'", async (tag, role, accessibleName, type) => {
+    mockApi(() =>
+      Promise.resolve(
+        Response.json({
+          ...found,
+          target: {
+            ...found.target,
+            tag,
+            role,
+            accessibleName,
+            label: "Unrelated descendant content",
+          },
+        }),
+      ),
+    );
+    const user = await openWorkspace();
+    await submitInstruction(user);
+    expect(await screen.findByRole("heading", { name: type })).toBeVisible();
+    expect(screen.getByText(accessibleName || "No accessible name")).toBeVisible();
+    expect(screen.queryByText("Unrelated descendant content")).not.toBeInTheDocument();
+    expect(screen.getByText(found.target.xpaths[0]!)).toBeVisible();
+  });
+
+  it.each([false, true])(
+    "timestamps sent and received messages, including failure=%s",
+    async (failure) => {
+      let finish!: (response: Response) => void;
+      mockApi(
+        () =>
+          new Promise((resolve) => {
+            finish = resolve;
+          }),
+      );
+      const user = await openWorkspace();
+      const sentAt = new Date("2026-09-30T19:24:00.000Z");
+      const receivedAt = new Date("2026-09-30T19:25:02.000Z");
+      vi.useFakeTimers({ toFake: ["Date"] });
+      vi.setSystemTime(sentAt);
+      try {
+        await submitInstruction(user);
+        const sent = screen.getByLabelText(/^Sent /, { selector: "time" });
+        expect(sent).toHaveAttribute("datetime", sentAt.toISOString());
+        expect(screen.queryByLabelText(/^Received /, { selector: "time" })).not.toBeInTheDocument();
+        expect(
+          within(screen.getByLabelText("Response message")).getByText("Resolving…"),
+        ).toBeVisible();
+        vi.setSystemTime(receivedAt);
+        finish(
+          failure
+            ? Response.json({ message: "Provider unavailable" }, { status: 502 })
+            : Response.json({
+                ...found,
+                diagnostics: { ...found.diagnostics, timingsMs: { total: 739 } },
+              }),
+        );
+        const received = await screen.findByLabelText(/^Received /, { selector: "time" });
+        expect(received).toHaveAttribute("datetime", receivedAt.toISOString());
+        expect(sent).toHaveAttribute("datetime", sentAt.toISOString());
+        expect(sent).toHaveTextContent(
+          sentAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        );
+        expect(received).toHaveTextContent(
+          receivedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        );
+        if (failure) expect(screen.getByRole("alert")).toHaveTextContent("Provider unavailable");
+        else {
+          const response = within(screen.getByLabelText("Response message"));
+          const content = [
+            response.getByRole("heading", { name: "Button" }),
+            response.getByText("Action: click"),
+            response.getByText(found.target.xpaths[0]!),
+            response.getByRole("heading", { name: "Verification" }),
+          ];
+          for (let index = 0; index < content.length - 1; index++) {
+            expect(content[index]!.compareDocumentPosition(content[index + 1]!)).toBe(
+              Node.DOCUMENT_POSITION_FOLLOWING,
+            );
+          }
+          expect(response.getByText("Resolution time: 739 ms")).toBeVisible();
+        }
+      } finally {
+        vi.useRealTimers();
+      }
+    },
+  );
+
   it.each(["found", "not_found"])(
     "shows one shared action for version-3 targets with a %s second result",
     async (secondOutcome) => {
@@ -148,8 +240,14 @@ describe("Workspace resolution", () => {
         await screen.findByText(missing ? "1 target found · 1 missing" : "2 targets found"),
       ).toBeVisible();
       expect(screen.getAllByText("Action: click")).toHaveLength(1);
+      expect(screen.queryByText(/all targets/i)).not.toBeInTheDocument();
       const targets = screen.getAllByRole("region", { name: /Target [12]/ });
       expect(targets).toHaveLength(2);
+      expect(within(targets[0]!).getByText("Target 1")).toBeVisible();
+      expect(within(targets[1]!).getByText("Target 2")).toBeVisible();
+      expect(within(targets[0]!).getByRole("button", { name: "Copy XPath 1" })).toBeVisible();
+      if (!missing)
+        expect(within(targets[1]!).getByRole("button", { name: "Copy XPath 2" })).toBeVisible();
       for (const target of targets) {
         expect(within(target).queryByText(/Action:/)).not.toBeInTheDocument();
         if (missing && target === targets[1])
@@ -298,7 +396,7 @@ describe("Workspace resolution", () => {
     );
     const user = await openWorkspace();
     await submitInstruction(user);
-    await screen.findByRole("heading", { name: "Pay now" });
+    await screen.findByText("Pay now", { selector: "bdi" });
     const transcript = screen.getByRole("log");
     expect(within(transcript).getAllByText("Click Pay now")).toHaveLength(1);
     expect(within(transcript).queryByText(page.url)).not.toBeInTheDocument();
@@ -422,7 +520,7 @@ describe("Workspace resolution", () => {
       const user = await openWorkspace();
       await submitInstruction(user);
       expect(await screen.findByText(message)).toBeVisible();
-      expect(screen.getByRole("heading", { name: "Pay now" })).toBeInTheDocument();
+      expect(screen.getByText("Pay now", { selector: "bdi" })).toBeInTheDocument();
       expect(screen.getByText("Resolution time: 125 ms")).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Copy XPath 1" })).toBeInTheDocument();
       if (status === "blocked")
@@ -439,14 +537,14 @@ describe("Workspace resolution", () => {
       status: "ready",
       checks: { enabled: "not_applicable", viewport: "pass", pointerReception: "pass" },
       message: "Verified: in view, unobstructed at the checked point.",
-      limit: "No action was performed; movement and page response are untested.",
+      limit: null,
     },
     {
       action: "fill",
       status: "unknown",
       checks: { compatibleControl: "pass", enabled: "pass", writable: "pass", keyboard: "unknown" },
       message: "Verified: compatible control type, enabled, not read-only.",
-      limit: "Keyboard behavior is untested; no action was performed.",
+      limit: "Keyboard readiness unknown.",
     },
     {
       action: "click",
@@ -466,8 +564,8 @@ describe("Workspace resolution", () => {
       action: "inspect",
       status: "ready",
       checks: { compatibleControl: "pass", enabled: "not_applicable", viewport: "not_applicable" },
-      message: "Target identified; no interaction requested.",
-      limit: "Target identified; no interaction requested.",
+      message: "Off-screen",
+      limit: null,
     },
     {
       action: "click",
@@ -494,7 +592,12 @@ describe("Workspace resolution", () => {
       const user = await openWorkspace();
       await submitInstruction(user);
       expect(await screen.findByText(message)).toBeVisible();
-      expect(screen.getByText(limit)).toBeVisible();
+      if (limit) expect(screen.getByText(limit)).toBeVisible();
+      expect(
+        screen.queryByText(
+          /No action was performed|no interaction requested|movement and page response/i,
+        ),
+      ).not.toBeInTheDocument();
       expect(screen.queryByText("Interaction checks passed.")).not.toBeInTheDocument();
       expect(screen.queryByText(/clickable|successfully clicked/i)).not.toBeInTheDocument();
     },
@@ -589,10 +692,10 @@ describe("Workspace resolution", () => {
     mockApi();
     const user = await openWorkspace();
     await submitInstruction(user);
-    await screen.findByRole("heading", { name: "Pay now" });
+    await screen.findByText("Pay now", { selector: "bdi" });
     await user.click(screen.getByRole("button", { name: "Resolve instruction" }));
     await waitFor(() =>
-      expect(screen.getAllByRole("heading", { name: "Pay now" })).toHaveLength(2),
+      expect(screen.getAllByText("Pay now", { selector: "bdi" })).toHaveLength(2),
     );
     vi.spyOn(navigator.clipboard, "writeText").mockRejectedValue(
       new Error("Clipboard unavailable"),
@@ -617,7 +720,7 @@ describe("Workspace resolution", () => {
     );
     const user = await openWorkspace();
     await submitInstruction(user);
-    await screen.findByRole("heading", { name: "Pay now" });
+    await screen.findByText("Pay now", { selector: "bdi" });
     const composer = screen.getByRole("textbox", { name: "Describe an element" });
     await user.clear(composer);
     await user.type(composer, "Click the missing button{Enter}");
@@ -637,7 +740,7 @@ describe("Workspace resolution", () => {
     const instruction = screen.getByRole("textbox", { name: "Describe an element" });
     await user.type(instruction, "Click Pay now{Enter}");
 
-    expect(await screen.findByRole("heading", { name: "Pay now" })).toBeInTheDocument();
+    expect(await screen.findByText("Pay now", { selector: "bdi" })).toBeInTheDocument();
     expect(instruction).toHaveValue("Click Pay now");
   });
 
@@ -654,7 +757,7 @@ describe("Workspace resolution", () => {
       await pending;
     });
 
-    await screen.findByRole("heading", { name: "Pay now" });
+    await screen.findByText("Pay now", { selector: "bdi" });
     expect(screen.getByRole("textbox", { name: "Describe an element" })).toHaveFocus();
   });
 
@@ -674,7 +777,7 @@ describe("Workspace resolution", () => {
       await pending;
     });
 
-    await screen.findByRole("heading", { name: "Pay now" });
+    await screen.findByText("Pay now", { selector: "bdi" });
     expect(theme).toHaveFocus();
   });
 
@@ -708,7 +811,7 @@ describe("Workspace resolution", () => {
 
     expect(resolve).not.toHaveBeenCalled();
     await user.keyboard("{Enter}");
-    expect(await screen.findByRole("heading", { name: "Pay now" })).toBeInTheDocument();
+    expect(await screen.findByText("Pay now", { selector: "bdi" })).toBeInTheDocument();
   });
 
   it("shows the resolver's reported duration beside the result", async () => {
@@ -731,7 +834,7 @@ describe("Workspace resolution", () => {
     const user = await openWorkspace();
     await submitInstruction(user);
 
-    await screen.findByRole("heading", { name: "Pay now" });
+    await screen.findByText("Pay now", { selector: "bdi" });
     expect(screen.queryByText(/Resolution time:/)).not.toBeInTheDocument();
   });
 
@@ -748,7 +851,7 @@ describe("Workspace resolution", () => {
     const user = await openWorkspace();
     await submitInstruction(user);
 
-    expect(await screen.findByRole("heading", { name: "Name" })).toBeInTheDocument();
+    expect(await screen.findByText("Name", { selector: "bdi" })).toBeInTheDocument();
     expect(screen.getByText("Not editable")).toBeInTheDocument();
     expect(
       screen.queryByText("I couldn’t find that element on this page."),
@@ -760,7 +863,7 @@ describe("Workspace resolution", () => {
     mockApi(undefined, () => current);
     const user = await openWorkspace();
     await submitInstruction(user);
-    await screen.findByRole("heading", { name: "Pay now" });
+    await screen.findByText("Pay now", { selector: "bdi" });
     current = { ...page, documentId: "document-2" };
 
     await waitFor(() => expect(screen.getByText(/Earlier result/)).toBeInTheDocument(), {
@@ -786,17 +889,17 @@ describe("Workspace resolution", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "The page changed. Resolve the instruction again.",
     );
-    expect(screen.queryByRole("heading", { name: "Pay now" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Pay now", { selector: "bdi" })).not.toBeInTheDocument();
   });
 
   it("preserves the previous result as historical when the user reloads the page", async () => {
     mockApi();
     const user = await openWorkspace();
     await submitInstruction(user);
-    await screen.findByRole("heading", { name: "Pay now" });
+    await screen.findByText("Pay now", { selector: "bdi" });
     await user.click(screen.getByRole("button", { name: "Reload page" }));
 
-    expect(screen.getByRole("heading", { name: "Pay now" })).toBeInTheDocument();
+    expect(screen.getByText("Pay now", { selector: "bdi" })).toBeInTheDocument();
     expect(screen.getByText(/Earlier result/)).toBeInTheDocument();
     expect(screen.getByText(found.target.xpaths[0]!)).toBeVisible();
     expect(screen.queryByText(found.target.xpaths[1]!)).not.toBeInTheDocument();
@@ -807,7 +910,7 @@ describe("Workspace resolution", () => {
     mockApi();
     const user = await openWorkspace();
     await submitInstruction(user);
-    await screen.findByRole("heading", { name: "Pay now" });
+    await screen.findByText("Pay now", { selector: "bdi" });
     expect(
       within(screen.getByRole("banner")).queryByRole("button", { name: /reset|close all/i }),
     ).not.toBeInTheDocument();
@@ -821,7 +924,7 @@ describe("Workspace resolution", () => {
     );
 
     await waitFor(() =>
-      expect(screen.queryByRole("heading", { name: "Pay now" })).not.toBeInTheDocument(),
+      expect(screen.queryByText("Pay now", { selector: "bdi" })).not.toBeInTheDocument(),
     );
     expect(screen.getByRole("textbox", { name: "Describe an element" })).toHaveValue("");
     expect(screen.getByRole("textbox", { name: "Describe an element" })).toBeDisabled();
@@ -841,7 +944,7 @@ describe("Workspace resolution", () => {
     mockApi();
     const user = await openWorkspace();
     await submitInstruction(user);
-    await screen.findByRole("heading", { name: "Pay now" });
+    await screen.findByText("Pay now", { selector: "bdi" });
     const originalFetch = globalThis.fetch;
     const freshSession = { sessionId: "session-2", pageId: "page-2", viewPath: "/view/session-2" };
     const freshPage = {
@@ -907,13 +1010,13 @@ describe("Workspace resolution", () => {
       ),
     );
     expect(screen.queryByRole("tab", { name: "Checkout" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "Pay now" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Pay now", { selector: "bdi" })).not.toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: "Describe an element" })).toHaveValue("");
     await user.type(
       screen.getByRole("textbox", { name: "Describe an element" }),
       "Click Fresh target{Enter}",
     );
-    expect(await screen.findByRole("heading", { name: "Fresh target" })).toBeInTheDocument();
+    expect(await screen.findByText("Fresh target", { selector: "bdi" })).toBeInTheDocument();
     expect(resolveFresh).toHaveBeenCalledTimes(1);
     expect(globalThis.fetch).toHaveBeenCalledWith(
       "/api/pages/page-2/resolve",
@@ -932,7 +1035,7 @@ describe("Workspace resolution", () => {
     mockApi();
     const user = await openWorkspace();
     await submitInstruction(user);
-    await screen.findByRole("heading", { name: "Pay now" });
+    await screen.findByText("Pay now", { selector: "bdi" });
     const originalFetch = globalThis.fetch;
     vi.stubGlobal(
       "fetch",
@@ -951,7 +1054,7 @@ describe("Workspace resolution", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Unable to close the browser.");
     expect(screen.getByRole("tab", { name: "Checkout" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Pay now" })).toBeInTheDocument();
+    expect(screen.getByText("Pay now", { selector: "bdi" })).toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: "Describe an element" })).toHaveValue(
       "Click Pay now",
     );
@@ -979,7 +1082,7 @@ describe("Workspace resolution", () => {
       finish(Response.json(found));
       await pending;
     });
-    expect(await screen.findByRole("heading", { name: "Pay now" })).toBeInTheDocument();
+    expect(await screen.findByText("Pay now", { selector: "bdi" })).toBeInTheDocument();
   });
 
   it("requires an open page and a nonblank instruction", async () => {
@@ -1045,7 +1148,7 @@ describe("Workspace resolution", () => {
     });
 
     expect(await screen.findByText(/Earlier result/)).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Pay now" })).toBeInTheDocument();
+    expect(screen.getByText("Pay now", { selector: "bdi" })).toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: "Page address" })).toHaveValue(
       "https://example.test/done",
     );
@@ -1156,7 +1259,7 @@ describe("Workspace resolution", () => {
     await user.type(instruction, "Click Pay now");
     await user.click(screen.getByRole("button", { name: "Resolve instruction" }));
 
-    expect(await screen.findByRole("heading", { name: "Pay now" })).toBeInTheDocument();
+    expect(await screen.findByText("Pay now", { selector: "bdi" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Copy XPath 2" })).not.toBeInTheDocument();
     expect(screen.queryByText(found.target.xpaths[1]!)).not.toBeInTheDocument();
     expect(screen.queryByText("1 alternative XPath")).not.toBeInTheDocument();

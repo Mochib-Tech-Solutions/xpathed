@@ -391,7 +391,7 @@ internal static class BrowserCaptureScript
               if (!element.isConnected || !accessibilityExposed(element)) return { errorCode: 'stale_capture' };
               const xpaths = xpathsFor(element);
               if (!xpaths.length) return { errorCode: 'xpath_validation_failed' };
-              return { target: { candidateId, frame, tag: element.localName, label: candidates[index].label || candidates[index].text,
+              return { target: { candidateId, frame, tag: element.localName, role: role(element), accessibleName: label(element), label: candidates[index].label || candidates[index].text,
                 xpaths, state: state(element), geometry: geometry(element), interactability: interactability(element, action) } };
               } catch (error) {
                 if (error === budgetExceeded) return { errorCode: 'validation_budget_exceeded' };
