@@ -83,26 +83,27 @@ Every C# project inherits the .NET recommended analyzers, nullable checks, warni
 
 Root commands are defined in `package.json`. Host C# build and formatting commands need the .NET SDK pinned in `global.json`; `pnpm restore` installs their locked inputs alongside workspace dependencies.
 
-| Command                                                       | Purpose                                                                        |
-| ------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| `pnpm run setup`                                              | Create local configuration and install locked workspace dependencies           |
-| `pnpm dev`                                                    | Run all services in Docker with source watching                                |
-| `pnpm build`                                                  | Build the .NET solution and production frontend                                |
-| `pnpm check`                                                  | Run the repository's formatting, lint, build and validation gates              |
-| `pnpm check:dotnet` / `pnpm check:web` / `pnpm check:tooling` | Validate one part of the repository                                            |
-| `pnpm lint`                                                   | Run analyzers, frontend lint and script syntax checks                          |
-| `pnpm format` / `pnpm format:check`                           | Apply or verify shared formatting                                              |
-| `pnpm test`                                                   | Run the configured automated checks                                            |
-| `pnpm test:persistence`                                       | Test migrations and recording against a supplied PostgreSQL test connection    |
-| `pnpm diagnostics -- <command>`                               | Inspect/export/import internal records; see [diagnostics](docs/diagnostics.md) |
-| `pnpm test:resolution`                                        | Run the explicit deterministic Docker resolution checks                        |
-| `pnpm test:resolution:live`                                   | Check the actual OpenRouter route with a configured API key                    |
-| `pnpm evaluate` / `pnpm evaluate:live`                        | Run independent deterministic or explicitly paid resolution evaluation         |
-| `pnpm evaluate:replay RUN_DIRECTORY`                          | Regrade saved evaluation evidence without a browser or provider                |
-| `pnpm docker:up` / `pnpm docker:down`                         | Start runtime images or stop project containers                                |
-| `pnpm docker:build` / `pnpm docker:check`                     | Build runtime images or validate Docker definitions                            |
-| `pnpm docker:logs` / `pnpm docker:status`                     | Inspect running services                                                       |
-| `pnpm clean`                                                  | Remove generated .NET output and the frontend build                            |
+| Command                                                                | Purpose                                                                        |
+| ---------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `pnpm run setup`                                                       | Create local configuration and install locked workspace dependencies           |
+| `pnpm dev`                                                             | Run all services in Docker with source watching                                |
+| `pnpm build`                                                           | Build the .NET solution and production frontend                                |
+| `pnpm check`                                                           | Run the repository's formatting, lint, build and validation gates              |
+| `pnpm check:dotnet` / `pnpm check:web` / `pnpm check:tooling`          | Validate one part of the repository                                            |
+| `pnpm lint`                                                            | Run analyzers, frontend lint and script syntax checks                          |
+| `pnpm format` / `pnpm format:check`                                    | Apply or verify shared formatting                                              |
+| `pnpm test`                                                            | Run the configured automated checks                                            |
+| `pnpm test:persistence`                                                | Test migrations and recording against a supplied PostgreSQL test connection    |
+| `pnpm diagnostics -- <command>`                                        | Inspect/export/import internal records; see [diagnostics](docs/diagnostics.md) |
+| `pnpm test:resolution`                                                 | Run the explicit deterministic Docker resolution checks                        |
+| `pnpm test:resolution:live`                                            | Check the actual OpenRouter route with a configured API key                    |
+| `pnpm evaluate` / `pnpm evaluate:live`                                 | Run independent deterministic or explicitly paid resolution evaluation         |
+| `pnpm evaluate:replay RUN_DIRECTORY`                                   | Regrade saved evaluation evidence without a browser or provider                |
+| `pnpm evaluate:compare` / `pnpm evaluate:compare:replay RUN_DIRECTORY` | Compare the custom resolver with pinned Stagehand or regrade saved evidence    |
+| `pnpm docker:up` / `pnpm docker:down`                                  | Start runtime images or stop project containers                                |
+| `pnpm docker:build` / `pnpm docker:check`                              | Build runtime images or validate Docker definitions                            |
+| `pnpm docker:logs` / `pnpm docker:status`                              | Inspect running services                                                       |
+| `pnpm clean`                                                           | Remove generated .NET output and the frontend build                            |
 
 `clean` preserves source, `.env`, installed dependencies and database volumes. Each service has its own Dockerfile under `docker/<service>/`; `docker/compose.sh` resolves paths from the repository root.
 
@@ -112,13 +113,13 @@ GitHub Actions selects affected .NET projects, Web and repository tooling from c
 
 Docker definitions have a separate validation job. A dedicated persistence job starts only an isolated PostgreSQL service and joins the aggregate `check` result. CI does not build application images or start the full application stack. Branch-protection availability depends on the private repository account plan; a green workflow alone does not establish enforced merge protection. The live resolution check pins DeepSeek V4.1 Flash through Wafer with reasoning disabled, a 4,096-token output cap for action lists and 512 for legacy calls. Runtime requests have no provider price filter. That narrow check makes at most two requests and checks reported cost against a one-cent total. The explicit resolution checks start a separate `xpathed-resolution` stack on loopback port 8081 and stop its containers afterward; the live check runs Browser and Resolver without ClientApi or PostgreSQL.
 
-The [independent evaluator](docs/evaluation.md) uses a separate `xpathed-evaluation` project with Browser, Resolver and labelled fixtures. It records every trial and separates intended-target grading from XPath validity. Deterministic runner/fixture/grader tests run in the tooling CI job; browser evaluations and paid live runs remain explicit. Saved reports can be regraded without services. Numerical qualification thresholds and a genuine held-out suite remain unset, so passing the initial suite does not approve a release.
+The [independent evaluator](docs/evaluation.md) uses a separate `xpathed-evaluation` project with Browser, Resolver and labelled fixtures. It records every trial and separates intended-target grading from XPath validity. Deterministic runner/fixture/grader tests run in the tooling CI job; browser evaluations and paid live runs remain explicit. The explicit `evaluate:compare` command adds an isolated pinned Stagehand observation adapter with the same independent target oracle; its live mode shares the initial experiment's $5 ceiling with dataset runs. Saved reports can be regraded without services. Numerical qualification thresholds and a genuine held-out suite remain unset, so passing the initial suite does not approve a release.
 
 ## Roadmap
 
 GitHub Issues hold the live requirements, dependencies and progress. The next capabilities are:
 
-- [Adapt external datasets (#7)](https://github.com/Mochib-Tech-Solutions/xpathed/issues/7), [compare Stagehand (#8)](https://github.com/Mochib-Tech-Solutions/xpathed/issues/8) and [qualify fast model configurations (#9)](https://github.com/Mochib-Tech-Solutions/xpathed/issues/9).
+- [Qualify fast model configurations (#9)](https://github.com/Mochib-Tech-Solutions/xpathed/issues/9).
 - [Extend verified PR/post-merge controls (#10)](https://github.com/Mochib-Tech-Solutions/xpathed/issues/10) and [add release promotion, rollback and drift monitoring (#11)](https://github.com/Mochib-Tech-Solutions/xpathed/issues/11).
 
 These links describe planned work, not available features. Hosting and presentation work are deferred. Consult the live tickets before starting a slice; research notes may describe alternatives that were not adopted.

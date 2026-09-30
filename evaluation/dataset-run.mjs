@@ -105,6 +105,15 @@ export function reserveCharge(ledger, maximumUsd, id) {
   return maximumUsd;
 }
 
+export function assertReconciledCharges(ledger) {
+  if (
+    ledger.entries.some(
+      (entry) => entry.reportedUsd == null || entry.reportedUsd > entry.reservedUsd,
+    )
+  )
+    throw new Error("Unreconciled prior attempt blocks further paid calls");
+}
+
 function options(args) {
   const result = { mode: "deterministic", limit: 30, seed: 1, budgetUsd: 5, split: "train" };
   const keys = {
@@ -346,10 +355,7 @@ export async function main(args = process.argv.slice(2)) {
         ledger = { version: 1, ceilingUsd: opt.budgetUsd, entries: [] };
       }
       ledger.ceilingUsd = Math.min(ledger.ceilingUsd, opt.budgetUsd);
-      if (ledger.entries.some((entry) => entry.reportedUsd == null))
-        throw new Error(
-          "Unreconciled prior attempt: inspect its retained reservation before further paid calls",
-        );
+      assertReconciledCharges(ledger);
       const response = await fetch(
         "https://openrouter.ai/api/v1/models/deepseek/deepseek-v4.1-flash/endpoints",
         { signal: AbortSignal.timeout(10000) },

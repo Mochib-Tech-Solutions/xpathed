@@ -100,6 +100,10 @@ Validated locally on macOS Apple Silicon, Colima with native arm64/4 CPUs/8 GiB,
 
 Pinned baseline: .NET SDK 10.0.401/runtime 10.0.12, Playwright .NET/browser image 1.63.0, EF PostgreSQL provider 10.0.3, Node 24.16.0, pnpm 12.8.1, React 19.3.0, Vite 8.3.1, Tailwind CSS 4.3.3 and noVNC 1.7.0. TypeScript uses the stable release supported by the pinned lint stack. Package lockfiles and image digests record exact inputs. x11vnc is installed from the base image's Ubuntu repository.
 
+## Evaluation-only Stagehand adapter
+
+The [comparison runner](evaluation.md#compare-the-custom-resolver-and-stagehand) starts Stagehand 4.1.0 separately from the application services. Its extension/CDP setup is confined to the isolated comparison container; the managed Browser service retains its existing ownership and network boundaries. The comparison pins the same Chromium binary, verifies observed browser/page parity, and performs passive observations only. Both strategy arms use the evaluation proxy for standard-route generation and the shared experiment charge ledger. The adapter is not a production service or a replacement for Resolver; its separate SDK dependency lock is installed only for explicit Docker comparison runs.
+
 ## Quality checks
 
 All .NET projects inherit nullable checks, the pinned `10.0-recommended` analyzer set, build/live analysis, code-style enforcement and warnings as errors from `Directory.Build.props`. `.editorconfig` defines formatting, braces, explicit accessibility, readonly fields and file-scoped namespaces. `dotnet format Xpathed.slnx` applies the policy; `dotnet format Xpathed.slnx --no-restore --verify-no-changes` verifies it. Both are wired into the root pnpm commands and CI. The frontend uses strict TypeScript, React Strict Mode, ESLint with React Hooks/DOM/Refresh rules and Prettier with Tailwind class sorting. The dev proxy has a runnable same-origin HTTP/WebSocket check.

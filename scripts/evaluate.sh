@@ -3,6 +3,7 @@ set -eu
 cd "$(dirname "$0")/.."
 
 mode=deterministic
+comparison=false
 repetitions=1
 seed=1
 timeout=45000
@@ -12,6 +13,7 @@ suite=
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --) shift; continue ;;
+    --comparison) comparison=true; shift; continue ;;
     --mode|--repetitions|--seed|--timeout-ms|--case|--output|--suite)
       if [ "$#" -lt 2 ]; then echo "Missing value for $1" >&2; exit 2; fi
       case "$1" in
@@ -27,6 +29,8 @@ while [ "$#" -gt 0 ]; do
     *) echo "Unknown evaluation option: $1" >&2; exit 2 ;;
   esac
 done
+if [ "$comparison" = true ] && [ -n "$suite" ]; then echo "Comparison uses its reviewed fixture subset" >&2; exit 2; fi
+export XPATHED_COMPARISON_MODE=$mode
 export XPATHED_EVALUATION_SUITE=
 if [ -n "$suite" ]; then
   if [ "$mode" != deterministic ]; then echo "Custom suites support deterministic evaluation only" >&2; exit 2; fi
@@ -80,7 +84,9 @@ NODE
 if [ -z "$output" ]; then output=".artifacts/evaluation/$(node -p 'crypto.randomUUID()')"; fi
 export XPATHED_EVALUATION_OUTPUT=$(node -e 'process.stdout.write(require("node:path").resolve(process.argv[1]))' "$output")
 compose() {
-  if [ "$mode" = live ]; then
+  if [ "$comparison" = true ]; then
+    docker/compose.sh --env-file "$evaluation_env" -f docker/compose.evaluation.yaml -f docker/compose.comparison.yaml "$@"
+  elif [ "$mode" = live ]; then
     docker/compose.sh --env-file "$evaluation_env" -f docker/compose.evaluation.yaml -f docker/compose.evaluation-live.yaml "$@"
   else
     docker/compose.sh --env-file "$evaluation_env" -f docker/compose.evaluation.yaml "$@"
@@ -94,6 +100,7 @@ for container in $(docker ps -aq --filter "label=com.docker.compose.project=$COM
   service=$(docker inspect --format '{{ index .Config.Labels "com.docker.compose.service" }}' "$container")
   case "$service" in
     browser|resolver|evaluation-fixture) ;;
+    stagehand) if [ "$comparison" != true ]; then echo "Comparison service belongs to a different runner" >&2; exit 2; fi ;;
     *) echo "Evaluation project contains a non-evaluation service: $service" >&2; exit 2 ;;
   esac
 done
@@ -116,7 +123,18 @@ if ! compose run --rm --no-deps --entrypoint node evaluation-fixture -e '
   exit 2
 fi
 rm "$XPATHED_EVALUATION_OUTPUT/.mount-check"
-compose up --build --wait browser resolver evaluation-fixture
+if [ "$comparison" = true ]; then
+  mkdir -p .artifacts/datasets
+  compose up --build --wait browser resolver evaluation-fixture stagehand
+else
+  compose up --build --wait browser resolver evaluation-fixture
+fi
 compose exec -T evaluation-fixture node /checks/ready.mjs http://browser:8080/health http://resolver:8080/health http://evaluation-fixture:8090/health
 echo "Evaluation artifacts: $XPATHED_EVALUATION_OUTPUT"
-compose exec -T evaluation-fixture node /evaluation/run.mjs "$@"
+if [ "$comparison" = true ]; then
+  compose exec -T evaluation-fixture node /checks/ready.mjs http://stagehand:8092/health
+  browser_binary_hash=$(compose exec -T browser sh -c 'sha256sum /ms-playwright/chromium-*/chrome-linux*/chrome' | awk '{print $1}')
+  compose exec -T -e "XPATHED_BROWSER_BINARY_SHA256=$browser_binary_hash" evaluation-fixture node /evaluation/compare.mjs "$@"
+else
+  compose exec -T evaluation-fixture node /evaluation/run.mjs "$@"
+fi

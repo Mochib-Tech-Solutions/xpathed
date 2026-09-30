@@ -49,6 +49,8 @@
     "diagnostics": "scripts/diagnostics.sh",
     "evaluate": "scripts/evaluate.sh",
     "evaluate:live": "scripts/evaluate.sh --mode live",
+    "evaluate:compare": "scripts/evaluate.sh --comparison",
+    "evaluate:compare:replay": "node evaluation/compare.mjs --replay",
     "evaluate:replay": "node evaluation/run.mjs --replay",
     "datasets:fetch": "node evaluation/dataset-sources.mjs",
     "datasets:import": "node evaluation/datasets.mjs",

@@ -226,7 +226,7 @@ export async function retainConfigurations(output, manifest, trial) {
   await rename(temporary, join(output, "manifest.json"));
 }
 
-async function request(url, body, timeoutMs = 45000, headers = {}) {
+export async function request(url, body, timeoutMs = 45000, headers = {}) {
   const response = await fetch(url, {
     method: body === undefined ? "GET" : "POST",
     headers: { "Content-Type": "application/json", ...headers },
@@ -249,7 +249,7 @@ async function request(url, body, timeoutMs = 45000, headers = {}) {
   }
 }
 
-async function command(fixture, trialId, body, timeoutMs) {
+export async function command(fixture, trialId, body, timeoutMs) {
   const id = randomUUID();
   await request(`${fixture}/command?trial=${trialId}`, { ...body, id }, timeoutMs);
   const started = performance.now();
@@ -590,7 +590,10 @@ export async function prune(path, now = new Date()) {
   }
   if (age < 30 * 86400000) return "retained";
   for (const sub of ["trials", "imports"])
-    for (const file of await readdir(join(path, sub))) {
+    for (const file of await readdir(join(path, sub)).catch((error) => {
+      if (error.code === "ENOENT") return [];
+      throw error;
+    })) {
       if (!file.endsWith(".json")) continue;
       const name = join(path, sub, file),
         value = await readJson(name);
@@ -599,6 +602,8 @@ export async function prune(path, now = new Date()) {
       if (value.mutation?.fresh) value.mutation.fresh.evidence = null;
       await writeFile(name, JSON.stringify(value, null, 2) + "\n");
     }
+  // Comparison provider snapshots contain the same expiring input/output evidence.
+  await rm(join(path, "provider"), { recursive: true, force: true });
   return "evidence_deleted";
 }
 
