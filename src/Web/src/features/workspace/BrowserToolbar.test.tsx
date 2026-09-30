@@ -48,11 +48,8 @@ describe("BrowserToolbar", () => {
     expect(onNavigate).toHaveBeenCalledExactlyOnceWith(defaults.pageUrl);
   });
 
-  it.each([
-    { sessionId: undefined, pageUrl: undefined, busy: false },
-    { sessionId: "session", pageUrl: defaults.pageUrl, busy: true },
-  ])("disables navigation for session=$sessionId busy=$busy", ({ sessionId, pageUrl, busy }) => {
-    render(<BrowserToolbar {...defaults} sessionId={sessionId} pageUrl={pageUrl} busy={busy} />);
+  it("disables navigation while a request is pending", () => {
+    render(<BrowserToolbar {...defaults} busy />);
 
     expect(screen.getByRole("textbox", { name: "Page address" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Go to address" })).toBeDisabled();

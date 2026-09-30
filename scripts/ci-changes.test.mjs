@@ -12,6 +12,8 @@ const all = { dotnet: projects, web: true, tooling: true, docker: true, solution
 
 for (const [path, expected] of [
   ["README.md", none],
+  ["tests/resolution/pipeline.test.mjs", { ...none, tooling: true }],
+  ["tests/Resolver.Tests/ResolutionContractTests.cs", { ...none, dotnet: ["Resolver"] }],
   ["docs/runtime.md", none],
   ["src/Web/src/features/browser/App.tsx", { ...none, web: true }],
   ["src/Web/package.json", { ...none, web: true }],

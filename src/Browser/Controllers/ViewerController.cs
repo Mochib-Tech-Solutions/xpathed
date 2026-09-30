@@ -26,7 +26,7 @@ public sealed class ViewerController(BrowserSessions sessions, IConfiguration co
             throw new ApiException(400, "websocket_required", "A WebSocket connection is required.");
         }
 
-        var session = sessions.Find(id);
+        var session = sessions.FindSession(id);
         using var tcp = new TcpClient();
         await tcp.ConnectAsync("127.0.0.1", session.Port, cancellationToken);
         using var socket = await HttpContext.WebSockets.AcceptWebSocketAsync();

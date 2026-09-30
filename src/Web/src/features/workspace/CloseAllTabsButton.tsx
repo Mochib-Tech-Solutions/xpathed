@@ -1,4 +1,4 @@
-import { RotateCcw } from "lucide-react";
+import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -12,24 +12,31 @@ import {
 
 type Props = { disabled: boolean; onConfirm: () => void };
 
-export default function ResetSessionButton({ disabled, onConfirm }: Props) {
+export default function CloseAllTabsButton({ disabled, onConfirm }: Props) {
   return (
     <AlertDialog>
       <AlertDialogTrigger asChild>
-        <Button variant="outline" size="sm" disabled={disabled}>
-          <RotateCcw aria-hidden="true" />
-          Reset session
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 px-2 text-xs"
+          disabled={disabled}
+          aria-label="Close all tabs"
+          title="Close all tabs"
+        >
+          <X className="size-3.5" aria-hidden="true" />
+          Close all
         </Button>
       </AlertDialogTrigger>
       <AlertDialogContent>
-        <AlertDialogTitle>Reset session?</AlertDialogTitle>
+        <AlertDialogTitle>Close all tabs?</AlertDialogTitle>
         <AlertDialogDescription>
-          Your page, chat and browsing state will be cleared.
+          All tabs, chat history and browsing state will be cleared.
         </AlertDialogDescription>
         <div className="mt-3 flex justify-end gap-2">
           <AlertDialogCancel>Cancel</AlertDialogCancel>
           <AlertDialogAction disabled={disabled} onClick={onConfirm}>
-            Reset session
+            Close all tabs
           </AlertDialogAction>
         </div>
       </AlertDialogContent>

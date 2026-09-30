@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import type { FormEvent } from "react";
-import { ArrowRight, RotateCw } from "lucide-react";
+import { ArrowRight, LoaderCircle, RotateCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -8,6 +8,7 @@ type Props = {
   sessionId: string | undefined;
   pageUrl: string | undefined;
   address: string;
+  focusRequest?: number;
   busy: boolean;
   onAddressChange: (address: string) => void;
   onNavigate: (url: string) => void;
@@ -17,24 +18,25 @@ export default function BrowserToolbar({
   sessionId,
   pageUrl,
   address,
+  focusRequest = 0,
   busy,
   onAddressChange,
   onNavigate,
 }: Props) {
   const addressInput = useRef<HTMLInputElement>(null);
   useEffect(() => {
-    if (sessionId) addressInput.current?.focus();
-  }, [sessionId]);
+    addressInput.current?.focus();
+  }, [sessionId, focusRequest]);
 
   function submit(event: FormEvent) {
     event.preventDefault();
     const url = address.trim();
-    if (url) onNavigate(/^[a-z][a-z\d+.-]*:/i.test(url) ? url : `https://${url}`);
+    if (url && !busy) onNavigate(/^[a-z][a-z\d+.-]*:/i.test(url) ? url : `https://${url}`);
   }
   const hasPage = /^https?:\/\//i.test(pageUrl ?? "");
   return (
     <form
-      className="flex min-h-[53px] items-center gap-1.5 border-b border-border px-3 py-2"
+      className="flex min-h-14 items-center gap-2 border-b border-border px-3 py-2"
       onSubmit={submit}
     >
       <Button
@@ -50,12 +52,12 @@ export default function BrowserToolbar({
       </Button>
       <Input
         ref={addressInput}
-        className="flex-1 bg-muted/60"
+        className="h-9 flex-1 rounded-lg bg-muted/60 px-3"
         aria-label="Page address"
         placeholder="Enter a website address"
         value={address}
         onChange={(event) => onAddressChange(event.currentTarget.value)}
-        disabled={!sessionId || busy}
+        disabled={busy}
         spellCheck={false}
         autoComplete="off"
       />
@@ -63,10 +65,15 @@ export default function BrowserToolbar({
         type="submit"
         variant="ghost"
         size="icon"
+        title="Go to address"
         aria-label="Go to address"
-        disabled={!sessionId || !address.trim() || busy}
+        disabled={!address.trim() || busy}
       >
-        <ArrowRight aria-hidden="true" />
+        {busy ? (
+          <LoaderCircle className="motion-safe:animate-spin" aria-hidden="true" />
+        ) : (
+          <ArrowRight aria-hidden="true" />
+        )}
       </Button>
     </form>
   );

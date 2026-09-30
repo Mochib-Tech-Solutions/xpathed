@@ -30,6 +30,21 @@ export default function BrowserViewer({ session }: { session: Session }) {
     rfb.addEventListener("connect", connected);
     rfb.addEventListener("disconnect", disconnected);
     const keyboard = (event: KeyboardEvent) => {
+      const key = event.key.toLowerCase();
+      const control = event.ctrlKey || event.metaKey;
+      if (
+        key === "f11" ||
+        key === "f12" ||
+        (control &&
+          (["t", "n", "w", "l", "tab", "pageup", "pagedown"].includes(key) ||
+            /^[1-9]$/.test(key))) ||
+        (control && event.shiftKey && ["i", "j", "c"].includes(key)) ||
+        (event.altKey && (key === "d" || key === "f4"))
+      ) {
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
       if (event.key === "F8" || (event.key === "Enter" && event.target === container)) {
         event.preventDefault();
         event.stopPropagation();
