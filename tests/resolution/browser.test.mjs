@@ -11,10 +11,11 @@ const oracleScript = `<script>
       const endpoint = '?page=' + encodeURIComponent(location.pathname);
       const response = await fetch('/oracle' + endpoint);
       if (response.status === 204) return;
-      const { xpaths = [], replaceTarget, reload, click, open, close, cookie } = await response.json();
+      const { xpaths = [], replaceTarget, reload, click, open, focusPopup, close, cookie } = await response.json();
       if (cookie) document.cookie = cookie;
       if (click) document.querySelector(click).click();
-      if (open) { const popup = window.open(open.url, open.name ?? '_blank', open.features ?? ''); if (open.focus) popup?.focus(); }
+      if (open) window.fixturePopup = window.open(open.url, open.name ?? '_blank', open.features ?? '');
+      if (focusPopup) window.fixturePopup?.focus();
       if (replaceTarget) document.querySelector('#expected-target').outerHTML = '<button id="expected-target">Replacement</button>';
       const matches = xpaths.map(xpath => {
         const nodes = document.evaluate(xpath, document, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
@@ -22,6 +23,7 @@ const oracleScript = `<script>
       });
       await fetch('/oracle-result' + endpoint, { method: 'POST', body: JSON.stringify({ matches, scrollY, clicks: document.querySelector('#expected-target')?.dataset.clicks ?? '0', nodeCount: document.querySelectorAll('*').length,
         cookie: document.cookie, openerPath: window.opener?.location.pathname ?? null, focused: document.hasFocus(),
+        activeElement: document.activeElement?.id, events: window.observedEvents ?? {},
         innerWidth, innerHeight, outerWidth, outerHeight, screenWidth: screen.width, screenHeight: screen.height }) });
       if (close) window.close();
       if (reload === 'hash') location.hash = 'changed';
@@ -173,6 +175,252 @@ test("Browser captures and highlights the independently identified target withou
   });
 });
 
+test("Disabled click and hover keep the same target with different action readiness", async () => {
+  await withFixture(
+    '<button id="expected-target" disabled>Disabled action</button>',
+    async (session, page) => {
+      const capture = await request(`/pages/${session.pageId}/capture`, {
+        documentId: page.documentId,
+      });
+      const candidate = capture.candidates.find((entry) => entry.text === "Disabled action");
+      for (const [action, status] of [
+        ["click", "blocked"],
+        ["hover", "unknown"],
+      ]) {
+        const { target } = await request(`/pages/${session.pageId}/selection`, {
+          documentId: page.documentId,
+          captureId: capture.captureId,
+          candidateId: candidate.id,
+          action,
+        });
+        assert.equal(target.state.version, "2");
+        assert.equal(target.interactability.version, "1");
+        assert.equal(target.interactability.action, action);
+        assert.equal(target.interactability.status, status);
+        assert.equal(
+          target.interactability.checks.enabled,
+          action === "hover" ? "not_applicable" : "fail",
+        );
+        assert.equal(target.interactability.checks.eventOutcome, "unknown");
+        assert.deepEqual(
+          (await verify(target.xpaths)).matches,
+          target.xpaths.map(() => ["expected-target"]),
+        );
+      }
+    },
+  );
+});
+
+test("Accessibility eligibility keeps exposed visual limitations and computes safe hidden names", async () => {
+  await withFixture(
+    `<style>.sr-only { position:absolute; width:1px; height:1px; clip:rect(0,0,0,0); overflow:hidden; }</style>
+    <button id="expected-target" aria-labelledby="hidden-name" aria-label="Wrong name">Visible duplicate</button>
+    <span id="hidden-name" hidden>Hidden name <input value="NAME_SECRET"><img alt="Icon"></span>
+    <button hidden>Excluded hidden</button><div inert><button>Excluded inert</button></div>
+    <div aria-hidden="true"><button aria-hidden="false">Excluded aria</button></div>
+    <div style="display:none"><button>Excluded display</button></div>
+    <div style="visibility:hidden"><button>Excluded visibility</button><button style="visibility:visible">Visibility override</button></div>
+    <button hidden style="display:block">Hidden override</button>
+    <button style="opacity:0">Transparent</button><button class="sr-only">Screen reader</button>
+    <button style="width:0;height:0;padding:0;border:0;overflow:hidden">Zero area</button>
+    <button style="position:absolute;top:4000px">Offscreen exposed</button>
+    <label hidden for="named-input">Native hidden label</label><input id="named-input" value="VALUE_SECRET">
+    <details><summary>Closed disclosure</summary><button>Excluded disclosure</button></details>
+    <input type="hidden" aria-label="Excluded hidden input">`,
+    async (session, page) => {
+      const capture = await request(`/pages/${session.pageId}/capture`, {
+        documentId: page.documentId,
+      });
+      assert.equal(capture.coverage.complete, true);
+      assert.ok(
+        capture.candidates.every(
+          (entry) => !entry.text.startsWith("Excluded") && !entry.label.startsWith("Excluded"),
+        ),
+      );
+      assert.doesNotMatch(JSON.stringify(capture), /SECRET/);
+      const named = capture.candidates.find((entry) => entry.label === "Hidden name Icon");
+      assert.ok(
+        named,
+        "aria-labelledby precedes aria-label and includes safe hidden reference text",
+      );
+      assert.ok(capture.candidates.some((entry) => entry.label === "Native hidden label"));
+      for (const name of [
+        "Visibility override",
+        "Hidden override",
+        "Transparent",
+        "Screen reader",
+        "Zero area",
+        "Offscreen exposed",
+      ]) {
+        const candidate = capture.candidates.find((entry) => entry.text === name);
+        assert.ok(candidate, name);
+        assert.equal(candidate.state.accessibilityExposed, true);
+        const { target } = await request(`/pages/${session.pageId}/selection`, {
+          documentId: page.documentId,
+          captureId: capture.captureId,
+          candidateId: candidate.id,
+          action: "hover",
+        });
+        assert.ok(target.xpaths.length > 0, name);
+        if (name === "Transparent" || name === "Zero area")
+          assert.equal(target.state.rendered, false);
+        if (name === "Zero area" || name === "Offscreen exposed")
+          assert.equal(target.interactability.status, "blocked");
+      }
+      const selected = await request(`/pages/${session.pageId}/selection`, {
+        documentId: page.documentId,
+        captureId: capture.captureId,
+        candidateId: named.id,
+        action: "click",
+      });
+      assert.deepEqual(
+        (await verify(selected.target.xpaths)).matches,
+        selected.target.xpaths.map(() => ["expected-target"]),
+      );
+    },
+  );
+});
+
+test("Action readiness explains readonly, incompatible, covered, pointer and custom controls without interaction", async () => {
+  await withFixture(
+    `<input aria-label="Readonly field" readonly value="PRIVATE_VALUE">
+    <input type="checkbox" aria-label="Check choice"><input type="radio" aria-label="Radio choice">
+    <select aria-label="Select country"><option>PRIVATE_OPTION</option></select>
+    <div role="combobox" aria-label="Custom select" tabindex="0">Custom</div>
+    <div role="textbox" aria-label="Custom editor" aria-readonly="true" tabindex="0"></div>
+    <button aria-label="Blocked pointer" style="pointer-events:none">Pointer</button>
+    <div style="position:relative;width:160px;height:40px"><button aria-label="Covered" style="width:160px;height:40px">Covered</button><div style="position:absolute;inset:0;background:black"></div></div>
+    <button aria-label="Plain button">Plain</button>
+    <script>window.observedEvents={};for(const name of ['click','input','change','focusin','mouseover','pointerover','scroll'])document.addEventListener(name,()=>window.observedEvents[name]=(window.observedEvents[name]??0)+1,true);</script>`,
+    async (session, page) => {
+      const before = await observe();
+      const capture = await request(`/pages/${session.pageId}/capture`, {
+        documentId: page.documentId,
+      });
+      for (const [name, action, status, reason] of [
+        ["Readonly field", "fill", "blocked", "readonly"],
+        ["Readonly field", "type", "blocked", "readonly"],
+        ["Readonly field", "click", "unknown", null],
+        ["Plain button", "fill", "blocked", "incompatible_control"],
+        ["Blocked pointer", "hover", "blocked", "pointer_events_none"],
+        ["Covered", "click", "blocked", "obstructed_at_hit_point"],
+        ["Select country", "select", "unknown", null],
+        ["Check choice", "check", "unknown", null],
+        ["Check choice", "uncheck", "unknown", null],
+        ["Radio choice", "uncheck", "blocked", "incompatible_control"],
+        ["Custom select", "select", "unsupported", "custom_control_unverified"],
+        ["Custom editor", "fill", "blocked", "readonly"],
+      ]) {
+        const candidate = capture.candidates.find((entry) => entry.label === name);
+        assert.ok(candidate, name);
+        const { target } = await request(`/pages/${session.pageId}/selection`, {
+          documentId: page.documentId,
+          captureId: capture.captureId,
+          candidateId: candidate.id,
+          action,
+        });
+        assert.equal(target.interactability.status, status, `${name}: ${action}`);
+        if (reason)
+          assert.ok(target.interactability.reasons.includes(reason), `${name}: ${reason}`);
+        assert.equal(target.interactability.checks.eventOutcome, "unknown");
+      }
+      const after = await observe();
+      assert.deepEqual(after.events, before.events);
+      assert.equal(after.activeElement, before.activeElement);
+      assert.equal(after.scrollY, before.scrollY);
+      assert.doesNotMatch(JSON.stringify(capture), /PRIVATE_/);
+    },
+  );
+});
+
+test("Chromium exposure exceptions preserve focus, modal controls and supported role fallback", async () => {
+  await withFixture(
+    `<div id="focused-parent"><button id="expected-target">Focused hidden exception</button></div>
+    <input type="search" aria-label="Search"><div role="invalid textbox" aria-label="Role fallback" aria-readonly="true" tabindex="0"></div>
+    <script>document.querySelector('#expected-target').focus();document.querySelector('#focused-parent').setAttribute('aria-hidden','true');</script>`,
+    async (session, page) => {
+      const before = await observe();
+      const capture = await request(`/pages/${session.pageId}/capture`, {
+        documentId: page.documentId,
+      });
+      assert.ok(capture.candidates.some((entry) => entry.label === "Focused hidden exception"));
+      assert.equal(capture.candidates.find((entry) => entry.label === "Search").role, "searchbox");
+      const fallback = capture.candidates.find((entry) => entry.label === "Role fallback");
+      assert.equal(fallback.role, "textbox");
+      assert.equal(fallback.state.readonly, true);
+      assert.equal((await observe()).activeElement, before.activeElement);
+    },
+  );
+  await withFixture(
+    `<button>Implicit inert background</button><section inert><dialog id="modal">
+    <button id="expected-target">Modal exposed</button></dialog></section>
+    <script>document.querySelector('#modal').showModal();</script>`,
+    async (session, page) => {
+      const before = await observe();
+      const capture = await request(`/pages/${session.pageId}/capture`, {
+        documentId: page.documentId,
+      });
+      assert.ok(capture.candidates.some((entry) => entry.label === "Modal exposed"));
+      assert.ok(capture.candidates.every((entry) => entry.text !== "Implicit inert background"));
+      assert.equal((await observe()).activeElement, before.activeElement);
+    },
+  );
+});
+
+test("Native semantics retain normalized inputs, presentation conflicts and descendant names", async () => {
+  await withFixture(
+    `<input type="unknown" aria-label="Normalized text"><input readonly type="checkbox" aria-label="Readonly inapplicable">
+    <input role="presentation" aria-label="Native presentation"><button id="expected-target"><span aria-label="Save"><span>Icon text</span></span></button>
+    <button id="referenced-name"><span aria-labelledby="save-name">Icon</span></button><span id="save-name" hidden>Save reference<input value="PRIVATE_VALUE"></span>
+    <button id="cyclic-name"><span id="cycle" aria-labelledby="cycle">Cycle</span></button>`,
+    async (session, page) => {
+      const capture = await request(`/pages/${session.pageId}/capture`, {
+        documentId: page.documentId,
+      });
+      assert.equal(
+        capture.candidates.find((entry) => entry.label === "Readonly inapplicable").state.readonly,
+        false,
+      );
+      assert.equal(
+        capture.candidates.find((entry) => entry.label === "Native presentation").role,
+        "textbox",
+      );
+      const named = capture.candidates.find((entry) => entry.tag === "button");
+      assert.equal(named.label, "Save");
+      assert.ok(
+        capture.candidates.some(
+          (entry) => entry.label === "Save reference" && entry.tag === "button",
+        ),
+      );
+      assert.doesNotMatch(JSON.stringify(capture), /PRIVATE_VALUE/);
+      assert.equal(capture.coverage.complete, true);
+      const text = capture.candidates.find((entry) => entry.label === "Normalized text");
+      const { target } = await request(`/pages/${session.pageId}/selection`, {
+        documentId: page.documentId,
+        captureId: capture.captureId,
+        candidateId: text.id,
+        action: "fill",
+      });
+      assert.equal(target.interactability.checks.compatibleControl, "pass");
+      assert.equal(target.interactability.status, "unknown");
+    },
+  );
+});
+
+test("The last opened modal determines exposure even in reverse DOM order", async () => {
+  await withFixture(
+    `<dialog id="first"><button>Active modal</button></dialog><dialog id="second"><button>Older modal</button></dialog>
+    <script>document.querySelector('#second').showModal();document.querySelector('#first').showModal();</script>`,
+    async (session, page) => {
+      const capture = await request(`/pages/${session.pageId}/capture`, {
+        documentId: page.documentId,
+      });
+      assert.ok(capture.candidates.some((entry) => entry.label === "Active modal"));
+      assert.ok(capture.candidates.every((entry) => entry.text !== "Older modal"));
+    },
+  );
+});
+
 test("Capture preserves control labels, Unicode, scope and observed state without sending form values", async () => {
   await withFixture(
     `${targetMarkup}
@@ -190,7 +438,7 @@ test("Capture preserves control labels, Unicode, scope and observed state withou
       <span>Hover text</span>
     </fieldset>
     <button hidden>Hidden one</button><div style="display:none"><button>Hidden two</button></div>
-    <div style="opacity:0"><button>Hidden three</button></div><button aria-hidden="true">Hidden four</button>
+    <div style="opacity:0"><button>Transparent three</button></div><button aria-hidden="true">Hidden four</button>
     <button style="position:absolute;top:4000px">Offscreen</button>
     <script>localStorage.setItem('credential', 'STORAGE_SECRET');document.cookie = 'session=COOKIE_SECRET';</script>`,
     async (session, page) => {
@@ -244,6 +492,11 @@ test("Capture preserves control labels, Unicode, scope and observed state withou
       );
       assert.ok(capture.candidates.some((candidate) => candidate.text === "Hover text"));
       assert.ok(capture.candidates.every((candidate) => !candidate.text.startsWith("Hidden")));
+      assert.equal(
+        capture.candidates.find((candidate) => candidate.text === "Transparent three").state
+          .rendered,
+        false,
+      );
       assert.equal(capture.coverage.complete, true);
       assert.equal(capture.coverage.capturedCount, capture.candidates.length);
     },
@@ -603,9 +856,14 @@ test("Native new-window links and feature popups become fullscreen tabs with the
           url: "/feature-popup?reused=1",
           name: "fixture-popup",
           features: "popup,width=320,height=240",
-          focus: true,
         },
       });
+      await waitForSession(session.sessionId, (state) =>
+        state.pages.some((entry) => entry.pageId === popupId && entry.url.endsWith("?reused=1")),
+      );
+      // Request focus after navigation replaces the popup document, avoiding its focus reset.
+      await observe({}, "/feature-popup");
+      await observe({ focusPopup: true });
       const reused = await waitForSession(
         session.sessionId,
         (state) =>
