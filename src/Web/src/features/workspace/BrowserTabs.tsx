@@ -36,7 +36,7 @@ export default function BrowserTabs({
         ref={strip}
         role="tablist"
         aria-label="Browser tabs"
-        className="flex min-w-0 flex-1 gap-1 overflow-x-auto"
+        className="flex min-w-0 gap-1 overflow-x-auto"
       >
         {pages.map((page, index) => {
           const title = page.title || (page.url === "about:blank" ? "New tab" : page.url);
@@ -115,7 +115,9 @@ export default function BrowserTabs({
       >
         <Plus aria-hidden="true" />
       </Button>
-      <CloseAllTabsButton disabled={busy} onConfirm={onCloseAll} />
+      <div className="ml-auto shrink-0">
+        <CloseAllTabsButton disabled={busy} onConfirm={onCloseAll} />
+      </div>
     </div>
   );
 }

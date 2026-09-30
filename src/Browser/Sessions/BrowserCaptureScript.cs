@@ -208,7 +208,7 @@ internal static class BrowserCaptureScript
               if (!complete) continue;
               const candidate = describe(element, candidates.length);
               bytes += new TextEncoder().encode(JSON.stringify(candidate)).length + 1;
-              if (bytes > 64000) { complete = false; continue; }
+              if (bytes > 512000) { complete = false; continue; }
               nodes.push(element);
               candidates.push(candidate);
             }

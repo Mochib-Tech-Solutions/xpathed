@@ -340,6 +340,16 @@ export default function useWorkspace() {
         tabs: { ...previous.tabs, [page.pageId]: { ...previous.tabs[page.pageId]!, instruction } },
       }));
   }
+  function resetChat() {
+    if (!page || pending.current) return;
+    setWorkspace((previous) => ({
+      ...previous,
+      tabs: {
+        ...previous.tabs,
+        [page.pageId]: { ...previous.tabs[page.pageId]!, instruction: "", history: [] },
+      },
+    }));
+  }
   function setAddress(address: string) {
     setWorkspace((previous) =>
       page
@@ -370,6 +380,7 @@ export default function useWorkspace() {
     resolve,
     inspectAction,
     setInstruction,
+    resetChat,
     setAddress,
     dismissError: () => setError(""),
   };
