@@ -4,19 +4,26 @@ import { once } from "node:events";
 import test from "node:test";
 
 const browserUrl = process.env.XPATHED_BROWSER_URL ?? "http://browser:8080";
-let oracleCommand;
-let completeOracle;
+const oracleCommands = new Map();
+const oracleObservers = new Map();
 const oracleScript = `<script>
     setInterval(async () => {
-      const response = await fetch('/oracle');
+      const endpoint = '?page=' + encodeURIComponent(location.pathname);
+      const response = await fetch('/oracle' + endpoint);
       if (response.status === 204) return;
-      const { xpaths, replaceTarget, reload } = await response.json();
+      const { xpaths = [], replaceTarget, reload, click, open, close, cookie } = await response.json();
+      if (cookie) document.cookie = cookie;
+      if (click) document.querySelector(click).click();
+      if (open) { const popup = window.open(open.url, open.name ?? '_blank', open.features ?? ''); if (open.focus) popup?.focus(); }
       if (replaceTarget) document.querySelector('#expected-target').outerHTML = '<button id="expected-target">Replacement</button>';
       const matches = xpaths.map(xpath => {
         const nodes = document.evaluate(xpath, document, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
         return Array.from({ length: nodes.snapshotLength }, (_, index) => nodes.snapshotItem(index).getAttribute('data-oracle') ?? nodes.snapshotItem(index).id);
       });
-      await fetch('/oracle-result', { method: 'POST', body: JSON.stringify({ matches, scrollY, clicks: document.querySelector('#expected-target')?.dataset.clicks ?? '0', nodeCount: document.querySelectorAll('*').length }) });
+      await fetch('/oracle-result' + endpoint, { method: 'POST', body: JSON.stringify({ matches, scrollY, clicks: document.querySelector('#expected-target')?.dataset.clicks ?? '0', nodeCount: document.querySelectorAll('*').length,
+        cookie: document.cookie, openerPath: window.opener?.location.pathname ?? null, focused: document.hasFocus(),
+        innerWidth, innerHeight, outerWidth, outerHeight, screenWidth: screen.width, screenHeight: screen.height }) });
+      if (close) window.close();
       if (reload === 'hash') location.hash = 'changed';
       else if (reload) location.reload();
     }, 30);
@@ -35,15 +42,52 @@ async function request(path, body, method = "POST") {
   return response.status === 204 ? undefined : response.json();
 }
 
-async function verify(xpaths, replaceTarget = false, reload = false) {
-  oracleCommand = { xpaths, replaceTarget, reload };
+async function observe(command = {}, pagePath = "/fixture") {
+  oracleCommands.set(pagePath, command);
   return new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => reject(new Error("Fixture oracle did not respond")), 5000);
-    completeOracle = (value) => {
+    const timeout = setTimeout(() => {
+      oracleObservers.delete(pagePath);
+      reject(new Error(`Fixture oracle did not respond on ${pagePath}`));
+    }, 5000);
+    oracleObservers.set(pagePath, (value) => {
       clearTimeout(timeout);
+      oracleObservers.delete(pagePath);
       resolve(value);
-    };
+    });
   });
+}
+
+function verify(xpaths, replaceTarget = false, reload = false) {
+  return observe({ xpaths, replaceTarget, reload });
+}
+
+async function waitForSession(sessionId, expected) {
+  let state;
+  for (let attempt = 0; attempt < 100; attempt++) {
+    state = await request(`/sessions/${sessionId}`, undefined, "GET");
+    if (expected(state)) return state;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  assert.fail(`Session state did not settle: ${JSON.stringify(state)}`);
+}
+
+function fillsDisplay(observation) {
+  return (
+    observation.innerWidth === observation.outerWidth &&
+    observation.innerHeight === observation.outerHeight &&
+    Math.abs(observation.outerWidth - observation.screenWidth) <= 1 &&
+    Math.abs(observation.outerHeight - observation.screenHeight) <= 1
+  );
+}
+
+async function observeFullscreen(pagePath) {
+  let observation;
+  for (let attempt = 0; attempt < 50; attempt++) {
+    observation = await observe({}, pagePath);
+    if (fillsDisplay(observation)) return observation;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  return observation;
 }
 
 async function expectError(path, body, status, code) {
@@ -57,22 +101,28 @@ async function expectError(path, body, status, code) {
 }
 
 async function withFixture(markup, check) {
+  oracleCommands.clear();
+  oracleObservers.clear();
   const server = createServer(async (request, response) => {
-    if (request.url === "/oracle") {
-      response.writeHead(oracleCommand ? 200 : 204, { "Content-Type": "application/json" });
-      response.end(oracleCommand ? JSON.stringify(oracleCommand) : "");
-      oracleCommand = undefined;
+    const url = new URL(request.url, "http://resolution-fixture:8070");
+    const pagePath = url.searchParams.get("page");
+    if (url.pathname === "/oracle") {
+      const command = oracleCommands.get(pagePath);
+      response.writeHead(command ? 200 : 204, { "Content-Type": "application/json" });
+      response.end(command ? JSON.stringify(command) : "");
+      oracleCommands.delete(pagePath);
       return;
     }
-    if (request.url === "/oracle-result") {
+    if (url.pathname === "/oracle-result") {
       let body = "";
       for await (const chunk of request) body += chunk;
-      completeOracle?.(JSON.parse(body));
+      oracleObservers.get(pagePath)?.(JSON.parse(body));
       response.end();
       return;
     }
     response.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-    response.end(`<!doctype html><html><body>${markup}${oracleScript}</body></html>`);
+    const content = typeof markup === "function" ? markup(url.pathname) : markup;
+    response.end(`<!doctype html><html><body>${content}${oracleScript}</body></html>`);
   });
   server.listen(8070, "0.0.0.0");
   await once(server, "listening");
@@ -451,4 +501,241 @@ test("Icon buttons and labelled images remain identifiable without visible text"
       );
     },
   );
+});
+
+test("Browser tabs create, activate, close and replace the last page without changing the viewer", async () => {
+  await withFixture(targetMarkup, async (session, page) => {
+    const sessionPath = `/sessions/${session.sessionId}`;
+    const initial = await request(sessionPath, undefined, "GET");
+    assert.equal(initial.sessionId, session.sessionId);
+    assert.equal(initial.activePageId, page.pageId);
+    assert.equal(typeof initial.activationVersion, "number");
+    assert.equal(initial.viewPath, `/view/${session.sessionId}`);
+    assert.equal(session.viewPath, initial.viewPath);
+    assert.deepEqual(
+      initial.pages.map((entry) => entry.pageId),
+      [page.pageId],
+    );
+
+    const added = await request(`${sessionPath}/pages`);
+    assert.equal(added.pages.length, 2);
+    assert.notEqual(added.activePageId, page.pageId);
+    const second = added.pages.find((entry) => entry.pageId === added.activePageId);
+    assert.equal(second.url, "about:blank");
+    assert.equal(added.viewPath, initial.viewPath);
+
+    const switched = await request(`/pages/${page.pageId}/activate`);
+    assert.equal(switched.activePageId, page.pageId);
+    assert.ok(switched.activationVersion > initial.activationVersion);
+    assert.equal(
+      switched.pages.find((entry) => entry.pageId === page.pageId).documentId,
+      page.documentId,
+    );
+    assert.equal(switched.viewPath, initial.viewPath);
+
+    const closedBackground = await request(`/pages/${second.pageId}`, undefined, "DELETE");
+    assert.equal(closedBackground.activePageId, page.pageId);
+    assert.deepEqual(
+      closedBackground.pages.map((entry) => entry.pageId),
+      [page.pageId],
+    );
+    const closed = await fetch(`${browserUrl}/pages/${second.pageId}`);
+    assert.equal(closed.status, 404);
+
+    const replacement = await request(`/pages/${page.pageId}`, undefined, "DELETE");
+    assert.equal(replacement.pages.length, 1);
+    assert.notEqual(replacement.activePageId, page.pageId);
+    assert.equal(replacement.pages[0].url, "about:blank");
+    assert.equal(replacement.pages[0].pageId, replacement.activePageId);
+    assert.equal(replacement.viewPath, initial.viewPath);
+  });
+});
+
+test("Native new-window links and feature popups become fullscreen tabs with their opener and shared cookies", async () => {
+  await withFixture(
+    (path) =>
+      `${targetMarkup}${path === "/fixture" ? '<a id="new-tab" href="/link-tab" target="_blank" rel="opener">Open linked tab</a>' : ""}`,
+    async (session, page) => {
+      const initial = await request(`/sessions/${session.sessionId}`, undefined, "GET");
+      await observe({ cookie: "tabs_shared=fixture-cookie; path=/", click: "#new-tab" });
+      const linked = await waitForSession(
+        session.sessionId,
+        (state) =>
+          state.pages.length === 2 &&
+          state.pages.some(
+            (entry) => entry.pageId === state.activePageId && entry.url.endsWith("/link-tab"),
+          ),
+      );
+      const linkedPageId = linked.activePageId;
+      const linkObservation = await observeFullscreen("/link-tab");
+      assert.equal(linkObservation.cookie, "tabs_shared=fixture-cookie");
+      assert.equal(linkObservation.openerPath, "/fixture");
+      assert.ok(fillsDisplay(linkObservation), JSON.stringify(linkObservation));
+      assert.equal(linked.viewPath, initial.viewPath);
+      assert.ok(linked.activationVersion > initial.activationVersion);
+
+      await request(`/pages/${page.pageId}/activate`);
+      await observe({
+        open: {
+          url: "/feature-popup",
+          name: "fixture-popup",
+          features: "popup,width=320,height=240",
+        },
+      });
+      const popup = await waitForSession(
+        session.sessionId,
+        (state) =>
+          state.pages.length === 3 &&
+          state.pages.some(
+            (entry) => entry.pageId === state.activePageId && entry.url.endsWith("/feature-popup"),
+          ),
+      );
+      const popupId = popup.activePageId;
+      const popupObservation = await observeFullscreen("/feature-popup");
+      assert.equal(popupObservation.cookie, "tabs_shared=fixture-cookie");
+      assert.equal(popupObservation.openerPath, "/fixture");
+      assert.ok(fillsDisplay(popupObservation), JSON.stringify(popupObservation));
+      assert.equal(popup.viewPath, initial.viewPath);
+
+      await request(`/pages/${page.pageId}/activate`);
+      await observe({
+        open: {
+          url: "/feature-popup?reused=1",
+          name: "fixture-popup",
+          features: "popup,width=320,height=240",
+          focus: true,
+        },
+      });
+      const reused = await waitForSession(
+        session.sessionId,
+        (state) =>
+          state.activePageId === popupId &&
+          state.pages.some((entry) => entry.pageId === popupId && entry.url.endsWith("?reused=1")),
+      );
+      assert.equal(reused.pages.length, 3);
+      assert.equal((await observe({}, "/feature-popup")).focused, true);
+      await observe({ close: true }, "/feature-popup");
+      const closed = await waitForSession(
+        session.sessionId,
+        (state) =>
+          state.pages.length === 2 && !state.pages.some((entry) => entry.pageId === popupId),
+      );
+      assert.ok([page.pageId, linkedPageId].includes(closed.activePageId));
+      assert.equal(closed.viewPath, initial.viewPath);
+    },
+  );
+});
+
+test("Only the active tab can capture or validate, and switching away invalidates its previous capture", async () => {
+  await withFixture(
+    (path) =>
+      path === "/second"
+        ? '<button data-oracle="second-target">Second page</button>'
+        : targetMarkup,
+    async (session, firstPage) => {
+      const capturePath = `/pages/${firstPage.pageId}/capture`;
+      const firstCapture = await request(capturePath, { documentId: firstPage.documentId });
+      const firstTarget = firstCapture.candidates.find(
+        (candidate) => candidate.text === "About us",
+      );
+      const firstSelection = {
+        documentId: firstPage.documentId,
+        captureId: firstCapture.captureId,
+        candidateId: firstTarget.id,
+        action: "click",
+      };
+      const added = await request(`/sessions/${session.sessionId}/pages`);
+      const secondId = added.activePageId;
+      await expectError(capturePath, { documentId: firstPage.documentId }, 409, "inactive_page");
+      await expectError(
+        `/pages/${firstPage.pageId}/selection`,
+        firstSelection,
+        409,
+        "inactive_page",
+      );
+
+      const secondPage = await request(`/pages/${secondId}/navigate`, {
+        url: "http://resolution-fixture:8070/second",
+      });
+      const secondCapture = await request(`/pages/${secondId}/capture`, {
+        documentId: secondPage.documentId,
+      });
+      assert.equal(secondCapture.pageId, secondId);
+      assert.ok(!secondCapture.candidates.some((candidate) => candidate.text === "About us"));
+      const secondTarget = secondCapture.candidates.find(
+        (candidate) => candidate.text === "Second page",
+      );
+      assert.ok(secondTarget);
+      const secondSelection = await request(`/pages/${secondId}/selection`, {
+        documentId: secondPage.documentId,
+        captureId: secondCapture.captureId,
+        candidateId: secondTarget.id,
+        action: "click",
+      });
+      assert.ok(secondSelection.target.xpaths.length > 0);
+      assert.deepEqual(
+        (await observe({ xpaths: secondSelection.target.xpaths }, "/second")).matches,
+        secondSelection.target.xpaths.map(() => ["second-target"]),
+      );
+
+      const returned = await request(`/pages/${firstPage.pageId}/activate`);
+      assert.equal(
+        returned.pages.find((page) => page.pageId === firstPage.pageId).documentId,
+        firstPage.documentId,
+      );
+      await expectError(
+        `/pages/${firstPage.pageId}/selection`,
+        firstSelection,
+        409,
+        "stale_capture",
+      );
+      const fresh = await request(capturePath, { documentId: firstPage.documentId });
+      assert.notEqual(fresh.captureId, firstCapture.captureId);
+      const target = fresh.candidates.find((candidate) => candidate.text === "About us");
+      const selected = await request(`/pages/${firstPage.pageId}/selection`, {
+        ...firstSelection,
+        captureId: fresh.captureId,
+        candidateId: target.id,
+      });
+      assert.deepEqual(
+        (await verify(selected.target.xpaths)).matches,
+        selected.target.xpaths.map(() => ["expected-target"]),
+      );
+    },
+  );
+});
+
+test("Tab limits reject extra pages and popups, and closing a tab releases capacity", async () => {
+  await withFixture(targetMarkup, async (session, first) => {
+    const sessionPath = `/sessions/${session.sessionId}`;
+    let state;
+    for (let count = 1; count < 8; count++) state = await request(`${sessionPath}/pages`);
+    assert.equal(state.pages.length, 8);
+    await expectError(`${sessionPath}/pages`, undefined, 409, "tab_limit");
+    const activeId = state.activePageId;
+    const page = await request(`/pages/${activeId}/navigate`, {
+      url: "http://resolution-fixture:8070/limit",
+    });
+    await observe({ open: { url: "/overflow" } }, "/limit");
+    const rejected = await waitForSession(session.sessionId, (current) =>
+      current.pages.some((entry) => entry.blockedPopups > 0),
+    );
+    assert.equal(rejected.pages.length, 8);
+    assert.equal(rejected.activePageId, activeId);
+    assert.ok(rejected.pages.every((entry) => !entry.url.endsWith("/overflow")));
+    const capture = await request(`/pages/${activeId}/capture`, { documentId: page.documentId });
+    assert.equal(capture.coverage.complete, true);
+    assert.ok(capture.candidates.some((candidate) => candidate.text === "About us"));
+
+    const closed = await request(`/pages/${first.pageId}`, undefined, "DELETE");
+    assert.equal(closed.pages.length, 7);
+    assert.equal(closed.activePageId, activeId);
+    const replacement = await request(`${sessionPath}/pages`);
+    assert.equal(replacement.pages.length, 8);
+    assert.notEqual(replacement.activePageId, activeId);
+    assert.equal(
+      replacement.pages.find((entry) => entry.pageId === replacement.activePageId).url,
+      "about:blank",
+    );
+  });
 });

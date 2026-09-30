@@ -34,7 +34,21 @@ function renderWorkspace() {
 describe("Workspace navigation", () => {
   it("creates a browser and opens the submitted website without a separate start step", async () => {
     const fetch = vi.fn<typeof globalThis.fetch>((input) =>
-      Promise.resolve(Response.json(input === "/api/sessions" ? session : page)),
+      Promise.resolve(
+        Response.json(
+          input === "/api/sessions"
+            ? session
+            : input === "/api/sessions/session-1"
+              ? {
+                  sessionId: session.sessionId,
+                  activePageId: page.pageId,
+                  activationVersion: 1,
+                  viewPath: session.viewPath,
+                  pages: [page],
+                }
+              : page,
+        ),
+      ),
     );
     vi.stubGlobal("fetch", fetch);
     const user = renderWorkspace();
@@ -66,6 +80,16 @@ describe("Workspace navigation", () => {
       if (input === "/api/pages/page-1/navigate" && ++attempts === 1)
         return Promise.resolve(
           Response.json({ message: "This website could not be opened." }, { status: 502 }),
+        );
+      if (input === "/api/sessions/session-1")
+        return Promise.resolve(
+          Response.json({
+            sessionId: session.sessionId,
+            activePageId: page.pageId,
+            activationVersion: 1,
+            viewPath: session.viewPath,
+            pages: [attempts < 2 ? { ...page, url: "about:blank" } : page],
+          }),
         );
       return Promise.resolve(Response.json(page));
     });

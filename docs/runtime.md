@@ -10,7 +10,7 @@
 | `browser` | Playwright, live contexts/pages, display and noVNC transport | `http://browser:8080` |
 | `db` | PostgreSQL, named persistent volume | `db:5432` |
 
-Each browser session owns a Chromium process, an isolated browser context, one managed page, one Xvfb display and one loopback-only x11vnc listener. ASP.NET bridges binary WebSocket traffic directly to VNC; no debugging or raw VNC port is published. CDP is used internally to put Chromium in fullscreen before the viewer connects. No browser objects cross an HTTP boundary.
+Each browser session owns a Chromium process, an isolated browser context, up to eight managed pages, one Xvfb display and one loopback-only x11vnc listener. ASP.NET bridges binary WebSocket traffic directly to VNC; no debugging or raw VNC port is published. CDP is used internally to keep each Chromium window fullscreen and bring the active page to the front. No browser objects cross an HTTP boundary.
 
 The resolver receives the same `pageId` as the client. It asks the browser service for an inspection without opening or navigating a page. The initial workspace creates no session. Submitting the address bar creates a session at `about:blank` and immediately navigates to the supplied website. Later submissions reuse that session; a failed navigation keeps it available for retry.
 
@@ -21,41 +21,47 @@ Paths below are available through `web`. JSON uses camelCase.
 | Method and path | Request | Response |
 | --- | --- | --- |
 | `POST /api/sessions` | Empty | `{sessionId, pageId, viewPath}` |
+| `GET /api/sessions/{sessionId}` | Empty | `{sessionId, activePageId, activationVersion, viewPath, pages}`; `pages` contains page states |
+| `POST /api/sessions/{sessionId}/pages` | Empty | Session state after adding and activating a blank tab |
+| `POST /api/pages/{pageId}/activate` | Empty | Session state after selecting the tab |
+| `DELETE /api/pages/{pageId}` | Empty | Session state after closing the tab; closing the last creates a blank tab |
 | `DELETE /api/sessions/{sessionId}` | Empty | `204`; repeated deletion succeeds |
 | `GET /api/pages/{pageId}` | Empty | `{sessionId, pageId, documentId, url, title, blockedPopups}` |
 | `POST /api/pages/{pageId}/navigate` | `{ "url": "https://example.com" }` | Updated page state |
 | `POST /api/pages/{pageId}/resolve` | `{instruction, documentId}` | [Version 1 resolution result](resolution.md) |
 | `POST /api/pages/{pageId}/inspect` | Empty | `{ "inspectedBy": "resolver", "page": { ... } }` |
-| `GET /view/{pageId}` | WebSocket upgrade with an allowed Origin | Binary RFB/noVNC stream |
+| `GET /view/{sessionId}` | WebSocket upgrade with an allowed Origin | Binary RFB/noVNC stream |
 | `GET /health` | Empty | Client API and database readiness; `503` when DB is unavailable |
 
 Navigation accepts absolute HTTP/HTTPS URLs without embedded credentials. The React address bar supplies `https://` for bare hostnames.
 
 An inspection contains `sessionId`, `pageId`, `url`, `title`, `scrollY` and `capturedAt`. Current form values, passwords, cookies and storage contents are not captured.
 
-The inspection endpoint remains available through the API; the workspace has no manual inspection control. Instruction resolution uses the separate resolve endpoint and displays its result in chat. Enter submits an instruction; Ctrl+Enter inserts a new line. Results show the reported total resolution time from `diagnostics.timingsMs.total` when available. This server duration excludes client network and display time. The [resolution contract](resolution.md) documents capture, model selection, XPath validation, highlight and diagnostics.
+The inspection endpoint remains available through the API; the workspace has no manual inspection control. Instruction resolution uses the separate resolve endpoint and displays its result in chat. Enter submits an instruction; Ctrl+Enter inserts a new line. Results show the reported total resolution time from `diagnostics.timingsMs.total` when available. This server duration excludes client network and display time. Each open tab retains its own draft and ordered result history in client memory, including timestamps and request-page metadata. Older-document or inactive results are labelled historical and never re-highlighted automatically. Tab close discards its chat; app reload and confirmed session reset clear all chat history. Persistence and diagnostic exports remain separate work in #5. The [resolution contract](resolution.md) documents capture, model selection, XPath validation, highlight and diagnostics.
 
 ## Internal API
 
 All three APIs use controller classes with explicit routes and constructor injection. `Program.cs` registers services and middleware; controllers handle HTTP contracts. Browser session operations remain in `Sessions/`, and a hosted service runs the inactivity sweep.
 
-The browser service exposes the client lifecycle routes without the `/api` prefix. Its read-only inspection is `GET /pages/{pageId}/inspection`. It also owns `/view/{pageId}`.
+The browser service exposes the client lifecycle routes without the `/api` prefix. Its read-only inspection is `GET /pages/{pageId}/inspection`. It also owns the stable session stream `/view/{sessionId}`.
 
 The resolver exposes `POST /pages/{pageId}/inspect`. It calls the browser inspection endpoint and returns the result with `inspectedBy: "resolver"`. The resolver also exposes `POST /pages/{pageId}/resolve`; Browser exposes the capture/selection operations in the [resolution contract](resolution.md). Both services provide their own `GET /health` liveness endpoint and can run without the client or database. Resolution uses the server-configured OpenRouter key.
 
 ## Lifecycle
 
-- Creation allocates new opaque session and page IDs and opens a blank page in a fresh context. Up to four independent sessions can exist in the service; one page is shown in each client workspace.
+- Creation allocates new opaque session and page IDs and opens a blank page in a fresh context. Up to four independent sessions can exist; each has up to eight tabs, one active page and one stable session viewer path.
 - Navigation changes the document identity while retaining the managed page ID. Same-URL reloads also invalidate captures and old results. Cookies and storage remain in that session until it ends.
-- Any additional page/window is closed. `blockedPopups` increases, the client shows a short notice, and the managed page remains unchanged.
-- The close API cancels active work and disposes the browser and display processes. The workspace offers a single **Reset session** control with a confirmation dialog. Confirming closes the old session before creating a new one and clears the chat; cancelling keeps the current session.
-- Closing or reloading the client makes a best-effort keepalive close request. A 15-minute inactivity sweep reclaims abandoned sessions. Connected clients poll page state every two seconds.
-- Restarting the browser service invalidates every live ID. Database records cannot restore contexts or login state. The client detects expiry and offers a new browser.
+- New-tab links and popup windows become managed tabs in the same context, preserving opener relationships and shared cookies/storage. Newly opened tabs become active. The client tab strip controls creation, activation and closing; native browser chrome stays hidden. At the eight-tab limit, additional popups are closed and `blockedPopups` records the rejection.
+- Activation brings the selected page to the front and invalidates previous captures and highlights, including when switching away and back without navigation. Capture and selection reject inactive pages with `409 inactive_page`. Each page owns its own document/capture identity. The session’s `activationVersion` changes on every active-tab change so clients can detect switching away and back between polls.
+- Closing a tab selects a remaining tab when needed. Closing the last tab creates a blank replacement in the same session. Closing the session disposes all tabs and shared browsing state.
+- The close API cancels active work and disposes the browser and display processes. The workspace offers a single **Reset session** control with a confirmation dialog. Confirming closes the old session and all its tabs before creating a new one and clears all chat history; cancelling keeps the current session.
+- Closing or reloading the client makes a best-effort keepalive close request. A 15-minute inactivity sweep reclaims abandoned sessions. Connected clients poll session state to discover popup tabs, active-page changes and navigation.
+- Restarting the browser service invalidates every live ID. Database records cannot restore contexts or login state. The client detects expiry and enables starting again through the address field.
 - Operations serialize within a session; independent sessions use separate locks and displays. Creation serializes while reserving a display slot.
 - Cancellation while waiting for a session lock leaves the page intact. Cancellation during a running browser command closes that session, because Playwright does not provide safe interruption of that operation. Closing another session is unaffected.
 - Navigation waits for `DOMContentLoaded` with a 20-second limit. It does not retry or claim that later application scripts have finished.
 
-Operation errors use `{code, message, traceId}`. Controller validation returns the same envelope with `400 invalid_request` for malformed or empty JSON navigation bodies. Unknown, closed and previous-process page IDs all return `404 page_not_found`; the service keeps no unbounded tombstone collection. Capacity exhaustion returns `409 session_limit`, invalid URLs `400 invalid_url`, browser failures `502 browser_operation_failed`, and navigation timeouts `504 navigation_timeout`. Other unavailable/timeout upstreams remain operational errors. A disconnected caller may not receive a cancellation response.
+Operation errors use `{code, message, traceId}`. Controller validation returns the same envelope with `400 invalid_request` for malformed or empty JSON navigation bodies. Unknown, closed and previous-process page IDs all return `404 page_not_found`; the service keeps no unbounded tombstone collection. Capacity exhaustion returns `409 session_limit` or `409 tab_limit`, invalid URLs `400 invalid_url`, browser failures `502 browser_operation_failed`, and navigation timeouts `504 navigation_timeout`. Other unavailable/timeout upstreams remain operational errors. A disconnected caller may not receive a cancellation response.
 
 ## Configuration
 

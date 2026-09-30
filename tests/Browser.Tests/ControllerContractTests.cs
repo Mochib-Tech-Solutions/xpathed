@@ -33,6 +33,20 @@ public sealed class ControllerContractTests(WebApplicationFactory<HealthControll
     }
 
     [Theory]
+    [InlineData("GET", "/sessions/missing", "session_not_found")]
+    [InlineData("POST", "/sessions/missing/pages", "session_not_found")]
+    [InlineData("POST", "/pages/missing/activate", "page_not_found")]
+    [InlineData("DELETE", "/pages/missing", "page_not_found")]
+    public async Task UnknownSessionOrTabOperationReturnsAnError(string method, string path, string code)
+    {
+        using var client = application.CreateClient();
+        using var request = new HttpRequestMessage(new HttpMethod(method), path);
+        using var response = await client.SendAsync(request);
+
+        await AssertErrorAsync(response, HttpStatusCode.NotFound, code);
+    }
+
+    [Theory]
     [InlineData("")]
     [InlineData("{")]
     [InlineData("{}")]

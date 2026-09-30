@@ -8,6 +8,7 @@ type Props = {
   sessionId: string | undefined;
   pageUrl: string | undefined;
   address: string;
+  focusRequest?: number;
   busy: boolean;
   onAddressChange: (address: string) => void;
   onNavigate: (url: string) => void;
@@ -17,6 +18,7 @@ export default function BrowserToolbar({
   sessionId,
   pageUrl,
   address,
+  focusRequest = 0,
   busy,
   onAddressChange,
   onNavigate,
@@ -24,7 +26,7 @@ export default function BrowserToolbar({
   const addressInput = useRef<HTMLInputElement>(null);
   useEffect(() => {
     addressInput.current?.focus();
-  }, [sessionId]);
+  }, [sessionId, focusRequest]);
 
   function submit(event: FormEvent) {
     event.preventDefault();

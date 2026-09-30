@@ -30,10 +30,16 @@ An expression that locates nodes within a document. In this assignment, the outp
 Another XPath expression for the same selected target element. Alternatives vary the way the element is located, not which element is selected.
 
 **Browser session**:
-A managed browsing instance in which the user prepares the page and the resolver inspects the target. The client and resolver refer to the same session.
+A managed browsing instance containing related tabs and their shared browsing state. The client and resolver refer to the same session.
 
 **Managed page**:
-The single page the user views and works with in a browser session. Its page identifier links resolution requests to that same live page.
+A live browser tab within a session. Its page identifier links resolution requests and chat history to that same tab.
+
+**Active page**:
+The managed page currently selected for viewing and target resolution. A session has one active page at a time.
+
+**Resolution history**:
+The ordered record of instructions and their results for a managed page, including when they were requested and how long resolution took. Historical results describe the page state at that time.
 
 **Page document**:
 The current document within a managed page. Navigation can replace the document while keeping the managed page itself.

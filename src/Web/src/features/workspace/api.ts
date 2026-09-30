@@ -9,6 +9,14 @@ export type PageState = {
   blockedPopups: number;
 };
 
+export type SessionState = {
+  sessionId: string;
+  activePageId: string;
+  activationVersion: number;
+  viewPath: string;
+  pages: PageState[];
+};
+
 export type ResolutionResult = {
   contractVersion: "1";
   outcome: "found" | "not_found" | "unsupported" | "error";
@@ -42,7 +50,17 @@ export type ResolutionResult = {
   };
 };
 
-export type Resolution = { instruction: string; result: ResolutionResult };
+export type Resolution = {
+  id: string;
+  instruction: string;
+  createdAt: string;
+  pageUrl: string;
+  pageTitle: string;
+  documentId: string;
+  historical: boolean;
+  result: ResolutionResult | null;
+  error: string | null;
+};
 
 export class ApiError extends Error {
   constructor(

@@ -3,6 +3,7 @@ import { createServer } from "node:http";
 const runs = new Map();
 let providerRequest;
 let scenario = "found";
+let targetText = "About us";
 const fixture = `<!doctype html><html lang="en"><meta charset="utf-8"><title>Resolution contract</title>
 <body><nav aria-label="Company"><button id="expected-target" data-testid="about-us" data-oracle="expected-target">About us</button></nav>
 <script>
@@ -30,8 +31,15 @@ const server = createServer(async (request, response) => {
     const state = runs.get(run);
     const body = request.method === "POST" ? JSON.parse(await readBody(request)) : null;
     let output;
-    if (["/fixture", "/privacy", "/quotes", "/oversized"].includes(path)) {
+    if (["/fixture", "/second", "/privacy", "/quotes", "/oversized"].includes(path)) {
       let html = fixture;
+      if (path === "/second")
+        html = html
+          .replace(
+            'id="expected-target" data-testid="about-us"',
+            'id="second-target" data-testid="second-page"',
+          )
+          .replace(">About us</button>", ">Second page</button>");
       if (path === "/privacy")
         html = html.replace(
           "<script>",
@@ -66,6 +74,7 @@ const server = createServer(async (request, response) => {
     } else if (path === "/provider-request") output = providerRequest ?? null;
     else if (path === "/scenario") {
       scenario = body.name;
+      targetText = body.targetText ?? "About us";
       providerRequest = null;
       output = { ok: true };
     } else if (path === "/api/v1/chat/completions") {
@@ -75,7 +84,7 @@ const server = createServer(async (request, response) => {
       const target = candidates.find(
         (candidate) =>
           candidate.tag === "button" &&
-          (candidate.text === "About us" || candidate.label === "About us"),
+          (candidate.text === targetText || candidate.label === targetText),
       );
       if (!target) throw new Error("Independent fixture target absent from provider input");
       output = {

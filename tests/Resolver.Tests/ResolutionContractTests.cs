@@ -183,6 +183,7 @@ public sealed class ResolutionContractTests
     [InlineData("not_found", "click", null, "stale_document")]
     [InlineData("unsupported", "unsupported", null, "stale_document")]
     [InlineData("found", "click", "button-save", "validation_budget_exceeded")]
+    [InlineData("found", "click", "button-save", "inactive_page")]
     public async Task BrowserValidationFailuresPreserveSafeCodesForSemanticOutcomes(string outcome, string action, string? candidateId, string code)
     {
         var handler = new DeterministicServicesHandler

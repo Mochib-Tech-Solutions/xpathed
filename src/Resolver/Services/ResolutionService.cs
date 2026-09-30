@@ -158,8 +158,10 @@ public sealed partial class ResolutionService(IHttpClientFactory clients, OpenRo
         {
             // Invalid error bodies contain no trustworthy diagnostic data.
         }
-        code = code is "page_not_found" or "stale_document" or "stale_capture" or "capture_budget_exceeded" or "validation_budget_exceeded" or "unknown_candidate" or "xpath_validation_failed"
+        code = code is "page_not_found" or "inactive_page" or "stale_document" or "stale_capture" or "capture_budget_exceeded" or "validation_budget_exceeded" or "unknown_candidate" or "xpath_validation_failed"
             ? code : "browser_unavailable";
-        throw new ApiException((int)response.StatusCode, code, "The browser could not validate the current page and target.");
+        throw new ApiException((int)response.StatusCode, code, code == "inactive_page"
+            ? "The active tab changed. Resolve the instruction again."
+            : "The browser could not validate the current page and target.");
     }
 }

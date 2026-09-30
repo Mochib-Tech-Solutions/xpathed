@@ -3,6 +3,7 @@ import { lazy, Suspense } from "react";
 import { Button } from "@/components/ui/button";
 import ThemeToggle from "../theme/ThemeToggle";
 import BrowserToolbar from "./BrowserToolbar";
+import BrowserTabs from "./BrowserTabs";
 import ChatPanel from "./ChatPanel";
 import ResetSessionButton from "./ResetSessionButton";
 import useWorkspace from "./useWorkspace";
@@ -13,9 +14,15 @@ export default function Workspace() {
   const {
     session,
     page,
+    pages,
+    resolving,
+    newTab,
+    selectTab,
+    closeTab,
     address,
+    addressFocus,
     instruction,
-    resolution,
+    history,
     busy,
     error,
     pollError,
@@ -61,22 +68,22 @@ export default function Workspace() {
           {pollError}
         </div>
       )}
-      {!!page?.blockedPopups && (
+      {!!page?.blockedPopups && pages.length >= 8 && (
         <div
           className="flex min-h-9 shrink-0 items-center justify-between border-b border-border bg-muted px-4 py-1.5 text-sm text-muted-foreground"
           role="status"
         >
-          New windows aren’t supported.
+          The tab limit was reached. Close a tab to open another.
         </div>
       )}
       <main className="flex min-h-0 flex-1 flex-col sm:grid sm:grid-cols-[300px_minmax(0,1fr)] md:grid-cols-[360px_minmax(0,1fr)]">
         <ChatPanel
-          key={session?.sessionId ?? "closed"}
+          key={page?.pageId ?? "closed"}
           instruction={instruction}
-          resolution={resolution}
+          history={history}
           ready={!!page && /^https?:\/\//i.test(page.url)}
           disabled={!page || !/^https?:\/\//i.test(page.url) || !!busy}
-          resolving={busy === "Resolving…"}
+          resolving={resolving}
           onInstructionChange={setInstruction}
           onResolve={resolve}
         />
@@ -84,15 +91,31 @@ export default function Workspace() {
           className="order-first flex min-h-0 min-w-0 flex-1 flex-col bg-background sm:order-none"
           aria-label="Browser workspace"
         >
+          {session && (
+            <BrowserTabs
+              pages={pages}
+              activePageId={page?.pageId}
+              busy={!!busy}
+              onNew={newTab}
+              onSelect={selectTab}
+              onClose={closeTab}
+            />
+          )}
           <BrowserToolbar
             sessionId={session?.sessionId}
             pageUrl={page?.url}
             address={address}
+            focusRequest={addressFocus}
             busy={!!busy}
             onAddressChange={setAddress}
             onNavigate={navigate}
           />
-          <div className="relative min-h-0 flex-1 overflow-hidden bg-muted/50">
+          <div
+            id="browser-panel"
+            role={page ? "tabpanel" : undefined}
+            aria-labelledby={page ? `tab-${page.pageId}` : undefined}
+            className="relative min-h-0 flex-1 overflow-hidden bg-muted/50"
+          >
             {session ? (
               <Suspense
                 fallback={

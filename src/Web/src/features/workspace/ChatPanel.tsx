@@ -5,7 +5,7 @@ import type { Resolution } from "./api";
 
 type Props = {
   instruction: string;
-  resolution: Resolution | null;
+  history: Resolution[];
   ready: boolean;
   disabled: boolean;
   resolving: boolean;
@@ -15,7 +15,7 @@ type Props = {
 
 export default function ChatPanel({
   instruction,
-  resolution,
+  history,
   ready,
   disabled,
   resolving,
@@ -23,9 +23,15 @@ export default function ChatPanel({
   onResolve,
 }: Props) {
   const [copied, setCopied] = useState("");
-  const [copyError, setCopyError] = useState("");
+  const [copyError, setCopyError] = useState<{ entryId: string; message: string } | null>(null);
   const composer = useRef<HTMLTextAreaElement>(null);
   const restoreFocus = useRef(false);
+  const transcript = useRef<HTMLDivElement>(null);
+  const followBottom = useRef(true);
+  useEffect(() => {
+    if (followBottom.current && transcript.current)
+      transcript.current.scrollTop = transcript.current.scrollHeight;
+  }, [history]);
   useEffect(() => {
     if (resolving || !restoreFocus.current) return;
     restoreFocus.current = false;
@@ -37,23 +43,15 @@ export default function ChatPanel({
       composer.current?.focus({ preventScroll: true });
     }
   }, [disabled, resolving]);
-  const target = resolution?.result.target;
   const tooLong = instruction.trim().length > 4000;
-  const totalMs = resolution?.result.diagnostics.timingsMs?.total;
-  const duration =
-    typeof totalMs === "number" && Number.isFinite(totalMs) && totalMs >= 0
-      ? totalMs < 1000
-        ? `${Math.round(totalMs)} ms`
-        : `${(totalMs / 1000).toFixed(2)} s`
-      : null;
 
-  async function copy(xpath: string) {
+  async function copy(xpath: string, entryId: string) {
     try {
       await navigator.clipboard.writeText(xpath);
-      setCopied(xpath);
-      setCopyError("");
+      setCopied(`${entryId}:${xpath}`);
+      setCopyError(null);
     } catch {
-      setCopyError("Unable to copy. Select and copy the XPath manually.");
+      setCopyError({ entryId, message: "Unable to copy. Select and copy the XPath manually." });
     }
   }
 
@@ -65,8 +63,19 @@ export default function ChatPanel({
       <div className="flex min-h-14 shrink-0 items-center border-b border-border px-4">
         <h1 className="font-medium">Chat</h1>
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4" aria-live="polite">
-        {!resolution && !resolving && (
+      <div
+        ref={transcript}
+        className="min-h-0 flex-1 overflow-y-auto px-4 py-4"
+        role="log"
+        aria-label="Chat history"
+        aria-live="polite"
+        onScroll={(event) => {
+          const element = event.currentTarget;
+          followBottom.current =
+            element.scrollHeight - element.scrollTop - element.clientHeight < 64;
+        }}
+      >
+        {!history.length && !resolving && (
           <div className="flex h-full flex-col justify-center gap-2 text-sm leading-relaxed">
             <h2 className="text-base font-medium">Find an element</h2>
             <p className="text-muted-foreground">
@@ -76,104 +85,160 @@ export default function ChatPanel({
             </p>
           </div>
         )}
-        {resolution && (
-          <div className="space-y-4 text-sm leading-relaxed">
-            <p className="rounded-xl bg-accent px-3 py-2.5 break-words whitespace-pre-wrap">
-              {resolution.instruction}
-            </p>
-            {duration && (
-              <p
-                className="text-xs text-muted-foreground"
-                title="Duration reported by the resolver"
-              >
-                Resolution time: {duration}
+        {history.map((resolution) => {
+          const result = resolution.result;
+          const target = result?.target;
+          const totalMs = result?.diagnostics.timingsMs?.total;
+          const duration =
+            typeof totalMs === "number" && Number.isFinite(totalMs) && totalMs >= 0
+              ? totalMs < 1000
+                ? `${Math.round(totalMs)} ms`
+                : `${(totalMs / 1000).toFixed(2)} s`
+              : null;
+          const xpathItem = (xpath: string, index: number) => (
+            <li key={xpath} className="rounded-lg border border-border bg-background p-3">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <span className="text-xs font-medium text-muted-foreground">
+                  {index === 0 ? "Primary XPath" : `Alternative ${index}`}
+                </span>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="-my-1 size-7"
+                  aria-label={`Copy XPath ${index + 1}`}
+                  onClick={() => {
+                    void copy(xpath, resolution.id);
+                  }}
+                >
+                  {copied === `${resolution.id}:${xpath}` ? (
+                    <Check aria-hidden="true" />
+                  ) : (
+                    <Copy aria-hidden="true" />
+                  )}
+                </Button>
+              </div>
+              <code className="block text-sm break-all whitespace-pre-wrap">{xpath}</code>
+            </li>
+          );
+          return (
+            <article key={resolution.id} className="mb-6 space-y-3 text-sm leading-relaxed">
+              <p className="rounded-xl bg-accent px-3 py-2.5 break-words whitespace-pre-wrap">
+                {resolution.instruction}
               </p>
-            )}
-            {resolution.result.outcome === "not_found" && <p>No matching element found.</p>}
-            {resolution.result.outcome === "unsupported" && (
-              <div>
-                <p>Unsupported instruction</p>
-                {resolution.result.diagnostics.message && (
-                  <p className="text-muted-foreground">{resolution.result.diagnostics.message}</p>
+              <div className="space-y-1 text-xs text-muted-foreground">
+                <time
+                  dateTime={resolution.createdAt}
+                  title={new Date(resolution.createdAt).toLocaleString()}
+                >
+                  {new Date(resolution.createdAt).toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </time>
+                {resolution.pageTitle && (
+                  <p className="font-medium break-words">{resolution.pageTitle}</p>
                 )}
+                <p className="break-all">{resolution.pageUrl}</p>
+                {resolution.historical && <p>Earlier result · no current highlight</p>}
               </div>
-            )}
-            {resolution.result.outcome === "error" && (
-              <div role="alert" className="text-destructive">
-                <p>Resolution failed</p>
-                {resolution.result.diagnostics.message && (
-                  <p>{resolution.result.diagnostics.message}</p>
-                )}
-              </div>
-            )}
-            {target && (
-              <>
+              {resolution.error && (
+                <p role="alert" className="text-destructive">
+                  {resolution.error}
+                </p>
+              )}
+              {!result && !resolution.error && (
+                <p className="text-muted-foreground">Waiting for result…</p>
+              )}
+              {duration && (
+                <p
+                  className="text-xs text-muted-foreground"
+                  title="Duration reported by the resolver"
+                >
+                  Resolution time: {duration}
+                </p>
+              )}
+              {result?.outcome === "not_found" && <p>No matching element found.</p>}
+              {result?.outcome === "unsupported" && (
                 <div>
-                  <p className="mb-1 flex items-center gap-1.5 font-medium">
-                    <Check className="size-3.5" aria-hidden="true" /> Target found
-                  </p>
-                  <h2 className="text-base font-medium break-words">
-                    {target.label || target.tag}
-                  </h2>
-                  <p className="text-muted-foreground">
-                    {resolution.result.action} · {target.tag}
-                  </p>
-                </div>
-                <div className="flex flex-wrap gap-1.5 text-xs text-muted-foreground [&>span]:rounded-md [&>span]:border [&>span]:bg-background [&>span]:px-2 [&>span]:py-0.5">
-                  <span>{target.state.inViewport ? "In viewport" : "Off-screen"}</span>
-                  <span>{target.state.enabled ? "Enabled" : "Disabled"}</span>
-                  {(target.state.editable ||
-                    resolution.result.action === "fill" ||
-                    resolution.result.action === "type") && (
-                    <span>{target.state.editable ? "Editable" : "Not editable"}</span>
-                  )}
-                  {target.state.checked !== null && (
-                    <span>{target.state.checked ? "Checked" : "Unchecked"}</span>
+                  <p>Unsupported instruction</p>
+                  {result?.diagnostics.message && (
+                    <p className="text-muted-foreground">{result?.diagnostics.message}</p>
                   )}
                 </div>
-                <p className="text-xs text-muted-foreground">No action was executed.</p>
-                <ol className="space-y-2.5" aria-label="Verified XPath alternatives">
-                  {target.xpaths.map((xpath, index) => (
-                    <li key={xpath} className="rounded-lg border border-border bg-background p-3">
-                      <div className="mb-2 flex items-center justify-between gap-2">
-                        <span className="text-xs font-medium text-muted-foreground">
-                          {index === 0 ? "Primary XPath" : `Alternative ${index}`}
-                        </span>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="-my-1 size-7"
-                          aria-label={`Copy XPath ${index + 1}`}
-                          onClick={() => {
-                            void copy(xpath);
-                          }}
+              )}
+              {result?.outcome === "error" && (
+                <div role="alert" className="text-destructive">
+                  <p>Resolution failed</p>
+                  {result?.diagnostics.message && <p>{result?.diagnostics.message}</p>}
+                </div>
+              )}
+              {target && (
+                <>
+                  <div>
+                    <p className="mb-1 flex items-center gap-1.5 font-medium">
+                      <Check className="size-3.5" aria-hidden="true" /> Target found
+                    </p>
+                    <h2 className="text-base font-medium break-words">
+                      {target.label || target.tag}
+                    </h2>
+                    <p className="text-muted-foreground">
+                      {result?.action} · {target.tag}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5 text-xs text-muted-foreground [&>span]:rounded-md [&>span]:border [&>span]:bg-background [&>span]:px-2 [&>span]:py-0.5">
+                    <span>{target.state.inViewport ? "In viewport" : "Off-screen"}</span>
+                    <span>{target.state.enabled ? "Enabled" : "Disabled"}</span>
+                    {(target.state.editable ||
+                      result?.action === "fill" ||
+                      result?.action === "type") && (
+                      <span>{target.state.editable ? "Editable" : "Not editable"}</span>
+                    )}
+                    {target.state.checked !== null && (
+                      <span>{target.state.checked ? "Checked" : "Unchecked"}</span>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">No action was executed.</p>
+                  <details open={!resolution.historical} className="group">
+                    <summary className="mb-2 cursor-pointer text-xs font-medium text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                      Verified XPaths
+                    </summary>
+                    <ol className="space-y-2.5" aria-label="Verified XPath alternatives">
+                      {target.xpaths.slice(0, 1).map(xpathItem)}
+                    </ol>
+                    {target.xpaths.length > 1 && (
+                      <details className="mt-3">
+                        <summary className="cursor-pointer text-xs text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                          {target.xpaths.length - 1} alternative XPath
+                          {target.xpaths.length > 2 ? "s" : ""}
+                        </summary>
+                        <ol
+                          start={2}
+                          className="mt-2 space-y-2.5"
+                          aria-label="Additional XPath alternatives"
                         >
-                          {copied === xpath ? (
-                            <Check aria-hidden="true" />
-                          ) : (
-                            <Copy aria-hidden="true" />
-                          )}
-                        </Button>
-                      </div>
-                      <code className="block text-sm break-all whitespace-pre-wrap">{xpath}</code>
-                    </li>
-                  ))}
-                </ol>
-                {copied && (
-                  <p role="status" className="text-muted-foreground">
-                    Copied
-                  </p>
-                )}
-                {copyError && (
-                  <p role="alert" className="text-destructive">
-                    {copyError}
-                  </p>
-                )}
-              </>
-            )}
-          </div>
-        )}
+                          {target.xpaths
+                            .slice(1)
+                            .map((xpath, index) => xpathItem(xpath, index + 1))}
+                        </ol>
+                      </details>
+                    )}
+                  </details>
+                  {copied.startsWith(`${resolution.id}:`) && (
+                    <p role="status" className="text-muted-foreground">
+                      Copied
+                    </p>
+                  )}
+                  {copyError?.entryId === resolution.id && (
+                    <p role="alert" className="text-destructive">
+                      {copyError.message}
+                    </p>
+                  )}
+                </>
+              )}
+            </article>
+          );
+        })}
         {resolving && (
           <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground">
             <LoaderCircle className="size-4 motion-safe:animate-spin" aria-hidden="true" />
@@ -182,12 +247,12 @@ export default function ChatPanel({
         )}
       </div>
       <form
-        className="mx-4 mb-4 shrink-0 rounded-xl border border-input bg-background shadow-sm transition-shadow focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/15"
+        className="m-3 shrink-0 overflow-hidden rounded-xl border border-input bg-background shadow-sm transition-shadow focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/15"
         onSubmit={(event) => {
           event.preventDefault();
           if (!disabled && !resolving && !tooLong && instruction.trim()) {
             setCopied("");
-            setCopyError("");
+            setCopyError(null);
             restoreFocus.current = true;
             onResolve();
           }
@@ -229,9 +294,10 @@ export default function ChatPanel({
             Use 4,000 characters or fewer.
           </p>
         )}
-        <div className="flex items-center justify-between gap-2 px-3 pb-2">
-          <p id="instruction-hint" className="text-xs text-muted-foreground">
-            Enter to send · Ctrl+Enter for a new line
+        <div className="flex items-center justify-between gap-3 border-t border-border/60 bg-muted/30 px-3 py-2">
+          <p id="instruction-hint" className="min-w-0 text-xs leading-4 text-muted-foreground">
+            <span className="block">Enter to send</span>
+            <span className="block">Ctrl+Enter for a new line</span>
           </p>
           <Button
             type="submit"

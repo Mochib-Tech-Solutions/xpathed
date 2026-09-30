@@ -11,6 +11,12 @@ public sealed class PagesController(BrowserSessions sessions) : ControllerBase
     [HttpGet("{id}")]
     public Task<PageState> Get(string id, CancellationToken cancellationToken) => sessions.StateAsync(id, cancellationToken);
 
+    [HttpPost("{id}/activate")]
+    public Task<BrowserSessionState> Activate(string id, CancellationToken cancellationToken) => sessions.ActivateAsync(id, cancellationToken);
+
+    [HttpDelete("{id}")]
+    public Task<BrowserSessionState> Close(string id, CancellationToken cancellationToken) => sessions.ClosePageAsync(id, cancellationToken);
+
     [HttpPost("{id}/navigate")]
     public Task<PageState> Navigate(string id, [FromBody] NavigateRequest request, CancellationToken cancellationToken) =>
         sessions.NavigateAsync(id, request.Url ?? "", cancellationToken);

@@ -184,3 +184,84 @@ test("fixture oracle commands and observations belong to one test run", async ()
   await json(`${fixture}/observation?run=${owner}`, "POST", { matches: [["expected-target"]] });
   assert.equal(await json(`${fixture}/observation?run=${unrelated}`), null);
 });
+
+test("ClientApi tab routes preserve active-page resolution and one stable session viewer", async () => {
+  const session = await json(`${client}/api/sessions`, "POST");
+  const sessionUrl = `${client}/api/sessions/${session.sessionId}`;
+  const firstRun = randomUUID();
+  const secondRun = randomUUID();
+  async function resolveAndVerify(page, targetText, run) {
+    await json(`${fixture}/scenario`, "POST", { name: "found", targetText });
+    const result = await json(`${client}/api/pages/${page.pageId}/resolve`, "POST", {
+      instruction: `Click ${targetText}.`,
+      documentId: page.documentId,
+    });
+    assert.equal(result.outcome, "found");
+    assert.equal(result.sessionId, session.sessionId);
+    assert.equal(result.pageId, page.pageId);
+    assert.equal(result.documentId, page.documentId);
+    assert.equal(result.target.label, targetText);
+    assert.ok(result.target.xpaths.length > 0);
+    await json(`${fixture}/oracle?run=${run}`, "POST", { xpaths: result.target.xpaths });
+    let observation;
+    for (let attempt = 0; attempt < 100; attempt++) {
+      observation = await json(`${fixture}/observation?run=${run}`);
+      if (observation) break;
+      await delay(50);
+    }
+    assert.ok(observation);
+    assert.deepEqual(
+      observation.matches,
+      result.target.xpaths.map(() => ["expected-target"]),
+    );
+    assert.equal(observation.clicks, 0);
+    assert.equal(observation.scrollY, 0);
+  }
+  try {
+    const first = await json(`${client}/api/pages/${session.pageId}/navigate`, "POST", {
+      url: `${fixture}/fixture?run=${firstRun}`,
+    });
+    const initial = await json(sessionUrl);
+    assert.equal(initial.activePageId, first.pageId);
+    assert.equal(initial.viewPath, session.viewPath);
+    await resolveAndVerify(first, "About us", firstRun);
+
+    const added = await json(`${sessionUrl}/pages`, "POST");
+    assert.equal(added.pages.length, 2);
+    assert.notEqual(added.activePageId, first.pageId);
+    assert.equal(added.viewPath, initial.viewPath);
+    await json(`${fixture}/scenario`, "POST", { name: "found" });
+    const inactive = await json(`${client}/api/pages/${first.pageId}/resolve`, "POST", {
+      instruction: "Click About us.",
+      documentId: first.documentId,
+    });
+    assert.equal(inactive.outcome, "error");
+    assert.equal(inactive.diagnostics.code, "inactive_page");
+    assert.equal(inactive.diagnostics.modelCalls, 0);
+    assert.equal(await json(`${fixture}/provider-request`), null);
+
+    const second = await json(`${client}/api/pages/${added.activePageId}/navigate`, "POST", {
+      url: `${fixture}/second?run=${secondRun}`,
+    });
+    await resolveAndVerify(second, "Second page", secondRun);
+    const switched = await json(`${client}/api/pages/${first.pageId}/activate`, "POST");
+    assert.equal(switched.activePageId, first.pageId);
+    assert.ok(switched.activationVersion > initial.activationVersion);
+    await resolveAndVerify(first, "About us", firstRun);
+
+    const closed = await json(`${client}/api/pages/${second.pageId}`, "DELETE");
+    assert.equal(closed.activePageId, first.pageId);
+    assert.deepEqual(
+      closed.pages.map((page) => page.pageId),
+      [first.pageId],
+    );
+    const replacement = await json(`${client}/api/pages/${first.pageId}`, "DELETE");
+    assert.equal(replacement.pages.length, 1);
+    assert.equal(replacement.pages[0].url, "about:blank");
+    assert.equal(replacement.activePageId, replacement.pages[0].pageId);
+    assert.notEqual(replacement.activePageId, first.pageId);
+    assert.equal(replacement.viewPath, initial.viewPath);
+  } finally {
+    await fetch(sessionUrl, { method: "DELETE" });
+  }
+});
