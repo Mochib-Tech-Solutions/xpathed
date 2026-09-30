@@ -5,6 +5,172 @@ import { setTimeout as delay } from "node:timers/promises";
 
 const client = "http://client-api:8080";
 const fixture = "http://resolution-fixture:8090";
+
+test("A plural current-page prompt keeps independent targets, blocked state, missing and dependent actions", async () => {
+  await json(`${fixture}/scenario`, "POST", {
+    name: "batch",
+    actions: [
+      {
+        step: 1,
+        instruction: "Click Approval",
+        action: "click",
+        outcome: "found",
+        label: "Approval",
+        index: 1,
+      },
+      {
+        step: 1,
+        instruction: "Click Approval",
+        action: "click",
+        outcome: "found",
+        label: "Approval",
+        index: 0,
+      },
+      {
+        step: 2,
+        instruction: "Fill Notes",
+        action: "fill",
+        outcome: "found",
+        label: "Notes",
+        tag: "input",
+      },
+      { step: 3, instruction: "Hover Contact", action: "hover", outcome: "not_found" },
+      {
+        step: 4,
+        instruction: "Click Done after opening details",
+        action: "click",
+        outcome: "unsupported",
+        limitation: "current_state_dependency",
+      },
+    ],
+  });
+  const session = await json(`${client}/api/sessions`, "POST");
+  const run = randomUUID();
+  try {
+    const page = await json(`${client}/api/pages/${session.pageId}/navigate`, "POST", {
+      url: `${fixture}/batch?run=${run}`,
+    });
+    const before = await observeXpaths(run, []);
+    const result = await json(`${client}/api/pages/${page.pageId}/resolve`, "POST", {
+      instruction:
+        "Click all Approval buttons, fill Notes, hover Contact, then click Done after opening details.",
+      documentId: page.documentId,
+      contractVersion: "2",
+    });
+    assert.equal(result.outcome, "partial", JSON.stringify(result));
+    assert.equal(result.contractVersion, "2");
+    assert.deepEqual(
+      result.actions.map((action) => action.actionId),
+      ["a1", "a2", "a3", "a4", "a5"],
+    );
+    assert.deepEqual(
+      result.actions.map((action) => action.outcome),
+      ["found", "found", "found", "not_found", "unsupported"],
+    );
+    assert.equal(result.actions[1].target.interactability.status, "blocked");
+    assert.equal(result.actions[2].target.interactability.reasons.includes("readonly"), true);
+    assert.equal(result.actions[4].code, "current_state_dependency");
+    assert.deepEqual(result.summary, {
+      processingComplete: true,
+      semanticCompleteness: "unverified",
+      total: 5,
+      found: 3,
+      notFound: 1,
+      unsupported: 1,
+      errors: 0,
+      blocked: 2,
+      readinessUnknown: 1,
+      assessmentUnsupported: 0,
+    });
+    assert.equal(result.diagnostics.modelCalls, 1);
+    assert.equal(result.diagnostics.promptVersion, "3");
+    assert.ok(
+      result.actions.every(
+        (action) =>
+          action.diagnosticsReference === result.attemptId &&
+          action.frameId === "main" &&
+          action.diagnostics === undefined,
+      ),
+    );
+    const xpaths = result.actions.flatMap((action) => action.target?.xpaths ?? []);
+    const expected = result.actions
+      .slice(0, 3)
+      .flatMap((action, index) =>
+        action.target.xpaths.map(() => [["approval-first", "approval-second", "notes"][index]]),
+      );
+    const observed = await observeXpaths(run, xpaths);
+    assert.deepEqual(observed?.matches, expected);
+    assert.equal(observed.clicks, 0);
+    assert.equal(observed.scrollY, 0);
+    assert.deepEqual(observed.events, before.events);
+    const inspected = await json(`${client}/api/pages/${page.pageId}/highlight`, "POST", {
+      documentId: page.documentId,
+      captureId: result.captureId,
+      actionId: "a2",
+    });
+    assert.equal(inspected.target.candidateId, result.actions[1].target.candidateId);
+    assert.deepEqual((await observeXpaths(run, [])).events, before.events);
+    const provider = await json(`${fixture}/provider-request`);
+    assert.equal(provider.max_tokens, 4096);
+    assert.doesNotMatch(
+      JSON.stringify(provider),
+      /PRIVATE_NOTE_VALUE|HIDDEN_APPROVAL|approval-first|approval-second/,
+    );
+  } finally {
+    await fetch(`${client}/api/sessions/${session.sessionId}`, { method: "DELETE" });
+  }
+});
+
+async function observeXpaths(run, xpaths) {
+  await json(`${fixture}/oracle?run=${run}`, "POST", { xpaths });
+  for (let attempt = 0; attempt < 100; attempt++) {
+    const observed = await json(`${fixture}/observation?run=${run}`);
+    if (observed) return observed;
+    await delay(50);
+  }
+  assert.fail("Independent fixture observation did not arrive");
+}
+
+test("An independent plural oracle detects omitted actions despite valid returned XPaths", async () => {
+  await json(`${fixture}/scenario`, "POST", {
+    name: "batch",
+    actions: [
+      {
+        step: 1,
+        instruction: "Click Approval",
+        action: "click",
+        outcome: "found",
+        label: "Approval",
+        index: 0,
+      },
+    ],
+  });
+  const session = await json(`${client}/api/sessions`, "POST");
+  const run = randomUUID();
+  try {
+    const page = await json(`${client}/api/pages/${session.pageId}/navigate`, "POST", {
+      url: `${fixture}/batch?run=${run}`,
+    });
+    const result = await json(`${client}/api/pages/${page.pageId}/resolve`, "POST", {
+      instruction: "Click all Approval buttons",
+      documentId: page.documentId,
+      contractVersion: "2",
+    });
+    assert.equal(result.outcome, "found");
+    assert.equal(result.summary.semanticCompleteness, "unverified");
+    const observed = await observeXpaths(
+      run,
+      result.actions.map((action) => action.target.xpaths[0]),
+    );
+    assert.throws(
+      () => assert.deepEqual(observed.matches, [["approval-first"], ["approval-second"]]),
+      assert.AssertionError,
+    );
+    assert.equal(observed.clicks, 0);
+  } finally {
+    await fetch(`${client}/api/sessions/${session.sessionId}`, { method: "DELETE" });
+  }
+});
 async function json(url, method = "GET", body) {
   const response = await fetch(url, {
     method,

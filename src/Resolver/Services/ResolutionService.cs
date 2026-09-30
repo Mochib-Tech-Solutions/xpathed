@@ -12,9 +12,13 @@ public sealed partial class ResolutionService(IHttpClientFactory clients, OpenRo
         var timer = Stopwatch.StartNew();
         var attemptId = Guid.NewGuid().ToString("N");
         CandidateCapture? capture = null;
+        var multiple = request.ContractVersion == "2";
+        var prompt = multiple ? ActionSelectionStrategy.Prompt : CandidateSelectionStrategy.Prompt;
+        var schema = multiple ? ActionSelectionStrategy.Schema : CandidateSelectionStrategy.Schema;
+        var outputTokens = multiple ? ActionSelectionStrategy.OutputTokens : 512;
         var strategy = configuration["Resolution:Strategy"] ?? "candidate-selection-v1";
-        var diagnostics = new ResolutionDiagnostics { Stage = "configuration", Strategy = strategy };
-        var configurationId = gateway.ConfigurationId(strategy, CandidateSelectionStrategy.Prompt, CandidateSelectionStrategy.Schema, diagnostics.ModelInputBudgetBytes);
+        var diagnostics = new ResolutionDiagnostics { Stage = "configuration", Strategy = strategy, PromptVersion = multiple ? "3" : "2" };
+        var configurationId = gateway.ConfigurationId(strategy, prompt, schema, diagnostics.ModelInputBudgetBytes, outputTokens, diagnostics.PromptVersion);
         try
         {
             if (strategy != "candidate-selection-v1")
@@ -66,7 +70,7 @@ public sealed partial class ResolutionService(IHttpClientFactory clients, OpenRo
                 throw new ApiException(422, "model_input_budget_exceeded", "The complete page representation exceeds the model input budget.");
             }
             diagnostics = diagnostics with { ModelCalls = 1 };
-            var completion = await gateway.CompleteAsync(CandidateSelectionStrategy.Prompt, input, CandidateSelectionStrategy.Schema, cancellationToken);
+            var completion = await gateway.CompleteAsync(prompt, input, schema, cancellationToken, outputTokens);
             diagnostics = diagnostics with
             {
                 Model = completion.Diagnostics.Model,
@@ -81,6 +85,55 @@ public sealed partial class ResolutionService(IHttpClientFactory clients, OpenRo
             {
                 throw new ApiException(502, code, "OpenRouter could not return a valid selection.");
             }
+            if (multiple)
+            {
+                var selections = ActionSelectionStrategy.Select(completion.Content!, capture);
+                diagnostics = diagnostics with { Stage = "selection" };
+                var requestedActions = selections.Select((item, index) => new ActionSelection($"a{index + 1}", item.CandidateId, item.Action)).ToArray();
+                using var response = await browser.PostAsJsonAsync($"/pages/{Uri.EscapeDataString(pageId)}/selections",
+                    new ActionSelectionRequest(request.DocumentId, capture.CaptureId, requestedActions), cancellationToken);
+                await EnsureBrowserSuccessAsync(response, cancellationToken);
+                var validation = await response.Content.ReadFromJsonAsync<ActionSelectionValidation>(cancellationToken);
+                if (validation?.Actions is null || validation.Actions.Length != selections.Length)
+                {
+                    throw new ApiException(502, "invalid_browser_selection", "The browser did not verify every action.");
+                }
+                var results = selections.Select((item, index) =>
+                {
+                    var verified = validation.Actions[index];
+                    if (verified is null || verified.ActionId != requestedActions[index].ActionId ||
+                        (item.Outcome == "found" ? !ValidTarget(verified.Target, item.CandidateId, item.Action) : verified.Target is not null))
+                    {
+                        throw new ApiException(502, "invalid_browser_selection", "The browser did not verify every action's target.");
+                    }
+                    var unsupportedScope = item.Outcome == "not_found" && capture.UnsupportedBoundaryCount > 0;
+                    var code = unsupportedScope ? "unsupported_scope" : item.Limitation == "none" ? null : item.Limitation;
+                    var message = unsupportedScope ? "Frame or shadow content is outside this capture's supported scope." : item.Limitation switch
+                    {
+                        "current_state_dependency" => "This step depends on a future page state. No earlier action was executed.",
+                        "ambiguous" => "The instruction does not identify one intended target.",
+                        "unsupported_action" => "This interaction is outside the supported action families.",
+                        _ => item.Outcome == "not_found" ? "No matching element found in the eligible current-page scope." : null
+                    };
+                    return new ActionResolution(verified.ActionId, index + 1, item.Step, item.Instruction, item.Action,
+                        unsupportedScope ? "unsupported" : item.Outcome, verified.Target, capture.FrameId, attemptId, code, message);
+                }).ToArray();
+                var inspected = results.FirstOrDefault(item => item.Target is not null)?.ActionId;
+                if (validation.InspectedActionId != inspected)
+                {
+                    throw new ApiException(502, "invalid_browser_selection", "The browser inspected another action.");
+                }
+                diagnostics.TimingsMs["validation"] = timer.Elapsed.TotalMilliseconds - diagnostics.TimingsMs["capture"] - diagnostics.TimingsMs["model"];
+                diagnostics = diagnostics with { Stage = "complete" };
+                var outcomes = results.Select(item => item.Outcome).Distinct().ToArray();
+                var outcome = outcomes.Length == 1 ? outcomes[0] : "partial";
+                var summary = new ResolutionSummary(true, "unverified", results.Length, results.Count(item => item.Outcome == "found"),
+                    results.Count(item => item.Outcome == "not_found"), results.Count(item => item.Outcome == "unsupported"), 0,
+                    results.Count(item => item.Target?.Interactability?.Status == "blocked"),
+                    results.Count(item => item.Target is { Interactability: null } || item.Target?.Interactability?.Status == "unknown"),
+                    results.Count(item => item.Target?.Interactability?.Status == "unsupported"));
+                return Result(outcome, null, null) with { Actions = results, Summary = summary, InspectedActionId = inspected };
+            }
             var selection = CandidateSelectionStrategy.Select(completion.Content!, capture);
             diagnostics = diagnostics with { Stage = "selection" };
             using var selectionResponse = await browser.PostAsJsonAsync($"/pages/{Uri.EscapeDataString(pageId)}/selection",
@@ -89,9 +142,7 @@ public sealed partial class ResolutionService(IHttpClientFactory clients, OpenRo
             var validated = await selectionResponse.Content.ReadFromJsonAsync<SelectionValidation>(cancellationToken)
                 ?? throw new ApiException(502, "invalid_upstream_response", "The browser returned an invalid selection.");
             if (selection.Outcome == "found"
-                ? validated.Target is null || validated.Target.CandidateId != selection.CandidateId || validated.Target.Xpaths is not { Length: > 0 } ||
-                  validated.Target.Xpaths.Any(string.IsNullOrWhiteSpace) || validated.Target.State is null || validated.Target.Geometry is null ||
-                  !ValidInteractability(validated.Target, selection.Action)
+                ? !ValidTarget(validated.Target, selection.CandidateId, selection.Action)
                 : validated.Target is not null)
             {
                 throw new ApiException(502, "invalid_browser_selection", "The browser did not verify the selected target.");
@@ -136,14 +187,18 @@ public sealed partial class ResolutionService(IHttpClientFactory clients, OpenRo
         ResolutionResult Result(string outcome, string? action, ResolvedTarget? target)
         {
             diagnostics.TimingsMs["total"] = timer.Elapsed.TotalMilliseconds;
-            return new ResolutionResult("1", outcome, capture?.SessionId, pageId, request.DocumentId,
+            return new ResolutionResult(request.ContractVersion, outcome, capture?.SessionId, pageId, request.DocumentId,
                 capture?.CaptureId, capture?.FrameId, traceId, attemptId, configurationId,
-                action, target, diagnostics);
+                action, target, diagnostics, multiple ? [] : null);
         }
     }
 
     [LoggerMessage(Level = LogLevel.Warning, Message = "Resolution failed: {Code} {TraceId} {AttemptId}")]
     private static partial void LogFailure(ILogger logger, string code, string traceId, string attemptId);
+
+    private static bool ValidTarget(ResolvedTarget? target, string? candidateId, string action) =>
+        target is not null && target.CandidateId == candidateId && target.Xpaths is { Length: > 0 } &&
+        !target.Xpaths.Any(string.IsNullOrWhiteSpace) && target.State is not null && target.Geometry is not null && ValidInteractability(target, action);
 
     private static bool ValidInteractability(ResolvedTarget target, string action)
     {

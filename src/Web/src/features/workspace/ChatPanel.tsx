@@ -25,6 +25,7 @@ type Props = {
   resolving: boolean;
   onInstructionChange: (instruction: string) => void;
   onResolve: () => void;
+  onInspect: (entryId: string, actionId: string) => void;
 };
 
 export default function ChatPanel({
@@ -35,6 +36,7 @@ export default function ChatPanel({
   resolving,
   onInstructionChange,
   onResolve,
+  onInspect,
 }: Props) {
   const [copied, setCopied] = useState("");
   const [copyError, setCopyError] = useState<{ entryId: string; message: string } | null>(null);
@@ -101,7 +103,21 @@ export default function ChatPanel({
         )}
         {history.map((resolution) => {
           const result = resolution.result;
-          const target = result?.target;
+          const actions = !result
+            ? []
+            : result.contractVersion === "2"
+              ? (result.actions ?? [])
+              : [
+                  {
+                    actionId: "legacy",
+                    order: 1,
+                    instruction: "",
+                    action: result.action,
+                    outcome: result.outcome,
+                    target: result.target,
+                    message: result.diagnostics.message,
+                  },
+                ];
           const totalMs = result?.diagnostics.timingsMs?.total;
           const duration =
             typeof totalMs === "number" && Number.isFinite(totalMs) && totalMs >= 0
@@ -109,7 +125,7 @@ export default function ChatPanel({
                 ? `${Math.round(totalMs)} ms`
                 : `${(totalMs / 1000).toFixed(2)} s`
               : null;
-          const xpathItem = (xpath: string, index: number) => (
+          const xpathItem = (xpath: string, index: number, actionId: string) => (
             <li key={xpath} className="rounded-lg border border-border bg-background p-3">
               <div className="mb-2 flex items-center justify-between gap-2">
                 <span className="text-xs font-medium text-muted-foreground">
@@ -122,10 +138,10 @@ export default function ChatPanel({
                   className="-my-1 size-7"
                   aria-label={`Copy XPath ${index + 1}`}
                   onClick={() => {
-                    void copy(xpath, resolution.id);
+                    void copy(xpath, `${resolution.id}:${actionId}`);
                   }}
                 >
-                  {copied === `${resolution.id}:${xpath}` ? (
+                  {copied === `${resolution.id}:${actionId}:${xpath}` ? (
                     <Check aria-hidden="true" />
                   ) : (
                     <Copy aria-hidden="true" />
@@ -173,105 +189,171 @@ export default function ChatPanel({
                 </p>
               )}
               {result && <ResolutionCost diagnostics={result.diagnostics} />}
-              {result?.outcome === "not_found" && (
-                <p>No matching element found in the eligible current-page scope.</p>
-              )}
-              {result?.outcome === "unsupported" && (
-                <div>
-                  <p>Unsupported instruction</p>
-                  {result?.diagnostics.message && (
-                    <p className="text-muted-foreground">{result?.diagnostics.message}</p>
-                  )}
+              {result?.summary && (
+                <div className="space-y-1">
+                  <p>
+                    {[
+                      `${result.summary.found} target${result.summary.found === 1 ? "" : "s"} found`,
+                      result.summary.notFound ? `${result.summary.notFound} missing` : "",
+                      result.summary.unsupported ? `${result.summary.unsupported} unsupported` : "",
+                      result.summary.blocked ? `${result.summary.blocked} blocked` : "",
+                      result.summary.readinessUnknown
+                        ? `${result.summary.readinessUnknown} readiness unknown`
+                        : "",
+                      result.summary.assessmentUnsupported
+                        ? `${result.summary.assessmentUnsupported} assessment unsupported`
+                        : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    No action was executed. Semantic completeness has not been independently
+                    verified.
+                  </p>
                 </div>
               )}
               {result?.outcome === "error" && (
                 <div role="alert" className="text-destructive">
                   <p>Resolution failed</p>
-                  {result?.diagnostics.message && <p>{result?.diagnostics.message}</p>}
+                  {result.diagnostics.message && <p>{result.diagnostics.message}</p>}
                 </div>
               )}
-              {target && (
-                <>
-                  <div>
-                    <p className="mb-1 flex items-center gap-1.5 font-medium">
-                      <Check className="size-3.5" aria-hidden="true" /> Target found
-                    </p>
-                    <h2 className="text-base font-medium break-words">
-                      {target.label || target.tag}
-                    </h2>
-                    <p className="text-muted-foreground">
-                      {result?.action} · {target.tag}
-                    </p>
-                  </div>
-                  <div className="space-y-1">
-                    <p>
-                      {target.interactability?.status === "blocked"
-                        ? "Interaction blocked by observed state."
-                        : target.interactability?.status === "unsupported"
-                          ? "Interaction assessment unsupported."
-                          : target.interactability?.status === "unknown"
-                            ? "Interaction readiness unknown."
-                            : "Interaction readiness unavailable."}
-                    </p>
-                    {target.interactability?.reasons.map((reason) => (
-                      <p key={reason} className="text-muted-foreground">
-                        {interactionReasons[reason] ?? "An interaction limitation was observed."}
-                      </p>
-                    ))}
-                    <p className="text-xs text-muted-foreground">
-                      Event delivery and action success were not tested.
-                    </p>
-                  </div>
-                  <div className="flex flex-wrap gap-1.5 text-xs text-muted-foreground [&>span]:rounded-md [&>span]:border [&>span]:bg-background [&>span]:px-2 [&>span]:py-0.5">
-                    <span>{target.state.inViewport ? "In viewport" : "Off-screen"}</span>
-                    <span>{target.state.enabled ? "Enabled" : "Disabled"}</span>
-                    {(target.state.editable ||
-                      result?.action === "fill" ||
-                      result?.action === "type") && (
-                      <span>{target.state.editable ? "Editable" : "Not editable"}</span>
+              {actions.map((action) => {
+                const target = action.target;
+                return (
+                  <section
+                    key={action.actionId}
+                    className="space-y-3"
+                    aria-label={`Action ${action.order}`}
+                  >
+                    {result?.contractVersion === "2" && (
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="font-medium">{action.instruction}</p>
+                        {target && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            aria-label={`Inspect action ${action.order}`}
+                            aria-pressed={
+                              !resolution.historical && result.inspectedActionId === action.actionId
+                            }
+                            disabled={disabled || resolution.historical}
+                            onClick={() => onInspect(resolution.id, action.actionId)}
+                          >
+                            Inspect
+                          </Button>
+                        )}
+                      </div>
                     )}
-                    {target.state.checked !== null && (
-                      <span>{target.state.checked ? "Checked" : "Unchecked"}</span>
+                    {action.outcome === "not_found" && (
+                      <p>No matching element found in the eligible current-page scope.</p>
                     )}
-                  </div>
-                  <p className="text-xs text-muted-foreground">No action was executed.</p>
-                  <details open={!resolution.historical} className="group">
-                    <summary className="mb-2 cursor-pointer text-xs font-medium text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                      Verified XPaths
-                    </summary>
-                    <ol className="space-y-2.5" aria-label="Verified XPath alternatives">
-                      {target.xpaths.slice(0, 1).map(xpathItem)}
-                    </ol>
-                    {target.xpaths.length > 1 && (
-                      <details className="mt-3">
-                        <summary className="cursor-pointer text-xs text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                          {target.xpaths.length - 1} alternative XPath
-                          {target.xpaths.length > 2 ? "s" : ""}
-                        </summary>
-                        <ol
-                          start={2}
-                          className="mt-2 space-y-2.5"
-                          aria-label="Additional XPath alternatives"
-                        >
-                          {target.xpaths
-                            .slice(1)
-                            .map((xpath, index) => xpathItem(xpath, index + 1))}
-                        </ol>
-                      </details>
+                    {action.outcome === "unsupported" && (
+                      <div>
+                        <p>Unsupported instruction</p>
+                        {action.message && (
+                          <p className="text-muted-foreground">{action.message}</p>
+                        )}
+                      </div>
                     )}
-                  </details>
-                  {copied.startsWith(`${resolution.id}:`) && (
-                    <p role="status" className="text-muted-foreground">
-                      Copied
-                    </p>
-                  )}
-                  {copyError?.entryId === resolution.id && (
-                    <p role="alert" className="text-destructive">
-                      {copyError.message}
-                    </p>
-                  )}
-                </>
-              )}
+                    {action.outcome === "error" && result?.contractVersion === "2" && (
+                      <div role="alert" className="text-destructive">
+                        <p>Action resolution failed</p>
+                        {action.message && <p>{action.message}</p>}
+                      </div>
+                    )}
+                    {target && (
+                      <>
+                        <div>
+                          <p className="mb-1 flex items-center gap-1.5 font-medium">
+                            <Check className="size-3.5" aria-hidden="true" /> Target found
+                          </p>
+                          <h2 className="text-base font-medium break-words">
+                            {target.label || target.tag}
+                          </h2>
+                          <p className="text-muted-foreground">
+                            {action.action} · {target.tag}
+                          </p>
+                        </div>
+                        <div className="space-y-1">
+                          <p>
+                            {target.interactability?.status === "blocked"
+                              ? "Interaction blocked by observed state."
+                              : target.interactability?.status === "unsupported"
+                                ? "Interaction assessment unsupported."
+                                : target.interactability?.status === "unknown"
+                                  ? "Interaction readiness unknown."
+                                  : "Interaction readiness unavailable."}
+                          </p>
+                          {target.interactability?.reasons.map((reason) => (
+                            <p key={reason} className="text-muted-foreground">
+                              {interactionReasons[reason] ??
+                                "An interaction limitation was observed."}
+                            </p>
+                          ))}
+                          <p className="text-xs text-muted-foreground">
+                            Event delivery and action success were not tested.
+                          </p>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5 text-xs text-muted-foreground [&>span]:rounded-md [&>span]:border [&>span]:bg-background [&>span]:px-2 [&>span]:py-0.5">
+                          <span>{target.state.inViewport ? "In viewport" : "Off-screen"}</span>
+                          <span>{target.state.enabled ? "Enabled" : "Disabled"}</span>
+                          {(target.state.editable ||
+                            action.action === "fill" ||
+                            action.action === "type") && (
+                            <span>{target.state.editable ? "Editable" : "Not editable"}</span>
+                          )}
+                          {target.state.checked !== null && (
+                            <span>{target.state.checked ? "Checked" : "Unchecked"}</span>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground">No action was executed.</p>
+                        <details open={!resolution.historical} className="group">
+                          <summary className="mb-2 cursor-pointer text-xs font-medium text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                            Verified XPaths
+                          </summary>
+                          <ol className="space-y-2.5" aria-label="Verified XPath alternatives">
+                            {target.xpaths
+                              .slice(0, 1)
+                              .map((xpath, index) => xpathItem(xpath, index, action.actionId))}
+                          </ol>
+                          {target.xpaths.length > 1 && (
+                            <details className="mt-3">
+                              <summary className="cursor-pointer text-xs text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                                {target.xpaths.length - 1} alternative XPath
+                                {target.xpaths.length > 2 ? "s" : ""}
+                              </summary>
+                              <ol
+                                start={2}
+                                className="mt-2 space-y-2.5"
+                                aria-label="Additional XPath alternatives"
+                              >
+                                {target.xpaths
+                                  .slice(1)
+                                  .map((xpath, index) =>
+                                    xpathItem(xpath, index + 1, action.actionId),
+                                  )}
+                              </ol>
+                            </details>
+                          )}
+                        </details>
+                        {copied.startsWith(`${resolution.id}:${action.actionId}:`) && (
+                          <p role="status" className="text-muted-foreground">
+                            Copied
+                          </p>
+                        )}
+                        {copyError?.entryId === `${resolution.id}:${action.actionId}` && (
+                          <p role="alert" className="text-destructive">
+                            {copyError.message}
+                          </p>
+                        )}
+                      </>
+                    )}
+                  </section>
+                );
+              })}
             </article>
           );
         })}
