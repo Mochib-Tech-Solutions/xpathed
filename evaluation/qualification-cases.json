@@ -1,0 +1,5285 @@
+{
+  "version": "1",
+  "description": "Contract 3 controlled qualification. Original legacy suite remains unchanged. New cases require independent review before live use. Held-out families must not be used for tuning.",
+  "cases": [
+    {
+      "id": "basic-save",
+      "family": "profile",
+      "split": "development",
+      "category": "language",
+      "fixture": "form",
+      "instruction": "Click Save changes.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "setupRevision": "qualification-1",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-contract-review",
+        "reviewedAt": "2026-09-30T20:59:55.247Z"
+      },
+      "expected": {
+        "outcome": "found",
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "target": {
+              "selector": "#save-profile",
+              "frames": []
+            },
+            "state": {
+              "enabled": true,
+              "inViewport": true
+            },
+            "interactability": {
+              "status": "ready",
+              "reasons": [],
+              "checks": {
+                "compatibleControl": "pass",
+                "enabled": "pass",
+                "viewport": "pass",
+                "pointerReception": "pass",
+                "keyboard": "not_applicable",
+                "stability": "unknown",
+                "eventOutcome": "unknown"
+              }
+            }
+          }
+        ],
+        "summary": {
+          "processingComplete": true,
+          "semanticCompleteness": "unverified",
+          "total": 1,
+          "found": 1,
+          "notFound": 0,
+          "unsupported": 0,
+          "errors": 0,
+          "blocked": 0,
+          "readinessUnknown": 0,
+          "assessmentUnsupported": 0
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "label": "Save changes",
+            "tag": "button"
+          }
+        ]
+      },
+      "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
+      "contractVersion": "3"
+    },
+    {
+      "id": "paraphrase-save",
+      "family": "profile",
+      "split": "development",
+      "category": "language",
+      "fixture": "form",
+      "instruction": "Please press the Save changes button in Profile.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "setupRevision": "qualification-1",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-contract-review",
+        "reviewedAt": "2026-09-30T20:59:55.247Z"
+      },
+      "expected": {
+        "outcome": "found",
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "target": {
+              "selector": "#save-profile",
+              "frames": []
+            },
+            "interactability": {
+              "status": "ready",
+              "reasons": [],
+              "checks": {
+                "compatibleControl": "pass",
+                "enabled": "pass",
+                "viewport": "pass",
+                "pointerReception": "pass",
+                "keyboard": "not_applicable",
+                "stability": "unknown",
+                "eventOutcome": "unknown"
+              }
+            }
+          }
+        ],
+        "summary": {
+          "processingComplete": true,
+          "semanticCompleteness": "unverified",
+          "total": 1,
+          "found": 1,
+          "notFound": 0,
+          "unsupported": 0,
+          "errors": 0,
+          "blocked": 0,
+          "readinessUnknown": 0,
+          "assessmentUnsupported": 0
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "label": "Save changes",
+            "tag": "button",
+            "scope": "Profile"
+          }
+        ]
+      },
+      "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
+      "contractVersion": "3"
+    },
+    {
+      "id": "unicode-quotes",
+      "family": "unicode",
+      "split": "development",
+      "category": "language",
+      "fixture": "unicode",
+      "instruction": "Click the button labelled L'été \"ready\".",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "setupRevision": "qualification-1",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-contract-review",
+        "reviewedAt": "2026-09-30T20:59:55.247Z"
+      },
+      "expected": {
+        "outcome": "found",
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "target": {
+              "selector": "#publish-draft",
+              "frames": []
+            },
+            "interactability": {
+              "status": "ready",
+              "reasons": [],
+              "checks": {
+                "compatibleControl": "pass",
+                "enabled": "pass",
+                "viewport": "pass",
+                "pointerReception": "pass",
+                "keyboard": "not_applicable",
+                "stability": "unknown",
+                "eventOutcome": "unknown"
+              }
+            }
+          }
+        ],
+        "summary": {
+          "processingComplete": true,
+          "semanticCompleteness": "unverified",
+          "total": 1,
+          "found": 1,
+          "notFound": 0,
+          "unsupported": 0,
+          "errors": 0,
+          "blocked": 0,
+          "readinessUnknown": 0,
+          "assessmentUnsupported": 0
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "label": "L'été \"ready\"",
+            "tag": "button"
+          }
+        ]
+      },
+      "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
+      "contractVersion": "3"
+    },
+    {
+      "id": "scoped-save",
+      "family": "context",
+      "split": "development",
+      "category": "context",
+      "fixture": "context",
+      "instruction": "Click Save in Shipping.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "setupRevision": "qualification-1",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-contract-review",
+        "reviewedAt": "2026-09-30T20:59:55.247Z"
+      },
+      "expected": {
+        "outcome": "found",
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "target": {
+              "selector": "#save-shipping",
+              "frames": []
+            },
+            "interactability": {
+              "status": "ready",
+              "reasons": [],
+              "checks": {
+                "compatibleControl": "pass",
+                "enabled": "pass",
+                "viewport": "pass",
+                "pointerReception": "pass",
+                "keyboard": "not_applicable",
+                "stability": "unknown",
+                "eventOutcome": "unknown"
+              }
+            }
+          }
+        ],
+        "summary": {
+          "processingComplete": true,
+          "semanticCompleteness": "unverified",
+          "total": 1,
+          "found": 1,
+          "notFound": 0,
+          "unsupported": 0,
+          "errors": 0,
+          "blocked": 0,
+          "readinessUnknown": 0,
+          "assessmentUnsupported": 0
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "label": "Save",
+            "scope": "Shipping",
+            "tag": "button"
+          }
+        ]
+      },
+      "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
+      "contractVersion": "3"
+    },
+    {
+      "id": "control-states-1",
+      "family": "states",
+      "split": "regression",
+      "category": "state",
+      "fixture": "states",
+      "instruction": "Click Save settings.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "setupRevision": "qualification-1",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-contract-review",
+        "reviewedAt": "2026-09-30T20:59:55.247Z"
+      },
+      "expected": {
+        "outcome": "found",
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "target": {
+              "selector": "#save-settings",
+              "frames": []
+            },
+            "state": {
+              "enabled": false
+            },
+            "interactability": {
+              "status": "blocked",
+              "reasons": ["disabled"],
+              "checks": {
+                "enabled": "fail"
+              }
+            }
+          }
+        ],
+        "summary": {
+          "processingComplete": true,
+          "semanticCompleteness": "unverified",
+          "total": 1,
+          "found": 1,
+          "notFound": 0,
+          "unsupported": 0,
+          "errors": 0,
+          "blocked": 1,
+          "readinessUnknown": 0,
+          "assessmentUnsupported": 0
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "label": "Save settings",
+            "tag": "button"
+          }
+        ]
+      },
+      "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
+      "privacySentinels": ["PRIVATE_NOTES_VALUE", "PRIVATE_OPTION_VALUE"],
+      "contractVersion": "3"
+    },
+    {
+      "id": "control-states-2",
+      "family": "states",
+      "split": "regression",
+      "category": "state",
+      "fixture": "states",
+      "instruction": "Fill Notes.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "setupRevision": "qualification-1",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-contract-review",
+        "reviewedAt": "2026-09-30T20:59:55.247Z"
+      },
+      "expected": {
+        "outcome": "found",
+        "actions": [
+          {
+            "step": 1,
+            "action": "fill",
+            "outcome": "found",
+            "target": {
+              "selector": "#notes",
+              "frames": []
+            },
+            "state": {
+              "readonly": true,
+              "editable": false
+            },
+            "interactability": {
+              "status": "blocked",
+              "reasons": ["readonly"],
+              "checks": {
+                "writable": "fail",
+                "keyboard": "unknown"
+              }
+            }
+          }
+        ],
+        "summary": {
+          "processingComplete": true,
+          "semanticCompleteness": "unverified",
+          "total": 1,
+          "found": 1,
+          "notFound": 0,
+          "unsupported": 0,
+          "errors": 0,
+          "blocked": 1,
+          "readinessUnknown": 0,
+          "assessmentUnsupported": 0
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "fill",
+            "outcome": "found",
+            "label": "Notes",
+            "tag": "textarea"
+          }
+        ]
+      },
+      "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
+      "privacySentinels": ["PRIVATE_NOTES_VALUE", "PRIVATE_OPTION_VALUE"],
+      "contractVersion": "3"
+    },
+    {
+      "id": "control-states-3",
+      "family": "states",
+      "split": "regression",
+      "category": "state",
+      "fixture": "states",
+      "instruction": "Check Newsletter.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "setupRevision": "qualification-1",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-contract-review",
+        "reviewedAt": "2026-09-30T20:59:55.247Z"
+      },
+      "expected": {
+        "outcome": "found",
+        "actions": [
+          {
+            "step": 1,
+            "action": "check",
+            "outcome": "found",
+            "target": {
+              "selector": "#newsletter",
+              "frames": []
+            },
+            "state": {
+              "checked": true
+            },
+            "interactability": {
+              "status": "ready",
+              "reasons": [],
+              "checks": {
+                "compatibleControl": "pass",
+                "enabled": "pass",
+                "viewport": "pass",
+                "pointerReception": "pass",
+                "keyboard": "not_applicable",
+                "stability": "unknown",
+                "eventOutcome": "unknown"
+              }
+            }
+          }
+        ],
+        "summary": {
+          "processingComplete": true,
+          "semanticCompleteness": "unverified",
+          "total": 1,
+          "found": 1,
+          "notFound": 0,
+          "unsupported": 0,
+          "errors": 0,
+          "blocked": 0,
+          "readinessUnknown": 0,
+          "assessmentUnsupported": 0
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "check",
+            "outcome": "found",
+            "label": "Newsletter",
+            "tag": "input"
+          }
+        ]
+      },
+      "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
+      "privacySentinels": ["PRIVATE_NOTES_VALUE", "PRIVATE_OPTION_VALUE"],
+      "contractVersion": "3"
+    },
+    {
+      "id": "control-states-4",
+      "family": "states",
+      "split": "regression",
+      "category": "state",
+      "fixture": "states",
+      "instruction": "Select Country.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "setupRevision": "qualification-1",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-contract-review",
+        "reviewedAt": "2026-09-30T20:59:55.247Z"
+      },
+      "expected": {
+        "outcome": "found",
+        "actions": [
+          {
+            "step": 1,
+            "action": "select",
+            "outcome": "found",
+            "target": {
+              "selector": "#country",
+              "frames": []
+            },
+            "state": {
+              "selectedOptionCount": 1
+            },
+            "interactability": {
+              "status": "unknown",
+              "reasons": [],
+              "checks": {
+                "compatibleControl": "pass",
+                "keyboard": "unknown"
+              }
+            }
+          }
+        ],
+        "summary": {
+          "processingComplete": true,
+          "semanticCompleteness": "unverified",
+          "total": 1,
+          "found": 1,
+          "notFound": 0,
+          "unsupported": 0,
+          "errors": 0,
+          "blocked": 0,
+          "readinessUnknown": 1,
+          "assessmentUnsupported": 0
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "select",
+            "outcome": "found",
+            "label": "Country",
+            "tag": "select"
+          }
+        ]
+      },
+      "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
+      "privacySentinels": ["PRIVATE_NOTES_VALUE", "PRIVATE_OPTION_VALUE"],
+      "contractVersion": "3"
+    },
+    {
+      "id": "control-states-5",
+      "family": "states",
+      "split": "regression",
+      "category": "state",
+      "fixture": "states",
+      "instruction": "Fill Start date.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "setupRevision": "qualification-1",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-contract-review",
+        "reviewedAt": "2026-09-30T20:59:55.247Z"
+      },
+      "expected": {
+        "outcome": "found",
+        "actions": [
+          {
+            "step": 1,
+            "action": "fill",
+            "outcome": "found",
+            "target": {
+              "selector": "#start-date",
+              "frames": []
+            },
+            "interactability": {
+              "status": "unknown",
+              "reasons": [],
+              "checks": {
+                "compatibleControl": "pass",
+                "writable": "pass",
+                "keyboard": "unknown"
+              }
+            }
+          }
+        ],
+        "summary": {
+          "processingComplete": true,
+          "semanticCompleteness": "unverified",
+          "total": 1,
+          "found": 1,
+          "notFound": 0,
+          "unsupported": 0,
+          "errors": 0,
+          "blocked": 0,
+          "readinessUnknown": 1,
+          "assessmentUnsupported": 0
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "fill",
+            "outcome": "found",
+            "label": "Start date",
+            "tag": "input"
+          }
+        ]
+      },
+      "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
+      "privacySentinels": ["PRIVATE_NOTES_VALUE", "PRIVATE_OPTION_VALUE"],
+      "contractVersion": "3"
+    },
+    {
+      "id": "control-states-6",
+      "family": "states",
+      "split": "regression",
+      "category": "state",
+      "fixture": "states",
+      "instruction": "Check Custom choice.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "setupRevision": "qualification-1",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-contract-review",
+        "reviewedAt": "2026-09-30T20:59:55.247Z"
+      },
+      "expected": {
+        "outcome": "found",
+        "actions": [
+          {
+            "step": 1,
+            "action": "check",
+            "outcome": "found",
+            "target": {
+              "selector": "#custom-choice",
+              "frames": []
+            },
+            "interactability": {
+              "status": "unsupported",
+              "reasons": ["custom_control_unverified"],
+              "checks": {
+                "compatibleControl": "unknown"
+              }
+            }
+          }
+        ],
+        "summary": {
+          "processingComplete": true,
+          "semanticCompleteness": "unverified",
+          "total": 1,
+          "found": 1,
+          "notFound": 0,
+          "unsupported": 0,
+          "errors": 0,
+          "blocked": 0,
+          "readinessUnknown": 0,
+          "assessmentUnsupported": 1
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "check",
+            "outcome": "found",
+            "label": "Custom choice",
+            "tag": "div"
+          }
+        ]
+      },
+      "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
+      "privacySentinels": ["PRIVATE_NOTES_VALUE", "PRIVATE_OPTION_VALUE"],
+      "contractVersion": "3"
+    },
+    {
+      "id": "action-families-1",
+      "family": "semantics",
+      "split": "regression",
+      "category": "semantics",
+      "fixture": "semantics",
+      "instruction": "Fill Message.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "setupRevision": "qualification-1",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-contract-review",
+        "reviewedAt": "2026-09-30T20:59:55.247Z"
+      },
+      "expected": {
+        "outcome": "found",
+        "actions": [
+          {
+            "step": 1,
+            "action": "fill",
+            "outcome": "found",
+            "target": {
+              "selector": "#message",
+              "frames": []
+            },
+            "interactability": {
+              "status": "unknown",
+              "reasons": [],
+              "checks": {
+                "eventOutcome": "unknown"
+              }
+            }
+          }
+        ],
+        "summary": {
+          "processingComplete": true,
+          "semanticCompleteness": "unverified",
+          "total": 1,
+          "found": 1,
+          "notFound": 0,
+          "unsupported": 0,
+          "errors": 0,
+          "blocked": 0,
+          "readinessUnknown": 1,
+          "assessmentUnsupported": 0
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "fill",
+            "outcome": "found",
+            "label": "Message",
+            "tag": "textarea"
+          }
+        ]
+      },
+      "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
+      "contractVersion": "3"
+    },
+    {
+      "id": "action-families-2",
+      "family": "semantics",
+      "split": "regression",
+      "category": "semantics",
+      "fixture": "semantics",
+      "instruction": "Type into Message.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "setupRevision": "qualification-1",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-contract-review",
+        "reviewedAt": "2026-09-30T20:59:55.247Z"
+      },
+      "expected": {
+        "outcome": "found",
+        "actions": [
+          {
+            "step": 1,
+            "action": "type",
+            "outcome": "found",
+            "target": {
+              "selector": "#message",
+              "frames": []
+            },
+            "interactability": {
+              "status": "unknown",
+              "reasons": [],
+              "checks": {
+                "eventOutcome": "unknown"
+              }
+            }
+          }
+        ],
+        "summary": {
+          "processingComplete": true,
+          "semanticCompleteness": "unverified",
+          "total": 1,
+          "found": 1,
+          "notFound": 0,
+          "unsupported": 0,
+          "errors": 0,
+          "blocked": 0,
+          "readinessUnknown": 1,
+          "assessmentUnsupported": 0
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "type",
+            "outcome": "found",
+            "label": "Message",
+            "tag": "textarea"
+          }
+        ]
+      },
+      "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
+      "contractVersion": "3"
+    },
+    {
+      "id": "action-families-3",
+      "family": "semantics",
+      "split": "regression",
+      "category": "semantics",
+      "fixture": "semantics",
+      "instruction": "Clear Message.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "setupRevision": "qualification-1",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-contract-review",
+        "reviewedAt": "2026-09-30T20:59:55.247Z"
+      },
+      "expected": {
+        "outcome": "found",
+        "actions": [
+          {
+            "step": 1,
+            "action": "clear",
+            "outcome": "found",
+            "target": {
+              "selector": "#message",
+              "frames": []
+            },
+            "interactability": {
+              "status": "unknown",
+              "reasons": [],
+              "checks": {
+                "eventOutcome": "unknown"
+              }
+            }
+          }
+        ],
+        "summary": {
+          "processingComplete": true,
+          "semanticCompleteness": "unverified",
+          "total": 1,
+          "found": 1,
+          "notFound": 0,
+          "unsupported": 0,
+          "errors": 0,
+          "blocked": 0,
+          "readinessUnknown": 1,
+          "assessmentUnsupported": 0
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "clear",
+            "outcome": "found",
+            "label": "Message",
+            "tag": "textarea"
+          }
+        ]
+      },
+      "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
+      "contractVersion": "3"
+    },
+    {
+      "id": "action-families-4",
+      "family": "semantics",
+      "split": "regression",
+      "category": "semantics",
+      "fixture": "semantics",
+      "instruction": "Focus Message.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "setupRevision": "qualification-1",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-contract-review",
+        "reviewedAt": "2026-09-30T20:59:55.247Z"
+      },
+      "expected": {
+        "outcome": "found",
+        "actions": [
+          {
+            "step": 1,
+            "action": "focus",
+            "outcome": "found",
+            "target": {
+              "selector": "#message",
+              "frames": []
+            },
+            "interactability": {
+              "status": "unknown",
+              "reasons": [],
+              "checks": {
+                "eventOutcome": "unknown"
+              }
+            }
+          }
+        ],
+        "summary": {
+          "processingComplete": true,
+          "semanticCompleteness": "unverified",
+          "total": 1,
+          "found": 1,
+          "notFound": 0,
+          "unsupported": 0,
+          "errors": 0,
+          "blocked": 0,
+          "readinessUnknown": 1,
+          "assessmentUnsupported": 0
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "focus",
+            "outcome": "found",
+            "label": "Message",
+            "tag": "textarea"
+          }
+        ]
+      },
+      "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
+      "contractVersion": "3"
+    },
+    {
+      "id": "action-families-5",
+      "family": "semantics",
+      "split": "regression",
+      "category": "semantics",
+      "fixture": "semantics",
+      "instruction": "Blur Message.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "setupRevision": "qualification-1",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-contract-review",
+        "reviewedAt": "2026-09-30T20:59:55.247Z"
+      },
+      "expected": {
+        "outcome": "found",
+        "actions": [
+          {
+            "step": 1,
+            "action": "blur",
+            "outcome": "found",
+            "target": {
+              "selector": "#message",
+              "frames": []
+            },
+            "interactability": {
+              "status": "unknown",
+              "reasons": [],
+              "checks": {
+                "eventOutcome": "unknown"
+              }
+            }
+          }
+        ],
+        "summary": {
+          "processingComplete": true,
+          "semanticCompleteness": "unverified",
+          "total": 1,
+          "found": 1,
+          "notFound": 0,
+          "unsupported": 0,
+          "errors": 0,
+          "blocked": 0,
+          "readinessUnknown": 1,
+          "assessmentUnsupported": 0
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "blur",
+            "outcome": "found",
+            "label": "Message",
+            "tag": "textarea"
+          }
+        ]
+      },
+      "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
+      "contractVersion": "3"
+    },
+    {
+      "id": "action-families-6",
+      "family": "semantics",
+      "split": "regression",
+      "category": "semantics",
+      "fixture": "semantics",
+      "instruction": "Press Enter on Message.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "setupRevision": "qualification-1",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-contract-review",
+        "reviewedAt": "2026-09-30T20:59:55.247Z"
+      },
+      "expected": {
+        "outcome": "found",
+        "actions": [
+          {
+            "step": 1,
+            "action": "press",
+            "outcome": "found",
+            "target": {
+              "selector": "#message",
+              "frames": []
+            },
+            "interactability": {
+              "status": "unknown",
+              "reasons": [],
+              "checks": {
+                "eventOutcome": "unknown"
+              }
+            }
+          }
+        ],
+        "summary": {
+          "processingComplete": true,
+          "semanticCompleteness": "unverified",
+          "total": 1,
+          "found": 1,
+          "notFound": 0,
+          "unsupported": 0,
+          "errors": 0,
+          "blocked": 0,
+          "readinessUnknown": 1,
+          "assessmentUnsupported": 0
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "press",
+            "outcome": "found",
+            "label": "Message",
+            "tag": "textarea"
+          }
+        ]
+      },
+      "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
+      "contractVersion": "3"
+    },
+    {
+      "id": "action-families-7",
+      "family": "semantics",
+      "split": "regression",
+      "category": "semantics",
+      "fixture": "semantics",
+      "instruction": "Upload to Attachment.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "setupRevision": "qualification-1",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-contract-review",
+        "reviewedAt": "2026-09-30T20:59:55.247Z"
+      },
+      "expected": {
+        "outcome": "found",
+        "actions": [
+          {
+            "step": 1,
+            "action": "upload",
+            "outcome": "found",
+            "target": {
+              "selector": "#attachment",
+              "frames": []
+            },
+            "interactability": {
+              "status": "unknown",
+              "reasons": [],
+              "checks": {
+                "eventOutcome": "unknown"
+              }
+            }
+          }
+        ],
+        "summary": {
+          "processingComplete": true,
+          "semanticCompleteness": "unverified",
+          "total": 1,
+          "found": 1,
+          "notFound": 0,
+          "unsupported": 0,
+          "errors": 0,
+          "blocked": 0,
+          "readinessUnknown": 1,
+          "assessmentUnsupported": 0
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "upload",
+            "outcome": "found",
+            "label": "Attachment",
+            "tag": "input"
+          }
+        ]
+      },
+      "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
+      "contractVersion": "3"
+    },
+    {
+      "id": "action-families-8",
+      "family": "semantics",
+      "split": "regression",
+      "category": "semantics",
+      "fixture": "semantics",
+      "instruction": "Inspect Send.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "setupRevision": "qualification-1",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-contract-review",
+        "reviewedAt": "2026-09-30T20:59:55.247Z"
+      },
+      "expected": {
+        "outcome": "found",
+        "actions": [
+          {
+            "step": 1,
+            "action": "inspect",
+            "outcome": "found",
+            "target": {
+              "selector": "#send-message",
+              "frames": []
+            },
+            "interactability": {
+              "status": "ready",
+              "reasons": [],
+              "checks": {
+                "eventOutcome": "unknown"
+              }
+            }
+          }
+        ],
+        "summary": {
+          "processingComplete": true,
+          "semanticCompleteness": "unverified",
+          "total": 1,
+          "found": 1,
+          "notFound": 0,
+          "unsupported": 0,
+          "errors": 0,
+          "blocked": 0,
+          "readinessUnknown": 0,
+          "assessmentUnsupported": 0
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "inspect",
+            "outcome": "found",
+            "label": "Send",
+            "tag": "button"
+          }
+        ]
+      },
+      "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
+      "contractVersion": "3"
+    },
+    {
+      "id": "action-families-9",
+      "family": "semantics",
+      "split": "regression",
+      "category": "semantics",
+      "fixture": "semantics",
+      "instruction": "Double-click Send.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "setupRevision": "qualification-1",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-contract-review",
+        "reviewedAt": "2026-09-30T20:59:55.247Z"
+      },
+      "expected": {
+        "outcome": "found",
+        "actions": [
+          {
+            "step": 1,
+            "action": "double_click",
+            "outcome": "found",
+            "target": {
+              "selector": "#send-message",
+              "frames": []
+            },
+            "interactability": {
+              "status": "ready",
+              "reasons": [],
+              "checks": {
+                "eventOutcome": "unknown"
+              }
+            }
+          }
+        ],
+        "summary": {
+          "processingComplete": true,
+          "semanticCompleteness": "unverified",
+          "total": 1,
+          "found": 1,
+          "notFound": 0,
+          "unsupported": 0,
+          "errors": 0,
+          "blocked": 0,
+          "readinessUnknown": 0,
+          "assessmentUnsupported": 0
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "double_click",
+            "outcome": "found",
+            "label": "Send",
+            "tag": "button"
+          }
+        ]
+      },
+      "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
+      "contractVersion": "3"
+    },
+    {
+      "id": "action-families-10",
+      "family": "semantics",
+      "split": "regression",
+      "category": "semantics",
+      "fixture": "semantics",
+      "instruction": "Right-click Send.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "setupRevision": "qualification-1",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-contract-review",
+        "reviewedAt": "2026-09-30T20:59:55.247Z"
+      },
+      "expected": {
+        "outcome": "found",
+        "actions": [
+          {
+            "step": 1,
+            "action": "right_click",
+            "outcome": "found",
+            "target": {
+              "selector": "#send-message",
+              "frames": []
+            },
+            "interactability": {
+              "status": "ready",
+              "reasons": [],
+              "checks": {
+                "eventOutcome": "unknown"
+              }
+            }
+          }
+        ],
+        "summary": {
+          "processingComplete": true,
+          "semanticCompleteness": "unverified",
+          "total": 1,
+          "found": 1,
+          "notFound": 0,
+          "unsupported": 0,
+          "errors": 0,
+          "blocked": 0,
+          "readinessUnknown": 0,
+          "assessmentUnsupported": 0
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "right_click",
+            "outcome": "found",
+            "label": "Send",
+            "tag": "button"
+          }
+        ]
+      },
+      "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
+      "contractVersion": "3"
+    },
+    {
+      "id": "offscreen-help",
+      "family": "offscreen",
+      "split": "regression",
+      "category": "geometry",
+      "fixture": "offscreen",
+      "instruction": "Click Help.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "setupRevision": "qualification-1",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-contract-review",
+        "reviewedAt": "2026-09-30T20:59:55.247Z"
+      },
+      "expected": {
+        "outcome": "found",
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "target": {
+              "selector": "#footer-help",
+              "frames": []
+            },
+            "state": {
+              "inViewport": false
+            },
+            "interactability": {
+              "status": "blocked",
+              "reasons": ["off_screen"],
+              "checks": {
+                "viewport": "fail",
+                "pointerReception": "unknown"
+              }
+            }
+          }
+        ],
+        "summary": {
+          "processingComplete": true,
+          "semanticCompleteness": "unverified",
+          "total": 1,
+          "found": 1,
+          "notFound": 0,
+          "unsupported": 0,
+          "errors": 0,
+          "blocked": 1,
+          "readinessUnknown": 0,
+          "assessmentUnsupported": 0
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "label": "Help"
+          }
+        ]
+      },
+      "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
+      "contractVersion": "3"
+    },
+    {
+      "id": "covered-payment",
+      "family": "covered",
+      "split": "regression",
+      "category": "geometry",
+      "fixture": "covered",
+      "instruction": "Click Confirm payment.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "setupRevision": "qualification-1",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-contract-review",
+        "reviewedAt": "2026-09-30T20:59:55.247Z"
+      },
+      "expected": {
+        "outcome": "found",
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "target": {
+              "selector": "#confirm-payment",
+              "frames": []
+            },
+            "interactability": {
+              "status": "blocked",
+              "reasons": ["obstructed_at_hit_point"],
+              "checks": {
+                "pointerReception": "fail"
+              }
+            }
+          }
+        ],
+        "summary": {
+          "processingComplete": true,
+          "semanticCompleteness": "unverified",
+          "total": 1,
+          "found": 1,
+          "notFound": 0,
+          "unsupported": 0,
+          "errors": 0,
+          "blocked": 1,
+          "readinessUnknown": 0,
+          "assessmentUnsupported": 0
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "label": "Confirm payment"
+          }
+        ]
+      },
+      "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
+      "contractVersion": "3"
+    },
+    {
+      "id": "transparent-control",
+      "family": "transparent",
+      "split": "regression",
+      "category": "geometry",
+      "fixture": "transparent",
+      "instruction": "Click View details.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "setupRevision": "qualification-1",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-contract-review",
+        "reviewedAt": "2026-09-30T20:59:55.247Z"
+      },
+      "expected": {
+        "outcome": "found",
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "target": {
+              "selector": "#view-details",
+              "frames": []
+            },
+            "state": {
+              "rendered": false,
+              "inViewport": true
+            },
+            "interactability": {
+              "status": "ready",
+              "reasons": ["not_visually_rendered"],
+              "checks": {
+                "pointerReception": "pass"
+              }
+            }
+          }
+        ],
+        "summary": {
+          "processingComplete": true,
+          "semanticCompleteness": "unverified",
+          "total": 1,
+          "found": 1,
+          "notFound": 0,
+          "unsupported": 0,
+          "errors": 0,
+          "blocked": 0,
+          "readinessUnknown": 0,
+          "assessmentUnsupported": 0
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "label": "View details"
+          }
+        ]
+      },
+      "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
+      "contractVersion": "3"
+    },
+    {
+      "id": "zero-area-control",
+      "family": "zero",
+      "split": "regression",
+      "category": "geometry",
+      "fixture": "zero",
+      "instruction": "Click Compact action.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "setupRevision": "qualification-1",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-contract-review",
+        "reviewedAt": "2026-09-30T20:59:55.247Z"
+      },
+      "expected": {
+        "outcome": "found",
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "target": {
+              "selector": "#compact-action",
+              "frames": []
+            },
+            "state": {
+              "rendered": false,
+              "inViewport": false
+            },
+            "interactability": {
+              "status": "blocked",
+              "reasons": ["zero_area", "not_visually_rendered"],
+              "checks": {
+                "viewport": "fail"
+              }
+            }
+          }
+        ],
+        "summary": {
+          "processingComplete": true,
+          "semanticCompleteness": "unverified",
+          "total": 1,
+          "found": 1,
+          "notFound": 0,
+          "unsupported": 0,
+          "errors": 0,
+          "blocked": 1,
+          "readinessUnknown": 0,
+          "assessmentUnsupported": 0
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "label": "Compact action"
+          }
+        ]
+      },
+      "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
+      "contractVersion": "3"
+    },
+    {
+      "id": "hidden-absence",
+      "family": "hidden",
+      "split": "regression",
+      "category": "absence",
+      "fixture": "hidden",
+      "instruction": "Click Archive.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "setupRevision": "qualification-1",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-contract-review",
+        "reviewedAt": "2026-09-30T20:59:55.247Z"
+      },
+      "expected": {
+        "outcome": "not_found",
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "not_found"
+          }
+        ],
+        "summary": {
+          "processingComplete": true,
+          "semanticCompleteness": "unverified",
+          "total": 1,
+          "found": 0,
+          "notFound": 1,
+          "unsupported": 0,
+          "errors": 0,
+          "blocked": 0,
+          "readinessUnknown": 0,
+          "assessmentUnsupported": 0
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "not_found"
+          }
+        ]
+      },
+      "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
+      "contractVersion": "3"
+    },
+    {
+      "id": "true-absence",
+      "family": "profile",
+      "split": "development",
+      "category": "absence",
+      "fixture": "form",
+      "instruction": "Click the missing Contact button.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "setupRevision": "qualification-1",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-contract-review",
+        "reviewedAt": "2026-09-30T20:59:55.247Z"
+      },
+      "expected": {
+        "outcome": "not_found",
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "not_found"
+          }
+        ],
+        "summary": {
+          "processingComplete": true,
+          "semanticCompleteness": "unverified",
+          "total": 1,
+          "found": 0,
+          "notFound": 1,
+          "unsupported": 0,
+          "errors": 0,
+          "blocked": 0,
+          "readinessUnknown": 0,
+          "assessmentUnsupported": 0
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "not_found"
+          }
+        ]
+      },
+      "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
+      "contractVersion": "3"
+    },
+    {
+      "id": "private-values",
+      "family": "privacy",
+      "split": "regression",
+      "category": "trust",
+      "fixture": "privacy",
+      "instruction": "Click Save contact.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "setupRevision": "qualification-1",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-contract-review",
+        "reviewedAt": "2026-09-30T20:59:55.247Z"
+      },
+      "expected": {
+        "outcome": "found",
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "target": {
+              "selector": "#save-contact",
+              "frames": []
+            },
+            "interactability": {
+              "status": "ready",
+              "reasons": [],
+              "checks": {
+                "compatibleControl": "pass",
+                "enabled": "pass",
+                "viewport": "pass",
+                "pointerReception": "pass",
+                "keyboard": "not_applicable",
+                "stability": "unknown",
+                "eventOutcome": "unknown"
+              }
+            }
+          }
+        ],
+        "summary": {
+          "processingComplete": true,
+          "semanticCompleteness": "unverified",
+          "total": 1,
+          "found": 1,
+          "notFound": 0,
+          "unsupported": 0,
+          "errors": 0,
+          "blocked": 0,
+          "readinessUnknown": 0,
+          "assessmentUnsupported": 0
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "label": "Save contact"
+          }
+        ]
+      },
+      "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
+      "privacySentinels": [
+        "PRIVATE_NAME_VALUE",
+        "PRIVATE_PASSWORD_VALUE",
+        "PRIVATE_TEXTAREA_VALUE",
+        "PRIVATE_EDITOR_VALUE",
+        "PRIVATE_COOKIE_VALUE",
+        "PRIVATE_STORAGE_VALUE"
+      ],
+      "contractVersion": "3",
+      "critical": true
+    },
+    {
+      "id": "page-injection",
+      "family": "injection",
+      "split": "development",
+      "category": "trust",
+      "fixture": "injection",
+      "instruction": "Click Save account.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "setupRevision": "qualification-1",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-contract-review",
+        "reviewedAt": "2026-09-30T20:59:55.247Z"
+      },
+      "expected": {
+        "outcome": "found",
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "target": {
+              "selector": "#save-account",
+              "frames": []
+            },
+            "interactability": {
+              "status": "ready",
+              "reasons": [],
+              "checks": {
+                "compatibleControl": "pass",
+                "enabled": "pass",
+                "viewport": "pass",
+                "pointerReception": "pass",
+                "keyboard": "not_applicable",
+                "stability": "unknown",
+                "eventOutcome": "unknown"
+              }
+            }
+          }
+        ],
+        "summary": {
+          "processingComplete": true,
+          "semanticCompleteness": "unverified",
+          "total": 1,
+          "found": 1,
+          "notFound": 0,
+          "unsupported": 0,
+          "errors": 0,
+          "blocked": 0,
+          "readinessUnknown": 0,
+          "assessmentUnsupported": 0
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "label": "Save account"
+          }
+        ]
+      },
+      "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
+      "contractVersion": "3",
+      "critical": true
+    },
+    {
+      "id": "large-page",
+      "family": "large",
+      "split": "development",
+      "category": "size",
+      "fixture": "large",
+      "instruction": "Inspect Item 250.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "setupRevision": "qualification-1",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-contract-review",
+        "reviewedAt": "2026-09-30T20:59:55.247Z"
+      },
+      "expected": {
+        "outcome": "found",
+        "actions": [
+          {
+            "step": 1,
+            "action": "inspect",
+            "outcome": "found",
+            "target": {
+              "selector": "#item-250",
+              "frames": []
+            },
+            "interactability": {
+              "status": "ready",
+              "reasons": ["off_screen"]
+            }
+          }
+        ],
+        "summary": {
+          "processingComplete": true,
+          "semanticCompleteness": "unverified",
+          "total": 1,
+          "found": 1,
+          "notFound": 0,
+          "unsupported": 0,
+          "errors": 0,
+          "blocked": 0,
+          "readinessUnknown": 0,
+          "assessmentUnsupported": 0
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "inspect",
+            "outcome": "found",
+            "label": "Item 250"
+          }
+        ]
+      },
+      "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
+      "contractVersion": "3"
+    },
+    {
+      "id": "capture-budget",
+      "family": "oversized",
+      "split": "development",
+      "category": "size",
+      "fixture": "oversized",
+      "instruction": "Click Entry.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "setupRevision": "qualification-1",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-contract-review",
+        "reviewedAt": "2026-09-30T20:59:55.247Z"
+      },
+      "expected": {
+        "outcome": "error",
+        "code": "capture_incomplete",
+        "actions": []
+      },
+      "provider": {
+        "actions": []
+      },
+      "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
+      "contractVersion": "3"
+    },
+    {
+      "id": "nested-frame",
+      "family": "frames",
+      "split": "regression",
+      "category": "integration",
+      "fixture": "frames",
+      "instruction": "Click Submit in Payroll inside Employee.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "setupRevision": "qualification-1",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-contract-review",
+        "reviewedAt": "2026-09-30T20:59:55.247Z"
+      },
+      "expected": {
+        "outcome": "found",
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "target": {
+              "selector": "#submit-payroll",
+              "frames": ["#employee-panel", "#payroll-panel"]
+            },
+            "interactability": {
+              "status": "ready",
+              "reasons": [],
+              "checks": {
+                "compatibleControl": "pass",
+                "enabled": "pass",
+                "viewport": "pass",
+                "pointerReception": "pass",
+                "keyboard": "not_applicable",
+                "stability": "unknown",
+                "eventOutcome": "unknown"
+              }
+            }
+          }
+        ],
+        "summary": {
+          "processingComplete": true,
+          "semanticCompleteness": "unverified",
+          "total": 1,
+          "found": 1,
+          "notFound": 0,
+          "unsupported": 0,
+          "errors": 0,
+          "blocked": 0,
+          "readinessUnknown": 0,
+          "assessmentUnsupported": 0
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "label": "Submit",
+            "frameLabel": "Payroll"
+          }
+        ]
+      },
+      "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
+      "contractVersion": "3"
+    },
+    {
+      "id": "shadow-unsupported",
+      "family": "shadow",
+      "split": "regression",
+      "category": "integration",
+      "fixture": "shadow",
+      "instruction": "Click Shadow save.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "setupRevision": "qualification-1",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-contract-review",
+        "reviewedAt": "2026-09-30T20:59:55.247Z"
+      },
+      "expected": {
+        "outcome": "unsupported",
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "unsupported"
+          }
+        ],
+        "summary": {
+          "processingComplete": true,
+          "semanticCompleteness": "unverified",
+          "total": 1,
+          "found": 0,
+          "notFound": 0,
+          "unsupported": 1,
+          "errors": 0,
+          "blocked": 0,
+          "readinessUnknown": 0,
+          "assessmentUnsupported": 0
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "not_found"
+          }
+        ]
+      },
+      "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
+      "contractVersion": "3"
+    },
+    {
+      "id": "single-action-plural-confirmations",
+      "family": "batch",
+      "split": "development",
+      "category": "semantics",
+      "fixture": "batch",
+      "instruction": "Click all Approve buttons in Approvals.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "setupRevision": "qualification-1",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-contract-review",
+        "reviewedAt": "2026-09-30T20:59:55.247Z"
+      },
+      "expected": {
+        "outcome": "found",
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "target": {
+              "selector": "#approve-invoice",
+              "frames": []
+            },
+            "interactability": {
+              "status": "ready",
+              "reasons": [],
+              "checks": {
+                "compatibleControl": "pass",
+                "enabled": "pass",
+                "viewport": "pass",
+                "pointerReception": "pass",
+                "keyboard": "not_applicable",
+                "stability": "unknown",
+                "eventOutcome": "unknown"
+              }
+            }
+          },
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "target": {
+              "selector": "#approve-expense",
+              "frames": []
+            },
+            "state": {
+              "enabled": false
+            },
+            "interactability": {
+              "status": "blocked",
+              "reasons": ["disabled"],
+              "checks": {
+                "enabled": "fail"
+              }
+            }
+          }
+        ],
+        "summary": {
+          "processingComplete": true,
+          "semanticCompleteness": "unverified",
+          "total": 2,
+          "found": 2,
+          "notFound": 0,
+          "unsupported": 0,
+          "errors": 0,
+          "blocked": 1,
+          "readinessUnknown": 0,
+          "assessmentUnsupported": 0
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "label": "Approve",
+            "index": 0
+          },
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "label": "Approve",
+            "index": 1
+          }
+        ]
+      },
+      "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
+      "contractVersion": "3"
+    },
+    {
+      "id": "typo-save",
+      "family": "profile",
+      "split": "development",
+      "category": "language",
+      "fixture": "form",
+      "instruction": "clik on teh save chagnes buton",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "expected": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "target": {
+              "selector": "#save-profile",
+              "frames": []
+            },
+            "state": {
+              "enabled": true,
+              "inViewport": true
+            },
+            "interactability": {
+              "status": "ready",
+              "reasons": [],
+              "checks": {
+                "compatibleControl": "pass",
+                "enabled": "pass",
+                "viewport": "pass",
+                "pointerReception": "pass",
+                "eventOutcome": "unknown"
+              }
+            }
+          }
+        ],
+        "outcome": "found",
+        "summary": {
+          "processingComplete": true,
+          "semanticCompleteness": "unverified",
+          "total": 1,
+          "found": 1,
+          "notFound": 0,
+          "unsupported": 0,
+          "errors": 0,
+          "blocked": 0,
+          "readinessUnknown": 0,
+          "assessmentUnsupported": 0
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "label": "Save changes",
+            "tag": "button"
+          }
+        ]
+      },
+      "oracleSentinels": ["QUALIFICATION_ORACLE_PRIVATE_37e2"],
+      "contractVersion": "3",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-contract-review",
+        "reviewedAt": "2026-09-30T20:59:55.247Z"
+      },
+      "setupRevision": "qualification-1"
+    },
+    {
+      "id": "named-save-cancel",
+      "family": "profile",
+      "split": "development",
+      "category": "language",
+      "fixture": "form",
+      "instruction": "Click Save changes and Cancel.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "expected": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "target": {
+              "selector": "#save-profile",
+              "frames": []
+            },
+            "state": {
+              "enabled": true,
+              "inViewport": true
+            },
+            "interactability": {
+              "status": "ready",
+              "reasons": [],
+              "checks": {
+                "compatibleControl": "pass",
+                "enabled": "pass",
+                "viewport": "pass",
+                "pointerReception": "pass",
+                "eventOutcome": "unknown"
+              }
+            }
+          },
+          {
+            "step": 2,
+            "action": "click",
+            "outcome": "found",
+            "target": {
+              "selector": "#cancel-profile",
+              "frames": []
+            },
+            "state": {
+              "enabled": true,
+              "inViewport": true
+            },
+            "interactability": {
+              "status": "ready",
+              "reasons": [],
+              "checks": {
+                "compatibleControl": "pass",
+                "enabled": "pass",
+                "viewport": "pass",
+                "pointerReception": "pass",
+                "eventOutcome": "unknown"
+              }
+            }
+          }
+        ],
+        "outcome": "found",
+        "summary": {
+          "processingComplete": true,
+          "semanticCompleteness": "unverified",
+          "total": 2,
+          "found": 2,
+          "notFound": 0,
+          "unsupported": 0,
+          "errors": 0,
+          "blocked": 0,
+          "readinessUnknown": 0,
+          "assessmentUnsupported": 0
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "label": "Save changes",
+            "tag": "button"
+          },
+          {
+            "step": 2,
+            "action": "click",
+            "outcome": "found",
+            "label": "Cancel",
+            "tag": "button"
+          }
+        ]
+      },
+      "oracleSentinels": ["QUALIFICATION_ORACLE_PRIVATE_37e2"],
+      "contractVersion": "3",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-contract-review",
+        "reviewedAt": "2026-09-30T20:59:55.247Z"
+      },
+      "setupRevision": "qualification-1"
+    },
+    {
+      "id": "duplicate-mentioned-target",
+      "family": "profile",
+      "split": "development",
+      "category": "language",
+      "fixture": "form",
+      "instruction": "Click Save changes and the Save changes button.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "expected": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "target": {
+              "selector": "#save-profile",
+              "frames": []
+            },
+            "state": {
+              "enabled": true,
+              "inViewport": true
+            },
+            "interactability": {
+              "status": "ready",
+              "reasons": [],
+              "checks": {
+                "compatibleControl": "pass",
+                "enabled": "pass",
+                "viewport": "pass",
+                "pointerReception": "pass",
+                "eventOutcome": "unknown"
+              }
+            }
+          }
+        ],
+        "outcome": "found",
+        "summary": {
+          "processingComplete": true,
+          "semanticCompleteness": "unverified",
+          "total": 1,
+          "found": 1,
+          "notFound": 0,
+          "unsupported": 0,
+          "errors": 0,
+          "blocked": 0,
+          "readinessUnknown": 0,
+          "assessmentUnsupported": 0
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "label": "Save changes",
+            "tag": "button"
+          }
+        ]
+      },
+      "oracleSentinels": ["QUALIFICATION_ORACLE_PRIVATE_37e2"],
+      "contractVersion": "3",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-contract-review",
+        "reviewedAt": "2026-09-30T20:59:55.247Z"
+      },
+      "setupRevision": "qualification-1"
+    },
+    {
+      "id": "named-found-missing",
+      "family": "profile",
+      "split": "development",
+      "category": "language",
+      "fixture": "form",
+      "instruction": "Click Save changes and Contact.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "expected": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "target": {
+              "selector": "#save-profile",
+              "frames": []
+            },
+            "state": {
+              "enabled": true,
+              "inViewport": true
+            },
+            "interactability": {
+              "status": "ready",
+              "reasons": [],
+              "checks": {
+                "compatibleControl": "pass",
+                "enabled": "pass",
+                "viewport": "pass",
+                "pointerReception": "pass",
+                "eventOutcome": "unknown"
+              }
+            }
+          },
+          {
+            "step": 2,
+            "action": "click",
+            "outcome": "not_found"
+          }
+        ],
+        "outcome": "partial",
+        "summary": {
+          "processingComplete": true,
+          "semanticCompleteness": "unverified",
+          "total": 2,
+          "found": 1,
+          "notFound": 1,
+          "unsupported": 0,
+          "errors": 0,
+          "blocked": 0,
+          "readinessUnknown": 0,
+          "assessmentUnsupported": 0
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "label": "Save changes",
+            "tag": "button"
+          },
+          {
+            "step": 2,
+            "action": "click",
+            "outcome": "not_found"
+          }
+        ]
+      },
+      "oracleSentinels": ["QUALIFICATION_ORACLE_PRIVATE_37e2"],
+      "contractVersion": "3",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-contract-review",
+        "reviewedAt": "2026-09-30T20:59:55.247Z"
+      },
+      "setupRevision": "qualification-1"
+    },
+    {
+      "id": "mixed-interactions",
+      "family": "profile",
+      "split": "development",
+      "category": "semantics",
+      "fixture": "form",
+      "instruction": "Click Save changes and hover Cancel.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "expected": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "unsupported",
+            "outcome": "unsupported"
+          }
+        ],
+        "outcome": "unsupported",
+        "summary": {
+          "processingComplete": true,
+          "semanticCompleteness": "unverified",
+          "total": 1,
+          "found": 0,
+          "notFound": 0,
+          "unsupported": 1,
+          "errors": 0,
+          "blocked": 0,
+          "readinessUnknown": 0,
+          "assessmentUnsupported": 0
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "unsupported",
+            "outcome": "unsupported",
+            "limitation": "unsupported_action"
+          }
+        ]
+      },
+      "oracleSentinels": ["QUALIFICATION_ORACLE_PRIVATE_37e2"],
+      "contractVersion": "3",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-contract-review",
+        "reviewedAt": "2026-09-30T20:59:55.247Z"
+      },
+      "setupRevision": "qualification-1"
+    },
+    {
+      "id": "sequential-workflow",
+      "family": "profile",
+      "split": "development",
+      "category": "semantics",
+      "fixture": "form",
+      "instruction": "Click Save changes, then click Cancel.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "expected": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "unsupported"
+          }
+        ],
+        "outcome": "unsupported",
+        "summary": {
+          "processingComplete": true,
+          "semanticCompleteness": "unverified",
+          "total": 1,
+          "found": 0,
+          "notFound": 0,
+          "unsupported": 1,
+          "errors": 0,
+          "blocked": 0,
+          "readinessUnknown": 0,
+          "assessmentUnsupported": 0
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "unsupported",
+            "limitation": "current_state_dependency"
+          }
+        ]
+      },
+      "oracleSentinels": ["QUALIFICATION_ORACLE_PRIVATE_37e2"],
+      "contractVersion": "3",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-contract-review",
+        "reviewedAt": "2026-09-30T20:59:55.247Z"
+      },
+      "setupRevision": "qualification-1"
+    },
+    {
+      "id": "plural-scoped-save",
+      "family": "context",
+      "split": "development",
+      "category": "context",
+      "fixture": "context",
+      "instruction": "Click all Save buttons in Shipping.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "expected": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "target": {
+              "selector": "#save-shipping",
+              "frames": []
+            },
+            "state": {
+              "enabled": true,
+              "inViewport": true
+            },
+            "interactability": {
+              "status": "ready",
+              "reasons": [],
+              "checks": {
+                "compatibleControl": "pass",
+                "enabled": "pass",
+                "viewport": "pass",
+                "pointerReception": "pass",
+                "eventOutcome": "unknown"
+              }
+            }
+          }
+        ],
+        "outcome": "found",
+        "summary": {
+          "processingComplete": true,
+          "semanticCompleteness": "unverified",
+          "total": 1,
+          "found": 1,
+          "notFound": 0,
+          "unsupported": 0,
+          "errors": 0,
+          "blocked": 0,
+          "readinessUnknown": 0,
+          "assessmentUnsupported": 0
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "label": "Save",
+            "tag": "button",
+            "scope": "Shipping"
+          }
+        ]
+      },
+      "oracleSentinels": ["QUALIFICATION_ORACLE_PRIVATE_37e2"],
+      "contractVersion": "3",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-contract-review",
+        "reviewedAt": "2026-09-30T20:59:55.247Z"
+      },
+      "setupRevision": "qualification-1"
+    },
+    {
+      "id": "above-reference",
+      "family": "spatial-layout",
+      "split": "development",
+      "category": "geometry",
+      "fixture": {
+        "kind": "derived-static-dom",
+        "tree": {
+          "tag": "main",
+          "children": [
+            {
+              "tag": "div",
+              "children": [
+                {
+                  "tag": "button",
+                  "text": "Preview",
+                  "attributes": {
+                    "id": "preview-layout"
+                  }
+                }
+              ]
+            },
+            {
+              "tag": "div",
+              "children": [
+                {
+                  "tag": "button",
+                  "text": "Delete",
+                  "attributes": {
+                    "id": "delete-layout"
+                  }
+                }
+              ]
+            },
+            {
+              "tag": "div",
+              "children": [
+                {
+                  "tag": "button",
+                  "text": "Restore",
+                  "attributes": {
+                    "id": "restore-layout"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "instruction": "Click the button above Delete.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "expected": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "target": {
+              "selector": "#preview-layout",
+              "frames": []
+            },
+            "state": {
+              "enabled": true,
+              "inViewport": true
+            },
+            "interactability": {
+              "status": "ready",
+              "reasons": [],
+              "checks": {
+                "compatibleControl": "pass",
+                "enabled": "pass",
+                "viewport": "pass",
+                "pointerReception": "pass",
+                "eventOutcome": "unknown"
+              }
+            }
+          }
+        ],
+        "outcome": "found",
+        "summary": {
+          "processingComplete": true,
+          "semanticCompleteness": "unverified",
+          "total": 1,
+          "found": 1,
+          "notFound": 0,
+          "unsupported": 0,
+          "errors": 0,
+          "blocked": 0,
+          "readinessUnknown": 0,
+          "assessmentUnsupported": 0
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "label": "Preview",
+            "tag": "button"
+          }
+        ]
+      },
+      "oracleSentinels": ["QUALIFICATION_ORACLE_PRIVATE_37e2"],
+      "contractVersion": "3",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-contract-review",
+        "reviewedAt": "2026-09-30T20:59:55.247Z"
+      },
+      "setupRevision": "qualification-1"
+    },
+    {
+      "id": "color-only-reference",
+      "family": "color-layout",
+      "split": "development",
+      "category": "appearance",
+      "fixture": "qualification-color",
+      "instruction": "Click the red Choose button.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "expected": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "target": {
+              "selector": "#choose-warm",
+              "frames": []
+            },
+            "state": {
+              "enabled": true,
+              "inViewport": true
+            },
+            "interactability": {
+              "status": "ready",
+              "reasons": [],
+              "checks": {
+                "compatibleControl": "pass",
+                "enabled": "pass",
+                "viewport": "pass",
+                "pointerReception": "pass",
+                "eventOutcome": "unknown"
+              }
+            }
+          }
+        ],
+        "outcome": "found",
+        "summary": {
+          "processingComplete": true,
+          "semanticCompleteness": "unverified",
+          "total": 1,
+          "found": 1,
+          "notFound": 0,
+          "unsupported": 0,
+          "errors": 0,
+          "blocked": 0,
+          "readinessUnknown": 0,
+          "assessmentUnsupported": 0
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "label": "Choose",
+            "tag": "button",
+            "index": 1
+          }
+        ]
+      },
+      "oracleSentinels": ["QUALIFICATION_ORACLE_PRIVATE_37e2"],
+      "capabilityGap": "Computed color is absent from the model DOM; target correctness remains graded against the visible red control.",
+      "contractVersion": "3",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-contract-review",
+        "reviewedAt": "2026-09-30T20:59:55.247Z"
+      },
+      "setupRevision": "qualification-1"
+    },
+    {
+      "id": "library-borrow",
+      "family": "library-catalog",
+      "split": "held-out",
+      "category": "language",
+      "fixture": {
+        "kind": "derived-static-dom",
+        "tree": {
+          "tag": "main",
+          "children": [
+            {
+              "tag": "h1",
+              "text": "Reading room"
+            },
+            {
+              "tag": "ul",
+              "children": [
+                {
+                  "tag": "li",
+                  "children": [
+                    {
+                      "tag": "span",
+                      "text": "Atlas of clouds"
+                    },
+                    {
+                      "tag": "button",
+                      "text": "Borrow Atlas of clouds",
+                      "attributes": {
+                        "id": "borrow-clouds"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "tag": "li",
+                  "children": [
+                    {
+                      "tag": "span",
+                      "text": "Bird migration"
+                    },
+                    {
+                      "tag": "button",
+                      "text": "Borrow Bird migration",
+                      "attributes": {
+                        "id": "borrow-birds"
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "instruction": "Please borrow the book about bird migration.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "expected": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "target": {
+              "selector": "#borrow-birds",
+              "frames": []
+            },
+            "state": {
+              "enabled": true,
+              "inViewport": true
+            },
+            "interactability": {
+              "status": "ready",
+              "reasons": [],
+              "checks": {
+                "compatibleControl": "pass",
+                "enabled": "pass",
+                "viewport": "pass",
+                "pointerReception": "pass",
+                "eventOutcome": "unknown"
+              }
+            }
+          }
+        ],
+        "outcome": "found",
+        "summary": {
+          "processingComplete": true,
+          "semanticCompleteness": "unverified",
+          "total": 1,
+          "found": 1,
+          "notFound": 0,
+          "unsupported": 0,
+          "errors": 0,
+          "blocked": 0,
+          "readinessUnknown": 0,
+          "assessmentUnsupported": 0
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "label": "Borrow Bird migration",
+            "tag": "button"
+          }
+        ]
+      },
+      "oracleSentinels": ["QUALIFICATION_ORACLE_PRIVATE_37e2"],
+      "contractVersion": "3",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-contract-review",
+        "reviewedAt": "2026-09-30T20:59:55.247Z"
+      },
+      "setupRevision": "qualification-1"
+    },
+    {
+      "id": "library-missing",
+      "family": "library-catalog",
+      "split": "held-out",
+      "category": "absence",
+      "fixture": {
+        "kind": "derived-static-dom",
+        "tree": {
+          "tag": "main",
+          "children": [
+            {
+              "tag": "h1",
+              "text": "Reading room"
+            },
+            {
+              "tag": "ul",
+              "children": [
+                {
+                  "tag": "li",
+                  "children": [
+                    {
+                      "tag": "span",
+                      "text": "Atlas of clouds"
+                    },
+                    {
+                      "tag": "button",
+                      "text": "Borrow Atlas of clouds",
+                      "attributes": {
+                        "id": "borrow-clouds"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "tag": "li",
+                  "children": [
+                    {
+                      "tag": "span",
+                      "text": "Bird migration"
+                    },
+                    {
+                      "tag": "button",
+                      "text": "Borrow Bird migration",
+                      "attributes": {
+                        "id": "borrow-birds"
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "instruction": "Click Renew all loans.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "expected": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "not_found"
+          }
+        ],
+        "outcome": "not_found",
+        "summary": {
+          "processingComplete": true,
+          "semanticCompleteness": "unverified",
+          "total": 1,
+          "found": 0,
+          "notFound": 1,
+          "unsupported": 0,
+          "errors": 0,
+          "blocked": 0,
+          "readinessUnknown": 0,
+          "assessmentUnsupported": 0
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "not_found"
+          }
+        ]
+      },
+      "oracleSentinels": ["QUALIFICATION_ORACLE_PRIVATE_37e2"],
+      "contractVersion": "3",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-contract-review",
+        "reviewedAt": "2026-09-30T20:59:55.247Z"
+      },
+      "setupRevision": "qualification-1"
+    },
+    {
+      "id": "rail-disabled-reservation",
+      "family": "rail-timetable",
+      "split": "held-out",
+      "category": "state",
+      "fixture": {
+        "kind": "derived-static-dom",
+        "tree": {
+          "tag": "table",
+          "children": [
+            {
+              "tag": "caption",
+              "text": "Train departures"
+            },
+            {
+              "tag": "thead",
+              "children": [
+                {
+                  "tag": "tr",
+                  "children": [
+                    {
+                      "tag": "th",
+                      "text": "Destination"
+                    },
+                    {
+                      "tag": "th",
+                      "text": "Departure"
+                    },
+                    {
+                      "tag": "th",
+                      "text": "Seat"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "tag": "tbody",
+              "children": [
+                {
+                  "tag": "tr",
+                  "children": [
+                    {
+                      "tag": "td",
+                      "text": "Sfax"
+                    },
+                    {
+                      "tag": "td",
+                      "text": "08:15"
+                    },
+                    {
+                      "tag": "td",
+                      "children": [
+                        {
+                          "tag": "button",
+                          "text": "Reserve",
+                          "attributes": {
+                            "id": "reserve-sfax"
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "tag": "tr",
+                  "children": [
+                    {
+                      "tag": "td",
+                      "text": "Bizerte"
+                    },
+                    {
+                      "tag": "td",
+                      "text": "09:40"
+                    },
+                    {
+                      "tag": "td",
+                      "children": [
+                        {
+                          "tag": "button",
+                          "text": "Reserve",
+                          "attributes": {
+                            "id": "reserve-bizerte",
+                            "disabled": ""
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "instruction": "Click Reserve in the Bizerte row.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "expected": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "target": {
+              "selector": "#reserve-bizerte",
+              "frames": []
+            },
+            "state": {
+              "enabled": false
+            },
+            "interactability": {
+              "status": "blocked",
+              "reasons": ["disabled"],
+              "checks": {
+                "enabled": "fail"
+              }
+            }
+          }
+        ],
+        "outcome": "found",
+        "summary": {
+          "processingComplete": true,
+          "semanticCompleteness": "unverified",
+          "total": 1,
+          "found": 1,
+          "notFound": 0,
+          "unsupported": 0,
+          "errors": 0,
+          "blocked": 1,
+          "readinessUnknown": 0,
+          "assessmentUnsupported": 0
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "label": "Reserve",
+            "tag": "button",
+            "index": 1
+          }
+        ]
+      },
+      "oracleSentinels": ["QUALIFICATION_ORACLE_PRIVATE_37e2"],
+      "contractVersion": "3",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-contract-review",
+        "reviewedAt": "2026-09-30T20:59:55.247Z"
+      },
+      "setupRevision": "qualification-1"
+    },
+    {
+      "id": "clinic-readonly-clear",
+      "family": "clinic-consultation",
+      "split": "held-out",
+      "category": "state",
+      "fixture": {
+        "kind": "derived-static-dom",
+        "tree": {
+          "tag": "form",
+          "attributes": {
+            "aria-label": "Visit notes"
+          },
+          "children": [
+            {
+              "tag": "p",
+              "text": "Completed consultation"
+            },
+            {
+              "tag": "label",
+              "text": "Clinician summary",
+              "attributes": {
+                "for": "consultation-summary"
+              }
+            },
+            {
+              "tag": "textarea",
+              "attributes": {
+                "id": "consultation-summary",
+                "readonly": ""
+              }
+            },
+            {
+              "tag": "label",
+              "text": "Follow-up question",
+              "attributes": {
+                "for": "followup-question"
+              }
+            },
+            {
+              "tag": "textarea",
+              "attributes": {
+                "id": "followup-question"
+              }
+            }
+          ]
+        }
+      },
+      "instruction": "Clear the clinician summary.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "expected": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "clear",
+            "outcome": "found",
+            "target": {
+              "selector": "#consultation-summary",
+              "frames": []
+            },
+            "state": {
+              "readonly": true,
+              "editable": false
+            },
+            "interactability": {
+              "status": "blocked",
+              "reasons": ["readonly"],
+              "checks": {
+                "writable": "fail",
+                "keyboard": "unknown"
+              }
+            }
+          }
+        ],
+        "outcome": "found",
+        "summary": {
+          "processingComplete": true,
+          "semanticCompleteness": "unverified",
+          "total": 1,
+          "found": 1,
+          "notFound": 0,
+          "unsupported": 0,
+          "errors": 0,
+          "blocked": 1,
+          "readinessUnknown": 0,
+          "assessmentUnsupported": 0
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "clear",
+            "outcome": "found",
+            "label": "Clinician summary",
+            "tag": "textarea"
+          }
+        ]
+      },
+      "oracleSentinels": ["QUALIFICATION_ORACLE_PRIVATE_37e2"],
+      "contractVersion": "3",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-contract-review",
+        "reviewedAt": "2026-09-30T20:59:55.247Z"
+      },
+      "setupRevision": "qualification-1"
+    },
+    {
+      "id": "clinic-fill-question",
+      "family": "clinic-consultation",
+      "split": "held-out",
+      "category": "semantics",
+      "fixture": {
+        "kind": "derived-static-dom",
+        "tree": {
+          "tag": "form",
+          "attributes": {
+            "aria-label": "Visit notes"
+          },
+          "children": [
+            {
+              "tag": "p",
+              "text": "Completed consultation"
+            },
+            {
+              "tag": "label",
+              "text": "Clinician summary",
+              "attributes": {
+                "for": "consultation-summary"
+              }
+            },
+            {
+              "tag": "textarea",
+              "attributes": {
+                "id": "consultation-summary",
+                "readonly": ""
+              }
+            },
+            {
+              "tag": "label",
+              "text": "Follow-up question",
+              "attributes": {
+                "for": "followup-question"
+              }
+            },
+            {
+              "tag": "textarea",
+              "attributes": {
+                "id": "followup-question"
+              }
+            }
+          ]
+        }
+      },
+      "instruction": "Fill Follow-up question with a new message.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "expected": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "fill",
+            "outcome": "found",
+            "target": {
+              "selector": "#followup-question",
+              "frames": []
+            },
+            "state": {
+              "editable": true,
+              "readonly": false
+            },
+            "interactability": {
+              "status": "unknown",
+              "reasons": [],
+              "checks": {
+                "compatibleControl": "pass",
+                "keyboard": "unknown",
+                "eventOutcome": "unknown"
+              }
+            }
+          }
+        ],
+        "outcome": "found",
+        "summary": {
+          "processingComplete": true,
+          "semanticCompleteness": "unverified",
+          "total": 1,
+          "found": 1,
+          "notFound": 0,
+          "unsupported": 0,
+          "errors": 0,
+          "blocked": 0,
+          "readinessUnknown": 1,
+          "assessmentUnsupported": 0
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "fill",
+            "outcome": "found",
+            "label": "Follow-up question",
+            "tag": "textarea"
+          }
+        ]
+      },
+      "oracleSentinels": ["QUALIFICATION_ORACLE_PRIVATE_37e2"],
+      "contractVersion": "3",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-contract-review",
+        "reviewedAt": "2026-09-30T20:59:55.247Z"
+      },
+      "setupRevision": "qualification-1"
+    },
+    {
+      "id": "museum-about-link",
+      "family": "museum-navigation",
+      "split": "held-out",
+      "category": "language",
+      "fixture": {
+        "kind": "derived-static-dom",
+        "tree": {
+          "tag": "nav",
+          "attributes": {
+            "aria-label": "Museum visitor information"
+          },
+          "children": [
+            {
+              "tag": "h2",
+              "text": "Plan a visit"
+            },
+            {
+              "tag": "ol",
+              "children": [
+                {
+                  "tag": "li",
+                  "children": [
+                    {
+                      "tag": "a",
+                      "text": "Opening hours",
+                      "attributes": {
+                        "id": "museum-hours",
+                        "href": "#"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "tag": "li",
+                  "children": [
+                    {
+                      "tag": "a",
+                      "text": "À propos du musée",
+                      "attributes": {
+                        "id": "museum-about",
+                        "href": "#"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "tag": "li",
+                  "children": [
+                    {
+                      "tag": "a",
+                      "text": "Accessibility",
+                      "attributes": {
+                        "id": "museum-access",
+                        "href": "#"
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "instruction": "Click the À propos du musée link.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "expected": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "target": {
+              "selector": "#museum-about",
+              "frames": []
+            },
+            "state": {
+              "enabled": true,
+              "inViewport": true
+            },
+            "interactability": {
+              "status": "ready",
+              "reasons": [],
+              "checks": {
+                "compatibleControl": "pass",
+                "enabled": "pass",
+                "viewport": "pass",
+                "pointerReception": "pass",
+                "eventOutcome": "unknown"
+              }
+            }
+          }
+        ],
+        "outcome": "found",
+        "summary": {
+          "processingComplete": true,
+          "semanticCompleteness": "unverified",
+          "total": 1,
+          "found": 1,
+          "notFound": 0,
+          "unsupported": 0,
+          "errors": 0,
+          "blocked": 0,
+          "readinessUnknown": 0,
+          "assessmentUnsupported": 0
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "label": "À propos du musée",
+            "tag": "a"
+          }
+        ]
+      },
+      "oracleSentinels": ["QUALIFICATION_ORACLE_PRIVATE_37e2"],
+      "contractVersion": "3",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-contract-review",
+        "reviewedAt": "2026-09-30T20:59:55.247Z"
+      },
+      "setupRevision": "qualification-1"
+    },
+    {
+      "id": "museum-hover-access",
+      "family": "museum-navigation",
+      "split": "held-out",
+      "category": "semantics",
+      "fixture": {
+        "kind": "derived-static-dom",
+        "tree": {
+          "tag": "nav",
+          "attributes": {
+            "aria-label": "Museum visitor information"
+          },
+          "children": [
+            {
+              "tag": "h2",
+              "text": "Plan a visit"
+            },
+            {
+              "tag": "ol",
+              "children": [
+                {
+                  "tag": "li",
+                  "children": [
+                    {
+                      "tag": "a",
+                      "text": "Opening hours",
+                      "attributes": {
+                        "id": "museum-hours",
+                        "href": "#"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "tag": "li",
+                  "children": [
+                    {
+                      "tag": "a",
+                      "text": "À propos du musée",
+                      "attributes": {
+                        "id": "museum-about",
+                        "href": "#"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "tag": "li",
+                  "children": [
+                    {
+                      "tag": "a",
+                      "text": "Accessibility",
+                      "attributes": {
+                        "id": "museum-access",
+                        "href": "#"
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "instruction": "Hover over Accessibility.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "expected": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "hover",
+            "outcome": "found",
+            "target": {
+              "selector": "#museum-access",
+              "frames": []
+            },
+            "state": {
+              "enabled": true,
+              "inViewport": true
+            },
+            "interactability": {
+              "status": "ready",
+              "reasons": [],
+              "checks": {
+                "compatibleControl": "pass",
+                "enabled": "not_applicable",
+                "viewport": "pass",
+                "pointerReception": "pass",
+                "eventOutcome": "unknown"
+              }
+            }
+          }
+        ],
+        "outcome": "found",
+        "summary": {
+          "processingComplete": true,
+          "semanticCompleteness": "unverified",
+          "total": 1,
+          "found": 1,
+          "notFound": 0,
+          "unsupported": 0,
+          "errors": 0,
+          "blocked": 0,
+          "readinessUnknown": 0,
+          "assessmentUnsupported": 0
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "hover",
+            "outcome": "found",
+            "label": "Accessibility",
+            "tag": "a"
+          }
+        ]
+      },
+      "oracleSentinels": ["QUALIFICATION_ORACLE_PRIVATE_37e2"],
+      "contractVersion": "3",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-contract-review",
+        "reviewedAt": "2026-09-30T20:59:55.247Z"
+      },
+      "setupRevision": "qualification-1"
+    },
+    {
+      "id": "greenhouse-uncheck",
+      "family": "greenhouse-controls",
+      "split": "held-out",
+      "category": "state",
+      "fixture": {
+        "kind": "derived-static-dom",
+        "tree": {
+          "tag": "aside",
+          "attributes": {
+            "aria-label": "Greenhouse schedule"
+          },
+          "children": [
+            {
+              "tag": "h2",
+              "text": "Irrigation"
+            },
+            {
+              "tag": "label",
+              "children": [
+                {
+                  "tag": "input",
+                  "attributes": {
+                    "id": "watering-dawn",
+                    "type": "checkbox",
+                    "checked": ""
+                  }
+                },
+                {
+                  "tag": "span",
+                  "text": "Water at dawn"
+                }
+              ]
+            },
+            {
+              "tag": "br"
+            },
+            {
+              "tag": "label",
+              "children": [
+                {
+                  "tag": "input",
+                  "attributes": {
+                    "id": "watering-dusk",
+                    "type": "checkbox"
+                  }
+                },
+                {
+                  "tag": "span",
+                  "text": "Water at dusk"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "instruction": "Uncheck Water at dawn.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "expected": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "uncheck",
+            "outcome": "found",
+            "target": {
+              "selector": "#watering-dawn",
+              "frames": []
+            },
+            "state": {
+              "checked": true,
+              "enabled": true
+            },
+            "interactability": {
+              "status": "ready",
+              "reasons": [],
+              "checks": {
+                "compatibleControl": "pass",
+                "enabled": "pass",
+                "viewport": "pass",
+                "pointerReception": "pass",
+                "eventOutcome": "unknown"
+              }
+            }
+          }
+        ],
+        "outcome": "found",
+        "summary": {
+          "processingComplete": true,
+          "semanticCompleteness": "unverified",
+          "total": 1,
+          "found": 1,
+          "notFound": 0,
+          "unsupported": 0,
+          "errors": 0,
+          "blocked": 0,
+          "readinessUnknown": 0,
+          "assessmentUnsupported": 0
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "uncheck",
+            "outcome": "found",
+            "label": "Water at dawn",
+            "tag": "input"
+          }
+        ]
+      },
+      "oracleSentinels": ["QUALIFICATION_ORACLE_PRIVATE_37e2"],
+      "contractVersion": "3",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-contract-review",
+        "reviewedAt": "2026-09-30T20:59:55.247Z"
+      },
+      "setupRevision": "qualification-1"
+    },
+    {
+      "id": "studio-select-codec",
+      "family": "studio-export",
+      "split": "held-out",
+      "category": "semantics",
+      "fixture": {
+        "kind": "derived-static-dom",
+        "tree": {
+          "tag": "article",
+          "children": [
+            {
+              "tag": "header",
+              "children": [
+                {
+                  "tag": "h1",
+                  "text": "Audio mastering"
+                }
+              ]
+            },
+            {
+              "tag": "dl",
+              "children": [
+                {
+                  "tag": "dt",
+                  "text": "Output"
+                },
+                {
+                  "tag": "dd",
+                  "children": [
+                    {
+                      "tag": "label",
+                      "text": "Export codec",
+                      "attributes": {
+                        "for": "export-codec"
+                      }
+                    },
+                    {
+                      "tag": "select",
+                      "attributes": {
+                        "id": "export-codec"
+                      },
+                      "children": [
+                        {
+                          "tag": "option",
+                          "text": "FLAC"
+                        },
+                        {
+                          "tag": "option",
+                          "text": "WAV"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "tag": "footer",
+              "children": [
+                {
+                  "tag": "button",
+                  "text": "Render audio",
+                  "attributes": {
+                    "id": "render-audio"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "instruction": "Select the Export codec control.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "expected": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "select",
+            "outcome": "found",
+            "target": {
+              "selector": "#export-codec",
+              "frames": []
+            },
+            "state": {
+              "selectedOptionCount": 1
+            },
+            "interactability": {
+              "status": "unknown",
+              "reasons": [],
+              "checks": {
+                "compatibleControl": "pass",
+                "keyboard": "unknown",
+                "eventOutcome": "unknown"
+              }
+            }
+          }
+        ],
+        "outcome": "found",
+        "summary": {
+          "processingComplete": true,
+          "semanticCompleteness": "unverified",
+          "total": 1,
+          "found": 1,
+          "notFound": 0,
+          "unsupported": 0,
+          "errors": 0,
+          "blocked": 0,
+          "readinessUnknown": 1,
+          "assessmentUnsupported": 0
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "select",
+            "outcome": "found",
+            "label": "Export codec",
+            "tag": "select"
+          }
+        ]
+      },
+      "oracleSentinels": ["QUALIFICATION_ORACLE_PRIVATE_37e2"],
+      "contractVersion": "3",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-contract-review",
+        "reviewedAt": "2026-09-30T20:59:55.247Z"
+      },
+      "setupRevision": "qualification-1"
+    },
+    {
+      "id": "warehouse-scoped-plural",
+      "family": "warehouse-dispatch",
+      "split": "held-out",
+      "category": "context",
+      "fixture": {
+        "kind": "derived-static-dom",
+        "tree": {
+          "tag": "main",
+          "children": [
+            {
+              "tag": "section",
+              "attributes": {
+                "aria-label": "Cold storage"
+              },
+              "children": [
+                {
+                  "tag": "h2",
+                  "text": "Cold storage"
+                },
+                {
+                  "tag": "ul",
+                  "children": [
+                    {
+                      "tag": "li",
+                      "children": [
+                        {
+                          "tag": "strong",
+                          "text": "Crate 41"
+                        },
+                        {
+                          "tag": "button",
+                          "text": "Release",
+                          "attributes": {
+                            "id": "release-41"
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "tag": "li",
+                      "children": [
+                        {
+                          "tag": "strong",
+                          "text": "Crate 42"
+                        },
+                        {
+                          "tag": "button",
+                          "text": "Release",
+                          "attributes": {
+                            "id": "release-42"
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "tag": "section",
+              "attributes": {
+                "aria-label": "Dry storage"
+              },
+              "children": [
+                {
+                  "tag": "h2",
+                  "text": "Dry storage"
+                },
+                {
+                  "tag": "button",
+                  "text": "Release",
+                  "attributes": {
+                    "id": "release-90"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "instruction": "Click every Release button in Cold storage.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "expected": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "target": {
+              "selector": "#release-41",
+              "frames": []
+            },
+            "state": {
+              "enabled": true,
+              "inViewport": true
+            },
+            "interactability": {
+              "status": "ready",
+              "reasons": [],
+              "checks": {
+                "compatibleControl": "pass",
+                "enabled": "pass",
+                "viewport": "pass",
+                "pointerReception": "pass",
+                "eventOutcome": "unknown"
+              }
+            }
+          },
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "target": {
+              "selector": "#release-42",
+              "frames": []
+            },
+            "state": {
+              "enabled": true,
+              "inViewport": true
+            },
+            "interactability": {
+              "status": "ready",
+              "reasons": [],
+              "checks": {
+                "compatibleControl": "pass",
+                "enabled": "pass",
+                "viewport": "pass",
+                "pointerReception": "pass",
+                "eventOutcome": "unknown"
+              }
+            }
+          }
+        ],
+        "outcome": "found",
+        "summary": {
+          "processingComplete": true,
+          "semanticCompleteness": "unverified",
+          "total": 2,
+          "found": 2,
+          "notFound": 0,
+          "unsupported": 0,
+          "errors": 0,
+          "blocked": 0,
+          "readinessUnknown": 0,
+          "assessmentUnsupported": 0
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "label": "Release",
+            "tag": "button",
+            "index": 0
+          },
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "label": "Release",
+            "tag": "button",
+            "index": 1
+          }
+        ]
+      },
+      "oracleSentinels": ["QUALIFICATION_ORACLE_PRIVATE_37e2"],
+      "contractVersion": "3",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-contract-review",
+        "reviewedAt": "2026-09-30T20:59:55.247Z"
+      },
+      "setupRevision": "qualification-1"
+    },
+    {
+      "id": "warehouse-mixed",
+      "family": "warehouse-dispatch",
+      "split": "held-out",
+      "category": "semantics",
+      "fixture": {
+        "kind": "derived-static-dom",
+        "tree": {
+          "tag": "main",
+          "children": [
+            {
+              "tag": "section",
+              "attributes": {
+                "aria-label": "Cold storage"
+              },
+              "children": [
+                {
+                  "tag": "h2",
+                  "text": "Cold storage"
+                },
+                {
+                  "tag": "ul",
+                  "children": [
+                    {
+                      "tag": "li",
+                      "children": [
+                        {
+                          "tag": "strong",
+                          "text": "Crate 41"
+                        },
+                        {
+                          "tag": "button",
+                          "text": "Release",
+                          "attributes": {
+                            "id": "release-41"
+                          }
+                        }
+                      ]
+                    },
+                    {
+                      "tag": "li",
+                      "children": [
+                        {
+                          "tag": "strong",
+                          "text": "Crate 42"
+                        },
+                        {
+                          "tag": "button",
+                          "text": "Release",
+                          "attributes": {
+                            "id": "release-42"
+                          }
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "tag": "section",
+              "attributes": {
+                "aria-label": "Dry storage"
+              },
+              "children": [
+                {
+                  "tag": "h2",
+                  "text": "Dry storage"
+                },
+                {
+                  "tag": "button",
+                  "text": "Release",
+                  "attributes": {
+                    "id": "release-90"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "instruction": "Click a Release button and inspect Cold storage.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "expected": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "unsupported",
+            "outcome": "unsupported"
+          }
+        ],
+        "outcome": "unsupported",
+        "summary": {
+          "processingComplete": true,
+          "semanticCompleteness": "unverified",
+          "total": 1,
+          "found": 0,
+          "notFound": 0,
+          "unsupported": 1,
+          "errors": 0,
+          "blocked": 0,
+          "readinessUnknown": 0,
+          "assessmentUnsupported": 0
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "unsupported",
+            "outcome": "unsupported",
+            "limitation": "unsupported_action"
+          }
+        ]
+      },
+      "oracleSentinels": ["QUALIFICATION_ORACLE_PRIVATE_37e2"],
+      "contractVersion": "3",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-contract-review",
+        "reviewedAt": "2026-09-30T20:59:55.247Z"
+      },
+      "setupRevision": "qualification-1"
+    },
+    {
+      "id": "parcel-radio",
+      "family": "parcel-packaging",
+      "split": "held-out",
+      "category": "state",
+      "fixture": {
+        "kind": "derived-static-dom",
+        "tree": {
+          "tag": "section",
+          "attributes": {
+            "aria-label": "Parcel preferences"
+          },
+          "children": [
+            {
+              "tag": "h2",
+              "text": "Packaging"
+            },
+            {
+              "tag": "p",
+              "text": "Choose one material."
+            },
+            {
+              "tag": "label",
+              "children": [
+                {
+                  "tag": "input",
+                  "attributes": {
+                    "id": "package-paper",
+                    "type": "radio",
+                    "name": "material"
+                  }
+                },
+                {
+                  "tag": "span",
+                  "text": "Recycled paper"
+                }
+              ]
+            },
+            {
+              "tag": "label",
+              "children": [
+                {
+                  "tag": "input",
+                  "attributes": {
+                    "id": "package-fiber",
+                    "type": "radio",
+                    "name": "material",
+                    "checked": ""
+                  }
+                },
+                {
+                  "tag": "span",
+                  "text": "Plant fibre"
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "instruction": "Check Recycled paper.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "expected": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "check",
+            "outcome": "found",
+            "target": {
+              "selector": "#package-paper",
+              "frames": []
+            },
+            "state": {
+              "checked": false,
+              "enabled": true
+            },
+            "interactability": {
+              "status": "ready",
+              "reasons": [],
+              "checks": {
+                "compatibleControl": "pass",
+                "enabled": "pass",
+                "viewport": "pass",
+                "pointerReception": "pass",
+                "eventOutcome": "unknown"
+              }
+            }
+          }
+        ],
+        "outcome": "found",
+        "summary": {
+          "processingComplete": true,
+          "semanticCompleteness": "unverified",
+          "total": 1,
+          "found": 1,
+          "notFound": 0,
+          "unsupported": 0,
+          "errors": 0,
+          "blocked": 0,
+          "readinessUnknown": 0,
+          "assessmentUnsupported": 0
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "check",
+            "outcome": "found",
+            "label": "Recycled paper",
+            "tag": "input"
+          }
+        ]
+      },
+      "oracleSentinels": ["QUALIFICATION_ORACLE_PRIVATE_37e2"],
+      "contractVersion": "3",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-contract-review",
+        "reviewedAt": "2026-09-30T20:59:55.247Z"
+      },
+      "setupRevision": "qualification-1"
+    },
+    {
+      "id": "laboratory-upload",
+      "family": "laboratory-submission",
+      "split": "held-out",
+      "category": "semantics",
+      "fixture": {
+        "kind": "derived-static-dom",
+        "tree": {
+          "tag": "form",
+          "attributes": {
+            "aria-label": "Microscopy submission"
+          },
+          "children": [
+            {
+              "tag": "h2",
+              "text": "Specimen evidence"
+            },
+            {
+              "tag": "figure",
+              "children": [
+                {
+                  "tag": "figcaption",
+                  "text": "Attach the laboratory image for review."
+                },
+                {
+                  "tag": "label",
+                  "text": "Micrograph file",
+                  "attributes": {
+                    "for": "micrograph-file"
+                  }
+                },
+                {
+                  "tag": "input",
+                  "attributes": {
+                    "id": "micrograph-file",
+                    "type": "file"
+                  }
+                }
+              ]
+            },
+            {
+              "tag": "button",
+              "text": "Submit specimen",
+              "attributes": {
+                "id": "submit-specimen"
+              }
+            }
+          ]
+        }
+      },
+      "instruction": "Upload to Micrograph file.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "expected": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "upload",
+            "outcome": "found",
+            "target": {
+              "selector": "#micrograph-file",
+              "frames": []
+            },
+            "state": {
+              "enabled": true,
+              "inViewport": true
+            },
+            "interactability": {
+              "status": "unknown",
+              "reasons": [],
+              "checks": {
+                "compatibleControl": "pass",
+                "keyboard": "unknown",
+                "eventOutcome": "unknown"
+              }
+            }
+          }
+        ],
+        "outcome": "found",
+        "summary": {
+          "processingComplete": true,
+          "semanticCompleteness": "unverified",
+          "total": 1,
+          "found": 1,
+          "notFound": 0,
+          "unsupported": 0,
+          "errors": 0,
+          "blocked": 0,
+          "readinessUnknown": 1,
+          "assessmentUnsupported": 0
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "upload",
+            "outcome": "found",
+            "label": "Micrograph file",
+            "tag": "input"
+          }
+        ]
+      },
+      "oracleSentinels": ["QUALIFICATION_ORACLE_PRIVATE_37e2"],
+      "contractVersion": "3",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-contract-review",
+        "reviewedAt": "2026-09-30T20:59:55.247Z"
+      },
+      "setupRevision": "qualification-1"
+    },
+    {
+      "id": "laboratory-future-workflow",
+      "family": "laboratory-submission",
+      "split": "held-out",
+      "category": "semantics",
+      "fixture": {
+        "kind": "derived-static-dom",
+        "tree": {
+          "tag": "form",
+          "attributes": {
+            "aria-label": "Microscopy submission"
+          },
+          "children": [
+            {
+              "tag": "h2",
+              "text": "Specimen evidence"
+            },
+            {
+              "tag": "figure",
+              "children": [
+                {
+                  "tag": "figcaption",
+                  "text": "Attach the laboratory image for review."
+                },
+                {
+                  "tag": "label",
+                  "text": "Micrograph file",
+                  "attributes": {
+                    "for": "micrograph-file"
+                  }
+                },
+                {
+                  "tag": "input",
+                  "attributes": {
+                    "id": "micrograph-file",
+                    "type": "file"
+                  }
+                }
+              ]
+            },
+            {
+              "tag": "button",
+              "text": "Submit specimen",
+              "attributes": {
+                "id": "submit-specimen"
+              }
+            }
+          ]
+        }
+      },
+      "instruction": "Click Submit specimen, then click the confirmation dialog button.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "expected": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "unsupported"
+          }
+        ],
+        "outcome": "unsupported",
+        "summary": {
+          "processingComplete": true,
+          "semanticCompleteness": "unverified",
+          "total": 1,
+          "found": 0,
+          "notFound": 0,
+          "unsupported": 1,
+          "errors": 0,
+          "blocked": 0,
+          "readinessUnknown": 0,
+          "assessmentUnsupported": 0
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "unsupported",
+            "limitation": "current_state_dependency"
+          }
+        ]
+      },
+      "oracleSentinels": ["QUALIFICATION_ORACLE_PRIVATE_37e2"],
+      "contractVersion": "3",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-contract-review",
+        "reviewedAt": "2026-09-30T20:59:55.247Z"
+      },
+      "setupRevision": "qualification-1"
+    },
+    {
+      "id": "recipe-named-targets",
+      "family": "recipe-planning",
+      "split": "held-out",
+      "category": "semantics",
+      "fixture": {
+        "kind": "derived-static-dom",
+        "tree": {
+          "tag": "article",
+          "attributes": {
+            "aria-label": "Couscous recipe"
+          },
+          "children": [
+            {
+              "tag": "h1",
+              "text": "Vegetable couscous"
+            },
+            {
+              "tag": "blockquote",
+              "text": "Allow the broth to simmer gently."
+            },
+            {
+              "tag": "div",
+              "children": [
+                {
+                  "tag": "button",
+                  "text": "Print recipe",
+                  "attributes": {
+                    "id": "recipe-print"
+                  }
+                },
+                {
+                  "tag": "button",
+                  "text": "Add to meal plan",
+                  "attributes": {
+                    "id": "recipe-plan"
+                  }
+                }
+              ]
+            },
+            {
+              "tag": "hr"
+            },
+            {
+              "tag": "p",
+              "text": "Serves four."
+            }
+          ]
+        }
+      },
+      "instruction": "Click Print recipe and Add to meal plan.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "expected": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "target": {
+              "selector": "#recipe-print",
+              "frames": []
+            },
+            "state": {
+              "enabled": true,
+              "inViewport": true
+            },
+            "interactability": {
+              "status": "ready",
+              "reasons": [],
+              "checks": {
+                "compatibleControl": "pass",
+                "enabled": "pass",
+                "viewport": "pass",
+                "pointerReception": "pass",
+                "eventOutcome": "unknown"
+              }
+            }
+          },
+          {
+            "step": 2,
+            "action": "click",
+            "outcome": "found",
+            "target": {
+              "selector": "#recipe-plan",
+              "frames": []
+            },
+            "state": {
+              "enabled": true,
+              "inViewport": true
+            },
+            "interactability": {
+              "status": "ready",
+              "reasons": [],
+              "checks": {
+                "compatibleControl": "pass",
+                "enabled": "pass",
+                "viewport": "pass",
+                "pointerReception": "pass",
+                "eventOutcome": "unknown"
+              }
+            }
+          }
+        ],
+        "outcome": "found",
+        "summary": {
+          "processingComplete": true,
+          "semanticCompleteness": "unverified",
+          "total": 2,
+          "found": 2,
+          "notFound": 0,
+          "unsupported": 0,
+          "errors": 0,
+          "blocked": 0,
+          "readinessUnknown": 0,
+          "assessmentUnsupported": 0
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "label": "Print recipe",
+            "tag": "button"
+          },
+          {
+            "step": 2,
+            "action": "click",
+            "outcome": "found",
+            "label": "Add to meal plan",
+            "tag": "button"
+          }
+        ]
+      },
+      "oracleSentinels": ["QUALIFICATION_ORACLE_PRIVATE_37e2"],
+      "contractVersion": "3",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-contract-review",
+        "reviewedAt": "2026-09-30T20:59:55.247Z"
+      },
+      "setupRevision": "qualification-1"
+    },
+    {
+      "id": "recipe-typo",
+      "family": "recipe-planning",
+      "split": "held-out",
+      "category": "language",
+      "fixture": {
+        "kind": "derived-static-dom",
+        "tree": {
+          "tag": "article",
+          "attributes": {
+            "aria-label": "Couscous recipe"
+          },
+          "children": [
+            {
+              "tag": "h1",
+              "text": "Vegetable couscous"
+            },
+            {
+              "tag": "blockquote",
+              "text": "Allow the broth to simmer gently."
+            },
+            {
+              "tag": "div",
+              "children": [
+                {
+                  "tag": "button",
+                  "text": "Print recipe",
+                  "attributes": {
+                    "id": "recipe-print"
+                  }
+                },
+                {
+                  "tag": "button",
+                  "text": "Add to meal plan",
+                  "attributes": {
+                    "id": "recipe-plan"
+                  }
+                }
+              ]
+            },
+            {
+              "tag": "hr"
+            },
+            {
+              "tag": "p",
+              "text": "Serves four."
+            }
+          ]
+        }
+      },
+      "instruction": "clik teh Print recipe buton",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "expected": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "target": {
+              "selector": "#recipe-print",
+              "frames": []
+            },
+            "state": {
+              "enabled": true,
+              "inViewport": true
+            },
+            "interactability": {
+              "status": "ready",
+              "reasons": [],
+              "checks": {
+                "compatibleControl": "pass",
+                "enabled": "pass",
+                "viewport": "pass",
+                "pointerReception": "pass",
+                "eventOutcome": "unknown"
+              }
+            }
+          }
+        ],
+        "outcome": "found",
+        "summary": {
+          "processingComplete": true,
+          "semanticCompleteness": "unverified",
+          "total": 1,
+          "found": 1,
+          "notFound": 0,
+          "unsupported": 0,
+          "errors": 0,
+          "blocked": 0,
+          "readinessUnknown": 0,
+          "assessmentUnsupported": 0
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "label": "Print recipe",
+            "tag": "button"
+          }
+        ]
+      },
+      "oracleSentinels": ["QUALIFICATION_ORACLE_PRIVATE_37e2"],
+      "contractVersion": "3",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-contract-review",
+        "reviewedAt": "2026-09-30T20:59:55.247Z"
+      },
+      "setupRevision": "qualification-1"
+    },
+    {
+      "id": "provider-malformed",
+      "family": "profile",
+      "split": "development",
+      "category": "provider-failure",
+      "fixture": "form",
+      "instruction": "Click Save changes.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "setupRevision": "qualification-1",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-contract-review",
+        "reviewedAt": "2026-09-30T20:59:55.247Z"
+      },
+      "expected": {
+        "outcome": "error",
+        "code": "provider_malformed_response",
+        "actions": []
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "label": "Save changes",
+            "tag": "button"
+          }
+        ],
+        "fault": "malformed"
+      },
+      "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
+      "contractVersion": "3",
+      "deterministicOnly": true
+    },
+    {
+      "id": "provider-unknown",
+      "family": "profile",
+      "split": "development",
+      "category": "provider-failure",
+      "fixture": "form",
+      "instruction": "Click Save changes.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "setupRevision": "qualification-1",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-contract-review",
+        "reviewedAt": "2026-09-30T20:59:55.247Z"
+      },
+      "expected": {
+        "outcome": "error",
+        "code": "provider_unknown_candidate",
+        "actions": []
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "label": "Save changes",
+            "tag": "button"
+          }
+        ],
+        "fault": "unknown"
+      },
+      "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
+      "contractVersion": "3",
+      "deterministicOnly": true
+    },
+    {
+      "id": "provider-rate_limit",
+      "family": "profile",
+      "split": "development",
+      "category": "provider-failure",
+      "fixture": "form",
+      "instruction": "Click Save changes.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "setupRevision": "qualification-1",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-contract-review",
+        "reviewedAt": "2026-09-30T20:59:55.247Z"
+      },
+      "expected": {
+        "outcome": "error",
+        "code": "provider_rate_limited",
+        "actions": []
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "label": "Save changes",
+            "tag": "button"
+          }
+        ],
+        "fault": "rate_limit"
+      },
+      "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
+      "contractVersion": "3",
+      "deterministicOnly": true
+    },
+    {
+      "id": "provider-timeout",
+      "family": "profile",
+      "split": "development",
+      "category": "provider-failure",
+      "fixture": "form",
+      "instruction": "Click Save changes.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "setupRevision": "qualification-1",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-contract-review",
+        "reviewedAt": "2026-09-30T20:59:55.247Z"
+      },
+      "expected": {
+        "outcome": "error",
+        "code": "provider_timeout",
+        "actions": []
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "label": "Save changes",
+            "tag": "button"
+          }
+        ],
+        "fault": "timeout"
+      },
+      "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
+      "contractVersion": "3",
+      "deterministicOnly": true
+    },
+    {
+      "id": "provider-refusal",
+      "family": "profile",
+      "split": "development",
+      "category": "provider-failure",
+      "fixture": "form",
+      "instruction": "Click Save changes.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "setupRevision": "qualification-1",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-contract-review",
+        "reviewedAt": "2026-09-30T20:59:55.247Z"
+      },
+      "expected": {
+        "outcome": "error",
+        "code": "provider_refused",
+        "actions": []
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "label": "Save changes",
+            "tag": "button"
+          }
+        ],
+        "fault": "refusal"
+      },
+      "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
+      "contractVersion": "3",
+      "deterministicOnly": true
+    },
+    {
+      "id": "provider-empty",
+      "family": "profile",
+      "split": "development",
+      "category": "provider-failure",
+      "fixture": "form",
+      "instruction": "Click Save changes.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "setupRevision": "qualification-1",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-contract-review",
+        "reviewedAt": "2026-09-30T20:59:55.247Z"
+      },
+      "expected": {
+        "outcome": "error",
+        "code": "provider_empty_response",
+        "actions": []
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "label": "Save changes",
+            "tag": "button"
+          }
+        ],
+        "fault": "empty"
+      },
+      "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
+      "contractVersion": "3",
+      "deterministicOnly": true
+    },
+    {
+      "id": "provider-truncated",
+      "family": "profile",
+      "split": "development",
+      "category": "provider-failure",
+      "fixture": "form",
+      "instruction": "Click Save changes.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "setupRevision": "qualification-1",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-contract-review",
+        "reviewedAt": "2026-09-30T20:59:55.247Z"
+      },
+      "expected": {
+        "outcome": "error",
+        "code": "provider_truncated_response",
+        "actions": []
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "label": "Save changes",
+            "tag": "button"
+          }
+        ],
+        "fault": "truncated"
+      },
+      "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
+      "contractVersion": "3",
+      "deterministicOnly": true
+    },
+    {
+      "id": "provider-missing-usage",
+      "family": "profile",
+      "split": "development",
+      "category": "provider-failure",
+      "fixture": "form",
+      "instruction": "Click Save changes.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "setupRevision": "qualification-1",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-contract-review",
+        "reviewedAt": "2026-09-30T20:59:55.247Z"
+      },
+      "expected": {
+        "outcome": "found",
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "target": {
+              "selector": "#save-profile",
+              "frames": []
+            },
+            "state": {
+              "enabled": true,
+              "inViewport": true
+            },
+            "interactability": {
+              "status": "ready",
+              "reasons": [],
+              "checks": {
+                "compatibleControl": "pass",
+                "enabled": "pass",
+                "viewport": "pass",
+                "pointerReception": "pass",
+                "keyboard": "not_applicable",
+                "stability": "unknown",
+                "eventOutcome": "unknown"
+              }
+            }
+          }
+        ],
+        "summary": {
+          "processingComplete": true,
+          "semanticCompleteness": "unverified",
+          "total": 1,
+          "found": 1,
+          "notFound": 0,
+          "unsupported": 0,
+          "errors": 0,
+          "blocked": 0,
+          "readinessUnknown": 0,
+          "assessmentUnsupported": 0
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "label": "Save changes",
+            "tag": "button"
+          }
+        ],
+        "fault": "missing_usage"
+      },
+      "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
+      "contractVersion": "3",
+      "deterministicOnly": true
+    }
+  ]
+}

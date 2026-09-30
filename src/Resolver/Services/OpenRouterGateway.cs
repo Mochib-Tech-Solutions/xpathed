@@ -17,6 +17,8 @@ public sealed class OpenRouterGateway(IHttpClientFactory clients, IConfiguration
     internal Dictionary<string, decimal>? EvaluationPriceLimits { get; set; }
 
     private readonly string? apiKey = configuration["OpenRouter:ApiKey"];
+    private readonly string? reasoningEffort = configuration["OpenRouter:ReasoningEffort"];
+    private readonly string? promptCacheMode = configuration["OpenRouter:PromptCacheMode"];
     private readonly string endpoint =
         (configuration["OpenRouter:BaseUrl"] ?? "https://openrouter.ai/api/v1/").TrimEnd('/') + "/";
     private readonly double timeoutSeconds = double.TryParse(
@@ -49,6 +51,8 @@ public sealed class OpenRouterGateway(IHttpClientFactory clients, IConfiguration
             || timeoutSeconds > 600
             || string.IsNullOrWhiteSpace(Model)
             || string.IsNullOrWhiteSpace(Provider)
+            || reasoningEffort is not (null or "none" or "low")
+            || promptCacheMode is not (null or "explicit")
         )
         {
             throw new ApiException(
@@ -111,17 +115,20 @@ public sealed class OpenRouterGateway(IHttpClientFactory clients, IConfiguration
             request = CreateRequest(prompt, string.Empty, schema, outputTokens),
         };
 
-    private object CreateRequest(string prompt, string input, JsonElement schema, int outputTokens) =>
-        new
+    private Dictionary<string, object> CreateRequest(string prompt, string input, JsonElement schema, int outputTokens)
+    {
+        var request = new Dictionary<string, object>
         {
-            model = Model,
-            stream = false,
-            max_tokens = outputTokens,
-            reasoning = new { enabled = false },
-            provider = ProviderSettings(),
-            plugins = new[] { new { id = "context-compression", enabled = false } },
-            messages = new[] { new { role = "system", content = prompt }, new { role = "user", content = input } },
-            response_format = new
+            ["model"] = Model,
+            ["stream"] = false,
+            ["max_tokens"] = outputTokens,
+            ["reasoning"] = reasoningEffort is null
+                ? (object)new { enabled = false }
+                : new { effort = reasoningEffort },
+            ["provider"] = ProviderSettings(),
+            ["plugins"] = new[] { new { id = "context-compression", enabled = false } },
+            ["messages"] = new[] { new { role = "system", content = prompt }, new { role = "user", content = input } },
+            ["response_format"] = new
             {
                 type = "json_schema",
                 json_schema = new
@@ -132,6 +139,12 @@ public sealed class OpenRouterGateway(IHttpClientFactory clients, IConfiguration
                 },
             },
         };
+        if (promptCacheMode is not null)
+        {
+            request["prompt_cache_options"] = new { mode = promptCacheMode };
+        }
+        return request;
+    }
 
     private Dictionary<string, object> ProviderSettings()
     {
