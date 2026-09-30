@@ -18,8 +18,8 @@ export type SessionState = {
 };
 
 export type ResolutionResult = {
-  contractVersion: "1";
-  outcome: "found" | "not_found" | "unsupported" | "error";
+  contractVersion: "1" | "2";
+  outcome: "found" | "not_found" | "unsupported" | "error" | "partial";
   sessionId: string | null;
   pageId: string;
   documentId: string;
@@ -29,6 +29,20 @@ export type ResolutionResult = {
   attemptId: string;
   configurationId: string;
   action: string | null;
+  actions?: ActionResolution[] | null;
+  inspectedActionId?: string | null;
+  summary?: {
+    processingComplete: boolean;
+    semanticCompleteness: "unverified";
+    total: number;
+    found: number;
+    notFound: number;
+    unsupported: number;
+    errors: number;
+    blocked: number;
+    readinessUnknown: number;
+    assessmentUnsupported: number;
+  } | null;
   target: {
     candidateId: string;
     tag: string;
@@ -78,6 +92,20 @@ export type ResolutionResult = {
       pricingFetchedAt: string;
     } | null;
   };
+};
+
+export type ActionResolution = {
+  actionId: string;
+  order: number;
+  step: number;
+  instruction: string;
+  action: string;
+  outcome: "found" | "not_found" | "unsupported" | "error";
+  target: ResolutionResult["target"];
+  frameId: string;
+  diagnosticsReference: string;
+  code: string | null;
+  message: string | null;
 };
 
 export type Resolution = {

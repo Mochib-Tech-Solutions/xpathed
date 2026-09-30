@@ -5,21 +5,25 @@ let providerRequest;
 let scenario = "found";
 let targetText = "About us";
 let targetAction = "click";
+let plannedActions = [];
+let planComplete = true;
 const fixture = `<!doctype html><html lang="en"><meta charset="utf-8"><title>Resolution contract</title>
 <body><nav aria-label="Company"><button id="expected-target" data-testid="about-us" data-oracle="expected-target">About us</button></nav>
 <script>
 let clicks = 0;
 const runQuery = '?run=' + encodeURIComponent(new URL(location.href).searchParams.get('run') ?? 'manual');
 document.querySelector('button').addEventListener('click', () => clicks++);
+const events = {};
+for (const name of ['click','input','change','focusin','mouseover','pointerover','scroll']) document.addEventListener(name, () => events[name] = (events[name] ?? 0) + 1, true);
 setInterval(async () => {
  const response = await fetch('/oracle' + runQuery);
  const command = await response.json();
  if (!command) return;
  const matches = command.xpaths.map(xpath => {
    const result = document.evaluate(xpath, document, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE);
-   return Array.from({length:result.snapshotLength}, (_,i) => result.snapshotItem(i) === document.querySelector('[data-oracle=expected-target]') ? 'expected-target' : 'wrong-target');
+   return Array.from({length:result.snapshotLength}, (_,i) => result.snapshotItem(i).getAttribute('data-oracle') ?? result.snapshotItem(i).id ?? 'wrong-target');
  });
- await fetch('/observation' + runQuery,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({matches,clicks,scrollY})});
+ await fetch('/observation' + runQuery,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({matches,clicks,scrollY,events})});
 }, 50);
 </script></body></html>`;
 
@@ -41,9 +45,18 @@ const server = createServer(async (request, response) => {
         "/oversized",
         "/state",
         "/hidden-only",
+        "/batch",
       ].includes(path)
     ) {
       let html = fixture;
+      if (path === "/batch")
+        html = html.replace(
+          /<nav.*?<\/nav>/s,
+          `<section aria-label="Approvals">
+        <button data-oracle="approval-first">Approval</button><button data-oracle="approval-second" disabled>Approval</button>
+        <button aria-hidden="true">HIDDEN_APPROVAL</button><label>Notes<input data-oracle="notes" readonly value="PRIVATE_NOTE_VALUE"></label>
+        <button>Show details</button><button hidden>Done</button></section>`,
+        );
       if (path === "/state")
         html = html
           .replace(
@@ -99,6 +112,8 @@ const server = createServer(async (request, response) => {
       scenario = body.name;
       targetText = body.targetText ?? "About us";
       targetAction = body.action ?? "click";
+      plannedActions = body.actions ?? [];
+      planComplete = body.complete ?? true;
       providerRequest = null;
       output = { ok: true };
     } else if (path === "/api/v1/models/deepseek/deepseek-v4.1-flash/endpoints") {
@@ -121,7 +136,7 @@ const server = createServer(async (request, response) => {
           candidate.tag === "button" &&
           (candidate.text === targetText || candidate.label === targetText),
       );
-      if (!target && scenario !== "absent")
+      if (!target && scenario !== "absent" && scenario !== "batch")
         throw new Error("Independent fixture target absent from provider input");
       output = {
         id: "deterministic-fixture",
@@ -133,13 +148,34 @@ const server = createServer(async (request, response) => {
             message: {
               role: "assistant",
               content: JSON.stringify(
-                scenario === "absent"
-                  ? { outcome: "not_found", action: targetAction, candidateId: null }
-                  : {
-                      outcome: "found",
-                      action: targetAction,
-                      candidateId: scenario === "unknown" ? "fabricated-id" : target.id,
-                    },
+                scenario === "batch"
+                  ? {
+                      complete: planComplete,
+                      actions: plannedActions.map((item) => ({
+                        step: item.step,
+                        instruction: item.instruction,
+                        action: item.action,
+                        outcome: item.outcome,
+                        candidateId:
+                          item.outcome === "found"
+                            ? (item.candidateId ??
+                              candidates.filter(
+                                (candidate) =>
+                                  (!item.tag || candidate.tag === item.tag) &&
+                                  (candidate.label === item.label || candidate.text === item.label),
+                              )[item.index ?? 0]?.id ??
+                              null)
+                            : null,
+                        limitation: item.limitation ?? "none",
+                      })),
+                    }
+                  : scenario === "absent"
+                    ? { outcome: "not_found", action: targetAction, candidateId: null }
+                    : {
+                        outcome: "found",
+                        action: targetAction,
+                        candidateId: scenario === "unknown" ? "fabricated-id" : target.id,
+                      },
               ),
             },
           },

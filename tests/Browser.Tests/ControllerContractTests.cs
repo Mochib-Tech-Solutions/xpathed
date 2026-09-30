@@ -76,6 +76,9 @@ public sealed class ControllerContractTests(WebApplicationFactory<HealthControll
     [InlineData("capture", "{\"documentId\":null}")]
     [InlineData("selection", "{}")]
     [InlineData("selection", "{\"documentId\":\"document\",\"captureId\":\"capture\"}")]
+    [InlineData("selections", "{\"documentId\":\"document\",\"captureId\":\"capture\",\"actions\":[null]}")]
+    [InlineData("selections", "{\"documentId\":\"document\",\"captureId\":\"capture\",\"actions\":[]}")]
+    [InlineData("highlight", "{}")]
     public async Task InvalidResolutionBodyReturnsBadRequest(string operation, string body)
     {
         using var client = application.CreateClient();

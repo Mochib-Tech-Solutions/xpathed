@@ -7,6 +7,7 @@ namespace Xpathed.Resolver.Tests;
 
 internal sealed class DeterministicServicesHandler : HttpMessageHandler
 {
+    private static readonly string[] SaveXpaths = ["//*[@data-testid='save-profile']"];
     public Func<string, CancellationToken, Task>? BeforeRespondAsync { get; init; }
     public string? ProviderBody { get; init; }
     public HttpStatusCode ProviderStatus { get; init; } = HttpStatusCode.OK;
@@ -51,6 +52,28 @@ internal sealed class DeterministicServicesHandler : HttpMessageHandler
         if (path == "/api/v1/models/deepseek/deepseek-v4.1-flash/endpoints")
         {
             return Json(PricingBody, PricingStatus);
+        }
+        if (path == "/pages/page-1/selections")
+        {
+            SelectionRequestCount++;
+            var batch = await request.Content!.ReadFromJsonAsync<JsonElement>(cancellationToken);
+            return Json(SelectionBody ?? JsonSerializer.Serialize(new
+            {
+                actions = batch.GetProperty("actions").EnumerateArray().Select(item => new
+                {
+                    actionId = item.GetProperty("actionId").GetString(),
+                    target = item.GetProperty("candidateId").ValueKind == JsonValueKind.Null ? (object?)null : new
+                    {
+                        candidateId = "button-save",
+                        tag = "button",
+                        label = "Save",
+                        xpaths = SaveXpaths,
+                        state = new { rendered = true, inViewport = true, enabled = true, editable = false, @checked = (bool?)null },
+                        geometry = new { x = 20, y = 40, width = 90, height = 30 }
+                    }
+                }),
+                inspectedActionId = batch.GetProperty("actions").EnumerateArray().Where(item => item.GetProperty("candidateId").ValueKind == JsonValueKind.String).Select(item => item.GetProperty("actionId").GetString()).FirstOrDefault()
+            }));
         }
         if (path == "/pages/page-1/selection")
         {

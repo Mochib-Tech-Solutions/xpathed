@@ -201,57 +201,111 @@ public sealed class BrowserSessions(IConfiguration configuration, ILogger<Browse
 
     public Task<SelectionValidation> SelectAsync(string pageId, SelectionRequest request, CancellationToken token)
     {
-        if (request.Action is not ("click" or "hover" or "fill" or "type" or "select" or "check" or "uncheck" or "unsupported"))
+        RequireAction(request.Action);
+        return OnPageAsync(pageId, async (session, page) =>
+        {
+            page.ActionSelections = null;
+            var result = await EvaluateCaptureAsync(session, page, request.DocumentId, request.CaptureId,
+                "(capture, selection) => capture.select(selection.candidateId, selection.action)", new { candidateId = request.CandidateId, action = request.Action });
+            var selection = result.Deserialize<SelectionValidation>(JsonOptions)!;
+            await HighlightTargetAsync(session, page, request.DocumentId, request.CaptureId, selection.Target);
+            return selection;
+        }, token);
+    }
+
+    public Task<ActionSelectionValidation> SelectActionsAsync(string pageId, ActionSelectionRequest request, CancellationToken token)
+    {
+        if (request.Actions.Any(action => action is null))
+        {
+            throw new ApiException(400, "invalid_request", "Every action must be an object.");
+        }
+        if (request.Actions.Select(action => action.ActionId).Distinct(StringComparer.Ordinal).Count() != request.Actions.Length)
+        {
+            throw new ApiException(400, "invalid_actions", "Action identities must be unique.");
+        }
+        foreach (var action in request.Actions)
+        {
+            RequireAction(action.Action);
+        }
+        return OnPageAsync(pageId, async (session, page) =>
+        {
+            page.ActionSelections = null;
+            var actions = request.Actions.Select(action => new { actionId = action.ActionId, candidateId = action.CandidateId, action = action.Action }).ToArray();
+            var result = await EvaluateCaptureAsync(session, page, request.DocumentId, request.CaptureId,
+                "(capture, actions) => capture.selectActions(actions)", actions);
+            var validation = result.Deserialize<ActionSelectionValidation>(JsonOptions)!;
+            await HighlightTargetAsync(session, page, request.DocumentId, request.CaptureId, validation.Actions.FirstOrDefault(action => action.Target is not null)?.Target);
+            page.ActionSelections = request.Actions.ToDictionary(action => action.ActionId, StringComparer.Ordinal);
+            return validation;
+        }, token);
+    }
+
+    public Task<ValidatedAction> InspectActionAsync(string pageId, InspectActionRequest request, CancellationToken token) => OnPageAsync(pageId, async (session, page) =>
+    {
+        await RequireCaptureAsync(session, page, request.DocumentId, request.CaptureId);
+        if (page.ActionSelections is null || !page.ActionSelections.TryGetValue(request.ActionId, out var action) || action.CandidateId is null)
+        {
+            throw new ApiException(409, "unknown_action", "This action has no verified target in the current capture.");
+        }
+        var result = await EvaluateCaptureAsync(session, page, request.DocumentId, request.CaptureId,
+            "(capture, selection) => capture.select(selection.candidateId, selection.action)", new { candidateId = action.CandidateId, action = action.Action });
+        var selection = result.Deserialize<SelectionValidation>(JsonOptions)!;
+        await HighlightTargetAsync(session, page, request.DocumentId, request.CaptureId, selection.Target);
+        return new ValidatedAction(action.ActionId, selection.Target);
+    }, token);
+
+    private static void RequireAction(string action)
+    {
+        if (action is not ("click" or "hover" or "fill" or "type" or "select" or "check" or "uncheck" or "unsupported"))
         {
             throw new ApiException(400, "invalid_action", "The requested action is not supported.");
         }
-        return OnPageAsync(pageId, async (s, page) =>
-        {
-            await RequireFocusedDocumentAsync(s, page, request.DocumentId);
-            if (page.Capture is null || request.CaptureId != page.CaptureId)
-            {
-                throw new ApiException(409, "stale_capture", "This capture is no longer current.");
-            }
-            var result = await page.Capture.EvaluateAsync<JsonElement>("(capture, selection) => capture.select(selection.candidateId, selection.action)", new { candidateId = request.CandidateId, action = request.Action });
-            await RequireFocusedDocumentAsync(s, page, request.DocumentId);
-            if (request.CaptureId != page.CaptureId)
-            {
-                throw new ApiException(409, "stale_capture", "This capture is no longer current.");
-            }
+    }
 
-            if (result.TryGetProperty("errorCode", out var error))
+    private static async Task RequireCaptureAsync(BrowserSessionRuntime session, BrowserPageRuntime page, string documentId, string captureId)
+    {
+        await RequireFocusedDocumentAsync(session, page, documentId);
+        if (page.Capture is null || page.CaptureId != captureId)
+        {
+            throw new ApiException(409, "stale_capture", "This capture is no longer current.");
+        }
+    }
+
+    private static async Task<JsonElement> EvaluateCaptureAsync(BrowserSessionRuntime session, BrowserPageRuntime page, string documentId, string captureId, string expression, object argument)
+    {
+        await RequireCaptureAsync(session, page, documentId, captureId);
+        var result = await page.Capture!.EvaluateAsync<JsonElement>(expression, argument);
+        await RequireCaptureAsync(session, page, documentId, captureId);
+        if (result.TryGetProperty("errorCode", out var error))
+        {
+            await page.ClearHighlightAsync();
+            throw new ApiException(409, error.GetString()!, "The selected target is no longer valid in this capture.");
+        }
+        return result;
+    }
+
+    private static async Task HighlightTargetAsync(BrowserSessionRuntime session, BrowserPageRuntime page, string documentId, string captureId, ResolvedTarget? target)
+    {
+        await page.ClearHighlightAsync();
+        if (target is { State.InViewport: true })
+        {
+            await page.Highlight!.SendAsync("Overlay.highlightRect", new Dictionary<string, object>
             {
-                throw new ApiException(409, error.GetString()!, "The selected target is no longer valid in this capture.");
-            }
-            var selection = result.Deserialize<SelectionValidation>(JsonOptions)!;
-            await page.Highlight!.SendAsync("Overlay.hideHighlight");
-            if (selection.Target is { State.InViewport: true } target)
-            {
-                await page.Highlight.SendAsync("Overlay.highlightRect", new Dictionary<string, object>
-                {
-                    ["x"] = (int)Math.Round(target.Geometry.X),
-                    ["y"] = (int)Math.Round(target.Geometry.Y),
-                    ["width"] = (int)Math.Round(target.Geometry.Width),
-                    ["height"] = (int)Math.Round(target.Geometry.Height),
-                    ["color"] = new { r = 59, g = 130, b = 246, a = 0.18 },
-                    ["outlineColor"] = new { r = 37, g = 99, b = 235, a = 1 }
-                });
-            }
-            try
-            {
-                await RequireFocusedDocumentAsync(s, page, request.DocumentId);
-                if (request.CaptureId != page.CaptureId)
-                {
-                    throw new ApiException(409, "stale_capture", "This capture is no longer current.");
-                }
-            }
-            catch (ApiException)
-            {
-                await page.ClearHighlightAsync();
-                throw;
-            }
-            return selection;
-        }, token);
+                ["x"] = (int)Math.Round(target.Geometry.X),
+                ["y"] = (int)Math.Round(target.Geometry.Y),
+                ["width"] = (int)Math.Round(target.Geometry.Width),
+                ["height"] = (int)Math.Round(target.Geometry.Height),
+                ["color"] = new { r = 59, g = 130, b = 246, a = 0.18 },
+                ["outlineColor"] = new { r = 37, g = 99, b = 235, a = 1 }
+            });
+        }
+        try
+        { await RequireCaptureAsync(session, page, documentId, captureId); }
+        catch (ApiException)
+        {
+            await page.ClearHighlightAsync();
+            throw;
+        }
     }
 
     private static void RequireActive(BrowserSessionRuntime session, BrowserPageRuntime page)

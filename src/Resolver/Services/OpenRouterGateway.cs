@@ -32,10 +32,10 @@ public sealed class OpenRouterGateway(IHttpClientFactory clients, IConfiguration
         }
     }
 
-    internal string ConfigurationId(string strategy, string prompt, JsonElement schema, int modelInputBudgetBytes) => Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new
+    internal string ConfigurationId(string strategy, string prompt, JsonElement schema, int modelInputBudgetBytes, int outputTokens = 512, string promptVersion = "2") => Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new
     {
         strategy,
-        promptVersion = "2",
+        promptVersion,
         captureVersion = "2",
         stateVersion = "2",
         interactabilityVersion = "1",
@@ -43,14 +43,15 @@ public sealed class OpenRouterGateway(IHttpClientFactory clients, IConfiguration
         timeoutSeconds = timeoutSeconds.ToString("R", CultureInfo.InvariantCulture),
         modelInputBudgetBytes,
         responseCache = false,
-        request = CreateRequest(prompt, string.Empty, schema)
+        maximumActions = promptVersion == "3" ? ActionSelectionStrategy.MaximumActions : 1,
+        request = CreateRequest(prompt, string.Empty, schema, outputTokens)
     }))));
 
-    private object CreateRequest(string prompt, string input, JsonElement schema) => new
+    private object CreateRequest(string prompt, string input, JsonElement schema, int outputTokens) => new
     {
         model = Model,
         stream = false,
-        max_tokens = 512,
+        max_tokens = outputTokens,
         reasoning = new { enabled = false },
         provider = new { only = new[] { Provider }, order = new[] { Provider }, allow_fallbacks = false, require_parameters = true },
         plugins = new[] { new { id = "context-compression", enabled = false } },
@@ -71,7 +72,7 @@ public sealed class OpenRouterGateway(IHttpClientFactory clients, IConfiguration
         }
     };
 
-    internal async Task<ProviderCompletion> CompleteAsync(string prompt, string input, JsonElement schema, CancellationToken cancellationToken)
+    internal async Task<ProviderCompletion> CompleteAsync(string prompt, string input, JsonElement schema, CancellationToken cancellationToken, int outputTokens = 512)
     {
         using var client = clients.CreateClient("openrouter");
         client.BaseAddress = new Uri(endpoint);
@@ -80,7 +81,7 @@ public sealed class OpenRouterGateway(IHttpClientFactory clients, IConfiguration
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
         request.Headers.Add("X-OpenRouter-Cache", "false");
         request.Headers.Add("X-OpenRouter-Metadata", "enabled");
-        request.Content = JsonContent.Create(CreateRequest(prompt, input, schema));
+        request.Content = JsonContent.Create(CreateRequest(prompt, input, schema, outputTokens));
         using var response = await client.SendAsync(request, cancellationToken);
         JsonElement body;
         try
