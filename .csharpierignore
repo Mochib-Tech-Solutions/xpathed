@@ -1,0 +1,7 @@
+# Keep this formatter responsible only for C# source; retain existing XML layout.
+**/*.csproj
+**/*.props
+**/*.targets
+**/*.slnx
+**/*.config
+**/*.xml

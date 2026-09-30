@@ -12,10 +12,12 @@ public sealed class SessionsController(BrowserSessions sessions) : ControllerBas
     public Task<BrowserSession> Create(CancellationToken cancellationToken) => sessions.CreateAsync(cancellationToken);
 
     [HttpGet("{id}")]
-    public Task<BrowserSessionState> Get(string id, CancellationToken cancellationToken) => sessions.SessionStateAsync(id, cancellationToken);
+    public Task<BrowserSessionState> Get(string id, CancellationToken cancellationToken) =>
+        sessions.SessionStateAsync(id, cancellationToken);
 
     [HttpPost("{id}/pages")]
-    public Task<BrowserSessionState> NewPage(string id, CancellationToken cancellationToken) => sessions.NewPageAsync(id, cancellationToken);
+    public Task<BrowserSessionState> NewPage(string id, CancellationToken cancellationToken) =>
+        sessions.NewPageAsync(id, cancellationToken);
 
     [HttpDelete("{id}")]
     public async Task<IActionResult> Delete(string id)

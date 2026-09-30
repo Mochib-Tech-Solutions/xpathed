@@ -14,6 +14,8 @@ The assignment clarification supplied on 2026-09-30 changes accepted future scop
 
 ## Start issue-driven work from current evidence
 
+For persistence and diagnostic work in #5, follow [ADR-0013](docs/adr/0013-store-diagnostics-as-automatic-backend-logs.md): automatic backend records and sanitized evidence, with no frontend history/export UI or capture-consent controls. This accepted clarification supersedes older #1/#5 wording. Read [backend diagnostics](docs/diagnostics.md) for schema, internal access, sanitization, retention and migration contracts.
+
 1. Check `git status`, the current branch and the repository remote before editing. Preserve unrelated work.
 2. Read the requested issue's body, comments and native blockers, plus [specification #1](https://github.com/Mochib-Tech-Solutions/xpathed/issues/1) and the relevant linked tickets. Use the live GitHub data, not a copied status list. Commands are in [the issue-tracker guide](docs/agents/issue-tracker.md).
 3. Read [CONTEXT.md](CONTEXT.md) for domain terms and the relevant [ADRs](docs/adr/) for accepted decisions. Follow source references that affect the task; unrelated documentation need not be reread for a small edit.
@@ -24,8 +26,10 @@ GitHub is the live source of requirements and progress. These files are maintain
 
 ## Architecture and ownership
 
+Before editing a service or tests, read its scoped `AGENTS.md`. Repository skills `$xpathed-diagnostics` and `$xpathed-resolution-checks` cover the associated cross-service verification workflows.
+
 - **Browser** owns live Playwright objects, session/page identity, serialized operations and display cleanup. Other services exchange records from **Common**, never browser handles.
-- **Resolver** is stateless between requests and independent of the client database. **ClientApi** owns EF Core/PostgreSQL persistence; durable history and schema work begins in #5. Current per-tab chat history lives in the Web workspace session.
+- **Resolver** is stateless between requests and independent of the client database. **ClientApi** owns EF Core/PostgreSQL persistence; automatic diagnostic records and schema are documented in [backend diagnostics](docs/diagnostics.md). Current per-tab chat history lives in the Web workspace session.
 - **Web** owns the React workspace. Keep shared shadcn/ui controls in `components/ui/`, feature state in `features/`, and common helpers in `lib/`. Use semantic CSS theme tokens, strict types and effect cleanup.
 - All three .NET APIs use `ControllerBase`, explicit attribute routes and constructor injection. Keep `Program.cs` for composition, middleware for request policies, and service behavior outside controllers. One named C# type belongs in a matching file with a folder-aligned namespace.
 - All five local services run in Docker. Compose and per-service Dockerfiles live in `docker/`; use the root commands or `docker/compose.sh` so relative paths remain correct.
@@ -38,11 +42,12 @@ Run commands from the repository root, using the RTK prefix required above. `pac
 
 - `pnpm run setup` prepares configuration and workspace dependencies; `pnpm dev` replaces the existing development runner for this checkout and Compose project, then runs Docker development mode. Preserve `.env` and database volumes; never replace unrelated projects. A separate checkout needs its own `COMPOSE_PROJECT_NAME` and `XPATHED_PORT`.
 - `pnpm check:dotnet`, `pnpm check:web` and `pnpm check:tooling` validate the affected area. `pnpm check` is the full local gate.
-- `pnpm format` applies formatting; `pnpm format:check` verifies it. C# builds enforce the shared recommended analyzers and warnings as errors.
+- `pnpm format` applies formatting; `pnpm format:check` verifies it. C# builds enforce the shared recommended analyzers and warnings as errors. Pinned CSharpier owns whitespace/wrapping at the `.editorconfig` 120-column target; native `dotnet format style` checks semantic style. Restore local tools with `dotnet tool restore`.
+- `pnpm test:persistence` runs real PostgreSQL integration checks with `ConnectionStrings__Database` pointing to a disposable test server; fixtures create isolated databases. `pnpm diagnostics -- <command>` operates on internal records without frontend controls.
 - `pnpm test:resolution` runs deterministic real-browser resolution checks in an isolated Docker stack; `pnpm test:resolution:live` explicitly exercises OpenRouter with the local API key. These remain outside CI service startup. Keep live tests on the documented cheap route, retain the output limit and report actual cost; runtime requests have no provider price filter; use deterministic responses for other checks.
 - `pnpm docker:check` validates Docker definitions. `pnpm docker:build` builds images, and `pnpm docker:down` stops project containers without deleting database data.
 
-Keep CI jobs independent and selected by relevant changes. Docker image builds and service startup remain explicit operations outside CI. Update `Xpathed.slnx` and `scripts/ci-changes.mjs` when adding projects. Validate behavior at the appropriate boundary; report actual checks rather than inferring success from configuration alone.
+Keep CI jobs independent and selected by relevant changes. Docker image builds and full application-stack startup remain explicit operations outside CI; the persistence CI job starts only PostgreSQL. Update `Xpathed.slnx` and `scripts/ci-changes.mjs` when adding projects. Validate behavior at the appropriate boundary; report actual checks rather than inferring success from configuration alone.
 
 ## Keep the guide current
 

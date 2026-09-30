@@ -51,6 +51,12 @@ The managed page currently selected for viewing and target resolution. A session
 **Resolution history**:
 The ordered record of instructions and their results for a managed page, including when they were requested and how long resolution took. Historical results describe the page state at that time.
 
+**Resolution attempt**:
+One attempt to resolve an instruction, including its ordered action results or operational failure. A later retry is a separate attempt and does not replace the original outcome.
+
+**Diagnostic evidence**:
+The sanitized observations and configuration associated with a resolution attempt that support later investigation. Evidence can be incomplete and does not by itself reconstruct the original browser state.
+
 **Page document**:
 The current document within a managed page. Navigation can replace the document while keeping the managed page itself.
 

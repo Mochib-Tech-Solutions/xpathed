@@ -6,7 +6,7 @@ A local browser workspace for turning English instructions into verified XPath e
 
 The managed browser foundation ([#2](https://github.com/Mochib-Tech-Solutions/xpathed/issues/2)) is implemented. Open your own website, interact with Chromium tabs, and close all tabs when you are done. The full-page workspace keeps each tab’s chat beside the selected page; noVNC displays page content without Chromium's tabs or address bar. The theme menu offers System, Light and Dark modes and remembers your choice.
 
-Enter an English instruction to resolve one or more actions on the current page through OpenRouter. Press Enter to send or Ctrl+Enter for a new line. Chat shows the interpreted action, target and verified XPath directly, with state details inline and no alternative paths. Multiple actions include a compact partial-result summary. Resolution time and cost appear together. The first found target is highlighted automatically, including when it is off-screen; scrolling to it reveals the highlight without resolution moving the page. Hover or focus the cost to see model/provider identity, token counts, input/output rates and subtotals, and OpenRouter’s reported charge separately from the estimate. Resolution covers ordinary controls in the main document and nested same-origin or cross-origin iframes. Frame results show the containing frame chain separately from the target’s document XPath. Chat separates target discovery from action readiness, names the checks that passed, and explains disabled, readonly, off-screen, pointer-blocked and incompatible controls. It distinguishes those observations from untested movement, keyboard behavior and page response. Exposed visually hidden targets remain eligible; passing passive checks are reported separately from blocked, unsupported or unknown readiness. Each tab keeps its instructions, results, timestamps and resolution durations for the current workspace session. Navigation retains that history and marks older page results as historical. **Reset chat** clears the active tab’s draft and results without closing its page or changing other tabs. Closing a tab clears its chat; closing all tabs or reloading the app clears all local history. Durable history is later work. See the [versioned resolution contract](docs/resolution.md) for supported scope and error handling.
+Enter an English instruction to resolve one or more actions on the current page through OpenRouter. Press Enter to send or Ctrl+Enter for a new line. Chat shows the interpreted action, target and verified XPath directly, with state details inline and no alternative paths. Multiple actions include a compact partial-result summary. Resolution time and cost appear together. The first found target is highlighted automatically, including when it is off-screen; scrolling to it reveals the highlight without resolution moving the page. Hover or focus the cost to see model/provider identity, token counts, input/output rates and subtotals, and OpenRouter’s reported charge separately from the estimate. Resolution covers ordinary controls in the main document and nested same-origin or cross-origin iframes. Frame results show the containing frame chain separately from the target’s document XPath. Chat separates target discovery from action readiness, names the checks that passed, and explains disabled, readonly, off-screen, pointer-blocked and incompatible controls. It distinguishes those observations from untested movement, keyboard behavior and page response. Exposed visually hidden targets remain eligible; passing passive checks are reported separately from blocked, unsupported or unknown readiness. Each tab keeps its instructions, results, timestamps and resolution durations for the current workspace session. Navigation retains that history and marks older page results as historical. **Reset chat** clears the active tab’s draft and results without closing its page or changing other tabs. Closing a tab clears its chat; closing all tabs or reloading the app clears all local history. Sanitized diagnostic records are stored automatically in the backend, with no history or capture controls in the UI; see [backend diagnostics](docs/diagnostics.md). See the [versioned resolution contract](docs/resolution.md) for supported scope and error handling.
 
 ## Setup and run
 
@@ -49,7 +49,7 @@ This builds and starts the runtime images at the same address. Use `pnpm docker:
 | **ClientApi**  | Client-facing endpoints and ownership of the EF Core/PostgreSQL connection |
 | **Resolver**   | Stateless page inspection and instruction resolution                       |
 | **Browser**    | Live Chromium sessions, page operations and the noVNC stream               |
-| **PostgreSQL** | Persistent storage for later history and configuration work                |
+| **PostgreSQL** | Internal diagnostic records, evidence and evaluation artifacts             |
 
 The browser creates a fresh context and returns opaque session and page IDs. Navigation retains the page ID; closing the session or restarting the browser invalidates it. The client API and resolver pass these IDs to the browser service, so inspection refers to the exact page shown in the viewer. Live browser objects never leave their owning service.
 
@@ -61,7 +61,7 @@ Resolution asks a model to select an element from sanitized DOM context, then co
 docker/                  Compose files, service Dockerfiles and runtime configuration
 src/Common/              Shared request/response contracts and API error handling
 src/Browser/             Controllers, session lifetime and noVNC transport
-src/ClientApi/           Controllers, upstream forwarding and EF Core context
+src/ClientApi/           Controllers, upstream forwarding, diagnostics and EF Core migrations
 src/Resolver/            Controllers and stateless resolution service
 src/Web/src/
   components/ui/         Shared shadcn/ui primitives
@@ -76,28 +76,30 @@ Each .NET API uses controller classes with attribute routes and constructor inje
 
 The frontend uses React, strict TypeScript, Tailwind CSS and shadcn/ui. Reuse semantic theme tokens and shared controls; keep workspace state in its feature hook and clean up connections, timers and listeners in effects. Preserve accessible names, keyboard behavior and visible focus. Keep the product focused on chat and one browser page.
 
-Every C# project inherits the .NET recommended analyzers, nullable checks, warnings as errors and shared style rules from `Directory.Build.props` and `.editorconfig`. Frontend formatting, typed lint rules and Tailwind class sorting are configured centrally. The [repository guidance](AGENTS.md) explains how implementation work follows live issues and keeps these docs current.
+Every C# project inherits the .NET recommended analyzers, nullable checks, warnings as errors and shared style rules from `Directory.Build.props` and `.editorconfig`. Pinned CSharpier formats C# with a 120-column target, including positional records; native `dotnet format style` and build analyzers check the remaining style rules. Restore local tools with `dotnet tool restore`; `pnpm format` and CI use the same formatter. Frontend formatting, typed lint rules and Tailwind class sorting are configured centrally. The [repository guidance](AGENTS.md) explains how implementation work follows live issues and keeps these docs current.
 
 ### Commands
 
 Root commands are defined in `package.json`. Host C# build and formatting commands need the .NET SDK pinned in `global.json`; `pnpm restore` installs their locked inputs alongside workspace dependencies.
 
-| Command                                                       | Purpose                                                              |
-| ------------------------------------------------------------- | -------------------------------------------------------------------- |
-| `pnpm run setup`                                              | Create local configuration and install locked workspace dependencies |
-| `pnpm dev`                                                    | Run all services in Docker with source watching                      |
-| `pnpm build`                                                  | Build the .NET solution and production frontend                      |
-| `pnpm check`                                                  | Run the repository's formatting, lint, build and validation gates    |
-| `pnpm check:dotnet` / `pnpm check:web` / `pnpm check:tooling` | Validate one part of the repository                                  |
-| `pnpm lint`                                                   | Run analyzers, frontend lint and script syntax checks                |
-| `pnpm format` / `pnpm format:check`                           | Apply or verify shared formatting                                    |
-| `pnpm test`                                                   | Run the configured automated checks                                  |
-| `pnpm test:resolution`                                        | Run the explicit deterministic Docker resolution checks              |
-| `pnpm test:resolution:live`                                   | Check the actual OpenRouter route with a configured API key          |
-| `pnpm docker:up` / `pnpm docker:down`                         | Start runtime images or stop project containers                      |
-| `pnpm docker:build` / `pnpm docker:check`                     | Build runtime images or validate Docker definitions                  |
-| `pnpm docker:logs` / `pnpm docker:status`                     | Inspect running services                                             |
-| `pnpm clean`                                                  | Remove generated .NET output and the frontend build                  |
+| Command                                                       | Purpose                                                                        |
+| ------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| `pnpm run setup`                                              | Create local configuration and install locked workspace dependencies           |
+| `pnpm dev`                                                    | Run all services in Docker with source watching                                |
+| `pnpm build`                                                  | Build the .NET solution and production frontend                                |
+| `pnpm check`                                                  | Run the repository's formatting, lint, build and validation gates              |
+| `pnpm check:dotnet` / `pnpm check:web` / `pnpm check:tooling` | Validate one part of the repository                                            |
+| `pnpm lint`                                                   | Run analyzers, frontend lint and script syntax checks                          |
+| `pnpm format` / `pnpm format:check`                           | Apply or verify shared formatting                                              |
+| `pnpm test`                                                   | Run the configured automated checks                                            |
+| `pnpm test:persistence`                                       | Test migrations and recording against a supplied PostgreSQL test connection    |
+| `pnpm diagnostics -- <command>`                               | Inspect/export/import internal records; see [diagnostics](docs/diagnostics.md) |
+| `pnpm test:resolution`                                        | Run the explicit deterministic Docker resolution checks                        |
+| `pnpm test:resolution:live`                                   | Check the actual OpenRouter route with a configured API key                    |
+| `pnpm docker:up` / `pnpm docker:down`                         | Start runtime images or stop project containers                                |
+| `pnpm docker:build` / `pnpm docker:check`                     | Build runtime images or validate Docker definitions                            |
+| `pnpm docker:logs` / `pnpm docker:status`                     | Inspect running services                                                       |
+| `pnpm clean`                                                  | Remove generated .NET output and the frontend build                            |
 
 `clean` preserves source, `.env`, installed dependencies and database volumes. Each service has its own Dockerfile under `docker/<service>/`; `docker/compose.sh` resolves paths from the repository root.
 
@@ -105,13 +107,12 @@ Root commands are defined in `package.json`. Host C# build and formatting comman
 
 GitHub Actions selects affected .NET projects, Web and repository tooling from changed paths. Shared code selects its consumers; documentation-only changes skip application builds. Solution changes also build `Xpathed.slnx`. Formatting, lint, build and validation failures feed one final `check` result.
 
-Docker definitions have a separate validation job. CI does not build application images or start the Docker system. The live check pins DeepSeek V4.1 Flash through Wafer with reasoning disabled, a 4,096-token output cap for action lists and 512 for legacy calls. Runtime requests have no provider price filter. It makes at most two requests and checks reported cost against a one-cent total. The explicit resolution checks start a separate `xpathed-resolution` stack on loopback port 8081 and stop its containers afterward; the live check runs Browser and Resolver without ClientApi or PostgreSQL. Live model evaluation, release qualification and verified branch/review controls are later roadmap work.
+Docker definitions have a separate validation job. A dedicated persistence job starts only an isolated PostgreSQL service and joins the aggregate `check` result. CI does not build application images or start the full application stack. Branch-protection availability depends on the private repository account plan; a green workflow alone does not establish enforced merge protection. The live check pins DeepSeek V4.1 Flash through Wafer with reasoning disabled, a 4,096-token output cap for action lists and 512 for legacy calls. Runtime requests have no provider price filter. It makes at most two requests and checks reported cost against a one-cent total. The explicit resolution checks start a separate `xpathed-resolution` stack on loopback port 8081 and stop its containers afterward; the live check runs Browser and Resolver without ClientApi or PostgreSQL. Live model evaluation, release qualification and verified branch/review controls are later roadmap work.
 
 ## Roadmap
 
 GitHub Issues hold the live requirements, dependencies and progress. The next capabilities are:
 
-- [Persist history and export permitted diagnostics (#5)](https://github.com/Mochib-Tech-Solutions/xpathed/issues/5).
 - [Build independent evaluation (#6)](https://github.com/Mochib-Tech-Solutions/xpathed/issues/6), [adapt external datasets (#7)](https://github.com/Mochib-Tech-Solutions/xpathed/issues/7), [compare Stagehand (#8)](https://github.com/Mochib-Tech-Solutions/xpathed/issues/8) and [qualify fast model configurations (#9)](https://github.com/Mochib-Tech-Solutions/xpathed/issues/9).
 - [Extend verified PR/post-merge controls (#10)](https://github.com/Mochib-Tech-Solutions/xpathed/issues/10) and [add release promotion, rollback and drift monitoring (#11)](https://github.com/Mochib-Tech-Solutions/xpathed/issues/11).
 

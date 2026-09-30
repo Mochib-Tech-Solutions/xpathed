@@ -19,8 +19,14 @@ export function classifyChanges(paths) {
       web = tooling = docker = solution = true;
     }
     if (path === "Xpathed.slnx") solution = true;
-    if (path.startsWith("scripts/ci-dotnet-tests") || path === "scripts/format.sh") {
+    if (
+      path.startsWith("scripts/ci-dotnet-tests") ||
+      path === "scripts/format.sh" ||
+      path === ".config/dotnet-tools.json" ||
+      path === ".csharpierignore"
+    ) {
       projects.forEach((project) => affected.add(project));
+      tooling = true;
     }
     if (path === "scripts/format.sh") web = true;
     if (
@@ -62,6 +68,7 @@ export function classifyChanges(paths) {
     tooling,
     docker,
     solution,
+    persistence: affected.has("ClientApi"),
   };
 }
 

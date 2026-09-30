@@ -7,8 +7,23 @@ import test from "node:test";
 import { changedPaths, classifyChanges, projects } from "./ci-changes.mjs";
 import { testProjects } from "./ci-dotnet-tests.mjs";
 
-const none = { dotnet: [], web: false, tooling: false, docker: false, solution: false };
-const all = { dotnet: projects, web: true, tooling: true, docker: true, solution: true };
+const none = {
+  dotnet: [],
+  web: false,
+  tooling: false,
+  docker: false,
+  solution: false,
+  persistence: false,
+};
+const all = {
+  dotnet: projects,
+  web: true,
+  tooling: true,
+  docker: true,
+  solution: true,
+  persistence: true,
+};
+const sharedDotnet = { ...none, dotnet: projects, persistence: true };
 
 for (const [path, expected] of [
   ["README.md", none],
@@ -22,21 +37,31 @@ for (const [path, expected] of [
   [".npmrc", { ...none, web: true, tooling: true }],
   ["src/Browser/Sessions/BrowserSessions.cs", { ...none, dotnet: ["Browser"] }],
   ["src/Resolver/Resolver.csproj", { ...none, dotnet: ["Resolver"] }],
-  ["tests/ClientApi.Tests/SessionTests.cs", { ...none, dotnet: ["ClientApi"] }],
-  ["src/Common/Contracts/Session.cs", { ...none, dotnet: projects }],
-  ["tests/Common.Tests/ContractTests.cs", { ...none, dotnet: projects }],
-  ["Directory.Build.props", { ...none, dotnet: projects }],
-  ["Xpathed.slnx", { ...none, dotnet: projects, solution: true }],
-  ["Directory.Packages.props", { ...none, dotnet: projects }],
-  ["tests/Directory.Build.props", { ...none, dotnet: projects }],
-  ["global.json", { ...none, dotnet: projects, tooling: true }],
-  [".editorconfig", { ...none, dotnet: projects, web: true, tooling: true }],
+  ["tests/ClientApi.Tests/SessionTests.cs", { ...none, dotnet: ["ClientApi"], persistence: true }],
+  [
+    "tests/ClientApi.IntegrationTests/PersistenceTests.cs",
+    { ...none, dotnet: ["ClientApi"], persistence: true },
+  ],
+  [
+    "src/ClientApi/Persistence/ClientDbContext.cs",
+    { ...none, dotnet: ["ClientApi"], persistence: true },
+  ],
+  ["src/Common/Contracts/Session.cs", sharedDotnet],
+  ["tests/Common.Tests/ContractTests.cs", sharedDotnet],
+  ["Directory.Build.props", sharedDotnet],
+  ["Xpathed.slnx", { ...sharedDotnet, solution: true }],
+  ["Directory.Packages.props", sharedDotnet],
+  ["tests/Directory.Build.props", sharedDotnet],
+  ["global.json", { ...sharedDotnet, tooling: true }],
+  [".editorconfig", { ...sharedDotnet, web: true, tooling: true }],
+  [".config/dotnet-tools.json", { ...sharedDotnet, tooling: true }],
+  [".csharpierignore", { ...sharedDotnet, tooling: true }],
   [".prettierrc.json", { ...none, web: true, tooling: true }],
   [".github/workflows/check.yml", all],
   ["scripts/ci-changes.mjs", all],
-  ["scripts/ci-dotnet-tests.mjs", { ...none, dotnet: projects, tooling: true }],
+  ["scripts/ci-dotnet-tests.mjs", { ...sharedDotnet, tooling: true }],
   ["package.json", all],
-  ["scripts/format.sh", { ...none, dotnet: projects, web: true, tooling: true }],
+  ["scripts/format.sh", { ...sharedDotnet, web: true, tooling: true }],
   ["scripts/ci-docker.sh", { ...none, tooling: true, docker: true }],
   ["scripts/clean.mjs", { ...none, tooling: true }],
   ["docker/compose.dev.yaml", { ...none, tooling: true, docker: true }],
@@ -107,15 +132,20 @@ test("Git event ranges include deletions and both rename owners, and PRs use mer
 test("test discovery selects only the owning service test projects", (t) => {
   const cwd = mkdtempSync(join(tmpdir(), "xpathed-ci-tests-"));
   t.after(() => rmSync(cwd, { recursive: true, force: true }));
-  for (const name of ["Browser.Tests", "Browser.IntegrationTests", "Resolver.Tests"]) {
+  for (const name of [
+    "Browser.Tests",
+    "Browser.IntegrationTests",
+    "ClientApi.IntegrationTests",
+    "Resolver.Tests",
+  ]) {
     mkdirSync(join(cwd, "tests", name), { recursive: true });
     writeFileSync(join(cwd, "tests", name, `${name}.csproj`), "<Project />");
   }
-  assert.deepEqual(testProjects("Browser", cwd), [
-    "tests/Browser.IntegrationTests/Browser.IntegrationTests.csproj",
-    "tests/Browser.Tests/Browser.Tests.csproj",
-  ]);
-  assert.equal(testProjects("all", cwd).length, 3);
+  assert.deepEqual(testProjects("Browser", cwd), ["tests/Browser.Tests/Browser.Tests.csproj"]);
+  assert.equal(testProjects("all", cwd).length, 2);
   assert.deepEqual(testProjects("ClientApi", cwd), []);
+  assert.deepEqual(testProjects("persistence", cwd), [
+    "tests/ClientApi.IntegrationTests/ClientApi.IntegrationTests.csproj",
+  ]);
   assert.throws(() => testProjects("../outside", cwd), /Unknown project/);
 });
