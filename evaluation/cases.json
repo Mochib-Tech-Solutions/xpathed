@@ -2648,6 +2648,103 @@
           }
         }
       }
+    },
+    {
+      "id": "single-action-plural-confirmations",
+      "family": "batch",
+      "split": "development",
+      "category": "semantics",
+      "fixture": "batch",
+      "instruction": "Click all Approve buttons in Approvals.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "setupRevision": "1",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-fixture-review",
+        "reviewedAt": "2026-09-30T18:56:45Z"
+      },
+      "expected": {
+        "outcome": "found",
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "target": {
+              "selector": "#approve-invoice",
+              "frames": []
+            },
+            "interactability": {
+              "status": "ready",
+              "reasons": [],
+              "checks": {
+                "compatibleControl": "pass",
+                "enabled": "pass",
+                "viewport": "pass",
+                "pointerReception": "pass",
+                "keyboard": "not_applicable",
+                "stability": "unknown",
+                "eventOutcome": "unknown"
+              }
+            }
+          },
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "target": {
+              "selector": "#approve-expense",
+              "frames": []
+            },
+            "state": {
+              "enabled": false
+            },
+            "interactability": {
+              "status": "blocked",
+              "reasons": ["disabled"],
+              "checks": {
+                "enabled": "fail"
+              }
+            }
+          }
+        ],
+        "summary": {
+          "processingComplete": true,
+          "semanticCompleteness": "unverified",
+          "total": 2,
+          "found": 2,
+          "notFound": 0,
+          "unsupported": 0,
+          "errors": 0,
+          "blocked": 1,
+          "readinessUnknown": 0,
+          "assessmentUnsupported": 0
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "label": "Approve",
+            "index": 0
+          },
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "label": "Approve",
+            "index": 1
+          }
+        ]
+      },
+      "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
+      "contractVersion": "3"
     }
   ]
 }

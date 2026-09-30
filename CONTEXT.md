@@ -6,7 +6,7 @@ This context covers identifying a web element from a natural-language test instr
 
 **Test instruction**:
 A natural-language request describing an interaction and the element it concerns, such as “Hover over OK under Employee.”
-A test instruction can request several interactions, such as “Click all Approval buttons.”
+A basic test instruction requests one interaction across one or more targets, such as “Click all Approval buttons.”
 
 **Action**:
 The requested interaction, such as clicking, hovering, or selecting an option.
@@ -14,8 +14,14 @@ The requested interaction, such as clicking, hovering, or selecting an option.
 **Action resolution**:
 The result of identifying one action's target in a particular page state, including absence or an unsupported scope. A found action resolution concerns one target and has one preferred verified XPath expression for that target.
 
+**Target set**:
+The distinct elements intended by one action on the current page. Finding only some of those elements does not establish that the target set is complete.
+
+**Multi-target result**:
+One shared action with independent outcomes for its intended targets. Its partial-result summary separates found targets from missing, unsupported, failed or non-interactable targets.
+
 **Multi-action result**:
-The ordered action resolutions for one test instruction. Its partial-result summary distinguishes independently resolved actions from missing, unsupported, failed or non-interactable actions.
+The ordered resolutions of several interactions requested together. This legacy scope is distinct from one action concerning several targets.
 
 **Instruction step**:
 An ordered part of a test instruction. An unordered plural step expands into multiple action resolutions, one for each intended eligible target.
@@ -52,7 +58,7 @@ The managed page currently selected for viewing and target resolution. A session
 The ordered record of instructions and their results for a managed page, including when they were requested and how long resolution took. Historical results describe the page state at that time.
 
 **Resolution attempt**:
-One attempt to resolve an instruction, including its ordered action results or operational failure. A later retry is a separate attempt and does not replace the original outcome.
+One attempt to resolve an instruction, including its target results or operational failure. A later retry is a separate attempt and does not replace the original outcome.
 
 **Diagnostic evidence**:
 The sanitized observations and configuration associated with a resolution attempt that support later investigation. Evidence can be incomplete and does not by itself reconstruct the original browser state.

@@ -14,6 +14,7 @@ public sealed class ResolutionContractTests
     [Theory]
     [InlineData("1", 512, 1, "5")]
     [InlineData("2", 4096, 16, "6")]
+    [InlineData("3", 4096, 16, "7")]
     public async Task DiagnosticConfigurationDescribesEffectiveSettingsWithoutCredentialsOrPageInput(
         string version,
         int outputTokens,
@@ -24,7 +25,7 @@ public sealed class ResolutionContractTests
         var handler = new DeterministicServicesHandler
         {
             ProviderBody =
-                version == "2"
+                version != "1"
                     ? ProviderSelection(
                         """{"complete":true,"actions":[{"step":1,"instruction":"Click Save","action":"click","outcome":"found","candidateId":"button-save","limitation":"none"}]}"""
                     )
@@ -433,16 +434,29 @@ public sealed class ResolutionContractTests
     }
 
     [Theory]
-    [InlineData("incomplete", "decomposition_incomplete")]
-    [InlineData("duplicate", "provider_malformed_response")]
-    [InlineData("unknown", "provider_unknown_candidate")]
-    [InlineData("step_gap", "provider_malformed_response")]
-    [InlineData("dependent_found", "provider_malformed_response")]
-    [InlineData("empty", "provider_malformed_response")]
-    [InlineData("limit", "action_budget_exceeded")]
-    [InlineData("output_limit", "action_output_budget_exceeded")]
-    [InlineData("truncated", "provider_truncated_response")]
-    public async Task IncompleteOrInvalidActionListsCannotBecomeUsefulLookingPartialResults(string problem, string code)
+    [InlineData("incomplete", "decomposition_incomplete", "2")]
+    [InlineData("incomplete", "decomposition_incomplete", "3")]
+    [InlineData("duplicate", "provider_malformed_response", "2")]
+    [InlineData("duplicate", "provider_malformed_response", "3")]
+    [InlineData("unknown", "provider_unknown_candidate", "2")]
+    [InlineData("unknown", "provider_unknown_candidate", "3")]
+    [InlineData("step_gap", "provider_malformed_response", "2")]
+    [InlineData("step_gap", "provider_malformed_response", "3")]
+    [InlineData("dependent_found", "provider_malformed_response", "2")]
+    [InlineData("dependent_found", "provider_malformed_response", "3")]
+    [InlineData("empty", "provider_malformed_response", "2")]
+    [InlineData("empty", "provider_malformed_response", "3")]
+    [InlineData("limit", "action_budget_exceeded", "2")]
+    [InlineData("limit", "action_budget_exceeded", "3")]
+    [InlineData("output_limit", "action_output_budget_exceeded", "2")]
+    [InlineData("output_limit", "action_output_budget_exceeded", "3")]
+    [InlineData("truncated", "provider_truncated_response", "2")]
+    [InlineData("truncated", "provider_truncated_response", "3")]
+    public async Task IncompleteOrInvalidActionListsCannotBecomeUsefulLookingPartialResults(
+        string problem,
+        string code,
+        string version
+    )
     {
         var entry = new JsonObject
         {
@@ -517,7 +531,7 @@ public sealed class ResolutionContractTests
             {
                 instruction = "Click Save",
                 documentId = "document-1",
-                contractVersion = "2",
+                contractVersion = version,
             }
         );
         var result = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -528,6 +542,228 @@ public sealed class ResolutionContractTests
         Assert.Equal(0.0001m, result.GetProperty("diagnostics").GetProperty("usage").GetProperty("cost").GetDecimal());
         Assert.Equal(1, handler.ProviderRequestCount);
         Assert.Equal(0, handler.SelectionRequestCount);
+    }
+
+    [Theory]
+    [InlineData("Click Save and hover Contact", "unsupported", "unsupported_action")]
+    [InlineData("Click Menu then click the revealed item", "click", "current_state_dependency")]
+    [InlineData("Use that control", "unsupported", "ambiguous")]
+    public async Task UnsupportedSingleInteractionCommandsRemainWholeWithoutTargets(
+        string instruction,
+        string action,
+        string limitation
+    )
+    {
+        var handler = new DeterministicServicesHandler
+        {
+            ProviderBody = ProviderSelection(
+                JsonSerializer.Serialize(
+                    new
+                    {
+                        complete = true,
+                        actions = new[]
+                        {
+                            new
+                            {
+                                step = 1,
+                                instruction,
+                                action,
+                                outcome = "unsupported",
+                                candidateId = (string?)null,
+                                limitation,
+                            },
+                        },
+                    }
+                )
+            ),
+        };
+        await using var application = CreateApplication(handler);
+        using var client = application.CreateClient();
+        using var response = await client.PostAsJsonAsync(
+            "/pages/page-1/resolve",
+            new
+            {
+                instruction,
+                documentId = "document-1",
+                contractVersion = "3",
+            }
+        );
+        response.EnsureSuccessStatusCode();
+        var result = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("unsupported", result.GetProperty("outcome").GetString());
+        Assert.Equal(action, result.GetProperty("action").GetString());
+        var item = Assert.Single(result.GetProperty("actions").EnumerateArray());
+        Assert.Equal("unsupported", item.GetProperty("outcome").GetString());
+        Assert.Equal(JsonValueKind.Null, item.GetProperty("target").ValueKind);
+        Assert.Equal(limitation, item.GetProperty("code").GetString());
+        Assert.Equal(1, result.GetProperty("summary").GetProperty("unsupported").GetInt32());
+        Assert.Equal(0, result.GetProperty("summary").GetProperty("found").GetInt32());
+        Assert.Equal(1, handler.ProviderRequestCount);
+        Assert.Equal("7", result.GetProperty("diagnostics").GetProperty("promptVersion").GetString());
+        var prompt = handler.ModelRequest.GetProperty("messages")[0].GetProperty("content").GetString()!;
+        Assert.Contains("ONE interaction type", prompt, StringComparison.Ordinal);
+        Assert.DoesNotContain("ALL independently resolvable actions", prompt, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task PluralSingleInteractionReturnsEveryDistinctVerifiedTargetInCaptureOrder()
+    {
+        var capture = JsonNode.Parse(new DeterministicServicesHandler().CaptureBody)!;
+        var candidates = capture["candidates"]!.AsArray();
+        var other = candidates[0]!.DeepClone();
+        other["id"] = "button-confirm";
+        other["label"] = "Confirm";
+        other["text"] = "Confirm";
+        candidates.Add(other);
+        capture["coverage"]!["eligibleCount"] = 2;
+        capture["coverage"]!["capturedCount"] = 2;
+        var handler = new DeterministicServicesHandler
+        {
+            CaptureBody = capture.ToJsonString(),
+            ProviderBody = ProviderSelection(
+                """
+                {"complete":true,"actions":[
+                  {"step":1,"instruction":"Click Confirm","outcome":"found","action":"click","candidateId":"button-confirm","limitation":"none"},
+                  {"step":1,"instruction":"Click Save","outcome":"found","action":"click","candidateId":"button-save","limitation":"none"}]}
+                """
+            ),
+            SelectionBody = """
+                {"actions":[
+                  {"actionId":"a1","target":{"candidateId":"button-save","tag":"button","label":"Save","xpaths":["//button[@id='save']"],
+                   "state":{"rendered":true,"inViewport":true,"enabled":true,"editable":false},"geometry":{"x":20,"y":40,"width":90,"height":30}}},
+                  {"actionId":"a2","target":{"candidateId":"button-confirm","tag":"button","label":"Confirm","xpaths":["//button[@id='confirm']"],
+                   "state":{"rendered":true,"inViewport":true,"enabled":true,"editable":false},"geometry":{"x":20,"y":80,"width":90,"height":30}}}],
+                 "inspectedActionId":"a1"}
+                """,
+        };
+        await using var application = CreateApplication(handler);
+        using var client = application.CreateClient();
+        using var response = await client.PostAsJsonAsync(
+            "/pages/page-1/resolve",
+            new
+            {
+                instruction = "Click all buttons in Profile",
+                documentId = "document-1",
+                contractVersion = "3",
+            }
+        );
+        response.EnsureSuccessStatusCode();
+        var result = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("found", result.GetProperty("outcome").GetString());
+        Assert.Equal("click", result.GetProperty("action").GetString());
+        var actions = result.GetProperty("actions");
+        Assert.Equal(2, actions.GetArrayLength());
+        Assert.Equal("button-save", actions[0].GetProperty("target").GetProperty("candidateId").GetString());
+        Assert.Equal("button-confirm", actions[1].GetProperty("target").GetProperty("candidateId").GetString());
+        Assert.All(actions.EnumerateArray(), item => Assert.Equal("click", item.GetProperty("action").GetString()));
+        Assert.Equal(2, result.GetProperty("summary").GetProperty("found").GetInt32());
+        Assert.Equal(1, handler.ProviderRequestCount);
+        Assert.Equal(1, handler.SelectionRequestCount);
+    }
+
+    [Theory]
+    [InlineData("hover", "not_found", "none", null)]
+    [InlineData("click", "found", "none", "button-save")]
+    [InlineData("click", "unsupported", "current_state_dependency", null)]
+    public async Task SingleInteractionRejectsMixedRepeatedOrSequentialTargetsBeforeBrowserVerification(
+        string secondAction,
+        string outcome,
+        string limitation,
+        string? candidateId
+    )
+    {
+        var handler = new DeterministicServicesHandler
+        {
+            ProviderBody = ProviderSelection(
+                JsonSerializer.Serialize(
+                    new
+                    {
+                        complete = true,
+                        actions = new[]
+                        {
+                            new
+                            {
+                                step = 1,
+                                instruction = "Click Save",
+                                action = "click",
+                                outcome = "found",
+                                candidateId = (string?)"button-save",
+                                limitation = "none",
+                            },
+                            new
+                            {
+                                step = 2,
+                                instruction = "Other target",
+                                action = secondAction,
+                                outcome,
+                                candidateId,
+                                limitation,
+                            },
+                        },
+                    }
+                )
+            ),
+        };
+        await using var application = CreateApplication(handler);
+        using var client = application.CreateClient();
+        using var response = await client.PostAsJsonAsync(
+            "/pages/page-1/resolve",
+            new
+            {
+                instruction = "Click Save and Contact",
+                documentId = "document-1",
+                contractVersion = "3",
+            }
+        );
+        var result = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("error", result.GetProperty("outcome").GetString());
+        Assert.Equal("provider_malformed_response", result.GetProperty("diagnostics").GetProperty("code").GetString());
+        Assert.Empty(result.GetProperty("actions").EnumerateArray());
+        Assert.Equal(JsonValueKind.Null, result.GetProperty("action").ValueKind);
+        Assert.Equal(JsonValueKind.Null, result.GetProperty("summary").ValueKind);
+        Assert.Equal(1, handler.ProviderRequestCount);
+        Assert.Equal(0, handler.SelectionRequestCount);
+    }
+
+    [Fact]
+    public async Task OneInteractionPreservesFoundAndMissingTargetsWithSharedAction()
+    {
+        var handler = new DeterministicServicesHandler
+        {
+            ProviderBody = ProviderSelection(
+                """
+                {"complete":true,"actions":[
+                  {"step":1,"instruction":"Click Save","outcome":"found","action":"click","candidateId":"button-save","limitation":"none"},
+                  {"step":2,"instruction":"Click Contact","outcome":"not_found","action":"click","candidateId":null,"limitation":"none"}]}
+                """
+            ),
+        };
+        await using var application = CreateApplication(handler);
+        using var client = application.CreateClient();
+        using var response = await client.PostAsJsonAsync(
+            "/pages/page-1/resolve",
+            new
+            {
+                instruction = "Click Save and Contact",
+                documentId = "document-1",
+                contractVersion = "3",
+            }
+        );
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var result = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("3", result.GetProperty("contractVersion").GetString());
+        Assert.Equal("click", result.GetProperty("action").GetString());
+        Assert.Equal("partial", result.GetProperty("outcome").GetString());
+        Assert.Equal(2, result.GetProperty("actions").GetArrayLength());
+        Assert.Equal(
+            "button-save",
+            result.GetProperty("actions")[0].GetProperty("target").GetProperty("candidateId").GetString()
+        );
+        Assert.Equal("not_found", result.GetProperty("actions")[1].GetProperty("outcome").GetString());
+        Assert.Equal(1, result.GetProperty("summary").GetProperty("found").GetInt32());
+        Assert.Equal(1, result.GetProperty("summary").GetProperty("notFound").GetInt32());
+        Assert.Equal(1, handler.ProviderRequestCount);
+        Assert.Equal(1, handler.SelectionRequestCount);
     }
 
     [Fact]

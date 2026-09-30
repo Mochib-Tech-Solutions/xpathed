@@ -130,9 +130,10 @@ export default function ChatPanel({
         )}
         {history.map((resolution) => {
           const result = resolution.result;
+          const sharedAction = result?.contractVersion === "3";
           const actions = !result
             ? []
-            : result.contractVersion === "2"
+            : result.contractVersion !== "1"
               ? (result.actions ?? [])
               : [
                   {
@@ -193,6 +194,11 @@ export default function ChatPanel({
               {!result && !resolution.error && (
                 <p className="text-muted-foreground">Waiting for result…</p>
               )}
+              {sharedAction && result.action && result.action !== "unsupported" && (
+                <p className="text-xs text-muted-foreground">
+                  Action: {result.action.replaceAll("_", "-")}
+                </p>
+              )}
               {result?.summary && actions.length > 1 && (
                 <p className="text-xs text-muted-foreground">
                   {[
@@ -231,9 +237,9 @@ export default function ChatPanel({
                   <section
                     key={action.actionId}
                     className="space-y-3"
-                    aria-label={`Action ${action.order}`}
+                    aria-label={`${sharedAction ? "Target" : "Action"} ${action.order}`}
                   >
-                    {actions.length > 1 && (
+                    {!sharedAction && actions.length > 1 && (
                       <p className="text-xs font-medium text-muted-foreground">
                         {action.order}. {action.instruction}
                       </p>
@@ -248,12 +254,15 @@ export default function ChatPanel({
                     )}
                     {action.outcome === "unsupported" && (
                       <p>
-                        {instructionLimits[action.code ?? ""] ??
-                          action.message ??
-                          "This instruction is not supported yet."}
+                        {sharedAction && action.code === "unsupported_action"
+                          ? (action.message ??
+                            "Use one action per command. You can target several elements on this page.")
+                          : (instructionLimits[action.code ?? ""] ??
+                            action.message ??
+                            "This instruction is not supported yet.")}
                       </p>
                     )}
-                    {action.outcome === "error" && result?.contractVersion === "2" && (
+                    {action.outcome === "error" && result?.contractVersion !== "1" && (
                       <div role="alert" className="text-destructive">
                         <p>{action.message || "This target could not be resolved. Try again."}</p>
                       </div>
@@ -267,7 +276,9 @@ export default function ChatPanel({
                           </p>
                         ))}
                         <div className="space-y-2 text-xs text-muted-foreground">
-                          {action.action && <p>Action: {action.action.replaceAll("_", "-")}</p>}
+                          {!sharedAction && action.action && (
+                            <p>Action: {action.action.replaceAll("_", "-")}</p>
+                          )}
                           {verified && <p>Verified: {verified}.</p>}
                           <p>
                             {target.interactability?.status === "ready"
