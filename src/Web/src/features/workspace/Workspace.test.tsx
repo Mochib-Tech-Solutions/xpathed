@@ -92,6 +92,45 @@ async function submitInstruction(user: ReturnType<typeof userEvent.setup>) {
 }
 
 describe("Workspace resolution", () => {
+  it.each([
+    ["blocked", ["disabled", "off_screen"], "Interaction blocked by observed state."],
+    ["unknown", [], "Interaction readiness unknown."],
+    ["unsupported", ["custom_control_unverified"], "Interaction assessment unsupported."],
+  ])(
+    "shows %s readiness while retaining target, XPath and diagnostics",
+    async (status, reasons, message) => {
+      mockApi(() =>
+        Promise.resolve(
+          Response.json({
+            ...found,
+            target: {
+              ...found.target,
+              interactability: {
+                version: "1",
+                action: "click",
+                status,
+                reasons,
+                checks: { eventOutcome: "unknown" },
+              },
+            },
+            diagnostics: { ...found.diagnostics, timingsMs: { total: 125 } },
+          }),
+        ),
+      );
+      const user = await openWorkspace();
+      await submitInstruction(user);
+      expect(await screen.findByText(message)).toBeInTheDocument();
+      expect(screen.getByText("Target found")).toBeInTheDocument();
+      expect(screen.getByText("Resolution time: 125 ms")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Copy XPath 1" })).toBeInTheDocument();
+      if (status === "blocked")
+        expect(screen.getByText("The target is disabled for this action.")).toBeInTheDocument();
+      expect(
+        screen.getByText("Event delivery and action success were not tested."),
+      ).toBeInTheDocument();
+    },
+  );
+
   it("shows structured cost details on hover and keyboard focus without mixing estimates and charges", async () => {
     mockApi(() =>
       Promise.resolve(
@@ -214,7 +253,9 @@ describe("Workspace resolution", () => {
     await user.clear(composer);
     await user.type(composer, "Click the missing button{Enter}");
 
-    expect(await screen.findByText("No matching element found.")).toBeInTheDocument();
+    expect(
+      await screen.findByText("No matching element found in the eligible current-page scope."),
+    ).toBeInTheDocument();
     expect(screen.getByText("Click Pay now")).toBeInTheDocument();
     expect(screen.getByText("Click the missing button", { selector: "p" })).toBeInTheDocument();
     expect(screen.getByText("Resolution time: 1.26 s")).toBeInTheDocument();
@@ -340,7 +381,9 @@ describe("Workspace resolution", () => {
 
     expect(await screen.findByRole("heading", { name: "Name" })).toBeInTheDocument();
     expect(screen.getByText("Not editable")).toBeInTheDocument();
-    expect(screen.queryByText("No matching element found.")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("No matching element found in the eligible current-page scope."),
+    ).not.toBeInTheDocument();
   });
 
   it("preserves a result as historical when polling detects a same-URL document change", async () => {
@@ -513,7 +556,9 @@ describe("Workspace resolution", () => {
       await submitInstruction(user);
 
       expect(await screen.findByRole("alert")).toHaveTextContent(message);
-      expect(screen.queryByText("No matching element found.")).not.toBeInTheDocument();
+      expect(
+        screen.queryByText("No matching element found in the eligible current-page scope."),
+      ).not.toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Resolve instruction" })).toBeEnabled();
     },
   );
@@ -574,7 +619,9 @@ describe("Workspace resolution", () => {
 
     expect(await screen.findByText("Resolution failed")).toBeInTheDocument();
     expect(screen.getByRole("alert")).toHaveTextContent("The model provider is rate limited.");
-    expect(screen.queryByText("No matching element found.")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("No matching element found in the eligible current-page scope."),
+    ).not.toBeInTheDocument();
   });
 
   it("distinguishes unsupported instructions from absence", async () => {
@@ -596,7 +643,9 @@ describe("Workspace resolution", () => {
 
     expect(await screen.findByText("Unsupported instruction")).toBeInTheDocument();
     expect(screen.getByText("This instruction requests multiple targets.")).toBeInTheDocument();
-    expect(screen.queryByText("No matching element found.")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("No matching element found in the eligible current-page scope."),
+    ).not.toBeInTheDocument();
   });
 
   it("reports semantic absence without displaying a target", async () => {
@@ -604,7 +653,9 @@ describe("Workspace resolution", () => {
     const user = await openWorkspace();
     await submitInstruction(user);
 
-    expect(await screen.findByText("No matching element found.")).toBeInTheDocument();
+    expect(
+      await screen.findByText("No matching element found in the eligible current-page scope."),
+    ).toBeInTheDocument();
     expect(
       screen.queryByRole("list", { name: "Verified XPath alternatives" }),
     ).not.toBeInTheDocument();

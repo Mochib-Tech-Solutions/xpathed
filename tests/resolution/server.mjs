@@ -4,6 +4,7 @@ const runs = new Map();
 let providerRequest;
 let scenario = "found";
 let targetText = "About us";
+let targetAction = "click";
 const fixture = `<!doctype html><html lang="en"><meta charset="utf-8"><title>Resolution contract</title>
 <body><nav aria-label="Company"><button id="expected-target" data-testid="about-us" data-oracle="expected-target">About us</button></nav>
 <script>
@@ -31,8 +32,30 @@ const server = createServer(async (request, response) => {
     const state = runs.get(run);
     const body = request.method === "POST" ? JSON.parse(await readBody(request)) : null;
     let output;
-    if (["/fixture", "/second", "/privacy", "/quotes", "/oversized"].includes(path)) {
+    if (
+      [
+        "/fixture",
+        "/second",
+        "/privacy",
+        "/quotes",
+        "/oversized",
+        "/state",
+        "/hidden-only",
+      ].includes(path)
+    ) {
       let html = fixture;
+      if (path === "/state")
+        html = html
+          .replace(
+            'id="expected-target"',
+            'id="expected-target" disabled aria-labelledby="state-label" aria-label="Wrong label"',
+          )
+          .replace(
+            "</nav>",
+            '<span id="state-label" hidden>About us<input value="PRIVATE_REFERENCE_VALUE"></span><button aria-hidden="true">HIDDEN_DUPLICATE</button></nav>',
+          );
+      if (path === "/hidden-only")
+        html = html.replace('id="expected-target"', 'id="expected-target" aria-hidden="true"');
       if (path === "/second")
         html = html
           .replace(
@@ -75,6 +98,7 @@ const server = createServer(async (request, response) => {
     else if (path === "/scenario") {
       scenario = body.name;
       targetText = body.targetText ?? "About us";
+      targetAction = body.action ?? "click";
       providerRequest = null;
       output = { ok: true };
     } else if (path === "/api/v1/models/deepseek/deepseek-v4.1-flash/endpoints") {
@@ -97,7 +121,8 @@ const server = createServer(async (request, response) => {
           candidate.tag === "button" &&
           (candidate.text === targetText || candidate.label === targetText),
       );
-      if (!target) throw new Error("Independent fixture target absent from provider input");
+      if (!target && scenario !== "absent")
+        throw new Error("Independent fixture target absent from provider input");
       output = {
         id: "deterministic-fixture",
         model: "deepseek/deepseek-v4.1-flash",
@@ -109,10 +134,10 @@ const server = createServer(async (request, response) => {
               role: "assistant",
               content: JSON.stringify(
                 scenario === "absent"
-                  ? { outcome: "not_found", action: "click", candidateId: null }
+                  ? { outcome: "not_found", action: targetAction, candidateId: null }
                   : {
                       outcome: "found",
-                      action: "click",
+                      action: targetAction,
                       candidateId: scenario === "unknown" ? "fabricated-id" : target.id,
                     },
               ),

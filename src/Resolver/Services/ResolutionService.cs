@@ -90,7 +90,8 @@ public sealed partial class ResolutionService(IHttpClientFactory clients, OpenRo
                 ?? throw new ApiException(502, "invalid_upstream_response", "The browser returned an invalid selection.");
             if (selection.Outcome == "found"
                 ? validated.Target is null || validated.Target.CandidateId != selection.CandidateId || validated.Target.Xpaths is not { Length: > 0 } ||
-                  validated.Target.Xpaths.Any(string.IsNullOrWhiteSpace) || validated.Target.State is null || validated.Target.Geometry is null
+                  validated.Target.Xpaths.Any(string.IsNullOrWhiteSpace) || validated.Target.State is null || validated.Target.Geometry is null ||
+                  !ValidInteractability(validated.Target, selection.Action)
                 : validated.Target is not null)
             {
                 throw new ApiException(502, "invalid_browser_selection", "The browser did not verify the selected target.");
@@ -101,6 +102,10 @@ public sealed partial class ResolutionService(IHttpClientFactory clients, OpenRo
             {
                 diagnostics = diagnostics with { Code = "unsupported_scope", Message = "The page contains frame or shadow content outside this capture's supported scope." };
                 return Result("unsupported", selection.Action, null);
+            }
+            if (selection.Outcome == "not_found")
+            {
+                diagnostics = diagnostics with { Message = "No matching element found in the eligible current-page scope." };
             }
             return Result(selection.Outcome, selection.Action, validated.Target);
         }
@@ -140,6 +145,27 @@ public sealed partial class ResolutionService(IHttpClientFactory clients, OpenRo
     [LoggerMessage(Level = LogLevel.Warning, Message = "Resolution failed: {Code} {TraceId} {AttemptId}")]
     private static partial void LogFailure(ILogger logger, string code, string traceId, string attemptId);
 
+    private static bool ValidInteractability(ResolvedTarget target, string action)
+    {
+        if (target.State.Version == "1" && target.Interactability is null)
+        {
+            return true;
+        }
+        var assessment = target.Interactability;
+        if (assessment?.Checks is not { } checks)
+        {
+            return false;
+        }
+        string[] values = [checks.CompatibleControl, checks.Enabled, checks.Writable, checks.Viewport, checks.PointerReception, checks.Keyboard, checks.Stability, checks.EventOutcome];
+        return target.State.Version == "2" && target.State.AccessibilityExposed == true && target.State.Readonly is not null &&
+            assessment is { Version: "1", Reasons: not null, Checks: not null } && assessment.Action == action &&
+            assessment.Status is "blocked" or "unknown" or "unsupported" &&
+            assessment.Reasons.All(reason => !string.IsNullOrWhiteSpace(reason)) &&
+            values.All(value => value is "pass" or "fail" or "unknown" or "not_applicable") &&
+            checks.EventOutcome == "unknown" &&
+            (assessment.Status == "blocked") == values.Contains("fail", StringComparer.Ordinal);
+    }
+
     private static async Task EnsureBrowserSuccessAsync(HttpResponseMessage response, CancellationToken cancellationToken)
     {
         if (response.IsSuccessStatusCode)
@@ -159,7 +185,7 @@ public sealed partial class ResolutionService(IHttpClientFactory clients, OpenRo
         {
             // Invalid error bodies contain no trustworthy diagnostic data.
         }
-        code = code is "page_not_found" or "inactive_page" or "stale_document" or "stale_capture" or "capture_budget_exceeded" or "validation_budget_exceeded" or "unknown_candidate" or "xpath_validation_failed"
+        code = code is "page_not_found" or "inactive_page" or "stale_document" or "stale_capture" or "capture_budget_exceeded" or "capture_exposure_unknown" or "validation_budget_exceeded" or "unknown_candidate" or "xpath_validation_failed"
             ? code : "browser_unavailable";
         throw new ApiException((int)response.StatusCode, code, code == "inactive_page"
             ? "The active tab changed. Resolve the instruction again."

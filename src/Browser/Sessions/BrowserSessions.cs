@@ -212,7 +212,7 @@ public sealed class BrowserSessions(IConfiguration configuration, ILogger<Browse
             {
                 throw new ApiException(409, "stale_capture", "This capture is no longer current.");
             }
-            var result = await page.Capture.EvaluateAsync<JsonElement>("(capture, candidateId) => capture.select(candidateId)", request.CandidateId);
+            var result = await page.Capture.EvaluateAsync<JsonElement>("(capture, selection) => capture.select(selection.candidateId, selection.action)", new { candidateId = request.CandidateId, action = request.Action });
             await RequireFocusedDocumentAsync(s, page, request.DocumentId);
             if (request.CaptureId != page.CaptureId)
             {

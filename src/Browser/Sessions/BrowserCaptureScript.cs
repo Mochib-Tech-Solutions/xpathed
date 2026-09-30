@@ -12,50 +12,95 @@ internal static class BrowserCaptureScript
           let styleCache = new WeakMap();
           let textCache = new WeakMap();
           let labelCache = new WeakMap();
+          let exposureCache = new WeakMap();
+          let modalityUnknown = false;
+          const currentModal = () => {
+            const modals = [...document.querySelectorAll('dialog:modal')];
+            const active = document.activeElement?.closest('dialog:modal') ?? document.elementFromPoint(0, 0)?.closest('dialog:modal');
+            modalityUnknown = modals.length > 1 && !active;
+            return active ?? modals[0];
+          };
+          let modal = currentModal();
           const normalize = value => (value ?? '').replace(/\s+/gu, ' ').trim().normalize('NFC');
           const valueContainer = 'input,textarea,select,[contenteditable]:not([contenteditable="false"])';
           const buttonInput = 'input[type=button],input[type=submit],input[type=reset]';
           const ignored = 'script,style,noscript,template';
-          const rendered = element => {
-            const rect = element.getBoundingClientRect();
-            if (rect.width <= 0 || rect.height <= 0) return false;
+          const cssFor = element => {
+            if (!styleCache.has(element)) styleCache.set(element, getComputedStyle(element));
+            return styleCache.get(element);
+          };
+          const exposed = element => {
+            if (exposureCache.has(element)) return exposureCache.get(element);
             const ancestors = [];
             let current = element;
-            while (current && !styleCache.has(current)) {
-              checkBudget();
-              ancestors.push(current);
-              current = current.parentElement;
+            while (current && !exposureCache.has(current)) {
+              checkBudget(); ancestors.push(current); current = current.parentElement;
             }
-            let visible = current ? styleCache.get(current) : true;
+            let allowed = current ? exposureCache.get(current) : true;
             while (ancestors.length) {
               current = ancestors.pop();
-              const css = getComputedStyle(current);
-              visible = visible && !current.matches('[hidden],[inert],[aria-hidden="true"]') && css.display !== 'none' && css.visibility === 'visible' && Number(css.opacity) > 0 && css.contentVisibility !== 'hidden';
-              styleCache.set(current, visible);
+              const css = cssFor(current);
+              const hiddenAria = current.getAttribute('aria-hidden')?.toLowerCase() === 'true' && !current.contains(document.activeElement);
+              const inert = current.hasAttribute('inert') && !(modal && current !== modal && current.contains(modal));
+              allowed = allowed && !current.matches(`${ignored},input[type=hidden]`) && !inert && !hiddenAria && css.display !== 'none' && css.contentVisibility !== 'hidden';
+              const disclosure = current.parentElement;
+              if (disclosure?.matches('details:not([open])') && current !== disclosure.querySelector(':scope > summary')) allowed = false;
+              exposureCache.set(current, allowed);
             }
-            return visible;
+            return allowed;
           };
-          const text = element => {
-            if (!element || element.matches(valueContainer) || element.closest(ignored)) return '';
-            if (textCache.has(element)) return textCache.get(element);
-            const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
-            const parts = [];
-            while (walker.nextNode()) {
+          const accessibilityExposed = element => (!modal || modal.contains(element)) && exposed(element) && !['hidden', 'collapse'].includes(cssFor(element).visibility);
+          const rendered = element => {
+            const rect = element.getBoundingClientRect();
+            if (rect.width <= 0 || rect.height <= 0 || !accessibilityExposed(element)) return false;
+            for (let current = element; current; current = current.parentElement) {
               checkBudget();
-              const parent = walker.currentNode.parentElement;
-              if (parent && !parent.closest(`${valueContainer},${ignored}`) && rendered(parent)) parts.push(walker.currentNode.textContent);
+              if (Number(cssFor(current).opacity) === 0) return false;
+            }
+            return true;
+          };
+          const nameText = (reference, references) => reference ? normalize(reference.getAttribute('aria-label')) ||
+            normalize(reference.getAttribute('alt')) || text(reference, !accessibilityExposed(reference), references) : '';
+          const text = (element, includeHidden = false, references = new Set()) => {
+            if (!element || element.matches(valueContainer) || element.closest(ignored)) return '';
+            if (references.has(element)) return '';
+            const cacheable = !includeHidden && references.size === 0;
+            if (cacheable && textCache.has(element)) return textCache.get(element);
+            references = new Set(references).add(element);
+            const parts = [];
+            const pending = [];
+            const children = node => {
+              for (let index = node.childNodes.length - 1; index >= 0; index--) {
+                checkBudget(); pending.push(node.childNodes[index]);
+              }
+            };
+            children(element);
+            while (pending.length) {
+              checkBudget();
+              const node = pending.pop();
+              const parent = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
+              if (!parent || parent.closest(`${valueContainer},${ignored}`) || !includeHidden && !accessibilityExposed(parent)) continue;
+              if (node.nodeType === Node.TEXT_NODE) parts.push(node.textContent);
+              else {
+                const referencedName = normalize((node.getAttribute('aria-labelledby') ?? '').split(/\s+/u)
+                  .map(id => nameText(document.getElementById(id), references)).join(' '));
+                if (referencedName) parts.push(referencedName);
+                else if (normalize(node.getAttribute('aria-label'))) parts.push(node.getAttribute('aria-label'));
+                else if (node.localName === 'img') parts.push(node.getAttribute('alt'));
+                else children(node);
+              }
             }
             const result = normalize(parts.join(' '));
             if (result.length > 64000) throw budgetExceeded;
-            textCache.set(element, result);
+            if (cacheable) textCache.set(element, result);
             return result;
           };
           const label = element => {
             if (labelCache.has(element)) return labelCache.get(element);
-            const result = normalize(element.getAttribute('aria-label')) ||
-              normalize((element.getAttribute('aria-labelledby') ?? '').split(/\s+/u).map(id => text(document.getElementById(id))).join(' ')) ||
-              normalize(Array.from(element.labels ?? [], text).join(' ')) || normalize(element.getAttribute('alt')) || normalize(element.getAttribute('title')) ||
-              (element.matches(buttonInput) ? normalize(element.value) : '');
+            const result = normalize((element.getAttribute('aria-labelledby') ?? '').split(/\s+/u).map(id => nameText(document.getElementById(id))).join(' ')) ||
+              normalize(element.getAttribute('aria-label')) || normalize(Array.from(element.labels ?? [], reference => nameText(reference)).join(' ')) ||
+              normalize(element.getAttribute('alt')) || (element.matches(buttonInput) ? normalize(element.value) : '') ||
+              (element.matches('button,a[href],summary,[role=button],[role=checkbox],[role=radio]') ? text(element) : '') || normalize(element.getAttribute('title'));
             labelCache.set(element, result);
             return result;
           };
@@ -68,8 +113,20 @@ internal static class BrowserCaptureScript
             }
             return scopes;
           };
-          const role = element => element.getAttribute('role') || ({ button: 'button', a: 'link', select: 'combobox', textarea: 'textbox', summary: 'button' }[element.localName] ??
-            (element.localName === 'input' ? ({ checkbox: 'checkbox', radio: 'radio', button: 'button', submit: 'button', reset: 'button', image: 'button' }[element.type] ?? 'textbox') : ''));
+          const roles = new Set('alert alertdialog application article banner blockquote button caption cell checkbox code columnheader combobox complementary contentinfo definition deletion dialog directory document emphasis feed figure form generic grid gridcell group heading img insertion link list listbox listitem log main marquee math menu menubar menuitem menuitemcheckbox menuitemradio meter navigation none note option paragraph presentation progressbar radio radiogroup region row rowgroup rowheader scrollbar search searchbox separator slider spinbutton status strong subscript suggestion superscript switch tab table tablist tabpanel term textbox time timer toolbar tooltip tree treegrid treeitem'.split(' '));
+          const role = element => {
+            const explicit = (element.getAttribute('role') ?? '').split(/\s+/u).find(value => roles.has(value));
+            const presentationConflict = ['none', 'presentation'].includes(explicit) &&
+              ((!element.matches(':disabled') && (element.tabIndex >= 0 || element.hasAttribute('tabindex'))) ||
+              element.matches('[aria-label],[aria-labelledby],[aria-describedby],[aria-description],[aria-controls],[aria-owns],[aria-live],[aria-busy],[aria-current]'));
+            if (explicit && !presentationConflict) return explicit;
+            return element.localName === 'select' ? element.multiple || element.size > 1 ? 'listbox' : 'combobox' :
+            element.localName === 'a' ? element.hasAttribute('href') ? 'link' : '' :
+            ({ button: 'button', textarea: 'textbox', summary: 'button', img: 'img' }[element.localName] ??
+            (element.localName === 'input' ? ({ checkbox: 'checkbox', radio: 'radio', button: 'button', submit: 'button', reset: 'button', image: 'button', number: 'spinbutton', range: 'slider', search: element.list ? 'combobox' : 'searchbox', text: element.list ? 'combobox' : 'textbox', email: element.list ? 'combobox' : 'textbox', tel: element.list ? 'combobox' : 'textbox', url: element.list ? 'combobox' : 'textbox' }[element.type] ?? '') : ''));
+          };
+          const textControl = element => element.isContentEditable || element.localName === 'textarea' ||
+            element.localName === 'input' && ['text','search','email','url','tel','password','number'].includes(element.type);
           const geometry = element => {
             const { x, y, width, height } = element.getBoundingClientRect();
             return { x, y, width, height };
@@ -77,15 +134,53 @@ internal static class BrowserCaptureScript
           const state = element => {
             const rect = geometry(element);
             return {
+              version: '2', accessibilityExposed: accessibilityExposed(element), readonly: (element.localName === 'textarea' ||
+                element.localName === 'input' && ['text','search','email','url','tel','password','number','date','month','week','time','datetime-local'].includes(element.type)) && element.readOnly ||
+                ['textbox','searchbox','spinbutton','combobox','listbox','checkbox','slider'].includes(role(element)) && element.getAttribute('aria-readonly') === 'true',
               rendered: rendered(element),
-              inViewport: rect.x < innerWidth && rect.y < innerHeight && rect.x + rect.width > 0 && rect.y + rect.height > 0,
+              inViewport: rect.width > 0 && rect.height > 0 && rect.x < innerWidth && rect.y < innerHeight && rect.x + rect.width > 0 && rect.y + rect.height > 0,
               enabled: !element.matches(':disabled') && !element.closest('[aria-disabled="true"]'),
-              editable: element.isContentEditable || element.matches('input:not([readonly]):not([type=checkbox]):not([type=radio]):not([type=button]):not([type=submit]):not([type=reset]):not([type=image]):not([type=file]):not([type=hidden]),textarea:not([readonly])'),
+              editable: textControl(element) && !element.readOnly && element.getAttribute('aria-readonly') !== 'true',
               checked: element.matches('input[type=checkbox],input[type=radio]') ? element.checked : ({ true: true, false: false }[element.getAttribute('aria-checked')] ?? null)
             };
           };
+          const interactability = (element, action) => {
+            const observed = state(element);
+            const pointer = ['click', 'hover', 'check', 'uncheck'].includes(action);
+            const editable = ['fill', 'type'].includes(action);
+            const rect = geometry(element);
+            const point = { x: Math.max(0, rect.x) + (Math.min(innerWidth, rect.x + rect.width) - Math.max(0, rect.x)) / 2,
+              y: Math.max(0, rect.y) + (Math.min(innerHeight, rect.y + rect.height) - Math.max(0, rect.y)) / 2 };
+            const hit = pointer && observed.inViewport ? document.elementFromPoint(point.x, point.y) : null;
+            const semanticRole = role(element);
+            const custom = editable ? !element.isContentEditable && !element.matches('input,textarea') && ['textbox','searchbox','spinbutton'].includes(semanticRole) :
+              action === 'select' ? element.localName !== 'select' && ['combobox','listbox'].includes(semanticRole) :
+              ['check','uncheck'].includes(action) ? !element.matches('input[type=checkbox],input[type=radio]') && ['checkbox','radio','switch'].includes(semanticRole) : false;
+            const compatible = custom || (editable ? textControl(element) :
+              action === 'select' ? element.localName === 'select' :
+              ['check', 'uncheck'].includes(action) ? element.matches('input[type=checkbox],input[type=radio]') && !(action === 'uncheck' && element.type === 'radio') : true);
+            const checks = {
+              compatibleControl: custom ? 'unknown' : compatible ? 'pass' : 'fail',
+              enabled: action === 'hover' ? 'not_applicable' : observed.enabled ? 'pass' : 'fail',
+              writable: editable ? observed.readonly ? 'fail' : 'pass' : 'not_applicable',
+              viewport: pointer ? observed.inViewport ? 'pass' : 'fail' : 'not_applicable',
+              pointerReception: !pointer ? 'not_applicable' : !observed.inViewport ? 'unknown' : hit && (hit === element || element.contains(hit)) ? 'pass' : 'fail',
+              keyboard: editable || action === 'select' ? 'unknown' : 'not_applicable',
+              stability: 'unknown', eventOutcome: 'unknown'
+            };
+            const reasons = [];
+            if (!compatible) reasons.push('incompatible_control');
+            if (custom) reasons.push('custom_control_unverified');
+            if (checks.enabled === 'fail') reasons.push('disabled');
+            if (checks.writable === 'fail') reasons.push('readonly');
+            if (rect.width <= 0 || rect.height <= 0) reasons.push('zero_area');
+            else if (!observed.inViewport) reasons.push('off_screen');
+            if (!observed.rendered) reasons.push('not_visually_rendered');
+            if (checks.pointerReception === 'fail') reasons.push(getComputedStyle(element).pointerEvents === 'none' ? 'pointer_events_none' : 'obstructed_at_hit_point');
+            return { version: '1', action, status: Object.values(checks).includes('fail') ? 'blocked' : custom ? 'unsupported' : 'unknown', reasons, checks };
+          };
           const eligible = element => {
-            if (element.closest(ignored) || !rendered(element)) return false;
+            if (!accessibilityExposed(element)) return false;
             const container = element.closest(valueContainer);
             if (container && container !== element) return false;
             return element.matches('a[href],button,input,select,textarea,summary,img[alt],[aria-label],[aria-labelledby],[role],[tabindex],[contenteditable]:not([contenteditable="false"])') ||
@@ -98,7 +193,7 @@ internal static class BrowserCaptureScript
           });
           const nodes = [];
           const candidates = [];
-          let scannedCount = 0, eligibleCount = 0, unsupportedBoundaryCount = 0, bytes = 2, complete = true;
+          let scannedCount = 0, eligibleCount = 0, unsupportedBoundaryCount = 0, bytes = 2, complete = !modalityUnknown;
           const walker = document.createTreeWalker(document, NodeFilter.SHOW_ELEMENT);
           try {
             while (walker.nextNode()) {
@@ -106,7 +201,7 @@ internal static class BrowserCaptureScript
               if (scannedCount === 20000) throw budgetExceeded;
               scannedCount++;
               const element = walker.currentNode;
-              if ((element.localName === 'iframe' || element.shadowRoot) && rendered(element)) unsupportedBoundaryCount++;
+              if ((element.localName === 'iframe' || element.shadowRoot) && accessibilityExposed(element)) unsupportedBoundaryCount++;
               if (!eligible(element)) continue;
               eligibleCount++;
               if (eligibleCount > 2000) complete = false;
@@ -170,11 +265,13 @@ internal static class BrowserCaptureScript
           };
           return {
             data: { ...identity, frameId: 'main', capturedAt: new Date().toISOString(), candidates,
-              coverage: { scannedCount, eligibleCount, capturedCount: candidates.length, complete, errorCode: complete ? null : 'capture_budget_exceeded' }, unsupportedBoundaryCount },
-            select(candidateId) {
+              coverage: { scannedCount, eligibleCount, capturedCount: candidates.length, complete, errorCode: complete ? null : modalityUnknown ? 'capture_exposure_unknown' : 'capture_budget_exceeded' }, unsupportedBoundaryCount },
+            select(candidateId, action) {
               try {
               deadline = performance.now() + 2000;
-              styleCache = new WeakMap(); textCache = new WeakMap(); labelCache = new WeakMap();
+              styleCache = new WeakMap(); textCache = new WeakMap(); labelCache = new WeakMap(); exposureCache = new WeakMap();
+              modal = currentModal();
+              if (modalityUnknown) return { errorCode: 'capture_exposure_unknown' };
               if (capturedDocument !== document) return { errorCode: 'stale_document' };
               if (!complete) return { errorCode: 'capture_budget_exceeded' };
               if (document.documentElement !== capturedRoot || nodes.some(node => !node.isConnected || node.ownerDocument !== document)) return { errorCode: 'stale_capture' };
@@ -182,11 +279,11 @@ internal static class BrowserCaptureScript
               const index = candidates.findIndex(candidate => candidate.id === candidateId);
               if (index < 0) return { errorCode: 'unknown_candidate' };
               const element = nodes[index];
-              if (!element.isConnected || !state(element).rendered) return { errorCode: 'stale_capture' };
+              if (!element.isConnected || !accessibilityExposed(element)) return { errorCode: 'stale_capture' };
               const xpaths = xpathsFor(element);
               if (!xpaths.length) return { errorCode: 'xpath_validation_failed' };
               return { target: { candidateId, tag: element.localName, label: candidates[index].label || candidates[index].text,
-                xpaths, state: state(element), geometry: geometry(element) } };
+                xpaths, state: state(element), geometry: geometry(element), interactability: interactability(element, action) } };
               } catch (error) {
                 if (error === budgetExceeded) return { errorCode: 'validation_budget_exceeded' };
                 throw error;
