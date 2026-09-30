@@ -11,6 +11,130 @@ namespace Xpathed.Resolver.Tests;
 
 public sealed class ResolutionContractTests
 {
+    [Fact]
+    public async Task ANullBrowserActionIsAnOperationalErrorRatherThanAnUnhandledFailure()
+    {
+        var handler = new DeterministicServicesHandler
+        {
+            ProviderBody = ProviderSelection("""
+                {"complete":true,"actions":[{"step":1,"instruction":"Click Save","outcome":"found","action":"click","candidateId":"button-save","limitation":"none"}]}
+                """),
+            SelectionBody = """{"actions":[null],"inspectedActionId":null}"""
+        };
+        await using var application = CreateApplication(handler);
+        using var client = application.CreateClient();
+        using var response = await client.PostAsJsonAsync("/pages/page-1/resolve", new { instruction = "Click Save", documentId = "document-1", contractVersion = "2" });
+        var result = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("error", result.GetProperty("outcome").GetString());
+        Assert.Equal("invalid_browser_selection", result.GetProperty("diagnostics").GetProperty("code").GetString());
+        Assert.Empty(result.GetProperty("actions").EnumerateArray());
+    }
+
+    [Theory]
+    [InlineData("incomplete", "decomposition_incomplete")]
+    [InlineData("duplicate", "provider_malformed_response")]
+    [InlineData("unknown", "provider_unknown_candidate")]
+    [InlineData("step_gap", "provider_malformed_response")]
+    [InlineData("dependent_found", "provider_malformed_response")]
+    [InlineData("empty", "provider_malformed_response")]
+    [InlineData("limit", "action_budget_exceeded")]
+    [InlineData("output_limit", "action_output_budget_exceeded")]
+    [InlineData("truncated", "provider_truncated_response")]
+    public async Task IncompleteOrInvalidActionListsCannotBecomeUsefulLookingPartialResults(string problem, string code)
+    {
+        var entry = new JsonObject { ["step"] = 1, ["instruction"] = "Click Save", ["outcome"] = "found", ["action"] = "click", ["candidateId"] = "button-save", ["limitation"] = "none" };
+        var actions = new JsonArray(entry);
+        var plan = new JsonObject { ["complete"] = true, ["actions"] = actions };
+        switch (problem)
+        {
+            case "incomplete":
+                plan["complete"] = false;
+                break;
+            case "duplicate":
+                actions.Add(entry.DeepClone());
+                break;
+            case "unknown":
+                entry["candidateId"] = "fabricated";
+                break;
+            case "step_gap":
+                entry["step"] = 2;
+                break;
+            case "dependent_found":
+                entry["limitation"] = "current_state_dependency";
+                break;
+            case "empty":
+                actions.Clear();
+                break;
+            case "limit":
+                for (var index = 0; index < 16; index++)
+                {
+                    actions.Add(entry.DeepClone());
+                }
+
+                break;
+            case "output_limit":
+                entry["instruction"] = new string('x', 16000);
+                break;
+        }
+        var handler = new DeterministicServicesHandler
+        {
+            ProviderBody = JsonSerializer.Serialize(new
+            {
+                id = "generation-invalid-batch",
+                choices = new[] { new { finish_reason = problem == "truncated" ? "length" : "stop", message = new { content = plan.ToJsonString() } } },
+                usage = new { prompt_tokens = 140, completion_tokens = 100, cost = 0.0001m }
+            })
+        };
+        await using var application = CreateApplication(handler);
+        using var client = application.CreateClient();
+        using var response = await client.PostAsJsonAsync("/pages/page-1/resolve", new { instruction = "Click Save", documentId = "document-1", contractVersion = "2" });
+        var result = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("error", result.GetProperty("outcome").GetString());
+        Assert.Empty(result.GetProperty("actions").EnumerateArray());
+        Assert.Equal(JsonValueKind.Null, result.GetProperty("summary").ValueKind);
+        Assert.Equal(code, result.GetProperty("diagnostics").GetProperty("code").GetString());
+        Assert.Equal(0.0001m, result.GetProperty("diagnostics").GetProperty("usage").GetProperty("cost").GetDecimal());
+        Assert.Equal(1, handler.ProviderRequestCount);
+        Assert.Equal(0, handler.SelectionRequestCount);
+    }
+
+    [Fact]
+    public async Task CurrentPageActionsPreserveIndependentOutcomesWithOneInferenceCharge()
+    {
+        var handler = new DeterministicServicesHandler
+        {
+            ProviderBody = JsonSerializer.Serialize(new
+            {
+                id = "generation-batch",
+                model = "deepseek/deepseek-v4.1-flash",
+                provider = "Wafer",
+                choices = new[] { new { finish_reason = "stop", message = new { content = """
+                    {"complete":true,"actions":[
+                      {"step":1,"instruction":"Click Save","outcome":"found","action":"click","candidateId":"button-save","limitation":"none"},
+                      {"step":2,"instruction":"Hover Contact","outcome":"not_found","action":"hover","candidateId":null,"limitation":"none"}]}
+                    """ } } },
+                usage = new { prompt_tokens = 140, completion_tokens = 100, total_tokens = 240, cost = 0.0001m }
+            })
+        };
+        await using var application = CreateApplication(handler);
+        using var client = application.CreateClient();
+        using var response = await client.PostAsJsonAsync("/pages/page-1/resolve", new { instruction = "Click Save and hover Contact", documentId = "document-1", contractVersion = "2" });
+        var result = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("2", result.GetProperty("contractVersion").GetString());
+        Assert.Equal("partial", result.GetProperty("outcome").GetString());
+        var actions = result.GetProperty("actions");
+        Assert.Equal(2, actions.GetArrayLength());
+        Assert.Equal("a1", actions[0].GetProperty("actionId").GetString());
+        Assert.Equal("button-save", actions[0].GetProperty("target").GetProperty("candidateId").GetString());
+        Assert.Equal("not_found", actions[1].GetProperty("outcome").GetString());
+        Assert.Equal(JsonValueKind.Null, actions[1].GetProperty("target").ValueKind);
+        Assert.Equal(1, result.GetProperty("summary").GetProperty("found").GetInt32());
+        Assert.Equal(1, result.GetProperty("summary").GetProperty("notFound").GetInt32());
+        Assert.All(actions.EnumerateArray(), action => Assert.Equal(result.GetProperty("attemptId").GetString(), action.GetProperty("diagnosticsReference").GetString()));
+        Assert.Equal(0.0001m, result.GetProperty("diagnostics").GetProperty("usage").GetProperty("cost").GetDecimal());
+        Assert.Equal(1, handler.ProviderRequestCount);
+    }
+
     [Theory]
     [InlineData("click", "blocked", "found")]
     [InlineData("hover", "blocked", "error")]

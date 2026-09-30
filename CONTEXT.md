@@ -17,6 +17,12 @@ The result of identifying one action's target in a particular page state, includ
 **Multi-action result**:
 The ordered action resolutions for one test instruction. Its partial-result summary distinguishes independently resolved actions from missing, unsupported, failed or non-interactable actions.
 
+**Instruction step**:
+An ordered part of a test instruction. An unordered plural step expands into multiple action resolutions, one for each intended eligible target.
+
+**Inspected action**:
+The found action whose verified target currently owns the browser highlight. Inspecting an action does not execute it.
+
 **Target element**:
 The web element that the instruction intends the action to affect.
 _Avoid_: XPath file

@@ -266,9 +266,19 @@ internal static class BrowserCaptureScript
           return {
             data: { ...identity, frameId: 'main', capturedAt: new Date().toISOString(), candidates,
               coverage: { scannedCount, eligibleCount, capturedCount: candidates.length, complete, errorCode: complete ? null : modalityUnknown ? 'capture_exposure_unknown' : 'capture_budget_exceeded' }, unsupportedBoundaryCount },
-            select(candidateId, action) {
-              try {
+            selectActions(actions) {
               deadline = performance.now() + 2000;
+              const validated = [];
+              for (const action of actions) {
+                const result = this.select(action.candidateId, action.action, false);
+                if (result.errorCode) return result;
+                validated.push({ actionId: action.actionId, target: result.target });
+              }
+              return { actions: validated, inspectedActionId: validated.find(action => action.target)?.actionId ?? null };
+            },
+            select(candidateId, action, resetBudget = true) {
+              try {
+              if (resetBudget) deadline = performance.now() + 2000;
               styleCache = new WeakMap(); textCache = new WeakMap(); labelCache = new WeakMap(); exposureCache = new WeakMap();
               modal = currentModal();
               if (modalityUnknown) return { errorCode: 'capture_exposure_unknown' };

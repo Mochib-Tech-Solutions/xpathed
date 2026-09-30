@@ -1,4 +1,5 @@
 using Microsoft.Playwright;
+using Xpathed.Common.Contracts;
 
 namespace Xpathed.Browser.Sessions;
 
@@ -13,6 +14,7 @@ internal sealed class BrowserPageRuntime(IPage page, long order)
     public string DocumentId { get; private set; } = Guid.NewGuid().ToString("N");
     public string? CaptureId { get; set; }
     public IJSHandle? Capture { get; set; }
+    public Dictionary<string, ActionSelection>? ActionSelections { get; set; }
     public ICDPSession? Highlight { get; private set; }
 
     public async Task InitializeAsync(IBrowserContext context, Action<BrowserPageRuntime> focused)
@@ -102,7 +104,11 @@ internal sealed class BrowserPageRuntime(IPage page, long order)
         return result!.Value.GetProperty("result").TryGetProperty("value", out var value) && value.ValueKind == System.Text.Json.JsonValueKind.True;
     }
 
-    public void InvalidateCapture() => CaptureId = null;
+    public void InvalidateCapture()
+    {
+        CaptureId = null;
+        ActionSelections = null;
+    }
 
     public async Task ClearCaptureAsync()
     {
