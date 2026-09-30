@@ -107,6 +107,12 @@ One declared execution of an evaluation case. Repetitions and later diagnostic r
 **Target oracle**:
 An independently established mapping from an expected action to its intended element. It is separate from the resolver's selected candidate and generated XPath.
 
+**Comparison pair**:
+Two strategy attempts on equivalent independently reset page states and the same instruction, retained together even when one fails or cannot support the case.
+
+**Target-set completeness**:
+Whether the returned distinct elements exactly cover all independently labelled targets for the command, with no missing or extra elements. Correct interaction and passive state are assessed separately.
+
 **Saved-locator reuse**:
 Checking whether a previously returned locator still identifies its intended element after a page change. This is distinct from resolving the instruction again on the changed page.
 

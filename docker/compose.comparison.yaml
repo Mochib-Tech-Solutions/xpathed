@@ -1,0 +1,24 @@
+services:
+  resolver:
+    environment:
+      OpenRouter__BaseUrl: http://evaluation-fixture:8091/api/v1/
+      OpenRouter__ApiKey: comparison-proxy-only
+      OpenRouter__Model: deepseek/deepseek-v4.1-flash
+      OpenRouter__Provider: wafer
+  evaluation-fixture:
+    environment:
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      XPATHED_COMPARISON_MODE: ${XPATHED_COMPARISON_MODE:-deterministic}
+      XPATHED_BUDGET_PATH: /budget/experiment-budget.json
+    volumes:
+      - ./.artifacts/datasets:/budget
+  stagehand:
+    build:
+      context: .
+      dockerfile: docker/stagehand.Dockerfile
+    init: true
+    shm_size: 1gb
+    security_opt: ["seccomp=./docker/browser/seccomp.json"]
+    environment:
+      STAGEHAND_MODEL_URL: http://evaluation-fixture:8091/api/v1/chat/completions
+    stop_grace_period: 20s
