@@ -107,6 +107,8 @@ export function adaptPhraseNode(annotation, page, provenance) {
     style(node, "display") === "none" ||
     style(node, "content-visibility") === "hidden";
   const invisible = (node) => ["hidden", "collapse"].includes(style(node, "visibility"));
+  const frameScope = (node) =>
+    ["iframe", "frame", "shadow-root"].includes(String(node.tag).toLowerCase());
   const parents = new Map();
   for (const node of page.info)
     for (const child of node.children ?? []) {
@@ -125,13 +127,14 @@ export function adaptPhraseNode(annotation, page, provenance) {
   }
   try {
     for (const node of page.info) ancestry(node);
-    if (ancestry(target).some((node) => String(node.tag).toLowerCase() === "iframe"))
+    if (ancestry(target).some(frameScope))
       return fail(result, "unsupported-frame-scope", "unsupported");
     if (ancestry(target).some(hidden) || invisible(target))
       return fail(result, "accessibility-hidden-target");
     const nodes = page.info.filter(
       (node) =>
         !["t", "script", "style", "noscript"].includes(String(node.tag).toLowerCase()) &&
+        !ancestry(node).some(frameScope) &&
         !ancestry(node).some(hidden) &&
         !invisible(node) &&
         !ancestry(node).slice(1).some(editable),
@@ -139,7 +142,12 @@ export function adaptPhraseNode(annotation, page, provenance) {
     function content(node, depth = 0) {
       if (
         depth > 100 ||
-        ["input", "textarea", "script", "style"].includes(String(node.tag).toLowerCase()) ||
+        ["input", "textarea", "script", "style", "noscript"].includes(
+          String(node.tag).toLowerCase(),
+        ) ||
+        frameScope(node) ||
+        hidden(node) ||
+        invisible(node) ||
         editable(node)
       )
         return "";
@@ -216,7 +224,18 @@ export function adaptMind2Web(task, action, actionIndex, provenance, adaptation)
     result.source.rawOnlyTarget = original.length === 0;
     if (target.closest("iframe, frame, shadow-root"))
       return fail(result, "unsupported-frame-scope", "unsupported");
-    if (target.closest('[hidden], [aria-hidden="true"], [aria_hidden="true"]'))
+    const inlineInvisible = (node) => {
+      for (let current = node; current; current = current.parentElement) {
+        const visibility = current.style.visibility.toLowerCase();
+        if (["visible", "initial"].includes(visibility)) return false;
+        if (["hidden", "collapse"].includes(visibility)) return true;
+      }
+      return false;
+    };
+    if (
+      target.closest('[hidden], [aria-hidden="true"], [aria_hidden="true"]') ||
+      inlineInvisible(target)
+    )
       return fail(result, "accessibility-hidden-target");
     const sourceAction = {
       CLICK: "click",
@@ -245,9 +264,14 @@ export function adaptMind2Web(task, action, actionIndex, provenance, adaptation)
       node.removeAttribute("value");
     }
     if (!target.isConnected) return fail(result, "sanitization-removed-target");
+    for (const node of document.querySelectorAll("*"))
+      if (inlineInvisible(node))
+        for (const child of node.childNodes)
+          if (child.nodeType === window.Node.TEXT_NODE) child.textContent = "";
     const candidates = [...document.querySelectorAll("*")].filter(
       (node) =>
         !["SCRIPT", "STYLE", "NOSCRIPT", "TEXT"].includes(node.tagName) &&
+        !inlineInvisible(node) &&
         !node.closest(
           '[hidden], [aria-hidden="true"], [aria_hidden="true"], iframe, frame, shadow-root',
         ),

@@ -1,13 +1,14 @@
 import { createHash, randomUUID } from "node:crypto";
-import { mkdir, readFile, writeFile, readdir, rm, rename } from "node:fs/promises";
+import { mkdir, readFile, writeFile, readdir, rm, rename, lstat, readlink } from "node:fs/promises";
 import { resolve, join } from "node:path";
+import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { setTimeout as delay } from "node:timers/promises";
 
 const directory = fileURLToPath(new URL(".", import.meta.url));
 const hash = (value) =>
   createHash("sha256")
-    .update(typeof value === "string" ? value : JSON.stringify(value))
+    .update(typeof value === "string" || Buffer.isBuffer(value) ? value : JSON.stringify(value))
     .digest("hex");
 const readJson = async (path) => JSON.parse(await readFile(path, "utf8"));
 const saveJson = async (path, value) =>
@@ -481,6 +482,7 @@ export async function fingerprints() {
     "src/Resolver/Services/CandidateSelectionStrategy.cs",
     "src/Resolver/Services/ActionSelectionStrategy.cs",
     "src/Resolver/Services/OpenRouterGateway.cs",
+    "src/Resolver/Services/OfflineSelectionEvaluation.cs",
     "docker/browser/Dockerfile",
     "docker/compose.yaml",
   ];
@@ -495,9 +497,53 @@ export async function fingerprints() {
   for (const name of await readdir(directory))
     if (/\.(mjs|js|json)$/.test(name))
       files[`evaluation/${name}`] = hash(await readFile(join(directory, name), "utf8"));
+  for (const path of [
+    "src/Resolver/bin/Release/net10.0/Resolver.dll",
+    "src/Resolver/bin/Release/net10.0/Common.dll",
+  ]) {
+    try {
+      files[path] = hash(await readFile(join(root, path)));
+    } catch {
+      files[path] = "unavailable";
+    }
+  }
+  let revision = process.env.XPATHED_CODE_REVISION,
+    tree = process.env.XPATHED_TREE_HASH;
+  try {
+    revision ??= execFileSync("git", ["rev-parse", "HEAD"], {
+      cwd: root,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+    if (!tree) {
+      const paths = execFileSync(
+        "git",
+        ["ls-files", "-z", "--cached", "--others", "--exclude-standard"],
+        { cwd: root, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] },
+      )
+        .split("\0")
+        .filter(Boolean)
+        .sort();
+      const digest = createHash("sha256");
+      for (const path of new Set(paths)) {
+        digest.update(path + "\0");
+        try {
+          const full = join(root, path);
+          digest.update(
+            (await lstat(full)).isSymbolicLink() ? await readlink(full) : await readFile(full),
+          );
+        } catch (error) {
+          if (error.code !== "ENOENT") throw error;
+          digest.update("[deleted]");
+        }
+        digest.update("\0");
+      }
+      tree = digest.digest("hex");
+    }
+  } catch {}
   return {
-    revision: process.env.XPATHED_CODE_REVISION ?? "unavailable",
-    tree: process.env.XPATHED_TREE_HASH ?? "unavailable",
+    revision: revision ?? "unavailable",
+    tree: tree ?? "unavailable",
     node: process.version,
     files,
   };

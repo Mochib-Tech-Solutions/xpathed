@@ -531,3 +531,50 @@ test("one interaction cannot duplicate a candidate to inflate target completenes
   assert.equal(grade.passed, false);
   assert.ok(grade.failures.some((item) => /more than once/.test(item.detail)));
 });
+
+test("plural reports distinguish missing, extra, duplicate and wrong targets", () => {
+  const spec = {
+    track: "offline-selection",
+    expected: {
+      outcome: "found",
+      actions: ["n1", "n2"].map((candidateId, i) => ({
+        step: i + 1,
+        action: "click",
+        outcome: "found",
+        target: { candidateId },
+      })),
+    },
+  };
+  for (const [ids, missing, extra, duplicate, wrong, complete] of [
+    [["n1", "n2"], 0, 0, 0, 0, 1],
+    [["n1"], 1, 0, 0, 0, 0],
+    [["n1", "n2", "n3"], 0, 1, 0, 1, 0],
+    [["n1", "n1"], 1, 1, 1, 1, 0],
+    [["n9", "n2"], 1, 1, 0, 1, 0],
+  ]) {
+    const result = {
+      contractVersion: "offline-1",
+      outcome: "found",
+      action: "click",
+      actions: ids.map((candidateId, i) => ({
+        actionId: `a${i + 1}`,
+        step: i + 1,
+        order: i + 1,
+        action: "click",
+        outcome: "found",
+        target: { candidateId },
+      })),
+    };
+    const { metrics } = gradeTrial(spec, { result });
+    assert.deepEqual(
+      [
+        metrics.missingTargets,
+        metrics.extraTargets,
+        metrics.duplicateTargets,
+        metrics.wrongTargets,
+        metrics.targetSetsComplete,
+      ],
+      [missing, extra, duplicate, wrong, complete],
+    );
+  }
+});

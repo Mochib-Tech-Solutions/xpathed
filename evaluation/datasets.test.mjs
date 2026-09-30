@@ -40,6 +40,38 @@ test("PhraseNode preserves original identity outside sanitized model candidates"
   assert.equal(result.historicalState, "unavailable");
 });
 
+test("PhraseNode prunes private and hidden subtrees before collecting ancestor text", () => {
+  const source = {
+    common_styles: {},
+    info: [
+      { tag: "BODY", children: [1, 2, 4, 6, 8, 10] },
+      { tag: "BUTTON", xid: 23, text: "Save" },
+      { tag: "DIV", attributes: { hidden: "" }, children: [3] },
+      { tag: "SPAN", text: "HIDDEN_SECRET" },
+      { tag: "IFRAME", text: "FRAME_MARKUP", children: [5] },
+      { tag: "DIV", text: "FRAME_SECRET" },
+      { tag: "DIV", styles: { display: "none" }, children: [7] },
+      { tag: "SPAN", text: "DISPLAY_SECRET" },
+      { tag: "DIV", attributes: { "aria-hidden": "true" }, children: [9] },
+      { tag: "SPAN", text: "ARIA_SECRET" },
+      { tag: "shadow-root", children: [11] },
+      { tag: "SPAN", text: "SHADOW_SECRET" },
+    ],
+  };
+  const result = adaptPhraseNode(annotation, source, provenance);
+  assert.equal(result.status, "offline-eligible");
+  assert.doesNotMatch(JSON.stringify(result.candidates), /SECRET|FRAME_MARKUP/);
+  assert.deepEqual(
+    result.candidates.map((item) => item.text),
+    ["Save", "Save"],
+  );
+  const framed = structuredClone(source);
+  framed.info[11].xid = 99;
+  assert.deepEqual(adaptPhraseNode({ ...annotation, xid: 99 }, framed, provenance).reasons, [
+    "unsupported-frame-scope",
+  ]);
+});
+
 test("import verifies local bytes and writes deduplicated inputs with complete denominators", async () => {
   const dir = await mkdtemp(join(tmpdir(), "dataset-import-"));
   try {
@@ -250,6 +282,31 @@ test("Mind2Web removes frame and hidden subtree text from every candidate", () =
     ).reasons,
     ["unsupported-frame-scope"],
   );
+});
+
+test("Mind2Web respects inherited inline visibility and explicit visible descendants", () => {
+  const task = { annotation_id: "task" };
+  const action = {
+    action_uid: "a",
+    raw_html: '<button backend_node_id="7" data_pw_testid_buckeye="a">Save</button>',
+    operation: { op: "CLICK" },
+    pos_candidates: [],
+  };
+  const p = { dataset: "mind2web", revision: "abc", split: "train" };
+  for (const visibility of ["hidden", "collapse"]) {
+    const concealed = `<main style="visibility:${visibility}">PRIVATE_TEXT${action.raw_html}</main>`;
+    assert.deepEqual(adaptMind2Web(task, { ...action, raw_html: concealed }, 0, p).reasons, [
+      "accessibility-hidden-target",
+    ]);
+    const visible = concealed.replace("<button", '<button style="visibility:visible"');
+    const result = adaptMind2Web(task, { ...action, raw_html: visible }, 0, p);
+    assert.equal(result.status, "adaptation-required");
+    assert.doesNotMatch(JSON.stringify(result.candidates), /PRIVATE_TEXT/);
+    assert.equal(
+      result.candidates.find((item) => item.id === result.oracle.candidateId).text,
+      "Save",
+    );
+  }
 });
 
 test("import accounts for malformed records and excludes page families shared between splits", async () => {

@@ -1,6 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { reconstructPhraseNode } from "./reconstruction.mjs";
+import { importDataset } from "./datasets.mjs";
+import { mkdtemp, writeFile, readFile, rm, symlink } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { gzipSync } from "node:zlib";
+import { createHash } from "node:crypto";
+import { spawnSync } from "node:child_process";
 
 test("static derivative preserves independently mapped target identity without source IDs or active assets", () => {
   const page = {
@@ -108,4 +115,91 @@ test("editable descendants and frame fallback markup never enter the derivative"
   assert.equal(result.omissions.clearedValues, 1);
   assert.equal(result.omissions.removedNodes, 1);
   assert.equal(result.nodeMap.length, 3);
+});
+
+test("reconstruction CLI verifies pinned files and writes a reproducible private new suite", async () => {
+  const root = await mkdtemp(join(tmpdir(), "reconstruction-cli-"));
+  try {
+    const commands =
+      JSON.stringify({
+        exampleId: "source-case",
+        version: "v6",
+        webpage: "example.test",
+        xid: 7,
+        phrase: "go to home page",
+      }) + "\n";
+    const page = gzipSync(
+      JSON.stringify({
+        info: [
+          { tag: "BODY", children: [1] },
+          { tag: "A", xid: 7, text: "Home" },
+        ],
+      }),
+    );
+    await writeFile(join(root, "commands.jsonl"), commands);
+    await writeFile(join(root, "page.gz"), page);
+    const sha = (data) => createHash("sha256").update(data).digest("hex");
+    const imported = join(root, "import");
+    await importDataset(
+      {
+        version: 1,
+        dataset: "phrasenode",
+        revision: "fixture",
+        files: [
+          {
+            path: "commands.jsonl",
+            url: "https://example.test/commands",
+            sha256: sha(commands),
+            kind: "commands",
+            split: "train",
+          },
+          {
+            path: "page.gz",
+            url: "https://example.test/page",
+            sha256: sha(page),
+            kind: "page",
+            page: "v6/example.test",
+          },
+        ],
+      },
+      { sourceRoot: root, outputRoot: imported },
+    );
+    const [item] = JSON.parse(await readFile(join(imported, "cases.json")));
+    const output = join(root, "private", "suite.json");
+    const run = (target = output, sourceRoot = root) =>
+      spawnSync(
+        process.execPath,
+        [
+          "evaluation/reconstruction.mjs",
+          "--import",
+          imported,
+          "--source-root",
+          sourceRoot,
+          "--case",
+          item.id,
+          "--output",
+          target,
+        ],
+        { encoding: "utf8" },
+      );
+    assert.equal(run().status, 0);
+    const suite = JSON.parse(await readFile(output));
+    assert.equal(
+      suite.cases[0].expected.actions[0].target.selector,
+      "html > body > div:nth-of-type(1) > a:nth-of-type(1)",
+    );
+    assert.equal(suite.cases[0].provenance.actionLabelSource, "controlled-browser-probe");
+    assert.equal(suite.cases[0].provenance.sourceActionLabel, "unavailable");
+    assert.equal(suite.cases[0].split, "train");
+    assert.equal(run().status, 1, "existing private suite must not be overwritten");
+    const second = join(root, "second.json");
+    assert.equal(run(second).status, 0);
+    assert.equal(await readFile(output, "utf8"), await readFile(second, "utf8"));
+    await writeFile(join(root, "page.gz"), gzipSync("{}"));
+    assert.match(run(join(root, "bad.json")).stderr, /checksum mismatch/);
+    await symlink(join(root, "commands.jsonl"), join(imported, "commands.jsonl"));
+    assert.match(run(join(root, "outside.json"), imported).stderr, /escapes root/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
 });

@@ -232,6 +232,17 @@ export async function main(args = process.argv.slice(2)) {
     console.log(JSON.stringify(summary, null, 2));
     return summary.passed ? 0 : 1;
   }
+  if (opt.mode === "live") {
+    const build = spawnSync(
+      "dotnet",
+      ["build", "src/Resolver/Resolver.csproj", "--configuration", "Release", "--no-restore"],
+      { encoding: "utf8", timeout: 60000, maxBuffer: 2_000_000 },
+    );
+    if (build.error || build.status !== 0)
+      throw new Error(
+        "Build the current Resolver successfully before evaluating; run pnpm restore:dotnet if needed",
+      );
+  }
   const source = resolve(opt.import),
     output = resolve(opt.output);
   const caseText = await readFile(join(source, "cases.json"), "utf8");

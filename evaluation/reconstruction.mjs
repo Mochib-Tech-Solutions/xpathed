@@ -1,5 +1,9 @@
 import { createRequire } from "node:module";
 import { createHash } from "node:crypto";
+import { readFile, writeFile, mkdir, realpath } from "node:fs/promises";
+import { resolve, relative, isAbsolute, dirname, join } from "node:path";
+import { gunzipSync } from "node:zlib";
+import { parseArgs } from "node:util";
 import { derivedTags, derivedAttributes, renderDerivedBody } from "./fixtures.mjs";
 
 const { JSDOM } = createRequire(new URL("../src/Web/package.json", import.meta.url))("jsdom");
@@ -117,5 +121,121 @@ export function reconstructPhraseNode(annotation, page, provenance) {
     };
   } finally {
     window.close();
+  }
+}
+
+export async function createBrowserSuite(values) {
+  const hash = (bytes) => createHash("sha256").update(bytes).digest("hex");
+  const imported = resolve(values.import);
+  const root = await realpath(values["source-root"]);
+  const manifest = JSON.parse(await readFile(join(imported, "manifest.json"), "utf8"));
+  const bytes = await readFile(join(imported, "cases.json"));
+  if (manifest.dataset !== "phrasenode" || hash(bytes) !== manifest.casesSha256)
+    throw new Error("PhraseNode import integrity mismatch");
+  const matches = JSON.parse(bytes).filter((item) => item.id === values.case);
+  if (matches.length !== 1 || matches[0].status !== "offline-eligible")
+    throw new Error("Select exactly one eligible PhraseNode case");
+  const item = matches[0];
+  async function source(path, sha256, kind) {
+    const entry = manifest.files.find((file) => file.path === path && file.kind === kind);
+    if (!entry || entry.sha256 !== sha256) throw new Error("Source provenance mismatch");
+    const filename = await realpath(resolve(root, path));
+    const local = relative(root, filename);
+    if (!local || local.startsWith("..") || isAbsolute(local))
+      throw new Error("Source escapes root");
+    const data = await readFile(filename);
+    if (hash(data) !== sha256) throw new Error("Source checksum mismatch");
+    return data;
+  }
+  const commands = await source(
+    item.provenance.sourcePath,
+    item.provenance.sourceSha256,
+    "commands",
+  );
+  const annotation = JSON.parse(
+    commands.toString("utf8").split(/\r?\n/)[item.provenance.sourceLine - 1],
+  );
+  if (
+    annotation.exampleId !== item.provenance.originalId ||
+    annotation.phrase !== item.instruction ||
+    annotation.xid !== item.source.xid ||
+    annotation.version !== item.source.version ||
+    annotation.webpage !== item.source.webpage
+  )
+    throw new Error("Imported annotation differs from pinned source");
+  const pageBytes = await source(item.provenance.page.path, item.provenance.page.sha256, "page");
+  const page = JSON.parse(gunzipSync(pageBytes, { maxOutputLength: 64 * 1024 * 1024 }));
+  const reconstruction = reconstructPhraseNode(annotation, page, item.provenance);
+  if (!/^[a-f0-9]{64}$/.test(item.inputKey)) throw new Error("Invalid input identity");
+  const input = await readFile(join(imported, "inputs", `${item.inputKey}.json`));
+  if (hash(input) !== item.inputKey) throw new Error("Imported input integrity mismatch");
+  const candidate = JSON.parse(input).candidates.find(
+    (node) => node.id === item.oracle.candidateId,
+  );
+  const label = candidate?.label || candidate?.text;
+  if (!label) throw new Error("Controlled browser probe requires a labelled target");
+  const suite = {
+    version: "1",
+    cases: [
+      {
+        id: item.id,
+        dataset: item.dataset,
+        family: item.family,
+        split: item.split,
+        category: "external-reconstruction",
+        track: "derived-static-dom",
+        fixture: reconstruction.fixture,
+        instruction: item.instruction,
+        viewport: { width: 1280, height: 800, tolerance: 1 },
+        setupRevision: reconstructionVersion,
+        review: {
+          status: "source-mapping-validated",
+          method:
+            "Automated source adjacency and unique xid-to-selector mapping; no independent human review claimed",
+        },
+        expected: {
+          outcome: "found",
+          actions: [
+            {
+              step: 1,
+              action: "click",
+              outcome: "found",
+              target: { selector: reconstruction.oracle.selector, frames: [] },
+            },
+          ],
+        },
+        provider: {
+          actions: [{ step: 1, action: "click", outcome: "found", label, tag: candidate.tag }],
+        },
+        provenance: {
+          ...item.provenance,
+          actionLabelSource: "controlled-browser-probe",
+          sourceActionLabel: "unavailable",
+        },
+        sourceCaseId: item.id,
+        historicalState: reconstruction.historicalState,
+        reconstructionLimitations: reconstruction.limitations,
+      },
+    ],
+  };
+  const output = resolve(values.output);
+  await mkdir(dirname(output), { recursive: true, mode: 0o700 });
+  await writeFile(output, JSON.stringify(suite, null, 2) + "\n", { flag: "wx", mode: 0o600 });
+  return { output, caseId: item.id, fixtureSha256: reconstruction.fixture.sha256 };
+}
+
+if (import.meta.main) {
+  try {
+    const { values } = parseArgs({
+      options: Object.fromEntries(
+        ["import", "source-root", "case", "output"].map((name) => [name, { type: "string" }]),
+      ),
+    });
+    if (["import", "source-root", "case", "output"].some((name) => !values[name]))
+      throw new Error("Specify --import DIR --source-root DIR --case ID --output NEW_PRIVATE_JSON");
+    console.log(JSON.stringify(await createBrowserSuite(values)));
+  } catch (error) {
+    console.error(error.message);
+    process.exitCode = 1;
   }
 }

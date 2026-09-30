@@ -239,7 +239,7 @@ export default function ChatPanel({
                     className="space-y-3"
                     aria-label={`${sharedAction ? "Target" : "Action"} ${action.order}`}
                   >
-                    {!sharedAction && actions.length > 1 && (
+                    {actions.length > 1 && (!sharedAction || !target) && (
                       <p className="text-xs font-medium text-muted-foreground">
                         {action.order}. {action.instruction}
                       </p>

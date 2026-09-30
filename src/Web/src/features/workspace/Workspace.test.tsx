@@ -152,7 +152,9 @@ describe("Workspace resolution", () => {
       expect(targets).toHaveLength(2);
       for (const target of targets) {
         expect(within(target).queryByText(/Action:/)).not.toBeInTheDocument();
-        expect(within(target).queryByText(/Click the/)).not.toBeInTheDocument();
+        if (missing && target === targets[1])
+          expect(within(target).getByText(/Click the second confirmation button/)).toBeVisible();
+        else expect(within(target).queryByText(/Click the/)).not.toBeInTheDocument();
       }
       expect(within(targets[0]!).getByText(found.target.xpaths[0]!)).toBeVisible();
       expect(within(targets[0]!).getByText("Disabled")).toBeVisible();

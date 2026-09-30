@@ -77,6 +77,7 @@ export function gradeTrial(caseSpec, trial) {
     targetsExpected: wanted.filter((action) => action.outcome === "found").length,
     targetsCorrect: 0,
     wrongTargets: 0,
+    duplicateTargets: 0,
     falseNotFound: 0,
   };
   Object.assign(metrics, {
@@ -234,6 +235,7 @@ export function gradeTrial(caseSpec, trial) {
       fail("contract", "A command must return between one and sixteen target items.");
     for (const [index, action] of trial.result.actions.entries()) {
       const before = failures.length;
+      let duplicateTarget = false;
       const label = wanted[index];
       if (!object(action)) {
         fail("contract", `Action ${index + 1} is malformed.`);
@@ -264,11 +266,14 @@ export function gradeTrial(caseSpec, trial) {
       if (action.outcome === "found") {
         metrics.targetsReturned++;
         if (contractVersion !== "2" && action.target?.candidateId) {
-          if (selectedTargets.has(action.target.candidateId))
+          if (selectedTargets.has(action.target.candidateId)) {
+            duplicateTarget = true;
+            metrics.duplicateTargets++;
             fail(
               "target_identity",
               "The same candidate was returned more than once for one command.",
             );
+          }
           selectedTargets.add(action.target.candidateId);
         }
         if (offline) {
@@ -287,7 +292,7 @@ export function gradeTrial(caseSpec, trial) {
               "target_identity",
               `Target ${index + 1} differs from its independent source mapping.`,
             );
-          } else metrics.targetsCorrect++;
+          } else if (!duplicateTarget) metrics.targetsCorrect++;
         } else {
           if (
             action.target?.state?.version !== "2" ||
@@ -319,7 +324,7 @@ export function gradeTrial(caseSpec, trial) {
               `Action ${index + 1} does not uniquely identify the intended node.`,
             );
             metrics.wrongTargets++;
-          } else if (label?.outcome === "found") metrics.targetsCorrect++;
+          } else if (label?.outcome === "found" && !duplicateTarget) metrics.targetsCorrect++;
         }
       } else if (action.target != null) {
         fail("contract", `Action ${index + 1} returned a target for a non-found outcome.`);
@@ -346,6 +351,17 @@ export function gradeTrial(caseSpec, trial) {
         ? 0
         : 1;
   }
+  metrics.missingTargets = Math.max(0, metrics.targetsExpected - metrics.targetsCorrect);
+  // Extra returned entries include wrong nodes and duplicate occurrences; duplicateTargets separates the latter.
+  metrics.extraTargets = Math.max(0, metrics.targetsReturned - metrics.targetsCorrect);
+  metrics.targetSetsExpected = metrics.targetsExpected > 0 ? 1 : 0;
+  metrics.targetSetsComplete =
+    metrics.targetSetsExpected &&
+    !metrics.missingTargets &&
+    !metrics.extraTargets &&
+    !metrics.duplicateTargets
+      ? 1
+      : 0;
   metrics.semanticFailure = failures.some(({ category }) =>
     [
       "action_decomposition",
@@ -393,6 +409,11 @@ function aggregate(entries) {
     "targetsReturned",
     "targetsCorrect",
     "wrongTargets",
+    "missingTargets",
+    "extraTargets",
+    "duplicateTargets",
+    "targetSetsExpected",
+    "targetSetsComplete",
     "falseNotFound",
     "unsupportedExpected",
     "unsupportedCorrect",
@@ -413,6 +434,9 @@ function aggregate(entries) {
   }
   metrics.actionAccuracy = metrics.actionsExpected
     ? metrics.actionsCorrect / metrics.actionsExpected
+    : null;
+  metrics.targetSetCompleteness = metrics.targetSetsExpected
+    ? metrics.targetSetsComplete / metrics.targetSetsExpected
     : null;
   metrics.topOneAccuracy = metrics.targetsExpected
     ? metrics.targetsCorrect / metrics.targetsExpected
