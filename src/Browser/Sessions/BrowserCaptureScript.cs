@@ -81,7 +81,7 @@ internal static class BrowserCaptureScript
               const parent = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
               if (!parent || parent.closest(`${valueContainer},${ignored}`) || !includeHidden && !accessibilityExposed(parent)) continue;
               if (node.nodeType === Node.TEXT_NODE) parts.push(node.textContent);
-              else {
+              else if (node.nodeType === Node.ELEMENT_NODE) {
                 const referencedName = normalize((node.getAttribute('aria-labelledby') ?? '').split(/\s+/u)
                   .map(id => nameText(document.getElementById(id), references)).join(' '));
                 if (referencedName) parts.push(referencedName);
