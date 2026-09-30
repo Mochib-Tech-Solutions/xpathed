@@ -260,139 +260,40 @@ internal sealed class BrowserPageCapture(BrowserPageRuntime page) : IAsyncDispos
         return result.Deserialize<SelectionValidation>(JsonOptions)!;
     }
 
-    public async Task HighlightAsync(ResolvedTarget target)
+    public async Task HighlightAsync(ResolvedTarget[] targets)
     {
-        var frame = frames.Single(frame => frame.CandidateIds.Contains(target.CandidateId));
-        await PrepareHighlightAsync(frame);
-        var resolved = await frame.Highlight!.SendAsync(
-            "Runtime.evaluate",
-            new Dictionary<string, object>
-            {
-                ["contextId"] = frame.ContextId!.Value,
-                ["expression"] =
-                    "(() => { const nodes = document.evaluate("
-                    + JsonSerializer.Serialize(target.Xpaths[0])
-                    + ", document, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null); return nodes.snapshotLength === 1 ? nodes.snapshotItem(0) : null; })()",
-            }
-        );
-        if (!resolved!.Value.GetProperty("result").TryGetProperty("objectId", out var objectId))
+        foreach (var frame in frames)
         {
-            throw new ApiException(409, "stale_capture", "The target is no longer available to highlight.");
-        }
-        try
-        {
-            var current = await SelectAsync([
-                new ActionSelection("highlight", target.CandidateId, target.Interactability!.Action),
-            ]);
-            if (current.Actions[0].Target?.Xpaths[0] != target.Xpaths[0])
+            var ids = targets
+                .Where(target => frame.CandidateIds.Contains(target.CandidateId))
+                .Select(target => target.CandidateId)
+                .Distinct()
+                .ToArray();
+            if (ids.Length == 0)
             {
-                throw new ApiException(409, "stale_capture", "The selected target changed before highlighting.");
+                continue;
             }
-            await frame.Highlight.SendAsync(
-                "Overlay.highlightNode",
-                new Dictionary<string, object>
-                {
-                    ["objectId"] = objectId.GetString()!,
-                    ["highlightConfig"] = new
-                    {
-                        showInfo = false,
-                        contentColor = new
-                        {
-                            r = 59,
-                            g = 130,
-                            b = 246,
-                            a = 0.18,
-                        },
-                        borderColor = new
-                        {
-                            r = 37,
-                            g = 99,
-                            b = 235,
-                            a = 1,
-                        },
-                    },
-                }
+            frame.Highlight = await frame.Handle.EvaluateHandleAsync(
+                "(capture, ids) => (" + BrowserHighlightScript.Create + ")(capture.highlightNodes(ids))",
+                ids
             );
         }
-        finally
-        {
-            await frame.Highlight.SendAsync(
-                "Runtime.releaseObject",
-                new Dictionary<string, object> { ["objectId"] = objectId.GetString()! }
-            );
-        }
-    }
-
-    private async Task PrepareHighlightAsync(BrowserFrameCapture frame)
-    {
-        if (frame.ContextId is not null)
-        {
-            return;
-        }
-        string frameId;
-        if (frame.Parent is null)
-        {
-            frame.Highlight = page.Highlight!;
-            var tree = await frame.Highlight.SendAsync("Page.getFrameTree");
-            frameId = tree!.Value.GetProperty("frameTree").GetProperty("frame").GetProperty("id").GetString()!;
-        }
-        else
-        {
-            await PrepareHighlightAsync(frame.Parent);
-            var parentSession = frame.Parent.Highlight!;
-            var owner = await parentSession.SendAsync(
-                "Runtime.evaluate",
-                new Dictionary<string, object>
-                {
-                    ["contextId"] = frame.Parent.ContextId!.Value,
-                    ["expression"] =
-                        "document.evaluate("
-                        + JsonSerializer.Serialize(frame.Identity.Chain[^1].Xpath)
-                        + ",document,null,XPathResult.FIRST_ORDERED_NODE_TYPE,null).singleNodeValue",
-                }
-            );
-            var objectId = owner!.Value.GetProperty("result").GetProperty("objectId").GetString()!;
-            try
-            {
-                var node = await parentSession.SendAsync(
-                    "DOM.describeNode",
-                    new Dictionary<string, object> { ["objectId"] = objectId }
-                );
-                frameId = node!.Value.GetProperty("node").GetProperty("frameId").GetString()!;
-            }
-            finally
-            {
-                await parentSession.SendAsync(
-                    "Runtime.releaseObject",
-                    new Dictionary<string, object> { ["objectId"] = objectId }
-                );
-            }
-            try
-            {
-                frame.Highlight = await page.Page.Context.NewCDPSessionAsync(frame.Frame);
-                await frame.Highlight.SendAsync("DOM.enable");
-                await frame.Highlight.SendAsync("Overlay.enable");
-            }
-            catch (PlaywrightException error)
-                when (error.Message.Contains("does not have a separate CDP session", StringComparison.Ordinal))
-            {
-                frame.Highlight = parentSession;
-            }
-        }
-        var world = await frame.Highlight!.SendAsync(
-            "Page.createIsolatedWorld",
-            new Dictionary<string, object> { ["frameId"] = frameId, ["worldName"] = "xpathed-highlight" }
-        );
-        frame.ContextId = world!.Value.GetProperty("executionContextId").GetInt32();
     }
 
     public async Task ClearHighlightAsync()
     {
-        foreach (var session in frames.Select(frame => frame.Highlight).OfType<ICDPSession>().Distinct())
+        foreach (var frame in frames.ToArray())
         {
+            var highlight = frame.Highlight;
+            frame.Highlight = null;
+            if (highlight is null)
+            {
+                continue;
+            }
             try
             {
-                await session.SendAsync("Overlay.hideHighlight");
+                await highlight.EvaluateAsync("overlay => overlay.clear()");
+                await highlight.DisposeAsync();
             }
             catch (PlaywrightException) { }
         }
@@ -410,20 +311,6 @@ internal sealed class BrowserPageCapture(BrowserPageRuntime page) : IAsyncDispos
                 {
                     await frame.Owner.DisposeAsync();
                 }
-            }
-            catch (PlaywrightException) { }
-        }
-        foreach (
-            var session in frames
-                .Select(frame => frame.Highlight)
-                .OfType<ICDPSession>()
-                .Distinct()
-                .Where(session => session != page.Highlight)
-        )
-        {
-            try
-            {
-                await session.DetachAsync();
             }
             catch (PlaywrightException) { }
         }

@@ -27,7 +27,7 @@ The ordered resolutions of several interactions requested together. This legacy 
 An ordered part of a test instruction. An unordered plural step expands into multiple action resolutions, one for each intended eligible target.
 
 **Inspected action**:
-The found action whose verified target currently owns the browser highlight. Inspecting an action does not execute it.
+A found action selected for individual inspection. Resolution can highlight its full target set together; inspecting one action does not execute it.
 
 **Target element**:
 The web element that the instruction intends the action to affect.
