@@ -95,6 +95,15 @@ A test instruction paired with a specified page state and independently defined 
 **Evaluation run**:
 An assessment of a resolver configuration against a versioned collection of evaluation cases.
 
+**Evaluation trial**:
+One declared execution of an evaluation case. Repetitions and later diagnostic reruns retain separate identities and outcomes.
+
+**Target oracle**:
+An independently established mapping from an expected action to its intended element. It is separate from the resolver's selected candidate and generated XPath.
+
+**Saved-locator reuse**:
+Checking whether a previously returned locator still identifies its intended element after a page change. This is distinct from resolving the instruction again on the changed page.
+
 **Failure flag**:
 A diagnostic signal that a resolution attempt needs investigation because of a detected problem. It does not by itself establish a model error or an expected target.
 
