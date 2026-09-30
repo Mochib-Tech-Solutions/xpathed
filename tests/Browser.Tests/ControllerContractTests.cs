@@ -92,7 +92,16 @@ public sealed class ControllerContractTests(WebApplicationFactory<HealthControll
     public async Task UnsupportedActionIsRejectedBeforePageLookup()
     {
         using var client = application.CreateClient();
-        using var response = await client.PostAsJsonAsync("/pages/missing/selection", new { documentId = "document", captureId = "capture", candidateId = "candidate", action = "execute" });
+        using var response = await client.PostAsJsonAsync(
+            "/pages/missing/selection",
+            new
+            {
+                documentId = "document",
+                captureId = "capture",
+                candidateId = "candidate",
+                action = "execute",
+            }
+        );
 
         await AssertErrorAsync(response, HttpStatusCode.BadRequest, "invalid_action");
     }

@@ -9,7 +9,7 @@
   },
   "scripts": {
     "setup": "scripts/setup.sh && pnpm install --frozen-lockfile",
-    "restore": "pnpm restore:dotnet && pnpm install --frozen-lockfile",
+    "restore": "dotnet tool restore && pnpm restore:dotnet && pnpm install --frozen-lockfile",
     "restore:dotnet": "dotnet restore Xpathed.slnx --locked-mode",
     "dev": "node scripts/dev.mjs",
     "build": "pnpm build:dotnet && pnpm build:web",
@@ -33,6 +33,7 @@
     "test": "pnpm test:dotnet && pnpm test:web && pnpm test:tooling",
     "test:unit": "pnpm test",
     "test:dotnet": "node scripts/ci-dotnet-tests.mjs",
+    "test:persistence": "node scripts/ci-dotnet-tests.mjs persistence",
     "test:web": "pnpm --filter xpathed test",
     "test:web:watch": "pnpm --filter xpathed test:watch",
     "test:tooling": "node --test scripts/*.test.mjs",
@@ -44,7 +45,8 @@
     "docker:status": "docker/compose.sh ps",
     "clean": "node scripts/clean.mjs",
     "test:resolution": "scripts/resolution-check.sh",
-    "test:resolution:live": "scripts/resolution-check.sh --live"
+    "test:resolution:live": "scripts/resolution-check.sh --live",
+    "diagnostics": "scripts/diagnostics.sh"
   },
   "devDependencies": {
     "prettier": "3.9.9"

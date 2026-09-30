@@ -8,7 +8,11 @@ internal sealed class ServiceOriginMiddleware(RequestDelegate next)
     {
         if (context.Request.Headers.ContainsKey("Origin"))
         {
-            throw new ApiException(403, "invalid_origin", "Resolver requests must come from the client API or a service client.");
+            throw new ApiException(
+                403,
+                "invalid_origin",
+                "Resolver requests must come from the client API or a service client."
+            );
         }
 
         return next(context);

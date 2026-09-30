@@ -12,7 +12,10 @@ services:
     environment:
       BrowserUrl: http://browser:8080
       ResolverUrl: http://resolver:8080
-      ConnectionStrings__Database: Host=db;Database=xpathed;Username=xpathed;Password=${POSTGRES_PASSWORD:?Run scripts/setup.sh first}
+      ConnectionStrings__Database: Host=db;Database=xpathed;Username=xpathed;Password=${POSTGRES_PASSWORD:?Run scripts/setup.sh first};GSS Encryption Mode=Disable
+      Diagnostics__MigrateOnStartup: "true"
+      Diagnostics__RecordRetentionDays: ${DIAGNOSTIC_RECORD_DAYS:-90}
+      Diagnostics__CaptureRetentionDays: ${DIAGNOSTIC_CAPTURE_DAYS:-30}
       Logging__LogLevel__Default: Warning
     depends_on:
       db: { condition: service_healthy }

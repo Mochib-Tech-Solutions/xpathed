@@ -5,7 +5,13 @@ using Xpathed.Common.Http;
 
 namespace Xpathed.Browser.Sessions;
 
-internal sealed class BrowserFrameCapture(IFrame frame, IJSHandle handle, TargetFrame identity, BrowserFrameCapture? parent, IElementHandle? owner)
+internal sealed class BrowserFrameCapture(
+    IFrame frame,
+    IJSHandle handle,
+    TargetFrame identity,
+    BrowserFrameCapture? parent,
+    IElementHandle? owner
+)
 {
     public IFrame Frame { get; } = frame;
     public IJSHandle Handle { get; } = handle;
@@ -22,23 +28,39 @@ internal sealed class BrowserFrameCapture(IFrame frame, IJSHandle handle, Target
         string? environment = null;
         if (Parent is not null)
         {
-            var info = await Parent.Handle.EvaluateAsync<JsonElement>("(capture, args) => capture.frameInfo(args.owner, args.budgetMs)", new { owner = Owner, budgetMs });
+            var info = await Parent.Handle.EvaluateAsync<JsonElement>(
+                "(capture, args) => capture.frameInfo(args.owner, args.budgetMs)",
+                new { owner = Owner, budgetMs }
+            );
             if (info.TryGetProperty("errorCode", out _))
             {
-                throw new ApiException(409, "validation_budget_exceeded", "Frame observation exceeded its processing budget.");
+                throw new ApiException(
+                    409,
+                    "validation_budget_exceeded",
+                    "Frame observation exceeded its processing budget."
+                );
             }
-            if (!info.GetProperty("environment").GetProperty("exposed").GetBoolean() ||
-                !info.GetProperty("environment").GetProperty("geometrySupported").GetBoolean() || info.GetProperty("xpath").GetString() != Identity.Chain[^1].Xpath)
+            if (
+                !info.GetProperty("environment").GetProperty("exposed").GetBoolean()
+                || !info.GetProperty("environment").GetProperty("geometrySupported").GetBoolean()
+                || info.GetProperty("xpath").GetString() != Identity.Chain[^1].Xpath
+            )
             {
                 throw new ApiException(409, "stale_capture", "An ancestor frame changed after capture.");
             }
             environment = info.GetProperty("environment").GetRawText();
         }
-        var updated = await Handle.EvaluateAsync<JsonElement>("(capture, args) => capture.updateEnvironment(args.environment, args.budgetMs)",
-            new { environment, budgetMs = Math.Max(0, budgetMs - timer.ElapsedMilliseconds) });
+        var updated = await Handle.EvaluateAsync<JsonElement>(
+            "(capture, args) => capture.updateEnvironment(args.environment, args.budgetMs)",
+            new { environment, budgetMs = Math.Max(0, budgetMs - timer.ElapsedMilliseconds) }
+        );
         if (updated.TryGetProperty("errorCode", out _))
         {
-            throw new ApiException(409, "validation_budget_exceeded", "Viewport observation exceeded its processing budget.");
+            throw new ApiException(
+                409,
+                "validation_budget_exceeded",
+                "Viewport observation exceeded its processing budget."
+            );
         }
     }
 }

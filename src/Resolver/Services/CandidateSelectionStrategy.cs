@@ -34,39 +34,55 @@ internal static class CandidateSelectionStrategy
         Return only the JSON object required by the response schema.
         """;
 
-    public static readonly JsonElement Schema = JsonSerializer.Deserialize<JsonElement>("""
+    public static readonly JsonElement Schema = JsonSerializer.Deserialize<JsonElement>(
+        """
         {"type":"object","properties":{
           "outcome":{"type":"string","enum":["found","not_found","unsupported"]},
           "action":{"type":"string","enum":["click","double_click","right_click","hover","fill","type","clear","select","check","uncheck","press","focus","blur","upload","inspect","unsupported"]},
           "candidateId":{"type":["string","null"]}},
          "required":["outcome","action","candidateId"],"additionalProperties":false}
-        """);
+        """
+    );
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
         Encoder = JavaScriptEncoder.Create(UnicodeRanges.All),
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
     };
 
     public static string PrepareInput(string instruction, CandidateCapture capture) =>
-        JsonSerializer.Serialize(new
-        {
-            instruction,
-            capture.FrameId,
-            candidates = capture.Candidates.Select(candidate => new
+        JsonSerializer.Serialize(
+            new
             {
-                candidate.Id,
-                candidate.Tag,
-                role = string.IsNullOrEmpty(candidate.Role) ? null : candidate.Role,
-                text = string.IsNullOrEmpty(candidate.Text) || candidate.Text == candidate.Label ? null : candidate.Text,
-                label = string.IsNullOrEmpty(candidate.Label) ? null : candidate.Label,
-                placeholder = string.IsNullOrEmpty(candidate.Placeholder) ? null : candidate.Placeholder,
-                scope = candidate.Scope.Length == 0 ? null : candidate.Scope,
-                state = new { candidate.State.Rendered, candidate.State.InViewport, candidate.State.Enabled, candidate.State.Editable, candidate.State.Readonly },
-                candidate.Geometry,
-                frame = candidate.Frame is null ? null : new { candidate.Frame.Id, labels = candidate.Frame.Chain.Select(ancestor => ancestor.Label) }
-            })
-        }, JsonOptions);
+                instruction,
+                capture.FrameId,
+                candidates = capture.Candidates.Select(candidate => new
+                {
+                    candidate.Id,
+                    candidate.Tag,
+                    role = string.IsNullOrEmpty(candidate.Role) ? null : candidate.Role,
+                    text = string.IsNullOrEmpty(candidate.Text) || candidate.Text == candidate.Label
+                        ? null
+                        : candidate.Text,
+                    label = string.IsNullOrEmpty(candidate.Label) ? null : candidate.Label,
+                    placeholder = string.IsNullOrEmpty(candidate.Placeholder) ? null : candidate.Placeholder,
+                    scope = candidate.Scope.Length == 0 ? null : candidate.Scope,
+                    state = new
+                    {
+                        candidate.State.Rendered,
+                        candidate.State.InViewport,
+                        candidate.State.Enabled,
+                        candidate.State.Editable,
+                        candidate.State.Readonly,
+                    },
+                    candidate.Geometry,
+                    frame = candidate.Frame is null
+                        ? null
+                        : new { candidate.Frame.Id, labels = candidate.Frame.Chain.Select(ancestor => ancestor.Label) },
+                }),
+            },
+            JsonOptions
+        );
 
     public static ModelSelection Select(string content, CandidateCapture capture)
     {
@@ -75,18 +91,48 @@ internal static class CandidateSelectionStrategy
         {
             using var document = JsonDocument.Parse(content);
             var value = document.RootElement;
-            if (value.ValueKind != JsonValueKind.Object || value.EnumerateObject().Count() != 3 ||
-                !value.TryGetProperty("outcome", out var outcome) || outcome.ValueKind != JsonValueKind.String ||
-                !value.TryGetProperty("action", out var action) || action.ValueKind != JsonValueKind.String ||
-                !value.TryGetProperty("candidateId", out var candidate) || candidate.ValueKind is not (JsonValueKind.String or JsonValueKind.Null))
+            if (
+                value.ValueKind != JsonValueKind.Object
+                || value.EnumerateObject().Count() != 3
+                || !value.TryGetProperty("outcome", out var outcome)
+                || outcome.ValueKind != JsonValueKind.String
+                || !value.TryGetProperty("action", out var action)
+                || action.ValueKind != JsonValueKind.String
+                || !value.TryGetProperty("candidateId", out var candidate)
+                || candidate.ValueKind is not (JsonValueKind.String or JsonValueKind.Null)
+            )
             {
                 throw new JsonException();
             }
             selection = new ModelSelection(outcome.GetString()!, action.GetString()!, candidate.GetString());
-            if (selection.Outcome is not ("found" or "not_found" or "unsupported") ||
-                selection.Action is not ("click" or "double_click" or "right_click" or "hover" or "fill" or "type" or "clear" or "select" or "check" or "uncheck" or "press" or "focus" or "blur" or "upload" or "inspect" or "unsupported") ||
-                (selection.Outcome == "unsupported") != (selection.Action == "unsupported") ||
-                (selection.Outcome == "found" ? string.IsNullOrWhiteSpace(selection.CandidateId) : selection.CandidateId is not null))
+            if (
+                selection.Outcome is not ("found" or "not_found" or "unsupported")
+                || selection.Action
+                    is not (
+                        "click"
+                        or "double_click"
+                        or "right_click"
+                        or "hover"
+                        or "fill"
+                        or "type"
+                        or "clear"
+                        or "select"
+                        or "check"
+                        or "uncheck"
+                        or "press"
+                        or "focus"
+                        or "blur"
+                        or "upload"
+                        or "inspect"
+                        or "unsupported"
+                    )
+                || (selection.Outcome == "unsupported") != (selection.Action == "unsupported")
+                || (
+                    selection.Outcome == "found"
+                        ? string.IsNullOrWhiteSpace(selection.CandidateId)
+                        : selection.CandidateId is not null
+                )
+            )
             {
                 throw new JsonException();
             }
@@ -97,7 +143,11 @@ internal static class CandidateSelectionStrategy
         }
         if (selection.Outcome == "found" && !capture.Candidates.Any(candidate => candidate.Id == selection.CandidateId))
         {
-            throw new ApiException(502, "provider_unknown_candidate", "The model selected a candidate outside the current capture.");
+            throw new ApiException(
+                502,
+                "provider_unknown_candidate",
+                "The model selected a candidate outside the current capture."
+            );
         }
         return selection;
     }
