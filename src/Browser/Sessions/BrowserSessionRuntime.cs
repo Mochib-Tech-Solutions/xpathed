@@ -174,7 +174,9 @@ internal sealed partial class BrowserSessionRuntime(int slot, ILogger logger) : 
             return;
         }
 
-        foreach (var page in Pages.Values)
+        // Separate Chromium windows can both report focus; prefer the latest notification.
+        var focusedPageId = ActivePageId;
+        foreach (var page in Pages.Values.OrderByDescending(page => page.Id == focusedPageId))
         {
             if (!page.Page.IsClosed && await page.HasNativeFocusAsync())
             {
@@ -183,8 +185,11 @@ internal sealed partial class BrowserSessionRuntime(int slot, ILogger logger) : 
                     await other.ClearCaptureAsync();
                 }
 
+                if (revision != Interlocked.Read(ref focusRevision))
+                {
+                    return;
+                }
                 SetActive(page);
-                await page.ShowAsync();
                 break;
             }
         }

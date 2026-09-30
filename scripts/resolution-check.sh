@@ -28,5 +28,5 @@ if [ "$mode" = --live ]; then
 else
   compose up --build --wait
   compose exec -T resolution-fixture node ready.mjs http://browser:8080/health http://resolver:8080/health http://resolution-fixture:8090/health http://client-api:8080/health
-  compose exec -T resolution-fixture node --test browser.test.mjs pipeline.test.mjs
+  compose exec -T -e XPATHED_VIEWER_ORIGIN="http://localhost:$XPATHED_PORT" resolution-fixture node --test browser.test.mjs pipeline.test.mjs
 fi

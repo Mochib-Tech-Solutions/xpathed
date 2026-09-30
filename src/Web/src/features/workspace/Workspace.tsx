@@ -30,13 +30,24 @@ export default function Workspace() {
     resolve,
     inspectAction,
     setInstruction,
+    resetChat,
     setAddress,
     dismissError,
   } = useWorkspace();
   return (
     <div className="flex h-dvh min-h-80 flex-col">
       <header className="flex h-14 shrink-0 items-center justify-between border-b border-border px-4">
-        <span className="text-xl font-semibold tracking-[-1px]">xpathed</span>
+        <div className="flex min-w-0 items-center gap-4">
+          <span className="text-xl font-semibold tracking-[-1px]">xpathed</span>
+          {session && (
+            <span
+              className="truncate font-mono text-xs text-muted-foreground"
+              title={`Browser session: ${session.sessionId}`}
+            >
+              Session {session.sessionId}
+            </span>
+          )}
+        </div>
         <ThemeToggle />
       </header>
       {error && (
@@ -83,6 +94,8 @@ export default function Workspace() {
           resolving={resolving}
           onInstructionChange={setInstruction}
           onResolve={resolve}
+          onReset={resetChat}
+          resetDisabled={!page || !!busy}
           onInspect={inspectAction}
         />
         <section

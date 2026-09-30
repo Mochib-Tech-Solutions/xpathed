@@ -34,6 +34,23 @@ const targetMarkup = `<section aria-label="Employee"><h2>Employee</h2>
   <button id="expected-target" data-testid="about-us" onclick="this.dataset.clicks = '1'">About us</button>
 </section>`;
 
+test("Viewer disconnect completes its WebSocket close handshake and can reconnect", async () => {
+  await withFixture(targetMarkup, async (session) => {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const socket = new WebSocket(`${browserUrl.replace("http", "ws")}${session.viewPath}`, {
+        headers: { Origin: process.env.XPATHED_VIEWER_ORIGIN ?? "http://localhost:8081" },
+      });
+      const [message] = await once(socket, "message", { signal: AbortSignal.timeout(5000) });
+      assert.match(await message.data.text(), /^RFB /);
+      const closed = once(socket, "close", { signal: AbortSignal.timeout(5000) });
+      socket.close(1000);
+      const [event] = await closed;
+      assert.equal(event.code, 1000);
+      assert.equal(event.wasClean, true);
+    }
+  });
+});
+
 test("Browser captures labels containing comment nodes and validates each action target", async () => {
   await withFixture(
     `<section aria-label="Videos"><a id="expected-target" href="#first">First<!-- PRIVATE_COMMENT_SENTINEL --> video</a>
@@ -657,11 +674,39 @@ test("Positional XPath is a verified last fallback when identical elements have 
   );
 });
 
+test("Hundreds of multilingual controls retain complete capture and a verified target", async () => {
+  await withFixture(
+    Array.from(
+      { length: 500 },
+      (_, index) => `<button data-oracle="control-${index}">حالة الطقس ${index}</button>`,
+    ).join(""),
+    async (session, page) => {
+      const capture = await request(`/pages/${session.pageId}/capture`, {
+        documentId: page.documentId,
+      });
+      assert.equal(capture.coverage.complete, true);
+      assert.equal(capture.candidates.length, 500);
+      const target = capture.candidates.find((candidate) => candidate.text === "حالة الطقس 499");
+      const selection = await request(`/pages/${session.pageId}/selection`, {
+        documentId: page.documentId,
+        captureId: capture.captureId,
+        candidateId: target.id,
+        action: "click",
+      });
+      assert.deepEqual(
+        (await verify(selection.target.xpaths)).matches,
+        selection.target.xpaths.map(() => ["control-499"]),
+      );
+    },
+  );
+});
+
 test("Incomplete captures report operating-budget errors instead of returning truncated candidates", async () => {
   for (const markup of [
     "<button>Target</button>".repeat(2001),
     "<div></div>".repeat(20001),
-    `<button>${"長".repeat(25000)}</button>`,
+    `<button>${"長".repeat(65000)}</button>`,
+    `<button>${"長".repeat(15000)}</button>`.repeat(6),
   ]) {
     await withFixture(markup, async (session, page) => {
       const capture = await request(`/pages/${session.pageId}/capture`, {
@@ -845,6 +890,125 @@ test("Icon buttons and labelled images remain identifiable without visible text"
       );
     },
   );
+});
+
+test("Simultaneous workspaces have unique sessions and closing one preserves the other", async () => {
+  await withFixture(targetMarkup, async (first, firstPage) => {
+    const second = await request("/sessions");
+    let replacement;
+    try {
+      const secondPage = await request(`/pages/${second.pageId}/navigate`, {
+        url: "http://resolution-fixture:8070/second",
+      });
+      for (const id of [first.sessionId, second.sessionId, first.pageId, second.pageId])
+        assert.match(id, /^[a-f0-9]{32}$/);
+      assert.equal(
+        new Set([first.sessionId, second.sessionId, first.pageId, second.pageId]).size,
+        4,
+      );
+      assert.notEqual(first.viewPath, second.viewPath);
+      await observe({ cookie: "workspace=first" }, "/fixture");
+      assert.equal((await observe({}, "/second")).cookie, "");
+      const firstCapture = await request(`/pages/${first.pageId}/capture`, {
+        documentId: firstPage.documentId,
+      });
+      const secondCapture = await request(`/pages/${second.pageId}/capture`, {
+        documentId: secondPage.documentId,
+      });
+      await expectError(
+        `/pages/${second.pageId}/selection`,
+        {
+          documentId: secondPage.documentId,
+          captureId: firstCapture.captureId,
+          candidateId: firstCapture.candidates[0].id,
+          action: "click",
+        },
+        409,
+        "stale_capture",
+      );
+      await request(`/sessions/${first.sessionId}`, undefined, "DELETE");
+      replacement = await request("/sessions");
+      assert.notEqual(replacement.sessionId, first.sessionId);
+      assert.notEqual(replacement.sessionId, second.sessionId);
+      assert.equal(
+        (await request(`/sessions/${second.sessionId}`, undefined, "GET")).activePageId,
+        second.pageId,
+      );
+      const target = secondCapture.candidates.find((candidate) => candidate.tag === "button");
+      const selection = await request(`/pages/${second.pageId}/selection`, {
+        documentId: secondPage.documentId,
+        captureId: secondCapture.captureId,
+        candidateId: target.id,
+        action: "click",
+      });
+      assert.deepEqual(
+        (await observe({ xpaths: selection.target.xpaths }, "/second")).matches,
+        selection.target.xpaths.map(() => ["expected-target"]),
+      );
+    } finally {
+      await request(`/sessions/${second.sessionId}`, undefined, "DELETE");
+      if (replacement) await request(`/sessions/${replacement.sessionId}`, undefined, "DELETE");
+    }
+  });
+});
+
+test("Closing all tabs releases the session for repeated fresh captures and selections", async () => {
+  await withFixture(targetMarkup, async (initialSession, initialPage) => {
+    let session = initialSession;
+    let page = initialPage;
+    const sessionIds = new Set();
+    const pageIds = new Set();
+    const captureIds = new Set();
+    try {
+      for (let cycle = 0; cycle < 6; cycle++) {
+        assert.ok(!sessionIds.has(session.sessionId));
+        assert.ok(!pageIds.has(page.pageId));
+        sessionIds.add(session.sessionId);
+        pageIds.add(page.pageId);
+        assert.equal(session.viewPath, `/view/${session.sessionId}`);
+        assert.equal((await observe()).cookie, "");
+        assert.equal(
+          (await observe({ cookie: "old_session=must_clear; path=/" })).cookie,
+          "old_session=must_clear",
+        );
+        const added = await request(`/sessions/${session.sessionId}/pages`);
+        await request(`/pages/${page.pageId}/activate`);
+        const capture = await request(`/pages/${page.pageId}/capture`, {
+          documentId: page.documentId,
+        });
+        assert.ok(!captureIds.has(capture.captureId));
+        captureIds.add(capture.captureId);
+        const target = capture.candidates.find((candidate) => candidate.label === "About us");
+        assert.ok(target);
+        const batch = {
+          documentId: page.documentId,
+          captureId: capture.captureId,
+          actions: [{ actionId: "a1", candidateId: target.id, action: "click" }],
+        };
+        const selection = await request(`/pages/${page.pageId}/selections`, batch);
+        const xpaths = selection.actions[0].target.xpaths;
+        assert.deepEqual(
+          (await verify(xpaths)).matches,
+          xpaths.map(() => ["expected-target"]),
+        );
+        await request(`/sessions/${session.sessionId}`, undefined, "DELETE");
+        await request(`/sessions/${session.sessionId}`, undefined, "DELETE");
+        assert.equal((await fetch(`${browserUrl}/sessions/${session.sessionId}`)).status, 404);
+        for (const closedPage of added.pages) {
+          assert.equal((await fetch(`${browserUrl}/pages/${closedPage.pageId}`)).status, 404);
+        }
+        await expectError(`/pages/${page.pageId}/selections`, batch, 404, "page_not_found");
+        if (cycle < 5) {
+          session = await request("/sessions");
+          page = await request(`/pages/${session.pageId}/navigate`, {
+            url: "http://resolution-fixture:8070/fixture",
+          });
+        }
+      }
+    } finally {
+      await request(`/sessions/${session.sessionId}`, undefined, "DELETE");
+    }
+  });
 });
 
 test("Browser tabs create, activate, close and replace the last page without changing the viewer", async () => {
