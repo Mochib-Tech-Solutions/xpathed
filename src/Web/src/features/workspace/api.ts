@@ -59,9 +59,9 @@ export type ResolutionResult = {
       readonly?: boolean | null;
     };
     interactability?: {
-      version: "1";
+      version: "1" | "2";
       action: string;
-      status: "blocked" | "unknown" | "unsupported";
+      status: "ready" | "blocked" | "unknown" | "unsupported";
       reasons: string[];
       checks: Record<string, "pass" | "fail" | "unknown" | "not_applicable">;
     } | null;

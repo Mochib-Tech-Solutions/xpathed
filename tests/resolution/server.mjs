@@ -45,10 +45,16 @@ const server = createServer(async (request, response) => {
         "/oversized",
         "/state",
         "/hidden-only",
+        "/offscreen",
         "/batch",
       ].includes(path)
     ) {
       let html = fixture;
+      if (path === "/offscreen")
+        html = html.replace(
+          "<nav",
+          '<p>Scroll down to the target.</p><nav style="margin-top:1600px"',
+        );
       if (path === "/batch")
         html = html.replace(
           /<nav.*?<\/nav>/s,

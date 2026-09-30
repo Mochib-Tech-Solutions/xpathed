@@ -169,6 +169,72 @@ public sealed class ResolutionContractTests
         }
     }
 
+    [Theory]
+    [InlineData("1", "ready", "pass", "error")]
+    [InlineData("2", "ready", "pass", "found")]
+    [InlineData("2", "ready", "unknown", "error")]
+    [InlineData("2", "ready", "fail", "error")]
+    [InlineData("2", "unknown", "unknown", "found")]
+    public async Task PassiveReadinessPassesIndependentlyOfUntestedEventOutcome(string version, string status, string pointerReception, string outcome)
+    {
+        var handler = new DeterministicServicesHandler
+        {
+            SelectionBody = """
+                {"target":{"candidateId":"button-save","tag":"button","label":"Save","xpaths":["//button"],
+                  "state":{"version":"2","accessibilityExposed":true,"rendered":true,"inViewport":true,"enabled":true,"editable":false,"readonly":false,"checked":null},
+                  "geometry":{"x":20,"y":40,"width":90,"height":30},
+                  "interactability":{"version":"VERSION","action":"click","status":"STATUS","reasons":[],
+                    "checks":{"compatibleControl":"pass","enabled":"pass","writable":"not_applicable","viewport":"pass",
+                      "pointerReception":"POINTER","keyboard":"not_applicable","stability":"unknown","eventOutcome":"unknown"}}}}
+                """.Replace("VERSION", version, StringComparison.Ordinal).Replace("STATUS", status, StringComparison.Ordinal).Replace("POINTER", pointerReception, StringComparison.Ordinal)
+        };
+        await using var application = CreateApplication(handler);
+        using var client = application.CreateClient();
+        using var response = await client.PostAsJsonAsync("/pages/page-1/resolve", new { instruction = "Click Save", documentId = "document-1" });
+        var result = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(outcome, result.GetProperty("outcome").GetString());
+        if (outcome == "found")
+        {
+            Assert.Equal("unknown", result.GetProperty("target").GetProperty("interactability").GetProperty("checks").GetProperty("eventOutcome").GetString());
+        }
+        else
+        {
+            Assert.Equal("invalid_browser_selection", result.GetProperty("diagnostics").GetProperty("code").GetString());
+        }
+    }
+
+    [Theory]
+    [InlineData(1, "found")]
+    [InlineData(2, "error")]
+    public async Task ReturnsOnlyOneVerifiedXPath(int pathCount, string outcome)
+    {
+        string[] paths = ["//button", "//*[@id='save']"];
+        var handler = new DeterministicServicesHandler
+        {
+            SelectionBody = JsonSerializer.Serialize(new
+            {
+                target = new
+                {
+                    candidateId = "button-save",
+                    tag = "button",
+                    label = "Save",
+                    xpaths = paths.Take(pathCount),
+                    state = new { rendered = true, inViewport = true, enabled = true, editable = false },
+                    geometry = new { x = 20, y = 40, width = 90, height = 30 }
+                }
+            })
+        };
+        await using var application = CreateApplication(handler);
+        using var client = application.CreateClient();
+        using var response = await client.PostAsJsonAsync("/pages/page-1/resolve", new { instruction = "Click Save", documentId = "document-1" });
+        var result = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(outcome, result.GetProperty("outcome").GetString());
+        if (outcome == "error")
+        {
+            Assert.Equal("invalid_browser_selection", result.GetProperty("diagnostics").GetProperty("code").GetString());
+        }
+    }
+
     [Fact]
     public async Task ResolvesAnInstructionToTheVerifiedTargetOnTheManagedPage()
     {
