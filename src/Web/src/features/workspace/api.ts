@@ -47,6 +47,26 @@ export type ResolutionResult = {
     code: string | null;
     message: string | null;
     timingsMs?: { total?: number };
+    model?: string | null;
+    provider?: string | null;
+    usage?: {
+      inputTokens: number | null;
+      outputTokens: number | null;
+      totalTokens: number | null;
+      reasoningTokens: number | null;
+      cachedTokens: number | null;
+      cost: number | null;
+    } | null;
+    costEstimate?: {
+      currency: "USD";
+      inputPricePerMillion: number;
+      outputPricePerMillion: number;
+      inputCost: number;
+      outputCost: number;
+      requestCost: number;
+      totalCost: number;
+      pricingFetchedAt: string;
+    } | null;
   };
 };
 

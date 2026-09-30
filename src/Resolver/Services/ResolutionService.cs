@@ -73,7 +73,8 @@ public sealed partial class ResolutionService(IHttpClientFactory clients, OpenRo
                 Provider = completion.Diagnostics.Provider,
                 GenerationId = completion.Diagnostics.GenerationId,
                 FinishReason = completion.Diagnostics.FinishReason,
-                Usage = completion.Diagnostics.Usage
+                Usage = completion.Diagnostics.Usage,
+                CostEstimate = completion.Diagnostics.CostEstimate
             };
             diagnostics.TimingsMs["model"] = timer.Elapsed.TotalMilliseconds - diagnostics.TimingsMs["capture"];
             if (completion.Diagnostics.Code is { } code)
