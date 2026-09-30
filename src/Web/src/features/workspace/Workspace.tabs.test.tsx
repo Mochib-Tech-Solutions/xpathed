@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { mockSystemTheme } from "@/test/systemTheme";
@@ -278,7 +278,9 @@ describe("Browser tabs and chat", () => {
     await user.click(screen.getByRole("tab", { name: "First" }));
     expect(await screen.findByRole("heading", { name: "First target" })).toBeInTheDocument();
     expect(screen.getByText(/Earlier result/)).toBeInTheDocument();
-    expect(screen.getByText("https://first.test", { selector: "p" })).toBeInTheDocument();
+    expect(
+      within(screen.getByRole("log")).queryByText("https://first.test"),
+    ).not.toBeInTheDocument();
   });
 
   it("closing the last tab clears its chat and leaves an empty tab ready for a website", async () => {
@@ -298,6 +300,36 @@ describe("Browser tabs and chat", () => {
     expect(screen.queryByRole("heading", { name: "First target" })).not.toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: "Page address" })).toHaveValue("");
     expect(screen.getByRole("textbox", { name: "Describe an element" })).toBeDisabled();
+  });
+
+  it("resets only the active tab chat while keeping its browser page and other tab history", async () => {
+    browserApi();
+    const user = renderWorkspace();
+    await openFirst(user);
+    const composer = () => screen.getByRole("textbox", { name: "Describe an element" });
+    await user.type(composer(), "Click First{Enter}");
+    await screen.findByRole("heading", { name: "First target" });
+    await user.click(screen.getByRole("button", { name: "New tab" }));
+    await waitFor(() => expect(composer()).toBeDisabled());
+    await user.type(screen.getByRole("textbox", { name: "Page address" }), "second.test{Enter}");
+    await waitFor(() => expect(composer()).toBeEnabled());
+    await user.type(composer(), "Click Second{Enter}");
+    await screen.findByRole("heading", { name: "Second target" });
+    await user.click(screen.getByRole("button", { name: "Reset chat" }));
+    expect(screen.queryByRole("heading", { name: "Second target" })).not.toBeInTheDocument();
+    expect(composer()).toHaveValue("");
+    expect(composer()).toHaveFocus();
+    expect(screen.getByRole("textbox", { name: "Page address" })).toHaveValue(
+      "https://second.test",
+    );
+    expect(screen.getByRole("tab", { name: "Second" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("button", { name: "Reset chat" })).toBeDisabled();
+    expect(vi.mocked(fetch).mock.calls.some(([, options]) => options?.method === "DELETE")).toBe(
+      false,
+    );
+    await user.click(screen.getByRole("tab", { name: "First" }));
+    expect(await screen.findByRole("heading", { name: "First target" })).toBeInTheDocument();
+    expect(composer()).toHaveValue("Click First");
   });
 
   it("keeps separate chat and drafts when creating and selecting browser tabs", async () => {
