@@ -34,6 +34,33 @@ const targetMarkup = `<section aria-label="Employee"><h2>Employee</h2>
   <button id="expected-target" data-testid="about-us" onclick="this.dataset.clicks = '1'">About us</button>
 </section>`;
 
+test("Browser captures labels containing comment nodes and validates each action target", async () => {
+  await withFixture(
+    `<section aria-label="Videos"><a id="expected-target" href="#first">First<!-- PRIVATE_COMMENT_SENTINEL --> video</a>
+      <button aria-labelledby="video-name">Play</button><span id="video-name" hidden>Second<!-- comment --> video</span></section>`,
+    async (session, page) => {
+      const capture = await request(`/pages/${page.pageId}/capture`, {
+        documentId: page.documentId,
+      });
+      assert.equal(capture.coverage.complete, true);
+      assert.ok(!JSON.stringify(capture).includes("PRIVATE_COMMENT_SENTINEL"));
+      const link = capture.candidates.find((candidate) => candidate.tag === "a");
+      const button = capture.candidates.find((candidate) => candidate.tag === "button");
+      assert.equal(link.label, "First video");
+      assert.equal(button.label, "Second video");
+      const selection = await request(`/pages/${page.pageId}/selections`, {
+        documentId: page.documentId,
+        captureId: capture.captureId,
+        actions: [{ actionId: "a1", candidateId: link.id, action: "click" }],
+      });
+      assert.deepEqual(
+        (await verify(selection.actions[0].target.xpaths)).matches,
+        selection.actions[0].target.xpaths.map(() => ["expected-target"]),
+      );
+    },
+  );
+});
+
 test("An action batch verifies distinct retained nodes and inspects one target without executing", async () => {
   await withFixture(
     `<button id="expected-target">Approval</button><button id="second-target" data-oracle="second-target" disabled>Approval</button>`,
