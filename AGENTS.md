@@ -10,6 +10,8 @@ The implemented foundation is the managed browser in [issue #2](https://github.c
 
 Accepted follow-ups removed the bundled fixture website, browser Smoke project, manual Inspect button and duplicate close control. Do not restore them from the older #2 wording. Future evaluation work has its own explicit scope. Resolution selects and highlights a target; it does not execute the instruction or add autonomous browsing.
 
+The assignment clarification supplied on 2026-09-30 changes accepted future scope to one target per action, with several current-page actions per prompt and independent results plus a partial summary. Start with [#17](https://github.com/Mochib-Tech-Solutions/xpathed/issues/17) for accessibility-aware eligibility and action-specific interactability, then [#18](https://github.com/Mochib-Tech-Solutions/xpathed/issues/18) for the versioned action list before #4/#5/#6. Read [ADR-0008](docs/adr/0008-resolve-multiple-current-page-actions.md) when changing result cardinality, state, storage or grading. Keep implemented version-1 behavior accurately documented until these changes land; alternative XPaths always refer to the same node within one action, and shared inference charges are counted once.
+
 ## Start issue-driven work from current evidence
 
 1. Check `git status`, the current branch and the repository remote before editing. Preserve unrelated work.

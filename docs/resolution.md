@@ -1,9 +1,11 @@
 # Resolution contract, version 1
 
+This document describes the implemented single-action API. Accepted follow-ups [#17](https://github.com/Mochib-Tech-Solutions/xpathed/issues/17) and [#18](https://github.com/Mochib-Tech-Solutions/xpathed/issues/18) will add accessibility-aware interactability and multiple current-page action results with a partial summary. [ADR-0008](adr/0008-resolve-multiple-current-page-actions.md) records the revised scope; those capabilities are not yet implemented. Existing hidden/opacity/geometry exclusions below describe version 1, not the settled future accessibility policy.
+
 The client forwards `POST /api/pages/{pageId}/resolve` to the standalone resolver at `POST /pages/{pageId}/resolve`. The resolver needs the browser service and OpenRouter; it does not use the client application or database.
 
 ```json
-{"instruction":"Click on About us.","documentId":"current-document-id"}
+{ "instruction": "Click on About us.", "documentId": "current-document-id" }
 ```
 
 Get `documentId` from the managed page state. Instructions must be nonblank and at most 4,000 characters. The browser changes document identity on navigation, including same-URL reloads. The page ID continues to identify the same managed page until its session ends.
@@ -12,15 +14,15 @@ Get `documentId` from the managed page state. Instructions must be nonblank and 
 
 JSON field names use camelCase. The result has these fields:
 
-| Field | Meaning |
-| --- | --- |
-| `contractVersion` | `"1"` |
-| `outcome` | `found`, `not_found`, `unsupported`, or `error` |
-| `sessionId`, `pageId`, `documentId`, `captureId`, `frameId` | Browser-owned identities; fields unavailable before capture are null |
-| `traceId`, `attemptId`, `configurationId` | Request correlation, distinct attempt, and non-secret resolver configuration |
-| `action` | Interpreted interaction; null when interpretation is unavailable |
-| `target` | One verified target for `found`; otherwise null |
-| `diagnostics` | Coverage, provider evidence, stage timings, and a safe failure code/message |
+| Field                                                       | Meaning                                                                      |
+| ----------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| `contractVersion`                                           | `"1"`                                                                        |
+| `outcome`                                                   | `found`, `not_found`, `unsupported`, or `error`                              |
+| `sessionId`, `pageId`, `documentId`, `captureId`, `frameId` | Browser-owned identities; fields unavailable before capture are null         |
+| `traceId`, `attemptId`, `configurationId`                   | Request correlation, distinct attempt, and non-secret resolver configuration |
+| `action`                                                    | Interpreted interaction; null when interpretation is unavailable             |
+| `target`                                                    | One verified target for `found`; otherwise null                              |
+| `diagnostics`                                               | Coverage, provider evidence, stage timings, and a safe failure code/message  |
 
 `found` means the model selected a candidate and every returned XPath uniquely matches that exact captured node. It does not establish semantic accuracy or action success. Independent fixture labels test semantic accuracy. `not_found` represents absence in the supported inspected scope. `unsupported` represents instructions or target scopes outside this slice. Processing failures, incomplete capture, excess input size and provider failures are `error`.
 
@@ -63,14 +65,14 @@ Chat exposes these fields on cost hover or keyboard focus, with Escape dismissal
 
 The initial route is `deepseek/deepseek-v4.1-flash` via OpenRouter's `wafer` provider with reasoning disabled, strict JSON schema, 512 output tokens and no fallback, context compression, response healing or tools. Runtime requests do not include a provider price filter. The public route research and settings are in [the OpenRouter note](research/2026-09-29-openrouter-resolution.md). The live smoke pins this cheap route, makes at most two small requests, and stops if reported cost is missing or exceeds half a cent per call; total cost must remain below one cent. The dated research note records the authenticated two-case smoke check and its actual usage; this does not qualify other workloads or models.
 
-| Setting | Purpose |
-| --- | --- |
-| `OPENROUTER_API_KEY` | Ignored local `.env`; mapped to resolver `OpenRouter__ApiKey` |
-| `OPENROUTER_MODEL` | Default `deepseek/deepseek-v4.1-flash`; a different model requires supported settings and fresh verification |
-| `OPENROUTER_PROVIDER` | Default `wafer`; explicit serving route |
-| `OpenRouter__BaseUrl` | Default OpenRouter API; overridden only by the deterministic local test stack |
-| `OpenRouter__TimeoutSeconds` | Provider call timeout, default 30 seconds; greater than zero and at most 600 |
-| `Resolution__Strategy` | Default and sole implemented strategy `candidate-selection-v1`; other values fail explicitly |
+| Setting                      | Purpose                                                                                                      |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `OPENROUTER_API_KEY`         | Ignored local `.env`; mapped to resolver `OpenRouter__ApiKey`                                                |
+| `OPENROUTER_MODEL`           | Default `deepseek/deepseek-v4.1-flash`; a different model requires supported settings and fresh verification |
+| `OPENROUTER_PROVIDER`        | Default `wafer`; explicit serving route                                                                      |
+| `OpenRouter__BaseUrl`        | Default OpenRouter API; overridden only by the deterministic local test stack                                |
+| `OpenRouter__TimeoutSeconds` | Provider call timeout, default 30 seconds; greater than zero and at most 600                                 |
+| `Resolution__Strategy`       | Default and sole implemented strategy `candidate-selection-v1`; other values fail explicitly                 |
 
 `configurationId` hashes the normalized endpoint, model, provider, timeout, strategy, prompt/schema, versions and fixed budgets/settings. API keys, user instructions and page content are excluded, so local test routes and live routes have distinct identities.
 
