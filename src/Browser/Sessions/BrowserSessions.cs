@@ -262,6 +262,7 @@ public sealed class BrowserSessions(IConfiguration configuration, ILogger<Browse
             {
                 await RequireFocusedDocumentAsync(s, page, request.DocumentId);
                 await page.ClearCaptureAsync();
+                await page.BeginCaptureAsync();
                 page.CaptureId = Guid.NewGuid().ToString("N");
                 var captureId = page.CaptureId;
                 page.Capture = new BrowserPageCapture(page);
@@ -293,7 +294,13 @@ public sealed class BrowserSessions(IConfiguration configuration, ILogger<Browse
                     [new ActionSelection("single", request.CandidateId, request.Action)]
                 );
                 var selection = new SelectionValidation(result.Actions[0].Target);
-                await HighlightTargetAsync(session, page, request.DocumentId, request.CaptureId, selection.Target);
+                await HighlightTargetAsync(
+                    session,
+                    page,
+                    request.DocumentId,
+                    request.CaptureId,
+                    selection.Target is { } target ? [target] : []
+                );
                 return selection;
             },
             token
@@ -338,7 +345,7 @@ public sealed class BrowserSessions(IConfiguration configuration, ILogger<Browse
                     page,
                     request.DocumentId,
                     request.CaptureId,
-                    validation.Actions.FirstOrDefault(action => action.Target is not null)?.Target
+                    validation.Actions.Select(action => action.Target).OfType<ResolvedTarget>().ToArray()
                 );
                 page.ActionSelections = request.Actions.ToDictionary(action => action.ActionId, StringComparer.Ordinal);
                 return validation;
@@ -371,7 +378,13 @@ public sealed class BrowserSessions(IConfiguration configuration, ILogger<Browse
                 }
                 var result = await ValidateActionsAsync(session, page, request.DocumentId, request.CaptureId, [action]);
                 var selection = new SelectionValidation(result.Actions[0].Target);
-                await HighlightTargetAsync(session, page, request.DocumentId, request.CaptureId, selection.Target);
+                await HighlightTargetAsync(
+                    session,
+                    page,
+                    request.DocumentId,
+                    request.CaptureId,
+                    selection.Target is { } target ? [target] : []
+                );
                 return new ValidatedAction(action.ActionId, selection.Target);
             },
             token
@@ -446,15 +459,15 @@ public sealed class BrowserSessions(IConfiguration configuration, ILogger<Browse
         BrowserPageRuntime page,
         string documentId,
         string captureId,
-        ResolvedTarget? target
+        ResolvedTarget[] targets
     )
     {
         await page.ClearHighlightAsync();
         try
         {
-            if (target is not null)
+            if (targets.Length > 0)
             {
-                await page.Capture!.HighlightAsync(target);
+                await page.Capture!.HighlightAsync(targets);
             }
             await RequireCaptureAsync(session, page, documentId, captureId);
         }
