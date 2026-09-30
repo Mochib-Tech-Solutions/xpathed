@@ -287,17 +287,44 @@ public sealed class BrowserSessions(IConfiguration configuration, ILogger<Browse
     private static async Task HighlightTargetAsync(BrowserSessionRuntime session, BrowserPageRuntime page, string documentId, string captureId, ResolvedTarget? target)
     {
         await page.ClearHighlightAsync();
-        if (target is { State.InViewport: true })
+        if (target is not null)
         {
-            await page.Highlight!.SendAsync("Overlay.highlightRect", new Dictionary<string, object>
+            var resolved = await page.Highlight!.SendAsync("Runtime.evaluate", new Dictionary<string, object>
             {
-                ["x"] = (int)Math.Round(target.Geometry.X),
-                ["y"] = (int)Math.Round(target.Geometry.Y),
-                ["width"] = (int)Math.Round(target.Geometry.Width),
-                ["height"] = (int)Math.Round(target.Geometry.Height),
-                ["color"] = new { r = 59, g = 130, b = 246, a = 0.18 },
-                ["outlineColor"] = new { r = 37, g = 99, b = 235, a = 1 }
+                ["expression"] = "(() => { const nodes = document.evaluate(" + JsonSerializer.Serialize(target.Xpaths[0]) +
+                    ", document, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null); return nodes.snapshotLength === 1 ? nodes.snapshotItem(0) : null; })()"
             });
+            if (!resolved!.Value.GetProperty("result").TryGetProperty("objectId", out var objectId))
+            {
+                throw new ApiException(409, "stale_capture", "The selected target is no longer available to highlight.");
+            }
+            try
+            {
+                var revalidated = await EvaluateCaptureAsync(session, page, documentId, captureId,
+                    "(capture, selection) => capture.select(selection.candidateId, selection.action)",
+                    new { candidateId = target.CandidateId, action = target.Interactability!.Action });
+                var currentTarget = revalidated.Deserialize<SelectionValidation>(JsonOptions)!.Target;
+                if (currentTarget?.Xpaths[0] != target.Xpaths[0])
+                {
+                    throw new ApiException(409, "stale_capture", "The selected target changed before it could be highlighted.");
+                }
+                await page.Highlight.SendAsync("Overlay.highlightNode", new Dictionary<string, object>
+                {
+                    ["objectId"] = objectId.GetString()!,
+                    ["highlightConfig"] = new
+                    {
+                        showInfo = false,
+                        contentColor = new { r = 59, g = 130, b = 246, a = 0.18 },
+                        borderColor = new { r = 37, g = 99, b = 235, a = 1 }
+                    }
+                });
+            }
+            finally
+            {
+                try
+                { await page.Highlight.SendAsync("Runtime.releaseObject", new Dictionary<string, object> { ["objectId"] = objectId.GetString()! }); }
+                catch (PlaywrightException) { }
+            }
         }
         try
         { await RequireCaptureAsync(session, page, documentId, captureId); }

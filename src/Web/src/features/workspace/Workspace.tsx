@@ -28,7 +28,6 @@ export default function Workspace() {
     closeAllTabs,
     navigate,
     resolve,
-    inspectAction,
     setInstruction,
     resetChat,
     setAddress,
@@ -96,7 +95,6 @@ export default function Workspace() {
           onResolve={resolve}
           onReset={resetChat}
           resetDisabled={!page || !!busy}
-          onInspect={inspectAction}
         />
         <section
           className="order-first flex min-h-0 min-w-0 flex-1 flex-col bg-background sm:order-none"

@@ -177,7 +177,8 @@ internal static class BrowserCaptureScript
             else if (!observed.inViewport) reasons.push('off_screen');
             if (!observed.rendered) reasons.push('not_visually_rendered');
             if (checks.pointerReception === 'fail') reasons.push(getComputedStyle(element).pointerEvents === 'none' ? 'pointer_events_none' : 'obstructed_at_hit_point');
-            return { version: '1', action, status: Object.values(checks).includes('fail') ? 'blocked' : custom ? 'unsupported' : 'unknown', reasons, checks };
+            const readiness = [checks.compatibleControl, checks.enabled, checks.writable, checks.viewport, checks.pointerReception, checks.keyboard];
+            return { version: '2', action, status: readiness.includes('fail') ? 'blocked' : custom ? 'unsupported' : readiness.includes('unknown') ? 'unknown' : 'ready', reasons, checks };
           };
           const eligible = element => {
             if (!accessibilityExposed(element)) return false;
@@ -228,31 +229,32 @@ internal static class BrowserCaptureScript
           const xpathsFor = element => {
             const xpaths = [];
             const add = xpath => {
-              if (xpaths.includes(xpath)) return;
               const matches = document.evaluate(xpath, document, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
-              if (matches.snapshotLength === 1 && matches.snapshotItem(0) === element) xpaths.push(xpath);
+              if (matches.snapshotLength !== 1 || matches.snapshotItem(0) !== element) return false;
+              xpaths.push(xpath);
+              return true;
             };
             const testPredicates = attributes(element, testAttributes);
             const stablePredicates = attributes(element, stableAttributes);
             const elementText = text(element);
             const semanticPredicates = elementText ? [`normalize-space(.)=${literal(elementText)}`] : [];
             if (element.matches(buttonInput) && element.getAttribute('value')) semanticPredicates.push(`@value=${literal(element.getAttribute('value'))}`);
-            for (const predicate of [...testPredicates, ...stablePredicates]) add(`//${tag(element)}[${predicate}]`);
+            for (const predicate of [...testPredicates, ...stablePredicates]) if (add(`//${tag(element)}[${predicate}]`)) return xpaths;
             for (const associatedLabel of element.labels ?? []) {
               const labelText = text(associatedLabel);
-              if (labelText && element.id && associatedLabel.htmlFor === element.id) add(`//${tag(element)}[@id=//label[normalize-space(.)=${literal(labelText)}]/@for]`);
+              if (labelText && element.id && associatedLabel.htmlFor === element.id && add(`//${tag(element)}[@id=//label[normalize-space(.)=${literal(labelText)}]/@for]`)) return xpaths;
             }
+            for (const predicate of semanticPredicates) if (add(`//${tag(element)}[${predicate}]`)) return xpaths;
             for (let ancestor = element.parentElement; ancestor && ancestor !== document.body; ancestor = ancestor.parentElement) {
               checkBudget();
               const predicates = [...attributes(ancestor, testAttributes), ...attributes(ancestor, stableAttributes)];
               const heading = ancestor.querySelector(':scope > legend,:scope > h1,:scope > h2,:scope > h3,:scope > h4,:scope > h5,:scope > h6');
               if (heading && text(heading)) predicates.push(`${tag(heading)}[normalize-space(.)=${literal(text(heading))}]`);
               for (const context of predicates) {
-                for (const predicate of [...testPredicates, ...stablePredicates, ...semanticPredicates]) add(`//${tag(ancestor)}[${context}]//${tag(element)}[${predicate}]`);
-                add(`//${tag(ancestor)}[${context}]//${tag(element)}`);
+                for (const predicate of [...testPredicates, ...stablePredicates, ...semanticPredicates]) if (add(`//${tag(ancestor)}[${context}]//${tag(element)}[${predicate}]`)) return xpaths;
+                if (add(`//${tag(ancestor)}[${context}]//${tag(element)}`)) return xpaths;
               }
             }
-            for (const predicate of semanticPredicates) add(`//${tag(element)}[${predicate}]`);
             if (!xpaths.length) {
               const segments = [];
               for (let current = element; current; current = current.parentElement) {

@@ -33,7 +33,6 @@ type Props = {
   onInstructionChange: (instruction: string) => void;
   onResolve: () => void;
   onReset: () => void;
-  onInspect: (entryId: string, actionId: string) => void;
 };
 
 export default function ChatPanel({
@@ -46,7 +45,6 @@ export default function ChatPanel({
   onInstructionChange,
   onResolve,
   onReset,
-  onInspect,
 }: Props) {
   const [copied, setCopied] = useState("");
   const [copyError, setCopyError] = useState<{ entryId: string; message: string } | null>(null);
@@ -154,18 +152,16 @@ export default function ChatPanel({
                 ? `${Math.round(totalMs)} ms`
                 : `${(totalMs / 1000).toFixed(2)} s`
               : null;
-          const xpathItem = (xpath: string, index: number, actionId: string) => (
-            <li key={xpath} className="rounded-lg border border-border bg-background p-3">
+          const xpathItem = (xpath: string, actionId: string) => (
+            <div className="rounded-lg border border-border bg-background p-3">
               <div className="mb-2 flex items-center justify-between gap-2">
-                <span className="text-xs font-medium text-muted-foreground">
-                  {index === 0 ? "XPath" : `Alternative ${index}`}
-                </span>
+                <span className="text-xs font-medium text-muted-foreground">XPath</span>
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon"
                   className="-my-1 size-7"
-                  aria-label={`Copy XPath ${index + 1}`}
+                  aria-label="Copy XPath 1"
                   onClick={() => {
                     void copy(xpath, `${resolution.id}:${actionId}`);
                   }}
@@ -178,7 +174,7 @@ export default function ChatPanel({
                 </Button>
               </div>
               <code className="block text-sm break-all whitespace-pre-wrap">{xpath}</code>
-            </li>
+            </div>
           );
           return (
             <article key={resolution.id} className="mb-6 space-y-3 text-sm leading-relaxed">
@@ -228,26 +224,9 @@ export default function ChatPanel({
                       </p>
                     )}
                     {target && (
-                      <div className="flex items-start justify-between gap-2">
-                        <h2 className="text-base font-medium break-words">
-                          {target.label || target.tag}
-                        </h2>
-                        {result?.contractVersion === "2" && (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            aria-label={`Inspect action ${action.order}`}
-                            aria-pressed={
-                              !resolution.historical && result.inspectedActionId === action.actionId
-                            }
-                            disabled={disabled || resolution.historical}
-                            onClick={() => onInspect(resolution.id, action.actionId)}
-                          >
-                            Inspect
-                          </Button>
-                        )}
-                      </div>
+                      <h2 className="text-base font-medium break-words">
+                        {target.label || target.tag}
+                      </h2>
                     )}
                     {action.outcome === "not_found" && (
                       <p>I couldn’t find that element on this page.</p>
@@ -272,20 +251,19 @@ export default function ChatPanel({
                               "An interaction limitation was observed."}
                           </p>
                         ))}
-                        <details className="text-xs text-muted-foreground">
-                          <summary className="cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                            State details
-                          </summary>
-                          <p className="mt-2">
-                            {target.interactability?.status === "blocked"
-                              ? "Interaction blocked."
-                              : target.interactability?.status === "unsupported"
-                                ? "Interaction assessment unsupported."
-                                : target.interactability?.status === "unknown"
-                                  ? "Interaction readiness unknown."
-                                  : "Interaction readiness unavailable."}
+                        <div className="space-y-2 text-xs text-muted-foreground">
+                          <p>
+                            {target.interactability?.status === "ready"
+                              ? "Interaction checks passed."
+                              : target.interactability?.status === "blocked"
+                                ? "Interaction blocked."
+                                : target.interactability?.status === "unsupported"
+                                  ? "Interaction assessment unsupported."
+                                  : target.interactability?.status === "unknown"
+                                    ? "Interaction readiness unknown."
+                                    : "Interaction readiness unavailable."}
                           </p>
-                          <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
+                          <div className="flex flex-wrap gap-x-3 gap-y-1">
                             <span>{target.state.inViewport ? "In viewport" : "Off-screen"}</span>
                             <span>{target.state.enabled ? "Enabled" : "Disabled"}</span>
                             {(target.state.editable ||
@@ -297,38 +275,8 @@ export default function ChatPanel({
                               <span>{target.state.checked ? "Checked" : "Unchecked"}</span>
                             )}
                           </div>
-                        </details>
-                        <details open={!resolution.historical} className="group">
-                          <summary className="mb-2 cursor-pointer text-xs font-medium text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                            {resolution.historical
-                              ? "XPath from earlier result"
-                              : "Verified XPaths"}
-                          </summary>
-                          <ol className="space-y-2.5" aria-label="Verified XPath alternatives">
-                            {target.xpaths
-                              .slice(0, 1)
-                              .map((xpath, index) => xpathItem(xpath, index, action.actionId))}
-                          </ol>
-                          {target.xpaths.length > 1 && (
-                            <details className="mt-3">
-                              <summary className="cursor-pointer text-xs text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                                {target.xpaths.length - 1} alternative XPath
-                                {target.xpaths.length > 2 ? "s" : ""}
-                              </summary>
-                              <ol
-                                start={2}
-                                className="mt-2 space-y-2.5"
-                                aria-label="Additional XPath alternatives"
-                              >
-                                {target.xpaths
-                                  .slice(1)
-                                  .map((xpath, index) =>
-                                    xpathItem(xpath, index + 1, action.actionId),
-                                  )}
-                              </ol>
-                            </details>
-                          )}
-                        </details>
+                        </div>
+                        {target.xpaths[0] && xpathItem(target.xpaths[0], action.actionId)}
                         {copied.startsWith(`${resolution.id}:${action.actionId}:`) && (
                           <p role="status" className="text-muted-foreground">
                             Copied

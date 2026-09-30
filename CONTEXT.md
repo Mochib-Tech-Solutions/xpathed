@@ -12,7 +12,7 @@ A test instruction can request several interactions, such as “Click all Approv
 The requested interaction, such as clicking, hovering, or selecting an option.
 
 **Action resolution**:
-The result of identifying one action's target in a particular page state, including absence or an unsupported scope. A found action resolution concerns one target and may include alternative XPath expressions for that same target.
+The result of identifying one action's target in a particular page state, including absence or an unsupported scope. A found action resolution concerns one target and has one preferred verified XPath expression for that target.
 
 **Multi-action result**:
 The ordered action resolutions for one test instruction. Its partial-result summary distinguishes independently resolved actions from missing, unsupported, failed or non-interactable actions.
@@ -38,9 +38,6 @@ An approach for proposing target elements and their XPath expressions from an in
 
 **XPath expression**:
 An expression that locates nodes within a document. In this assignment, the output is intended to locate the target element on the current page.
-
-**Alternative XPath**:
-Another XPath expression for the same selected target element. Alternatives vary the way the element is located, not which element is selected.
 
 **Browser session**:
 A managed browsing instance containing related tabs and their shared browsing state. The client and resolver refer to the same session.
@@ -73,7 +70,7 @@ Whether page content is available to assistive technology under the supported in
 Whether an element belongs to the supported inspection scope. Eligibility is distinct from whether the requested action is possible on that element.
 
 **Target interactability**:
-The observed suitability of a target for a particular requested action, including known limitations and unknown observations. It is distinct from finding the target or successfully executing the action.
+The observed suitability of a target for a particular requested action, including known limitations and unknown observations. Passing the applicable observations establishes observed readiness; it is distinct from finding the target or successfully executing the action.
 
 **Action execution**:
 The performance of the requested interaction on a resolved target element.
