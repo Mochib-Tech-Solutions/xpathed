@@ -136,6 +136,29 @@ async function withFramebuffer(session, check) {
   }
 }
 
+test(
+  "Repeated session teardown releases display resources before reusing the slot",
+  { timeout: 300000 },
+  async () => {
+    // The old forced x11vnc shutdown exhausted the default 4096 System V segments before 128 sessions.
+    for (let index = 0; index < 128; index++) {
+      const session = await request("/sessions");
+      try {
+        if (index === 127) {
+          await withFramebuffer(session, async (readFrame) => {
+            const frame = await readFrame();
+            assert.equal(frame.width, 1280);
+            assert.equal(frame.height, 800);
+          });
+        }
+      } finally {
+        await request(`/sessions/${session.sessionId}`, undefined, "DELETE");
+      }
+      assert.equal((await fetch(`${browserUrl}/sessions/${session.sessionId}`)).status, 404);
+    }
+  },
+);
+
 test("Viewer disconnect completes its WebSocket close handshake and can reconnect", async () => {
   await withFixture(targetMarkup, async (session) => {
     for (let attempt = 0; attempt < 2; attempt++) {

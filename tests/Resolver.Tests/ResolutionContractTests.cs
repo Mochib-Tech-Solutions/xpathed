@@ -12,14 +12,47 @@ namespace Xpathed.Resolver.Tests;
 public sealed class ResolutionContractTests
 {
     [Theory]
-    [InlineData("1", 512, 1, "5")]
-    [InlineData("2", 4096, 16, "6")]
-    [InlineData("3", 4096, 16, "7")]
+    [InlineData("none")]
+    [InlineData("low")]
+    public async Task ExplicitReasoningSettingsAreSentAndRetained(string effort)
+    {
+        var handler = new DeterministicServicesHandler();
+        await using var application = CreateApplication(
+            handler,
+            new Dictionary<string, string?>
+            {
+                ["OpenRouter:ReasoningEffort"] = effort,
+                ["OpenRouter:PromptCacheMode"] = "explicit",
+            }
+        );
+        using var client = application.CreateClient();
+        client.DefaultRequestHeaders.Add("X-Xpathed-Attempt-Id", Guid.NewGuid().ToString("N"));
+        using var response = await client.PostAsJsonAsync(
+            "/internal/pages/page-1/resolve",
+            new { instruction = "Click Save", documentId = "document-1" }
+        );
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var envelope = await response.Content.ReadFromJsonAsync<JsonElement>();
+        using var retained = JsonDocument.Parse(
+            envelope.GetProperty("evidence").GetProperty("configurationJson").GetString()!
+        );
+        var request = retained.RootElement.GetProperty("effective").GetProperty("request");
+        Assert.Equal(effort, request.GetProperty("reasoning").GetProperty("effort").GetString());
+        Assert.Equal("explicit", request.GetProperty("prompt_cache_options").GetProperty("mode").GetString());
+        Assert.Equal(effort, handler.ModelRequest.GetProperty("reasoning").GetProperty("effort").GetString());
+    }
+
+    [Theory]
+    [InlineData("1", 512, 1, "5", null)]
+    [InlineData("2", 4096, 16, "6", null)]
+    [InlineData("3", 4096, 16, "7", null)]
+    [InlineData("3", 4096, 16, "7-concise-1", "concise")]
     public async Task DiagnosticConfigurationDescribesEffectiveSettingsWithoutCredentialsOrPageInput(
         string version,
         int outputTokens,
         int maximumActions,
-        string promptVersion
+        string promptVersion,
+        string? variant
     )
     {
         var handler = new DeterministicServicesHandler
@@ -40,6 +73,7 @@ public sealed class ResolutionContractTests
                 ["OpenRouter:Provider"] = "configured-route",
                 ["OpenRouter:TimeoutSeconds"] = "47",
                 ["OpenRouter:ApiKey"] = "configuration-secret-canary",
+                ["Resolution:PromptVariant"] = variant,
             }
         );
         using var client = application.CreateClient();
@@ -64,6 +98,10 @@ public sealed class ResolutionContractTests
         Assert.Equal("47", effective.GetProperty("timeoutSeconds").GetString());
         Assert.Equal(maximumActions, effective.GetProperty("maximumActions").GetInt32());
         Assert.Equal(promptVersion, effective.GetProperty("promptVersion").GetString());
+        Assert.Equal(
+            handler.ModelRequest.GetProperty("messages")[0].GetProperty("content").GetString(),
+            envelope.GetProperty("evidence").GetProperty("systemPrompt").GetString()
+        );
         Assert.False(effective.GetProperty("responseCache").GetBoolean());
         var request = effective.GetProperty("request");
         Assert.Equal("configured/model", request.GetProperty("model").GetString());
@@ -1423,6 +1461,8 @@ public sealed class ResolutionContractTests
     [InlineData("OpenRouter:TimeoutSeconds", "NaN", "invalid_provider_configuration")]
     [InlineData("OpenRouter:TimeoutSeconds", "Infinity", "invalid_provider_configuration")]
     [InlineData("OpenRouter:TimeoutSeconds", "-Infinity", "invalid_provider_configuration")]
+    [InlineData("OpenRouter:ReasoningEffort", "maximum", "invalid_provider_configuration")]
+    [InlineData("OpenRouter:PromptCacheMode", "automatic", "invalid_provider_configuration")]
     public async Task InvalidConfigurationCannotClaimAModelCall(string key, string? value, string expectedCode)
     {
         var handler = new DeterministicServicesHandler();
@@ -1442,6 +1482,8 @@ public sealed class ResolutionContractTests
     [Theory]
     [InlineData("OpenRouter:Model", "other/model", "Click Save", false)]
     [InlineData("OpenRouter:Provider", "other", "Click Save", false)]
+    [InlineData("OpenRouter:ReasoningEffort", "none", "Click Save", false)]
+    [InlineData("OpenRouter:PromptCacheMode", "explicit", "Click Save", false)]
     [InlineData("OpenRouter:BaseUrl", "http://localhost:9089/api/v1/", "Click Save", false)]
     [InlineData("OpenRouter:TimeoutSeconds", "31", "Click Save", false)]
     [InlineData("OpenRouter:ApiKey", "another-test-key", "Click Save", true)]
