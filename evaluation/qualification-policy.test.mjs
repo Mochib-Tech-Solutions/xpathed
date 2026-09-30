@@ -1,0 +1,427 @@
+import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
+import test from "node:test";
+import policy from "./qualification-policy.json" with { type: "json" };
+import { summarizeQualification } from "./qualification-policy.mjs";
+
+function evidence() {
+  const cases = Array.from({ length: 11 }, (_, index) => ({
+    id: `case-${index}`,
+    family: `family-${index}`,
+    split: index === 10 ? "regression" : "held-out",
+    contractVersion: "3",
+    expected: {
+      outcome: "found",
+      actions: (index === 0 ? [1, 2] : [1]).map((step) => ({
+        step,
+        action: "click",
+        outcome: "found",
+        target: { selector: `#button-${step}` },
+      })),
+      summary: { processingComplete: true },
+    },
+  }));
+  const plan = cases.flatMap((spec) =>
+    [1, 2, 3].map((repetition) => ({
+      id: `${spec.id}-${repetition}`,
+      caseId: spec.id,
+      profileId: "candidate",
+      repetition,
+      attempt: 1,
+    })),
+  );
+  const manifest = {
+    mode: "live",
+    cases,
+    profiles: [{ id: "candidate", model: "test/model", provider: "test-provider" }],
+    baselineEvidence: {
+      runId: "development-baseline",
+      profiles: { candidate: { criticalFailures: [], hardFailures: [], capabilityGaps: [] } },
+    },
+    plan: { trials: plan },
+    qualification: {
+      policySha256: createHash("sha256").update(JSON.stringify(policy)).digest("hex"),
+      frozenAt: "2026-09-30T12:00:00Z",
+      heldOutStartedAt: "2026-09-30T13:00:00Z",
+      baselineRunIds: ["development-baseline"],
+    },
+  };
+  const trials = plan.map((entry) => {
+    const spec = cases.find(({ id }) => id === entry.caseId);
+    return {
+      ...entry,
+      elapsedMs: 1900,
+      provider: [
+        {
+          forwarded: true,
+          identityValid: true,
+          requestedIdentity: { model: "test/model", provider: "test-provider" },
+          observedIdentity: {
+            model: "test/model",
+            provider: "Test Provider",
+            generationId: entry.id,
+          },
+          responseReuseDisabled: true,
+          responseCacheHit: false,
+          reportedUsd: 0.001,
+        },
+      ],
+      result: {
+        contractVersion: "3",
+        action: "click",
+        outcome: "found",
+        actions: spec.expected.actions.map(({ step }) => ({
+          actionId: `a${step}`,
+          order: step,
+          step,
+          action: "click",
+          outcome: "found",
+          target: {
+            candidateId: `c${step}`,
+            xpaths: [`//button[@id='button-${step}']`],
+            state: { version: "2" },
+            interactability: { version: "2", action: "click" },
+          },
+        })),
+        summary: { processingComplete: true },
+        diagnostics: { usage: { cost: 0.001 } },
+      },
+      observation: {
+        actions: spec.expected.actions.map(() => ({ matches: [{ count: 1, intended: true }] })),
+      },
+    };
+  });
+  return { manifest, trials };
+}
+
+test("a fully observed frozen live candidate qualifies without activating a default", () => {
+  const { manifest, trials } = evidence();
+  const report = summarizeQualification(manifest, trials);
+  assert.equal(report.profiles.candidate.qualification.status, "qualified");
+  assert.equal(report.profiles.candidate.qualification.correctCompleteWithinDeadline.rate, 1);
+  assert.equal(report.profiles.candidate.qualification.correctCompleteWithinGoal.rate, 1);
+  assert.equal(report.profiles.candidate.qualification.uncertainty.heldOutFamilies, 10);
+  assert.equal(report.profiles.candidate.firstAttempt.latencyMs.p95, 1900);
+  assert.ok(
+    Math.abs(report.profiles.candidate.firstAttempt.cost.reportedUsd.total - 0.033) < 1e-12,
+  );
+  assert.equal(report.defaultActivated, false);
+});
+
+test("quick wrong or incomplete results fail while every original request remains in the denominator", () => {
+  for (const change of [
+    (trial) => {
+      trial.observation.actions[0].matches[0].intended = false;
+    },
+    (trial) => {
+      trial.result.actions.pop();
+    },
+    (trial) => {
+      trial.result.summary.processingComplete = false;
+    },
+    (trial) => {
+      trial.result.actions[1].target.candidateId = "c1";
+    },
+  ]) {
+    const { manifest, trials } = evidence();
+    trials[0].elapsedMs = 1;
+    change(trials[0]);
+    const report = summarizeQualification(manifest, trials).profiles.candidate;
+    assert.equal(report.qualification.status, "not-qualified");
+    assert.equal(report.qualification.correctCompleteWithinDeadline.total, 33);
+    assert.equal(report.qualification.correctCompleteWithinDeadline.passed, 32);
+    assert.equal(report.correctLatencyMs.p50, 1900);
+  }
+});
+
+test("timeouts, missing attempts and reruns do not disappear from deadline or latency reports", () => {
+  const { manifest, trials } = evidence();
+  trials[0] = { ...trials[0], result: null, elapsedMs: 45000, error: { code: "timeout" } };
+  trials[1] = { ...trials[1], result: null, elapsedMs: 45000, error: { code: "timeout" } };
+  const retry = { ...trials[2], id: "retry", attempt: 2 };
+  trials.splice(2, 1);
+  const report = summarizeQualification(manifest, [...trials, retry]).profiles.candidate;
+  assert.equal(report.qualification.correctCompleteWithinDeadline.total, 33);
+  assert.equal(report.qualification.correctCompleteWithinDeadline.passed, 30);
+  assert.equal(report.firstAttempt.latencyMs.p95, 45000);
+  assert.equal(report.firstAttempt.latencyMs.unavailable, 1);
+  assert.equal(report.diagnosticReruns.passed, 1);
+  assert.equal(report.qualification.status, "not-qualified");
+  assert.ok(report.qualification.reasons.includes("planned_trials_missing"));
+});
+
+test("deterministic, offline, unsealed or small evidence cannot qualify despite perfect scores", () => {
+  for (const change of [
+    ({ manifest }) => {
+      manifest.mode = "deterministic";
+    },
+    ({ manifest }) => {
+      manifest.track = "offline-selection";
+    },
+    ({ manifest }) => {
+      manifest.qualification.policySha256 = "tampered";
+    },
+    ({ manifest }) => {
+      manifest.qualification.frozenAt = "2026-09-30T14:00:00Z";
+    },
+    ({ manifest }) => {
+      manifest.qualification.baselineRunIds = [];
+    },
+    ({ manifest }) => {
+      manifest.cases
+        .filter(({ split }) => split === "held-out")
+        .forEach((spec) => {
+          spec.family = "same-family";
+        });
+    },
+    ({ manifest }) => {
+      manifest.cases[0].family = manifest.cases[10].family;
+    },
+  ]) {
+    const data = evidence();
+    change(data);
+    const report = summarizeQualification(data.manifest, data.trials).profiles.candidate;
+    assert.equal(report.qualification.status, "insufficient-evidence");
+  }
+});
+
+test("privacy leaks and critical case failures block even a 95-percent aggregate score", () => {
+  for (const change of [
+    ({ trials }) => {
+      trials[0].observation.privacyLeak = true;
+    },
+    ({ trials }) => {
+      trials[0].observation.oracleLeak = true;
+    },
+    ({ trials }) => {
+      trials[0].observation.passiveStateUnchanged = false;
+    },
+    ({ manifest, trials }) => {
+      manifest.cases[0].critical = true;
+      trials[0].result.actions[0].action = "hover";
+    },
+  ]) {
+    const data = evidence();
+    change(data);
+    const report = summarizeQualification(data.manifest, data.trials).profiles.candidate;
+    assert.equal(report.firstAttempt.passRate > 0.95, true);
+    assert.equal(report.qualification.status, "not-qualified");
+  }
+});
+
+test("repeated perfect requests do not manufacture independent family confidence", () => {
+  const { manifest, trials } = evidence();
+  const uncertainty = summarizeQualification(manifest, trials).profiles.candidate.qualification
+    .uncertainty;
+  assert.equal(uncertainty.successfulFamilies, 10);
+  assert.ok(uncertainty.interval95.lower > 0.72 && uncertainty.interval95.lower < 0.73);
+  assert.equal(uncertainty.interval95.upper, 1);
+});
+
+test("extra regression successes cannot dilute a held-out deadline regression", () => {
+  const { manifest, trials } = evidence();
+  for (let index = 0; index < 20; index++) {
+    const caseId = `extra-${index}`;
+    manifest.cases.push({ ...structuredClone(manifest.cases[10]), id: caseId });
+    for (const repetition of [1, 2, 3]) {
+      const entry = {
+        ...structuredClone(manifest.plan.trials[30]),
+        id: `${caseId}-${repetition}`,
+        caseId,
+        repetition,
+      };
+      manifest.plan.trials.push(entry);
+      trials.push({ ...structuredClone(trials[30]), ...entry });
+    }
+  }
+  trials[0].elapsedMs = 3001;
+  trials[3].elapsedMs = 3001;
+  const report = summarizeQualification(manifest, trials).profiles.candidate;
+  assert.equal(report.qualification.correctCompleteWithinDeadline.rate > 0.95, true);
+  assert.equal(report.qualification.status, "not-qualified");
+  assert.ok(report.qualification.reasons.includes("split_deadline_below_gate"));
+});
+
+test("plan and artifact identity corruption cannot silently drop an inconvenient attempt", () => {
+  for (const change of [
+    ({ trials }) => {
+      trials.push({ ...trials[0], profileId: "unknown" });
+    },
+    ({ manifest }) => {
+      manifest.plan.trials.push({ ...manifest.plan.trials[0], profileId: "unknown" });
+    },
+    ({ manifest }) => {
+      manifest.profiles.push({ id: "candidate" });
+    },
+    ({ manifest }) => {
+      manifest.cases.push(structuredClone(manifest.cases[0]));
+    },
+    ({ manifest }) => {
+      manifest.plan.trials[0].repetition = 0;
+    },
+    ({ manifest }) => {
+      manifest.plan.trials[0].caseId = "unlabelled";
+    },
+    ({ manifest }) => {
+      manifest.plan.trials.pop();
+    },
+  ]) {
+    const data = evidence();
+    change(data);
+    assert.throws(() => summarizeQualification(data.manifest, data.trials), /plan|profile|case/i);
+  }
+});
+
+test("duplicate and unplanned attempts fail the candidate instead of improving its score", () => {
+  for (const change of [
+    (trials) => {
+      trials.push(structuredClone(trials[0]));
+    },
+    (trials) => {
+      trials.push({ ...trials[0], caseId: "unknown" });
+    },
+  ]) {
+    const { manifest, trials } = evidence();
+    change(trials);
+    const report = summarizeQualification(manifest, trials).profiles.candidate;
+    assert.equal(report.qualification.status, "not-qualified");
+    assert.ok(report.qualification.hardFailures.length > 0);
+  }
+});
+
+test("the two-second goal is distinct from the inclusive three-second qualification deadline", () => {
+  const { manifest, trials } = evidence();
+  for (const trial of trials) trial.elapsedMs = 3000;
+  const report = summarizeQualification(manifest, trials).profiles.candidate;
+  assert.equal(report.qualification.status, "qualified");
+  assert.equal(report.qualification.correctCompleteWithinGoal.passed, 0);
+  assert.equal(report.qualification.correctCompleteWithinDeadline.passed, 33);
+});
+
+test("correctly diagnosed provider failures are not usable successful resolutions", () => {
+  const { manifest, trials } = evidence();
+  manifest.cases[0].expected = { outcome: "error", code: "provider_timeout", actions: [] };
+  for (const trial of trials.filter(({ caseId }) => caseId === "case-0")) {
+    trial.result = {
+      contractVersion: "3",
+      outcome: "error",
+      actions: [],
+      diagnostics: { code: "provider_timeout" },
+    };
+  }
+  const report = summarizeQualification(manifest, trials).profiles.candidate;
+  assert.equal(report.firstAttempt.passed, 33);
+  assert.equal(report.qualification.correctCompleteWithinDeadline.passed, 30);
+  assert.equal(report.qualification.status, "not-qualified");
+});
+
+test("cached or wrong-route successes cannot qualify and missing charges stay unknown", () => {
+  for (const [change, status] of [
+    [
+      (trial) => {
+        trial.provider[0].identityValid = false;
+      },
+      "not-qualified",
+    ],
+    [
+      (trial) => {
+        trial.provider[0].responseCacheHit = true;
+      },
+      "not-qualified",
+    ],
+    [
+      (trial) => {
+        trial.provider[0].requestedIdentity.model = "other/model";
+      },
+      "not-qualified",
+    ],
+    [
+      (trial) => {
+        trial.provider[0].responseReuseDisabled = false;
+      },
+      "not-qualified",
+    ],
+    [
+      (trial) => {
+        trial.provider[0].reportedUsd = null;
+      },
+      "insufficient-evidence",
+    ],
+    [
+      (trial) => {
+        trial.provider = [];
+      },
+      "insufficient-evidence",
+    ],
+  ]) {
+    const { manifest, trials } = evidence();
+    change(trials[0]);
+    assert.equal(
+      summarizeQualification(manifest, trials).profiles.candidate.qualification.status,
+      status,
+    );
+  }
+});
+
+test("confirmation retains unresolved development capabilities and critical failures", () => {
+  for (const [change, status, reason] of [
+    [
+      (manifest) => {
+        manifest.baselineEvidence.profiles.candidate.criticalFailures = ["injection"];
+      },
+      "not-qualified",
+      "baseline_critical_failure",
+    ],
+    [
+      (manifest) => {
+        manifest.baselineEvidence.profiles.candidate.capabilityGaps = [
+          { caseId: "red", limitation: "Color absent from input" },
+        ];
+      },
+      "not-qualified",
+      "unresolved_capability_gap",
+    ],
+    [
+      (manifest) => {
+        manifest.cases[0].capabilityGap = "Color absent from input";
+      },
+      "not-qualified",
+      "unresolved_capability_gap",
+    ],
+    [
+      (manifest) => {
+        delete manifest.baselineEvidence;
+      },
+      "insufficient-evidence",
+      "baseline_details_missing",
+    ],
+  ]) {
+    const { manifest, trials } = evidence();
+    change(manifest);
+    const report = summarizeQualification(manifest, trials).profiles.candidate;
+    assert.equal(report.qualification.status, status);
+    assert.ok(report.qualification.reasons.includes(reason));
+  }
+});
+
+test("model comparison requires the same declared cases and repetitions for every profile", () => {
+  const { manifest, trials } = evidence();
+  manifest.profiles.push({ ...manifest.profiles[0], id: "other" });
+  manifest.plan.trials.push(
+    ...manifest.plan.trials
+      .filter(({ caseId }) => caseId !== "case-9")
+      .map((trial) => ({ ...trial, profileId: "other" })),
+  );
+  assert.throws(() => summarizeQualification(manifest, trials), /same case/);
+});
+
+test("a noncritical baseline privacy failure still blocks an otherwise perfect confirmation", () => {
+  const { manifest, trials } = evidence();
+  manifest.baselineEvidence.profiles.candidate.hardFailures = [
+    { caseId: "ordinary-unlabelled-form", category: "privacy" },
+  ];
+  const report = summarizeQualification(manifest, trials).profiles.candidate;
+  assert.equal(report.firstAttempt.passRate, 1);
+  assert.equal(report.qualification.status, "not-qualified");
+  assert.ok(report.qualification.reasons.includes("baseline_hard_invariant_failure"));
+});

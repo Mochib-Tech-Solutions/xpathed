@@ -35,6 +35,31 @@ Every live comparison first runs the deterministic basic and plural compatibilit
 
 Comparison directories retain `manifest.json`, each original `trials/` entry, `summary.json` and live `provider/` request/response evidence. Every planned strategy attempt remains in the report denominator, including errors and unsupported cases. Singleton and plural results stay separate. Replay requires the matching manifest and grader and regrades retained observations without services or provider calls. It does not rerun the browser. Keep these directories private because provider evidence can contain page text. The ordinary `node evaluation/run.mjs --prune RUN_DIRECTORY` command removes comparison page/provider evidence after 30 days and the complete run after 90 days; comparison manifests use version `"1"` and need no diagnostic imports. Preserve the separate charge ledger. These development cases and small live pilots do not qualify a release or establish a model default. See the dated [Stagehand compatibility research](research/stagehand-v4-compatibility.md) for the pinned API evidence and its limits.
 
+## Compare and qualify models
+
+The dated [qualification report](research/model-qualification-report.md) records measured latency, correctness, costs and the decision to leave defaults unchanged.
+
+`pnpm evaluate:qualify` uses the same browser execution and independent grader, with the profiles in `evaluation/qualification-profiles.json`. It compares the baseline prompt/schema/DOM on standard Luna/OpenAI, Gemini/Google AI Studio and DeepSeek/Wafer routes. Model-specific reasoning and caching settings are explicit, fingerprinted and checked against current endpoint metadata. The optional `deepseek-concise` profile changes only the contract-3 prompt and records its own prompt version; it is an experimental development variant. Application defaults stay unchanged.
+
+```sh
+pnpm evaluate:qualify -- --mode deterministic --split development,regression --output .artifacts/evaluation/qualification-contracts
+pnpm evaluate:qualify -- --mode live --profile luna,gemini,deepseek,deepseek-concise --repetitions 3 --output .artifacts/evaluation/qualification-pilot
+pnpm evaluate:qualify -- --mode live --phase confirmation --split regression,held-out --profile luna,gemini,deepseek --repetitions 3 --pilot .artifacts/evaluation/qualification-pilot --output .artifacts/evaluation/qualification-confirmation
+pnpm evaluate:qualify:replay .artifacts/evaluation/qualification-confirmation
+```
+
+The pilot is development evidence. Confirmation checks its configuration and source fingerprints, forecasts cost from recorded input/output token distributions at fresh endpoint rates, and freezes the policy before held-out calls. Never change settings or thresholds in response to held-out results: move exposed families to regression before another tuning cycle. A run uses seeded case order, rotates profile order, executes one request at a time, and retains every original attempt without retries or discarded warmups. Provider prompt-cache warmth is uncontrolled and recorded separately from response caching. The proxy sends `X-OpenRouter-Cache: false`; cached responses or mismatched identities are invalid fresh-inference evidence.
+
+`evaluation/qualification-policy.json` declares a **2-second goal and 3-second deadline**. At least 95% of all planned requests must be correct and complete within the deadline; errors, wrong actions, missing/extra targets and timeouts fail it. Correctness must also reach 95% overall and in each required split, with an 80% family floor and no critical/invariant failure. The minimum held-out coverage is ten distinct fixture families and thirty trials, not a statistical guarantee. Reports retain family-level uncertainty; repeating one template does not create independent evidence. Development capability gaps and critical failures remain visible when considering confirmation.
+
+Timing covers the Resolver HTTP request, including capture, inference and live same-node XPath/readiness verification. Fixture setup and the independent oracle run outside that timer. Endpoint price lookup uses the proxy's frozen metadata snapshot; production currently fetches that metadata over the network. These measurements therefore describe the evaluation resolver path, not guaranteed browser-to-chat UI latency. Stage timings and all-attempt latency remain separate from correct-only latency.
+
+Before paid calls, deterministic positive, absent, scoped/plural and provider-failure checks exercise the same services. Live calls reserve charges through the **existing shared $5 ledger**. Missing usage/charges stop further paid work; preserve reservations until reconciled. No premium serving tier, response healing, fallback model or automated CI spending is enabled.
+
+The qualification manifest links source/dependency/browser fingerprints, full selected cases and exclusions, policy, route metadata and configuration identities. Per-trial artifacts retain nonsecret effective settings and expiring page/provider evidence. Replay uses the recorded runner and grader, checks manifest/trial identities and recomputes results without services. A completed measurement can exit successfully with **no qualified candidate**; inspect the qualification status rather than treating process success as approval. There is no automatic default promotion.
+
+The original legacy contract and saved-locator mutation suite remains separate. Imported PhraseNode and Mind2Web cases retain original split identities and offline-only limitations; these controlled browser results do not claim those corpora were rerun or that reconstructed DOMs reproduce historical readiness. Appearance-only commands expose a known gap: the baseline capture carries geometry but not computed color. That limitation must not disappear into an aggregate score or a full-scope release claim.
+
 ## Cases and oracles
 
 `evaluation/cases.json` versions instructions, fixture/setup revisions, viewport, expected ordered actions and targets, state/readiness, request summaries, categories, family/split membership and label provenance. The declared managed viewport is 1280×800 with an explicit one-pixel tolerance for kiosk window bounds; each trial records its observed viewport. Related templates, paraphrases and mutations remain in one split. Expected node mappings live outside model-visible fixture content and provider requests. DOM identity establishes intended-target correctness; matching XPath text is not the oracle.
@@ -81,7 +106,7 @@ The output must be a new private file. Construction validates source identity au
 
 ### Explicit live dataset pilot
 
-Restore dependencies with `pnpm restore:dotnet`. The live runner builds the current Resolver before freezing its manifest and invokes its offline selection entrypoint and existing gateway, without starting the application stack. It sends sanitized command/candidate input, not target-oracle fields. The current route is standard DeepSeek V4.1 Flash through Wafer; the broader model/prompt screening proposal remains future work, not an implemented comparison matrix or production model choice.
+Restore dependencies with `pnpm restore:dotnet`. The live runner builds the current Resolver before freezing its manifest and invokes its offline selection entrypoint and existing gateway, without starting the application stack. It sends sanitized command/candidate input, not target-oracle fields. The offline dataset runner uses standard DeepSeek V4.1 Flash through Wafer. The separate model matrix above evaluates controlled browser cases; it does not silently rerun or relabel imported corpora.
 
 Review each complete instruction/candidate payload before provider submission. Sanitization removes known form values and prunes frame and explicitly concealed subtree text before collecting ancestor text. Ordinary page text can still contain personal account details, location or search history. Public dataset availability does not make every captured page suitable for submission. Keep the review file private under `.artifacts/datasets/`; do not upload raw assets or payloads to CI or the repository.
 
@@ -116,6 +141,6 @@ Artifacts carry the ordinary 90-day and page-evidence 30-day retention policy. B
 
 ## Checks and limits
 
-The command exits nonzero when declared deterministic identity/privacy/contract checks fail. Zero means those checks passed; numerical model-quality and latency thresholds are unset, so qualification remains incomplete and the result cannot approve a release. Unknown and missing observations remain explicit.
+The ordinary evaluator exits nonzero when declared deterministic identity/privacy/contract checks fail. Its zero exit means those checks passed and does not approve a release. The separate model qualification runner applies the versioned policy above and can record a completed experiment with no qualifying model. Unknown and missing observations remain explicit.
 
 `pnpm check:tooling` runs Node tests for acquisition, adapters, runners, fixtures and grading, including negative controls. Evaluation source and manifest changes select that existing CI job. Tests use local synthetic samples, not source-corpus downloads or paid providers. Compose overlays are validated by the Docker configuration job. Neither CI job starts the evaluation services or makes paid calls; browser evaluation and live mode are explicit commands. Future release/quality gates remain governed by the live issue tracker.

@@ -204,6 +204,7 @@ export function configurationRecord(trial) {
             "reasoning",
             "provider",
             "plugins",
+            "prompt_cache_options",
           ]),
         }
       : null,
@@ -372,7 +373,7 @@ async function resolveTrial(spec, trial, session, page, options, services, chann
   }
 }
 
-async function execute(spec, trial, options, services) {
+export async function execute(spec, trial, options, services) {
   let session;
   try {
     await request(
@@ -471,32 +472,55 @@ async function execute(spec, trial, options, services) {
   }
 }
 
-export async function fingerprints() {
-  const root = process.env.XPATHED_WORKSPACE ?? resolve(directory, "..");
+export async function fingerprints(
+  root = process.env.XPATHED_WORKSPACE ?? resolve(directory, ".."),
+) {
   const paths = [
     "global.json",
     "pnpm-lock.yaml",
-    "src/Browser/packages.lock.json",
-    "src/Resolver/packages.lock.json",
-    "src/Browser/Sessions/BrowserCaptureScript.cs",
-    "src/Resolver/Services/CandidateSelectionStrategy.cs",
-    "src/Resolver/Services/ActionSelectionStrategy.cs",
-    "src/Resolver/Services/OpenRouterGateway.cs",
-    "src/Resolver/Services/OfflineSelectionEvaluation.cs",
-    "docker/browser/Dockerfile",
+    "package.json",
+    "Directory.Build.props",
+    "Directory.Build.targets",
+    "Directory.Packages.props",
+    "NuGet.Config",
+    ".editorconfig",
+    ".dockerignore",
     "docker/compose.yaml",
+    "docker/compose.evaluation.yaml",
+    "docker/compose.qualification.yaml",
+    "docker/compose.sh",
+    "scripts/evaluate.sh",
+    "tests/resolution/ready.mjs",
   ];
+  async function collect(path) {
+    const entries = await readdir(join(root, path), { withFileTypes: true }).catch((error) => {
+      if (error.code === "ENOENT") return [];
+      throw error;
+    });
+    for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
+      if (["bin", "obj", "node_modules", ".git"].includes(entry.name)) continue;
+      const child = `${path}/${entry.name}`;
+      if (entry.isDirectory()) await collect(child);
+      else if (!/\.md$|\.test\.mjs$/.test(entry.name)) paths.push(child);
+    }
+  }
+  for (const path of [
+    "src/Browser",
+    "src/Resolver",
+    "src/Common",
+    "docker/browser",
+    "docker/resolver",
+    "evaluation",
+  ])
+    await collect(path);
   const files = {};
-  for (const path of paths) {
+  for (const path of [...new Set(paths)].sort()) {
     try {
-      files[path] = hash(await readFile(join(root, path), "utf8"));
+      files[path] = hash(await readFile(join(root, path)));
     } catch {
       files[path] = "unavailable";
     }
   }
-  for (const name of await readdir(directory))
-    if (/\.(mjs|js|json)$/.test(name))
-      files[`evaluation/${name}`] = hash(await readFile(join(directory, name), "utf8"));
   for (const path of [
     "src/Resolver/bin/Release/net10.0/Resolver.dll",
     "src/Resolver/bin/Release/net10.0/Common.dll",

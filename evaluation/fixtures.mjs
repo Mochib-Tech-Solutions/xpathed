@@ -47,6 +47,8 @@ export function renderDerivedBody(fixture) {
 
 export function renderFixture(key, trial, frame) {
   const pages = {
+    "qualification-color":
+      '<main><button id="choose-cool" style="background:#1649cc;color:white">Choose</button><button id="choose-warm" style="background:#bb1818;color:white">Choose</button></main>',
     form: '<main><section aria-label="Profile"><h1>Profile</h1><button id="save-profile">Save changes</button><button id="cancel-profile">Cancel</button></section></main>',
     unicode:
       '<main><button id="publish-draft" aria-label="L&#39;été &quot;ready&quot;">Publish</button><button>Other</button></main>',
