@@ -5,6 +5,36 @@ import test from "node:test";
 import { createFixtureServer } from "./server.mjs";
 import { renderFixture } from "./fixtures.mjs";
 
+test("derived fixtures escape page text and reject executable tags, attributes and URLs", () => {
+  const fixture = {
+    kind: "derived-static-dom",
+    tree: { tag: "a", attributes: { href: "#" }, text: '<script>alert("secret")</script>' },
+  };
+  const html = renderFixture(fixture, "trial");
+  assert.match(html, /&lt;script&gt;/);
+  assert.doesNotMatch(html, /<script>alert/);
+  assert.throws(
+    () => renderFixture({ ...fixture, tree: { tag: "script", text: "alert(1)" } }, "trial"),
+    /Unsafe/,
+  );
+  assert.throws(
+    () =>
+      renderFixture(
+        { ...fixture, tree: { tag: "a", attributes: { href: "https://example.test" } } },
+        "trial",
+      ),
+    /Unsafe/,
+  );
+  assert.throws(
+    () =>
+      renderFixture(
+        { ...fixture, tree: { tag: "button", attributes: { onclick: "alert(1)" } } },
+        "trial",
+      ),
+    /Unsafe/,
+  );
+});
+
 test("controlled page content excludes the external oracle and case plan", async (t) => {
   const server = createFixtureServer();
   server.listen(0, "127.0.0.1");

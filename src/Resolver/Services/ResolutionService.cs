@@ -37,7 +37,8 @@ public sealed partial class ResolutionService(
             attemptId,
             value => input = value
         );
-        var multiple = request.ContractVersion == "2";
+        var multiple = request.ContractVersion is "2" or "3";
+        var singleInteraction = request.ContractVersion == "3";
         var sensitive =
             DiagnosticSanitizer.IsSensitiveInstruction(request.Instruction)
             || DiagnosticSanitizer.IsSensitiveAction(result.Action)
@@ -49,7 +50,9 @@ public sealed partial class ResolutionService(
                 : "sanitized",
             sensitive ? DiagnosticSanitizer.Redacted : DiagnosticSanitizer.RedactInstruction(request.Instruction),
             sensitive || input is null ? null : DiagnosticSanitizer.SanitizeJson(input),
-            multiple ? ActionSelectionStrategy.Prompt : CandidateSelectionStrategy.Prompt,
+            singleInteraction ? ActionSelectionStrategy.SingleInteractionPrompt
+                : multiple ? ActionSelectionStrategy.Prompt
+                : CandidateSelectionStrategy.Prompt,
             (multiple ? ActionSelectionStrategy.Schema : CandidateSelectionStrategy.Schema).GetRawText(),
             DiagnosticSanitizer.SanitizeJson(
                 JsonSerializer.Serialize(
@@ -64,7 +67,9 @@ public sealed partial class ResolutionService(
                         outputTokens = multiple ? ActionSelectionStrategy.OutputTokens : 512,
                         effective = gateway.DescribeConfiguration(
                             result.Diagnostics.Strategy,
-                            multiple ? ActionSelectionStrategy.Prompt : CandidateSelectionStrategy.Prompt,
+                            singleInteraction ? ActionSelectionStrategy.SingleInteractionPrompt
+                                : multiple ? ActionSelectionStrategy.Prompt
+                                : CandidateSelectionStrategy.Prompt,
                             multiple ? ActionSelectionStrategy.Schema : CandidateSelectionStrategy.Schema,
                             result.Diagnostics.ModelInputBudgetBytes,
                             multiple ? ActionSelectionStrategy.OutputTokens : 512,
@@ -90,8 +95,12 @@ public sealed partial class ResolutionService(
         var timer = Stopwatch.StartNew();
         var attemptId = suppliedAttemptId ?? Guid.NewGuid().ToString("N");
         CandidateCapture? capture = null;
-        var multiple = request.ContractVersion == "2";
-        var prompt = multiple ? ActionSelectionStrategy.Prompt : CandidateSelectionStrategy.Prompt;
+        var multiple = request.ContractVersion is "2" or "3";
+        var singleInteraction = request.ContractVersion == "3";
+        var prompt =
+            singleInteraction ? ActionSelectionStrategy.SingleInteractionPrompt
+            : multiple ? ActionSelectionStrategy.Prompt
+            : CandidateSelectionStrategy.Prompt;
         var schema = multiple ? ActionSelectionStrategy.Schema : CandidateSelectionStrategy.Schema;
         var outputTokens = multiple ? ActionSelectionStrategy.OutputTokens : 512;
         var strategy = configuration["Resolution:Strategy"] ?? "candidate-selection-v1";
@@ -99,7 +108,10 @@ public sealed partial class ResolutionService(
         {
             Stage = "configuration",
             Strategy = strategy,
-            PromptVersion = multiple ? "6" : "5",
+            PromptVersion =
+                singleInteraction ? "7"
+                : multiple ? "6"
+                : "5",
         };
         var configurationId = gateway.ConfigurationId(
             strategy,
@@ -225,7 +237,7 @@ public sealed partial class ResolutionService(
             }
             if (multiple)
             {
-                var selections = ActionSelectionStrategy.Select(completion.Content!, capture);
+                var selections = ActionSelectionStrategy.Select(completion.Content!, capture, singleInteraction);
                 diagnostics = diagnostics with { Stage = "selection" };
                 var requestedActions = selections
                     .Select((item, index) => new ActionSelection($"a{index + 1}", item.CandidateId, item.Action))
@@ -285,8 +297,9 @@ public sealed partial class ResolutionService(
                                     "current_state_dependency" =>
                                         "This step depends on a future page state. No earlier action was executed.",
                                     "ambiguous" => "The instruction does not identify one intended target.",
-                                    "unsupported_action" =>
-                                        "This interaction is outside the supported action families.",
+                                    "unsupported_action" => singleInteraction
+                                        ? "Use one supported interaction type per command. It may target several current-page elements; mixed interactions are unsupported."
+                                        : "This interaction is outside the supported action families.",
                                     _ => item.Outcome == "not_found"
                                         ? "No matching element found in the eligible current-page scope."
                                         : null,
@@ -331,7 +344,7 @@ public sealed partial class ResolutionService(
                     ),
                     results.Count(item => item.Target?.Interactability?.Status == "unsupported")
                 );
-                return Result(outcome, null, null) with
+                return Result(outcome, singleInteraction ? results[0].Action : null, null) with
                 {
                     Actions = results,
                     Summary = summary,

@@ -92,6 +92,129 @@ async function submitInstruction(user: ReturnType<typeof userEvent.setup>) {
 }
 
 describe("Workspace resolution", () => {
+  it.each(["found", "not_found"])(
+    "shows one shared action for version-3 targets with a %s second result",
+    async (secondOutcome) => {
+      const missing = secondOutcome === "not_found";
+      mockApi(() =>
+        Promise.resolve(
+          Response.json({
+            ...found,
+            contractVersion: "3",
+            outcome: missing ? "partial" : "found",
+            target: null,
+            summary: {
+              total: 2,
+              found: missing ? 1 : 2,
+              notFound: missing ? 1 : 0,
+              unsupported: 0,
+              errors: 0,
+              blocked: 0,
+            },
+            actions: [
+              {
+                actionId: "a1",
+                order: 1,
+                instruction: "Click the first confirmation button",
+                action: "click",
+                outcome: "found",
+                target: found.target,
+              },
+              {
+                actionId: "a2",
+                order: 2,
+                instruction: "Click the second confirmation button",
+                action: "click",
+                outcome: secondOutcome,
+                target: missing
+                  ? null
+                  : {
+                      ...found.target,
+                      label: "Confirm booking",
+                      xpaths: ["//button[@id='confirm-booking']"],
+                    },
+              },
+            ],
+          }),
+        ),
+      );
+      const user = await openWorkspace();
+      await user.type(
+        screen.getByRole("textbox", { name: "Describe an element" }),
+        "Click all confirmation buttons in the list",
+      );
+      await user.click(screen.getByRole("button", { name: "Resolve instruction" }));
+      expect(
+        await screen.findByText(missing ? "1 target found · 1 missing" : "2 targets found"),
+      ).toBeVisible();
+      expect(screen.getAllByText("Action: click")).toHaveLength(1);
+      const targets = screen.getAllByRole("region", { name: /Target [12]/ });
+      expect(targets).toHaveLength(2);
+      for (const target of targets) {
+        expect(within(target).queryByText(/Action:/)).not.toBeInTheDocument();
+        if (missing && target === targets[1])
+          expect(within(target).getByText(/Click the second confirmation button/)).toBeVisible();
+        else expect(within(target).queryByText(/Click the/)).not.toBeInTheDocument();
+      }
+      expect(within(targets[0]!).getByText(found.target.xpaths[0]!)).toBeVisible();
+      expect(within(targets[0]!).getByText("Disabled")).toBeVisible();
+      expect(
+        within(targets[1]!).getByText(
+          missing
+            ? "I couldn’t find that element on this page."
+            : "//button[@id='confirm-booking']",
+        ),
+      ).toBeVisible();
+      expect(screen.getAllByText("Cost unavailable")).toHaveLength(1);
+      expect(fetch).toHaveBeenCalledWith(
+        "/api/pages/page-1/resolve",
+        expect.objectContaining({
+          body: JSON.stringify({
+            instruction: "Click all confirmation buttons in the list",
+            documentId: "document-1",
+            contractVersion: "3",
+          }),
+        }),
+      );
+    },
+  );
+
+  it("explains the single-action limit for unsupported version-3 commands", async () => {
+    const message = "Use one action per command. You can target several elements on this page.";
+    mockApi(() =>
+      Promise.resolve(
+        Response.json({
+          ...found,
+          contractVersion: "3",
+          outcome: "unsupported",
+          action: "unsupported",
+          target: null,
+          actions: [
+            {
+              actionId: "a1",
+              order: 1,
+              action: "unsupported",
+              outcome: "unsupported",
+              code: "unsupported_action",
+              message,
+              target: null,
+            },
+          ],
+        }),
+      ),
+    );
+    const user = await openWorkspace();
+    await user.type(
+      screen.getByRole("textbox", { name: "Describe an element" }),
+      "Click Pay now and fill the notes field",
+    );
+    await user.click(screen.getByRole("button", { name: "Resolve instruction" }));
+    expect(await screen.findByText(message)).toBeVisible();
+    expect(screen.queryByText("Action: unsupported")).not.toBeInTheDocument();
+    expect(screen.queryByText("This interaction is not supported yet.")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Copy XPath/ })).not.toBeInTheDocument();
+  });
+
   it.each([
     ["1", "double_click", "double-click"],
     ["2", "type", "type"],
@@ -259,7 +382,7 @@ describe("Workspace resolution", () => {
         body: JSON.stringify({
           instruction: "Click Pay now",
           documentId: "document-1",
-          contractVersion: "2",
+          contractVersion: "3",
         }),
       }),
     );
@@ -798,7 +921,7 @@ describe("Workspace resolution", () => {
         body: JSON.stringify({
           instruction: "Click Fresh target",
           documentId: "document-2",
-          contractVersion: "2",
+          contractVersion: "3",
         }),
       }),
     );
@@ -1018,7 +1141,7 @@ describe("Workspace resolution", () => {
         expect(JSON.parse(typeof options?.body === "string" ? options.body : "null")).toEqual({
           instruction: "Click Pay now",
           documentId: "document-1",
-          contractVersion: "2",
+          contractVersion: "3",
         });
         return Promise.resolve(Response.json(found));
       }
