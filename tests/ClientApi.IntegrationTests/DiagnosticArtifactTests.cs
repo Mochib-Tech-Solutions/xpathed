@@ -75,6 +75,7 @@ public sealed class DiagnosticArtifactTests(PersistenceFixture database) : IClas
         using var client = app.CreateClient();
         var id = Guid.NewGuid().ToString("N");
         var artifact = Artifact(id, DateTimeOffset.UtcNow);
+        artifact["result"]!["accessibleName"] = "violet-cactus-782";
         artifact["result"]!["password"] = "synthetic-private-value";
         artifact["result"]!["configurationJson"] = "{\"apiKey\":\"violet-cactus-782\"}";
         artifact["result"]!["instruction"] = "Fill Name with violet-cactus-782";

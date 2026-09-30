@@ -129,6 +129,53 @@ test("Viewer disconnect completes its WebSocket close handshake and can reconnec
   });
 });
 
+test("Target descriptions preserve roles and image names without substituting descendant content", async () => {
+  await withFixture(
+    `<input id="submit" type="submit" value="Search">
+     <img id="photo" alt="Product photo" width="50" height="50">
+     <img id="unnamed" role="img" tabindex="0" width="50" height="50">
+     <div id="group" role="group">Unrelated descendant content</div>`,
+    async (session, page) => {
+      const capture = await request(`/pages/${page.pageId}/capture`, {
+        documentId: page.documentId,
+      });
+      const before = await observe();
+      for (const [tag, role, name, expectedId] of [
+        ["input", "button", "Search", "submit"],
+        ["img", "img", "Product photo", "photo"],
+        ["img", "img", "", "unnamed"],
+        ["div", "group", "", "group"],
+      ]) {
+        const candidate = capture.candidates.find(
+          (entry) => entry.tag === tag && entry.role === role && entry.label === name,
+        );
+        assert.ok(candidate, expectedId);
+        const body = {
+          documentId: page.documentId,
+          captureId: capture.captureId,
+          candidateId: candidate.id,
+          action: "inspect",
+        };
+        const { target } = await request(`/pages/${page.pageId}/selection`, body);
+        const batch = await request(`/pages/${page.pageId}/selections`, {
+          documentId: page.documentId,
+          captureId: capture.captureId,
+          actions: [{ actionId: "a1", candidateId: candidate.id, action: "inspect" }],
+        });
+        for (const selected of [target, batch.actions[0].target]) {
+          assert.equal(selected.role, role);
+          assert.equal(selected.accessibleName, name);
+          assert.deepEqual((await verify(selected.xpaths)).matches, [[expectedId]]);
+        }
+      }
+      const after = await observe();
+      assert.equal(after.activeElement, before.activeElement);
+      assert.equal(after.scrollY, before.scrollY);
+      assert.equal(after.clicks, before.clicks);
+    },
+  );
+});
+
 test("Browser captures labels containing comment nodes and validates each action target", async () => {
   await withFixture(
     `<section aria-label="Videos"><a id="expected-target" href="#first">First<!-- PRIVATE_COMMENT_SENTINEL --> video</a>

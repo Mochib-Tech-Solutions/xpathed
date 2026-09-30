@@ -93,6 +93,7 @@ public static partial class DiagnosticSanitizer
                     && key
                         is "instruction"
                             or "label"
+                            or "accessiblename"
                             or "labels"
                             or "text"
                             or "scope"

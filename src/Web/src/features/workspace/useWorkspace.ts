@@ -212,6 +212,7 @@ export default function useWorkspace() {
       id: crypto.randomUUID(),
       instruction: text,
       createdAt: new Date().toISOString(),
+      respondedAt: null,
       pageUrl: page.url,
       pageTitle: page.title,
       documentId: page.documentId,
@@ -252,6 +253,7 @@ export default function useWorkspace() {
         failure = caught instanceof Error ? caught.message : "Resolution failed. Please try again.";
       }
       if (!isCurrent()) return;
+      const respondedAt = new Date().toISOString();
       setWorkspace((previous) => {
         const origin = previous.tabs[page.pageId];
         if (!origin) return previous;
@@ -270,6 +272,7 @@ export default function useWorkspace() {
                       ...old,
                       result,
                       error: failure,
+                      respondedAt,
                       historical:
                         old.historical ||
                         (result !== null && failure !== null) ||

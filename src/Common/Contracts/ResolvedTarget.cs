@@ -8,5 +8,7 @@ public sealed record ResolvedTarget(
     TargetState State,
     ElementGeometry Geometry,
     ActionInteractability? Interactability = null,
-    TargetFrame? Frame = null
+    TargetFrame? Frame = null,
+    string? Role = null,
+    string? AccessibleName = null
 );
