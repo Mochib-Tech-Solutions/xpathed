@@ -1,6 +1,6 @@
 # Resolution contract, version 1
 
-This document describes the implemented single-action API. Accepted follow-ups [#17](https://github.com/Mochib-Tech-Solutions/xpathed/issues/17) and [#18](https://github.com/Mochib-Tech-Solutions/xpathed/issues/18) will add accessibility-aware interactability and multiple current-page action results with a partial summary. [ADR-0008](adr/0008-resolve-multiple-current-page-actions.md) records the revised scope; those capabilities are not yet implemented. Existing hidden/opacity/geometry exclusions below describe version 1, not the settled future accessibility policy.
+This document describes the implemented single-action API, including [#17](https://github.com/Mochib-Tech-Solutions/xpathed/issues/17)'s accessibility-aware eligibility and action-specific observations. The outer resolution contract remains `"1"`; target/candidate state is now version `"2"`, and found targets include interactability version `"1"`. Older state fields remain serialized, but `rendered` no longer decides eligibility. Clients reading older results must treat missing readiness as unavailable. Multiple current-page action results and a partial summary remain [#18](https://github.com/Mochib-Tech-Solutions/xpathed/issues/18); see [ADR-0008](adr/0008-resolve-multiple-current-page-actions.md).
 
 The client forwards `POST /api/pages/{pageId}/resolve` to the standalone resolver at `POST /pages/{pageId}/resolve`. The resolver needs the browser service and OpenRouter; it does not use the client application or database.
 
@@ -26,7 +26,7 @@ JSON field names use camelCase. The result has these fields:
 
 `found` means the model selected a candidate and every returned XPath uniquely matches that exact captured node. It does not establish semantic accuracy or action success. Independent fixture labels test semantic accuracy. `not_found` represents absence in the supported inspected scope. `unsupported` represents instructions or target scopes outside this slice. Processing failures, incomplete capture, excess input size and provider failures are `error`.
 
-A target contains `candidateId`, `tag`, `label`, ordered `xpaths`, `state`, and `geometry`. State reports `rendered`, `inViewport`, `enabled`, `editable`, and nullable `checked`. Geometry is `{x,y,width,height}` in viewport-relative CSS pixels. Disabled and off-screen nodes remain eligible; application-hidden nodes are excluded. Actions cover click, hover, fill/type, select and check/uncheck on ordinary current-DOM controls. Resolution never executes the action or scrolls to the element.
+A target contains `candidateId`, `tag`, `label`, ordered `xpaths`, `state`, `geometry` and `interactability`. State version `"2"` retains `rendered`, `inViewport`, `enabled`, `editable` and nullable `checked`, adding `accessibilityExposed` and `readonly`. Geometry is `{x,y,width,height}` in viewport-relative CSS pixels. `rendered` observes a nonzero box, CSS visibility and ancestor opacity; it does not establish that every pixel is visible. `inViewport` observes bounding-box intersection, not obstruction or clipping. Accessibility exposure describes the supported DOM eligibility policy, not membership of every node in a raw platform accessibility tree. Actions cover click, hover, fill/type, select and check/uncheck. Resolution never executes an action, reveals content, scrolls, focuses or waits for readiness.
 
 Locators prefer explicit test attributes, suitable stable attributes and meaningful text/label/ancestor scope before positional paths. Every alternative must match exactly one node identical to the selection. Duplicated attributes do not establish uniqueness, and the resolver does not append a first-match predicate to conceal ambiguity.
 
@@ -41,7 +41,37 @@ A capture includes session/page/document/capture/frame identities, its timestamp
 
 This slice resolves the main document (`frameId: "main"`). Visible iframes and detected open shadow roots are counted separately; their content is not captured. Closed shadow roots cannot be detected by this DOM capture. A lack of a main-document match cannot establish absence inside an uninspected boundary. Expanded frame/state handling remains [#4](https://github.com/Mochib-Tech-Solutions/xpathed/issues/4).
 
-The compact representation preserves Unicode and uses allowlisted fields. Current editable input, textarea and select values, editable content, cookies, storage and URL attributes are excluded. The displayed labels of `input[type=button|submit|reset]` are the narrow exception: they are captured as button labels, while checkbox/radio values remain excluded. Candidate `checked` state is null; only the selected target reports its actual checked state. Labels, safe text and ancestor headings describe controls without forwarding raw accessibility snapshots. Hidden, inert, `aria-hidden`, zero-size, CSS-invisible and opacity-zero elements are excluded; off-screen and disabled elements remain eligible. The model receives page text as untrusted data, has no tools and returns only a selection. Browser constructs the XPath from the live DOM. Highlighting uses Chromium's display overlay, outside the DOM, so it cannot become a candidate or change target semantics.
+The compact representation preserves Unicode and uses allowlisted fields. Current editable input, textarea and select values, editable content, cookies, storage and URL attributes are excluded. The displayed labels of `input[type=button|submit|reset]` are the narrow exception: they are captured as button labels, while checkbox/radio values remain excluded. Candidate `checked` state is null; only the selected target reports its actual checked state. Labels, safe text and ancestor headings describe controls without forwarding raw accessibility snapshots. Safe hidden label references may name exposed controls, while those referenced hidden nodes remain excluded as targets. This intentionally omits embedded control values from accessible names. The model receives page text as untrusted data, has no tools and returns only a selection. Browser constructs XPath from the live DOM. Highlighting uses Chromium's display overlay, outside the DOM, so it cannot become a candidate or change target semantics.
+
+## Eligibility and action observations
+
+The policy follows [WAI-ARIA tree inclusion/exclusion](https://www.w3.org/TR/wai-aria-1.2/#tree_exclusion), [accessible-name hidden references](https://www.w3.org/TR/accname-1.2/#computation-steps) and [HTML hidden/inert semantics](https://html.spec.whatwg.org/multipage/interaction.html), with deterministic Chromium checks. It is a sanitized DOM policy for this main-document slice, not a complete accessibility compliance implementation.
+
+| Page condition | Candidate policy and observations |
+| --- | --- |
+| `display:none`, hidden input, `content-visibility:hidden`, unrevealed `hidden=until-found`, closed disclosure content | Excluded, including affected descendants; no reveal is performed |
+| `visibility:hidden/collapse` | Excluded according to each element's computed visibility; explicitly visible descendants may remain eligible |
+| `hidden` attribute | Excluded by browser CSS unless the page overrides the hidden display style |
+| Explicit or modal background inertness | Excluded; a top-layer modal dialog escapes an ancestor's inertness, as in Chromium |
+| `aria-hidden=true` ancestor | Excluded even if a child sets false; a currently focused subtree retains Chromium's focus exposure exception |
+| Off-screen, clipped/screen-reader-only, opacity-zero, covered, zero-area, disabled, readonly | Eligible; visual, viewport and requested-action limits are observed separately |
+| Hidden label/name references | Used only for safe name text; `aria-labelledby` precedes `aria-label`, then native labels and supported name-from-content/attribute fallbacks |
+
+Modal exposure uses Chromium's focused modal or top-layer backdrop hit, rather than DOM order. If several open modals cannot be distinguished without interaction, capture is incomplete with `capture_exposure_unknown`; it cannot substantiate absence.
+
+`interactability` has `{version:"1", action, status, reasons, checks}`. Every check is `pass`, `fail`, `unknown` or `not_applicable`. Status is `blocked` if an applicable observation fails, `unsupported` if custom-control behavior cannot be assessed with this slice, otherwise `unknown`. A found target remains found in all three cases and retains verified XPath alternatives. No status promises successful events or business outcomes.
+
+| Requested action | Applicable observations | Explicit limits |
+| --- | --- | --- |
+| Click | Enabled, viewport, pointer reception | Any eligible element can be selected; a DOM hit does not establish a click handler or business effect |
+| Hover | Viewport, pointer reception | Enabled is not applicable; disabled hover differs from disabled click |
+| Fill/type | Compatible text input/textarea/contenteditable, enabled, writable | Pointer/viewport checks are not applicable to keyboard-oriented assessment; keyboard readiness remains unknown |
+| Select | Compatible native select, enabled | Custom combobox/listbox assessment is unsupported; opening and selecting are untested |
+| Check/uncheck | Compatible native checkbox/radio, enabled, viewport, pointer reception | Radio uncheck is incompatible; custom checkbox/radio/switch behavior is unsupported |
+
+Checks are `compatibleControl`, `enabled`, `writable`, `viewport`, `pointerReception`, `keyboard`, `stability` and `eventOutcome`. Pointer reception samples the center of the target's viewport-intersected bounding box using `elementFromPoint`, accepting that node or a descendant. Failure describes that sampled point; other points, label proxies, clipping shapes and browser event delivery are not exhaustively tested. Zero-area and off-screen targets cannot establish a pointer hit without moving the page. A transparent element can pass pointer reception while `rendered` is false. For fill/type and select, off-screen/visual conditions remain reported limitations without claiming keyboard failure. Stability and event outcome always remain unknown because resolution performs no wait or event. Reasons include disabled, readonly, incompatible control, custom control unverified, off-screen, zero-area, not visually rendered, pointer-events none and obstruction/clipping at the hit point.
+
+This per-action extension is the contract to retain when #18 adds action lists. Resolution outcomes and request-owned usage/cost remain separate from interactability. Legacy version-1 results without the extension remain readable; readiness is unavailable. Browser and Resolver validate version-2 state and the matching action before returning a found result.
 
 ## Diagnostics and budgets
 

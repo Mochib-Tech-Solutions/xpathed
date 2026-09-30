@@ -35,8 +35,10 @@ public sealed class OpenRouterGateway(IHttpClientFactory clients, IConfiguration
     internal string ConfigurationId(string strategy, string prompt, JsonElement schema, int modelInputBudgetBytes) => Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new
     {
         strategy,
-        promptVersion = "1",
-        captureVersion = "1",
+        promptVersion = "2",
+        captureVersion = "2",
+        stateVersion = "2",
+        interactabilityVersion = "1",
         endpoint = Uri.TryCreate(endpoint, UriKind.Absolute, out var address) ? address.AbsoluteUri : endpoint,
         timeoutSeconds = timeoutSeconds.ToString("R", CultureInfo.InvariantCulture),
         modelInputBudgetBytes,

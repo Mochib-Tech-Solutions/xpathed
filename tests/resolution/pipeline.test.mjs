@@ -30,7 +30,7 @@ test("instruction resolves through client, resolver, provider and managed browse
       instruction: "Click on About us.",
       documentId: page.documentId,
     });
-    assert.equal(result.outcome, "found");
+    assert.equal(result.outcome, "found", JSON.stringify(result));
     assert.equal(result.pageId, session.pageId);
     assert.equal(result.documentId, page.documentId);
     assert.equal(result.action, "click");
@@ -81,6 +81,42 @@ test("genuine absence is a semantic not_found after full capture and current-doc
     assert.equal(result.target, null);
     assert.equal(result.diagnostics.capture.complete, true);
     assert.equal(result.diagnostics.modelInputComplete, true);
+  } finally {
+    await fetch(`${client}/api/sessions/${session.sessionId}`, { method: "DELETE" });
+  }
+});
+
+test("ClientApi preserves disabled click and hover assessments and scopes hidden-only absence", async () => {
+  const session = await json(`${client}/api/sessions`, "POST");
+  try {
+    for (const [path, action, outcome, status] of [
+      ["state", "click", "found", "blocked"],
+      ["state", "hover", "found", "unknown"],
+      ["hidden-only", "click", "not_found", null],
+    ]) {
+      await json(`${fixture}/scenario`, "POST", {
+        name: outcome === "not_found" ? "absent" : "found",
+        action,
+      });
+      const page = await json(`${client}/api/pages/${session.pageId}/navigate`, "POST", {
+        url: `${fixture}/${path}`,
+      });
+      const result = await json(`${client}/api/pages/${session.pageId}/resolve`, "POST", {
+        instruction: `${action} About us`,
+        documentId: page.documentId,
+      });
+      assert.equal(result.outcome, outcome, JSON.stringify(result));
+      assert.equal(result.action, action);
+      if (result.target) {
+        assert.equal(result.target.interactability.status, status);
+        assert.equal(result.target.interactability.action, action);
+        assert.equal(result.target.state.version, "2");
+        assert.equal(result.diagnostics.promptVersion, "2");
+        assert.ok(result.target.xpaths.length > 0);
+      } else assert.match(result.diagnostics.message, /eligible current-page scope/);
+      const input = JSON.stringify(await json(`${fixture}/provider-request`));
+      assert.doesNotMatch(input, /HIDDEN_DUPLICATE|PRIVATE_REFERENCE_VALUE/);
+    }
   } finally {
     await fetch(`${client}/api/sessions/${session.sessionId}`, { method: "DELETE" });
   }

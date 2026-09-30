@@ -60,6 +60,9 @@ An element present in the current page content but outside the visible viewport.
 **Target state**:
 The observed condition of the selected element relevant to the requested action, such as whether it is rendered, in the viewport, enabled, or editable. Target state is separate from the element's identity.
 
+**Accessibility exposure**:
+Whether page content is available to assistive technology under the supported inspection policy, separately from whether it is visually rendered or ready for an action.
+
 **Target eligibility**:
 Whether an element belongs to the supported inspection scope. Eligibility is distinct from whether the requested action is possible on that element.
 
