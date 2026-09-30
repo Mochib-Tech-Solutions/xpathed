@@ -174,6 +174,7 @@ public sealed class ResolutionContractTests
         Assert.Equal(JsonValueKind.Null, result.GetProperty("target").ValueKind);
         Assert.Equal(JsonValueKind.Null, result.GetProperty("diagnostics").GetProperty("provider").ValueKind);
         Assert.Equal(JsonValueKind.Null, result.GetProperty("diagnostics").GetProperty("usage").ValueKind);
+        Assert.Equal(JsonValueKind.Null, result.GetProperty("diagnostics").GetProperty("costEstimate").ValueKind);
         Assert.Equal(1, handler.SelectionRequestCount);
         Assert.Equal(1, handler.ProviderRequestCount);
     }
@@ -244,6 +245,7 @@ public sealed class ResolutionContractTests
     [InlineData("/api/v1/chat/completions")]
     [InlineData("/pages/page-1/capture")]
     [InlineData("/pages/page-1/selection")]
+    [InlineData("/api/v1/models/deepseek/deepseek-v4.1-flash/endpoints")]
     public async Task RequestCancellationReachesEveryUpstreamBoundary(string blockedPath)
     {
         var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -380,16 +382,82 @@ public sealed class ResolutionContractTests
         Assert.False(body.TryGetProperty("service_tier", out _));
         Assert.Equal(512, body.GetProperty("max_tokens").GetInt32());
         Assert.Equal("wafer", body.GetProperty("provider").GetProperty("only")[0].GetString());
-        var prices = body.GetProperty("provider").GetProperty("max_price");
-        Assert.Equal(0.06m, prices.GetProperty("prompt").GetDecimal());
-        Assert.Equal(0.45m, prices.GetProperty("completion").GetDecimal());
-        Assert.Equal(0m, prices.GetProperty("request").GetDecimal());
+        Assert.False(body.GetProperty("provider").TryGetProperty("max_price", out _));
         Assert.False(body.GetProperty("provider").GetProperty("allow_fallbacks").GetBoolean());
         Assert.True(body.GetProperty("provider").GetProperty("require_parameters").GetBoolean());
         Assert.True(body.GetProperty("response_format").GetProperty("json_schema").GetProperty("strict").GetBoolean());
         Assert.False(body.TryGetProperty("tools", out _));
         Assert.False(body.TryGetProperty("temperature", out _));
         Assert.Contains("東京", body.GetProperty("messages")[1].GetProperty("content").GetString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ReturnsRouteRatesAndTokenCostEstimateSeparatelyFromReportedCost()
+    {
+        var handler = new DeterministicServicesHandler
+        {
+            PricingBody = """
+                {"data":{"endpoints":[
+                  {"provider_name":"Other","pricing":{"prompt":"99","completion":"99"}},
+                  {"provider_name":"Wafer","pricing":{"prompt":"0.0000000749","completion":"0.00000044","request":"0.000001"}}]}}
+                """
+        };
+        await using var application = CreateApplication(handler);
+        using var client = application.CreateClient();
+        using var response = await client.PostAsJsonAsync("/pages/page-1/resolve", new { instruction = "Click Save", documentId = "document-1" });
+        var result = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("found", result.GetProperty("outcome").GetString());
+        var diagnostics = result.GetProperty("diagnostics");
+        var estimate = diagnostics.GetProperty("costEstimate");
+        Assert.Equal("USD", estimate.GetProperty("currency").GetString());
+        Assert.Equal(0.0749m, estimate.GetProperty("inputPricePerMillion").GetDecimal());
+        Assert.Equal(0.44m, estimate.GetProperty("outputPricePerMillion").GetDecimal());
+        Assert.Equal(0.000010486m, estimate.GetProperty("inputCost").GetDecimal());
+        Assert.Equal(0.0000066m, estimate.GetProperty("outputCost").GetDecimal());
+        Assert.Equal(0.000001m, estimate.GetProperty("requestCost").GetDecimal());
+        Assert.Equal(0.000018086m, estimate.GetProperty("totalCost").GetDecimal());
+        Assert.Equal(0.0000215m, diagnostics.GetProperty("usage").GetProperty("cost").GetDecimal());
+        Assert.NotEqual(default, estimate.GetProperty("pricingFetchedAt").GetDateTimeOffset());
+        Assert.Equal(1, handler.ProviderRequestCount);
+    }
+
+    [Theory]
+    [InlineData(503, "{}")]
+    [InlineData(200, "{")]
+    [InlineData(200, "null")]
+    [InlineData(200, """{"data":{"endpoints":[]}}""")]
+    [InlineData(200, """{"data":{"endpoints":[{"provider_name":"Other","pricing":{"prompt":"1","completion":"1"}}]}}""")]
+    [InlineData(200, """{"data":{"endpoints":[{"provider_name":"Wafer","pricing":{"prompt":"-1","completion":"1"}}]}}""")]
+    [InlineData(200, """{"data":{"endpoints":[{"provider_name":"Wafer","pricing":{"prompt":"1"}}]}}""")]
+    [InlineData(200, """{"data":{"endpoints":[{"provider_name":"Wafer","pricing":{"prompt":"1","completion":"1"}},{"provider_name":"Wafer","pricing":{"prompt":"2","completion":"1"}}]}}""")]
+    [InlineData(200, """{"data":{"endpoints":[{"provider_name":"Wafer","pricing":{"prompt":"1","completion":"1","overrides":[{}]}}]}}""")]
+    public async Task MissingInvalidOrAmbiguousPricingDoesNotDiscardTheResolution(int status, string body)
+    {
+        await using var application = CreateApplication(new DeterministicServicesHandler { PricingStatus = (HttpStatusCode)status, PricingBody = body });
+        using var client = application.CreateClient();
+        using var response = await client.PostAsJsonAsync("/pages/page-1/resolve", new { instruction = "Click Save", documentId = "document-1" });
+        var result = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("found", result.GetProperty("outcome").GetString());
+        Assert.Equal(JsonValueKind.Null, result.GetProperty("diagnostics").GetProperty("costEstimate").ValueKind);
+        Assert.Equal(0.0000215m, result.GetProperty("diagnostics").GetProperty("usage").GetProperty("cost").GetDecimal());
+    }
+
+    [Theory]
+    [InlineData("timeout")]
+    [InlineData("network")]
+    public async Task PricingLookupFailuresKeepSuccessfulResolutionAndUsage(string failure)
+    {
+        await using var application = CreateApplication(new DeterministicServicesHandler
+        {
+            BeforeRespondAsync = (path, _) => path.EndsWith("/endpoints", StringComparison.Ordinal)
+                ? Task.FromException(failure == "timeout" ? new OperationCanceledException() : new HttpRequestException())
+                : Task.CompletedTask
+        });
+        using var client = application.CreateClient();
+        using var response = await client.PostAsJsonAsync("/pages/page-1/resolve", new { instruction = "Click Save", documentId = "document-1" });
+        var result = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("found", result.GetProperty("outcome").GetString());
+        Assert.Equal(JsonValueKind.Null, result.GetProperty("diagnostics").GetProperty("costEstimate").ValueKind);
     }
 
     [Fact]
