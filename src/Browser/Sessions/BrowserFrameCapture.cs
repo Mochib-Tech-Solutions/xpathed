@@ -19,8 +19,7 @@ internal sealed class BrowserFrameCapture(
     public BrowserFrameCapture? Parent { get; } = parent;
     public IElementHandle? Owner { get; } = owner;
     public HashSet<string> CandidateIds { get; } = new(StringComparer.Ordinal);
-    public ICDPSession? Highlight { get; set; }
-    public int? ContextId { get; set; }
+    public IJSHandle? Highlight { get; set; }
 
     public async Task RefreshAsync(int budgetMs)
     {
