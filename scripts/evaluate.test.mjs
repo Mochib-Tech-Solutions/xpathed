@@ -79,3 +79,18 @@ test("custom dataset suites cannot enter live mode or read outside the checkout"
   assert.notEqual(outside.status, 0);
   assert.match(outside.stderr, /under this checkout/);
 });
+
+test("qualification cannot combine strategy comparison or inject an unreviewed suite", () => {
+  for (const args of [
+    ["--qualification", "--comparison"],
+    ["--qualification", "--suite", "evaluation/cases.json"],
+    ["--profile", "gemini"],
+  ]) {
+    const result = spawnSync("sh", ["scripts/evaluate.sh", ...args], {
+      encoding: "utf8",
+      cwd: resolve(import.meta.dirname, ".."),
+    });
+    assert.equal(result.status, 2);
+    assert.match(result.stderr, /qualification|Qualification/);
+  }
+});

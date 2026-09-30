@@ -86,17 +86,22 @@ export function createFixtureServer({
           provider: "Wafer",
           choices: [
             {
-              finish_reason: "stop",
+              finish_reason: fault === "truncated" ? "length" : "stop",
               message: {
                 role: "assistant",
+                ...(fault === "refusal" ? { refusal: "Controlled refusal" } : {}),
                 content:
                   fault === "malformed"
                     ? "{incomplete"
-                    : JSON.stringify({ complete: true, actions }),
+                    : fault === "empty"
+                      ? ""
+                      : JSON.stringify({ complete: true, actions }),
               },
             },
           ],
-          usage: { prompt_tokens: 150, completion_tokens: 25, total_tokens: 175 },
+          ...(fault === "missing_usage"
+            ? {}
+            : { usage: { prompt_tokens: 150, completion_tokens: 25, total_tokens: 175 } }),
         });
       }
       const trial = trials.get(url.searchParams.get("trial"));

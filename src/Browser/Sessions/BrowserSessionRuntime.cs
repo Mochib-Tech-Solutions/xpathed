@@ -427,8 +427,34 @@ internal sealed partial class BrowserSessionRuntime(int slot, ILogger logger) : 
 
             if (!process.HasExited)
             {
-                process.Kill(true);
-                await process.WaitForExitAsync();
+                // x11vnc must detach and remove its System V shared-memory segments before Xvfb exits.
+                using var signal = Process.Start(
+                    new ProcessStartInfo("/bin/kill")
+                    {
+                        ArgumentList = { "-TERM", process.Id.ToString(CultureInfo.InvariantCulture) },
+                        RedirectStandardError = true,
+                    }
+                );
+                if (signal is not null)
+                {
+                    await signal.WaitForExitAsync();
+                }
+                try
+                {
+                    await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(2));
+                }
+                catch (TimeoutException)
+                {
+                    try
+                    {
+                        if (!process.HasExited)
+                        {
+                            process.Kill(true);
+                        }
+                    }
+                    catch (InvalidOperationException) when (process.HasExited) { }
+                    await process.WaitForExitAsync();
+                }
             }
             process.Dispose();
         }

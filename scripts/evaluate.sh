@@ -4,6 +4,11 @@ cd "$(dirname "$0")/.."
 
 mode=deterministic
 comparison=false
+qualification=false
+phase=pilot
+split=development
+profile=luna,gemini,deepseek
+pilot=
 repetitions=1
 seed=1
 timeout=45000
@@ -14,7 +19,8 @@ while [ "$#" -gt 0 ]; do
   case "$1" in
     --) shift; continue ;;
     --comparison) comparison=true; shift; continue ;;
-    --mode|--repetitions|--seed|--timeout-ms|--case|--output|--suite)
+    --qualification) qualification=true; shift; continue ;;
+    --mode|--repetitions|--seed|--timeout-ms|--case|--output|--suite|--phase|--split|--profile|--pilot)
       if [ "$#" -lt 2 ]; then echo "Missing value for $1" >&2; exit 2; fi
       case "$1" in
         --mode) mode=$2 ;;
@@ -24,16 +30,26 @@ while [ "$#" -gt 0 ]; do
         --case) case_id=$2 ;;
         --output) output=$2 ;;
         --suite) suite=$2 ;;
+        --phase) phase=$2 ;;
+        --split) split=$2 ;;
+        --profile) profile=$2 ;;
+        --pilot) pilot=$2 ;;
       esac
       shift 2 ;;
     *) echo "Unknown evaluation option: $1" >&2; exit 2 ;;
   esac
 done
+if [ "$comparison" = true ] && [ "$qualification" = true ]; then echo "Choose comparison or qualification" >&2; exit 2; fi
+if [ "$qualification" != true ] && { [ "$phase" != pilot ] || [ "$split" != development ] || [ "$profile" != luna,gemini,deepseek ] || [ -n "$pilot" ]; }; then echo "Qualification options require --qualification" >&2; exit 2; fi
+if [ "$qualification" = true ]; then
+  if [ -n "$suite" ]; then echo "Qualification uses its reviewed versioned suite" >&2; exit 2; fi
+  suite=evaluation/qualification-cases.json
+fi
 if [ "$comparison" = true ] && [ -n "$suite" ]; then echo "Comparison uses its reviewed fixture subset" >&2; exit 2; fi
 export XPATHED_COMPARISON_MODE=$mode
 export XPATHED_EVALUATION_SUITE=
 if [ -n "$suite" ]; then
-  if [ "$mode" != deterministic ]; then echo "Custom suites support deterministic evaluation only" >&2; exit 2; fi
+  if [ "$mode" != deterministic ] && [ "$qualification" != true ]; then echo "Custom suites support deterministic evaluation only" >&2; exit 2; fi
   XPATHED_EVALUATION_SUITE=$(node --input-type=module -e '
     import { realpathSync, statSync } from "node:fs";
     import { relative, isAbsolute } from "node:path";
@@ -46,7 +62,23 @@ fi
 set -- --mode "$mode" --repetitions "$repetitions" --seed "$seed" --timeout-ms "$timeout" --output /artifacts
 if [ -n "$case_id" ]; then set -- "$@" --case "$case_id"; fi
 # Reuse the runner's validation before starting services or creating artifacts.
-node --input-type=module -e 'import { parseOptions } from "./evaluation/run.mjs"; parseOptions(process.argv.slice(1));' -- "$@"
+if [ "$qualification" = true ]; then
+  set -- "$@" --phase "$phase" --split "$split" --profile "$profile"
+  if [ -n "$pilot" ]; then
+    pilot=$(node --input-type=module -e '
+      import { realpathSync, statSync } from "node:fs";
+      import { relative, isAbsolute } from "node:path";
+      const path = realpathSync(process.argv[1]);
+      const rel = relative(realpathSync(process.cwd()), path);
+      if (!rel || rel.startsWith("..") || isAbsolute(rel) || !statSync(path).isDirectory()) throw new Error("Pilot must be an artifact directory under this checkout");
+      process.stdout.write("/workspace/" + rel);
+    ' "$pilot")
+    set -- "$@" --pilot "$pilot"
+  fi
+  node --input-type=module -e 'import { parseQualificationOptions } from "./evaluation/qualify.mjs"; parseQualificationOptions(process.argv.slice(1));' -- "$@"
+else
+  node --input-type=module -e 'import { parseOptions } from "./evaluation/run.mjs"; parseOptions(process.argv.slice(1));' -- "$@"
+fi
 
 export COMPOSE_PROJECT_NAME=${XPATHED_EVALUATION_PROJECT:-xpathed-evaluation}
 case "$COMPOSE_PROJECT_NAME" in ''|*[!a-z0-9_-]*) echo "Invalid evaluation project name" >&2; exit 2 ;; esac
@@ -84,7 +116,9 @@ NODE
 if [ -z "$output" ]; then output=".artifacts/evaluation/$(node -p 'crypto.randomUUID()')"; fi
 export XPATHED_EVALUATION_OUTPUT=$(node -e 'process.stdout.write(require("node:path").resolve(process.argv[1]))' "$output")
 compose() {
-  if [ "$comparison" = true ]; then
+  if [ "$qualification" = true ]; then
+    docker/compose.sh --env-file "$evaluation_env" -f docker/compose.evaluation.yaml -f docker/compose.qualification.yaml "$@"
+  elif [ "$comparison" = true ]; then
     docker/compose.sh --env-file "$evaluation_env" -f docker/compose.evaluation.yaml -f docker/compose.comparison.yaml "$@"
   elif [ "$mode" = live ]; then
     docker/compose.sh --env-file "$evaluation_env" -f docker/compose.evaluation.yaml -f docker/compose.evaluation-live.yaml "$@"
@@ -101,6 +135,7 @@ for container in $(docker ps -aq --filter "label=com.docker.compose.project=$COM
   case "$service" in
     browser|resolver|evaluation-fixture) ;;
     stagehand) if [ "$comparison" != true ]; then echo "Comparison service belongs to a different runner" >&2; exit 2; fi ;;
+    resolver-luna|resolver-gemini|resolver-deepseek-concise) if [ "$qualification" != true ]; then echo "Qualification service belongs to a different runner" >&2; exit 2; fi ;;
     *) echo "Evaluation project contains a non-evaluation service: $service" >&2; exit 2 ;;
   esac
 done
@@ -123,7 +158,10 @@ if ! compose run --rm --no-deps --entrypoint node evaluation-fixture -e '
   exit 2
 fi
 rm "$XPATHED_EVALUATION_OUTPUT/.mount-check"
-if [ "$comparison" = true ]; then
+if [ "$qualification" = true ]; then
+  mkdir -p .artifacts/datasets
+  compose up --build --wait browser resolver resolver-luna resolver-gemini resolver-deepseek-concise evaluation-fixture
+elif [ "$comparison" = true ]; then
   mkdir -p .artifacts/datasets
   compose up --build --wait browser resolver evaluation-fixture stagehand
 else
@@ -131,7 +169,11 @@ else
 fi
 compose exec -T evaluation-fixture node /checks/ready.mjs http://browser:8080/health http://resolver:8080/health http://evaluation-fixture:8090/health
 echo "Evaluation artifacts: $XPATHED_EVALUATION_OUTPUT"
-if [ "$comparison" = true ]; then
+if [ "$qualification" = true ]; then
+  compose exec -T evaluation-fixture node /checks/ready.mjs http://resolver-luna:8080/health http://resolver-gemini:8080/health http://resolver-deepseek-concise:8080/health
+  browser_binary_hash=$(compose exec -T browser sh -c 'sha256sum /ms-playwright/chromium-*/chrome-linux*/chrome' | awk '{print $1}')
+  compose exec -T -e "XPATHED_BROWSER_BINARY_SHA256=$browser_binary_hash" evaluation-fixture node /evaluation/qualify.mjs "$@"
+elif [ "$comparison" = true ]; then
   compose exec -T evaluation-fixture node /checks/ready.mjs http://stagehand:8092/health
   browser_binary_hash=$(compose exec -T browser sh -c 'sha256sum /ms-playwright/chromium-*/chrome-linux*/chrome' | awk '{print $1}')
   compose exec -T -e "XPATHED_BROWSER_BINARY_SHA256=$browser_binary_hash" evaluation-fixture node /evaluation/compare.mjs "$@"

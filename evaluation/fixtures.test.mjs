@@ -4,6 +4,26 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import { createFixtureServer } from "./server.mjs";
 import { renderFixture } from "./fixtures.mjs";
+import { validateCases } from "./run.mjs";
+
+test("qualification cases preserve family boundaries and render without oracle instructions", () => {
+  const suite = JSON.parse(
+    readFileSync(new URL("./qualification-cases.json", import.meta.url), "utf8"),
+  );
+  const cases = validateCases(suite);
+  const heldOut = cases.filter((c) => c.split === "held-out");
+  assert.ok(new Set(heldOut.map((c) => c.family)).size >= 10);
+  assert.ok(
+    heldOut.some((c) => c.expected.actions.filter((a) => a.outcome === "found").length > 1),
+  );
+  for (const spec of cases) {
+    assert.equal(spec.contractVersion, "3");
+    assert.equal(spec.review.status, "reviewed");
+    const html = renderFixture(spec.fixture, "qualification-test");
+    assert.ok(html.startsWith("<!doctype html>"));
+    for (const sentinel of spec.oracleSentinels ?? []) assert.ok(!html.includes(sentinel));
+  }
+});
 
 test("derived fixtures escape page text and reject executable tags, attributes and URLs", () => {
   const fixture = {
@@ -160,7 +180,13 @@ test("provider plans select captured labels and preserve isolated trial evidence
 });
 
 test("provider doubles distinguish malformed output, invalid identities and upstream errors", async (t) => {
-  const server = createFixtureServer();
+  const baseline = JSON.parse(readFileSync(new URL("./cases.json", import.meta.url), "utf8"));
+  const extra = ["refusal", "empty", "truncated", "missing_usage"].map((fault) => ({
+    ...baseline.cases.find((c) => c.id === "basic-save"),
+    id: `provider-${fault}`,
+    provider: { ...baseline.cases.find((c) => c.id === "basic-save").provider, fault },
+  }));
+  const server = createFixtureServer({ cases: [...baseline.cases, ...extra] });
   server.listen(0, "127.0.0.1");
   await once(server, "listening");
   t.after(() => {
@@ -179,6 +205,10 @@ test("provider doubles distinguish malformed output, invalid identities and upst
     ["unknown", 200],
     ["rate_limit", 429],
     ["timeout", 504],
+    ["refusal", 200],
+    ["empty", 200],
+    ["truncated", 200],
+    ["missing_usage", 200],
   ]) {
     await post("/trial", { id: fault, caseId: `provider-${fault}` });
     const response = await post("/api/v1/chat/completions", {
@@ -199,6 +229,10 @@ test("provider doubles distinguish malformed output, invalid identities and upst
         JSON.parse(result.choices[0].message.content).actions[0].candidateId,
         "unknown-candidate",
       );
+    if (fault === "refusal") assert.equal(result.choices[0].message.refusal, "Controlled refusal");
+    if (fault === "empty") assert.equal(result.choices[0].message.content, "");
+    if (fault === "truncated") assert.equal(result.choices[0].finish_reason, "length");
+    if (fault === "missing_usage") assert.equal(result.usage, undefined);
   }
   assert.equal((await fetch(base + "/cases.json?trial=unknown")).status, 404);
   assert.equal((await post("/trial", { id: "unknown", caseId: "basic-save" })).status, 400);

@@ -13,6 +13,11 @@ public sealed partial class ResolutionService(
     ILogger<ResolutionService> logger
 )
 {
+    private string SingleInteractionPrompt =>
+        configuration["Resolution:PromptVariant"] == "concise"
+            ? ActionSelectionStrategy.ConciseSingleInteractionPrompt
+            : ActionSelectionStrategy.SingleInteractionPrompt;
+
     public Task<ResolutionResult> ResolveAsync(
         string pageId,
         ResolutionRequest request,
@@ -50,7 +55,7 @@ public sealed partial class ResolutionService(
                 : "sanitized",
             sensitive ? DiagnosticSanitizer.Redacted : DiagnosticSanitizer.RedactInstruction(request.Instruction),
             sensitive || input is null ? null : DiagnosticSanitizer.SanitizeJson(input),
-            singleInteraction ? ActionSelectionStrategy.SingleInteractionPrompt
+            singleInteraction ? SingleInteractionPrompt
                 : multiple ? ActionSelectionStrategy.Prompt
                 : CandidateSelectionStrategy.Prompt,
             (multiple ? ActionSelectionStrategy.Schema : CandidateSelectionStrategy.Schema).GetRawText(),
@@ -67,7 +72,7 @@ public sealed partial class ResolutionService(
                         outputTokens = multiple ? ActionSelectionStrategy.OutputTokens : 512,
                         effective = gateway.DescribeConfiguration(
                             result.Diagnostics.Strategy,
-                            singleInteraction ? ActionSelectionStrategy.SingleInteractionPrompt
+                            singleInteraction ? SingleInteractionPrompt
                                 : multiple ? ActionSelectionStrategy.Prompt
                                 : CandidateSelectionStrategy.Prompt,
                             multiple ? ActionSelectionStrategy.Schema : CandidateSelectionStrategy.Schema,
@@ -98,7 +103,7 @@ public sealed partial class ResolutionService(
         var multiple = request.ContractVersion is "2" or "3";
         var singleInteraction = request.ContractVersion == "3";
         var prompt =
-            singleInteraction ? ActionSelectionStrategy.SingleInteractionPrompt
+            singleInteraction ? SingleInteractionPrompt
             : multiple ? ActionSelectionStrategy.Prompt
             : CandidateSelectionStrategy.Prompt;
         var schema = multiple ? ActionSelectionStrategy.Schema : CandidateSelectionStrategy.Schema;
@@ -109,7 +114,7 @@ public sealed partial class ResolutionService(
             Stage = "configuration",
             Strategy = strategy,
             PromptVersion =
-                singleInteraction ? "7"
+                singleInteraction ? (configuration["Resolution:PromptVariant"] == "concise" ? "7-concise-1" : "7")
                 : multiple ? "6"
                 : "5",
         };
@@ -124,6 +129,14 @@ public sealed partial class ResolutionService(
         );
         try
         {
+            if (configuration["Resolution:PromptVariant"] is not (null or "baseline" or "concise"))
+            {
+                throw new ApiException(
+                    422,
+                    "unsupported_prompt_variant",
+                    "The configured prompt variant is unavailable."
+                );
+            }
             if (strategy != "candidate-selection-v1")
             {
                 throw new ApiException(

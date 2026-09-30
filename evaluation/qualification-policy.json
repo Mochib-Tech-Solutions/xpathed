@@ -1,0 +1,22 @@
+{
+  "version": "1",
+  "goalMs": 2000,
+  "deadlineMs": 3000,
+  "minimumCorrectCompleteWithinDeadline": 0.95,
+  "minimumCorrectness": 0.95,
+  "minimumFamilyCorrectness": 0.8,
+  "minimumHeldOutFamilies": 10,
+  "minimumHeldOutTrials": 30,
+  "requiredSplits": ["regression", "held-out"],
+  "hardFailureCategories": [
+    "privacy",
+    "oracle_leak",
+    "passive_state",
+    "target_identity",
+    "contract",
+    "unplanned_trial",
+    "duplicate_trial"
+  ],
+  "basis": "Observed acceptance gates: the maintainer requested a 2-second goal and 3-second maximum. The existing development comparison exposed action misclassification; 95% whole-request correctness and 80% per-family correctness prevent speed alone selecting a candidate. Saved-locator mutation robustness stays a separate regression track. Gates must be frozen with baseline evidence before held-out requests.",
+  "uncertainty": "Minimum coverage is a practical experiment floor, not statistical certification. Report the two-sided 95% Wilson interval over held-out families whose every planned request is correct and complete within the deadline; related requests and repetitions do not count as independent families. Authored families are not a random sample of production traffic."
+}

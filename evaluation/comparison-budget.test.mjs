@@ -20,13 +20,17 @@ const pricing = {
 };
 const input = { model, messages: [{ role: "user", content: "Find Save" }], max_tokens: 4096 };
 
-async function setup(t, { completion, ceilingUsd, initial, onRecord } = {}) {
+async function setup(
+  t,
+  { completion, ceilingUsd, initial, onRecord, profiles, metadata = pricing } = {},
+) {
   const directory = await mkdtemp(join(tmpdir(), "xpathed-comparison-budget-"));
   const ledgerPath = join(directory, "experiment-budget.json");
   if (initial) await writeFile(ledgerPath, JSON.stringify(initial));
   const calls = [];
   const fetchImpl = async (url, options) => {
-    if (url.endsWith("/endpoints")) return Response.json(pricing);
+    if (url.endsWith("/endpoints"))
+      return Response.json(typeof metadata === "function" ? metadata(url) : metadata);
     calls.push({ url, options });
     const ledger = JSON.parse(await readFile(ledgerPath, "utf8"));
     assert.equal(
@@ -36,7 +40,7 @@ async function setup(t, { completion, ceilingUsd, initial, onRecord } = {}) {
     );
     assert.ok(ledger.entries.at(-1).reservedUsd > 0);
     return completion
-      ? completion()
+      ? completion(url, options)
       : Response.json({
           id: "generation-1",
           usage: { cost: 0.001, prompt_tokens: 50, completion_tokens: 20 },
@@ -49,6 +53,7 @@ async function setup(t, { completion, ceilingUsd, initial, onRecord } = {}) {
     fetchImpl,
     ceilingUsd,
     onRecord,
+    profiles,
   });
   t.after(async () => {
     await proxy.close();
@@ -220,4 +225,224 @@ test("simultaneous SDK calls cannot create another paid request", async (t) => {
     release();
   }
   assert.equal((await first).status, 200);
+});
+
+const qualificationProfiles = [
+  {
+    id: "luna",
+    model: "openai/gpt-6-luna",
+    provider: "openai",
+    reasoning: { effort: "none" },
+    maxTokens: 1024,
+    promptCacheOptions: { mode: "explicit" },
+  },
+  {
+    id: "gemini",
+    model: "google/gemini-3.8-flash",
+    provider: "google-ai-studio",
+    reasoning: { effort: "low" },
+    maxTokens: 1024,
+  },
+  { id: "flash", model, provider: "wafer", reasoning: { enabled: false }, maxTokens: 1024 },
+];
+const profileMetadata = (url) => {
+  const profile = qualificationProfiles.find((item) => url.includes(item.model));
+  return {
+    data: {
+      endpoints: [
+        {
+          tag: profile.provider,
+          status: 0,
+          supported_parameters: [
+            "response_format",
+            "structured_outputs",
+            "reasoning",
+            "max_tokens",
+          ],
+          pricing: {
+            prompt: "0.0000001",
+            completion: "0.0000005",
+            input_cache_write: "0.000000125",
+            overrides: [
+              {
+                min_prompt_tokens: 272000,
+                prompt: "0.0000002",
+                completion: "0.00000075",
+                input_cache_write: "0.00000025",
+              },
+            ],
+          },
+        },
+      ],
+    },
+  };
+};
+const profileInput = (profile) => ({
+  ...input,
+  model: profile.model,
+  max_tokens: profile.maxTokens,
+  reasoning: profile.reasoning,
+  ...(profile.promptCacheOptions ? { prompt_cache_options: profile.promptCacheOptions } : {}),
+  provider: {
+    only: [profile.provider],
+    order: [profile.provider],
+    allow_fallbacks: false,
+    require_parameters: true,
+  },
+  response_format: {
+    type: "json_schema",
+    json_schema: { name: "selection", strict: true, schema: { type: "object" } },
+  },
+});
+
+test("qualification pins each approved profile and reserves the highest tier and cache-write cost", async (t) => {
+  const { proxy, post, calls, ledgerPath } = await setup(t, {
+    profiles: qualificationProfiles,
+    metadata: profileMetadata,
+    completion: (_url, options) =>
+      Response.json(
+        {
+          model: JSON.parse(options.body).model,
+          provider: JSON.parse(options.body).provider.only[0],
+          id: "generation",
+          usage: { cost: 0.001, prompt_tokens_details: { cached_tokens: 12 } },
+        },
+        {
+          headers: {
+            "x-openrouter-cache-status": "MISS",
+            "x-request-id": "request",
+            "set-cookie": "private",
+          },
+        },
+      ),
+  });
+  assert.throws(() => proxy.beginAttempt("unknown", "missing"), /Unknown/);
+  for (const profile of qualificationProfiles) {
+    proxy.beginAttempt(profile.id, profile.id);
+    assert.equal((await post(profileInput(profile))).status, 200);
+  }
+  assert.equal(calls.length, 3);
+  assert.deepEqual(proxy.budget, {
+    ceilingUsd: 5,
+    spentUsd: 0.003,
+    remainingUsd: 4.997,
+    pendingCharges: 0,
+  });
+  assert.equal(JSON.parse(await readFile(ledgerPath, "utf8")).entries.length, 3);
+  for (const [index, call] of calls.entries()) {
+    const profile = qualificationProfiles[index];
+    const request = JSON.parse(call.options.body);
+    assert.equal(request.model, profile.model);
+    assert.deepEqual(request.reasoning, profile.reasoning);
+    assert.deepEqual(request.provider.only, [profile.provider]);
+    assert.equal(call.options.headers["X-OpenRouter-Cache"], "false");
+    assert.equal(request.provider.max_price.prompt, 0.25);
+    assert.equal(request.provider.max_price.completion, 0.75);
+    const record = proxy.records[index];
+    assert.equal(record.profileId, profile.id);
+    assert.equal(record.observedIdentity.model, profile.model);
+    assert.equal(record.identityValid, true);
+    assert.equal(call.options.headers["X-OpenRouter-Metadata"], "enabled");
+    assert.equal(record.headers["x-openrouter-cache-status"], "MISS");
+    assert.equal(record.headers["set-cookie"], undefined);
+    assert.equal(record.responseCacheHit, false);
+    assert.equal(record.usage.prompt_tokens_details.cached_tokens, 12);
+    assert.equal(record.pricing.prompt, 0.00000025);
+  }
+});
+
+test("qualification refuses profile drift, implicit routing and non-strict output before payment", async (t) => {
+  const profile = qualificationProfiles[0];
+  const { proxy, post, calls } = await setup(t, {
+    profiles: qualificationProfiles,
+    metadata: profileMetadata,
+  });
+  const valid = profileInput(profile);
+  const invalid = [
+    { ...valid, model },
+    { ...valid, reasoning: { effort: "high" } },
+    { ...valid, reasoning: undefined },
+    { ...valid, reasoning: { effort: "none", exclude: true } },
+    { ...valid, provider: undefined },
+    { ...valid, provider: { ...valid.provider, sort: "latency" } },
+    { ...valid, provider: { ...valid.provider, require_parameters: false } },
+    { ...valid, provider: { ...valid.provider, only: ["openai/fast"] } },
+    { ...valid, max_tokens: 2048 },
+    { ...valid, prompt_cache_options: undefined },
+    { ...valid, response_format: { type: "json_object" } },
+    { ...valid, service_tier: "priority" },
+    { ...valid, temperature: 0 },
+  ];
+  for (const [index, request] of invalid.entries()) {
+    proxy.beginAttempt(`invalid-profile-${index}`, profile.id);
+    assert.equal((await post(request)).status, 400);
+  }
+  assert.equal(calls.length, 0);
+});
+
+test("unapproved profiles and unknown price overrides fail closed at startup", async () => {
+  for (const profile of [
+    { ...qualificationProfiles[0], provider: "openai/fast" },
+    { ...qualificationProfiles[1], reasoning: { enabled: false } },
+    { ...qualificationProfiles[2], model: "deepseek/latest" },
+  ])
+    await assert.rejects(createBudgetProxy({ apiKey: "key", profiles: [profile] }), /Unapproved/);
+  const directory = await mkdtemp(join(tmpdir(), "xpathed-unbounded-price-"));
+  try {
+    const metadata = profileMetadata("openai/gpt-6-luna");
+    metadata.data.endpoints[0].pricing.overrides[0].start_time = "12:00";
+    await assert.rejects(
+      createBudgetProxy({
+        apiKey: "key",
+        profiles: [qualificationProfiles[0]],
+        ledgerPath: join(directory, "ledger.json"),
+        fetchImpl: async () => Response.json(metadata),
+      }),
+      /Unbounded/,
+    );
+    await assert.rejects(readFile(join(directory, "ledger.json")), /ENOENT/);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("cache hits remain explicit evidence despite unique generation IDs", async (t) => {
+  const { proxy, post } = await setup(t, {
+    completion: () =>
+      Response.json(
+        { id: "unique-id", usage: { cost: 0 } },
+        { headers: { "x-openrouter-cache-status": "HIT" } },
+      ),
+  });
+  proxy.beginAttempt("cached");
+  assert.equal((await post()).status, 200);
+  assert.equal(proxy.records[0].responseCacheHit, true);
+  assert.equal(proxy.records[0].reportedUsd, 0);
+});
+
+test("qualification reconciles charged identity or cache failures but blocks subsequent calls", async (t) => {
+  for (const reason of ["identity", "cache", "tier"])
+    await t.test(reason, async (t) => {
+      const profile = qualificationProfiles[0];
+      const { proxy, post, ledgerPath } = await setup(t, {
+        profiles: [profile],
+        metadata: profileMetadata,
+        completion: () =>
+          Response.json(
+            {
+              model: reason === "identity" ? "other/model" : profile.model,
+              provider: profile.provider,
+              service_tier: reason === "tier" ? "priority" : "default",
+              usage: { cost: 0.001 },
+            },
+            { headers: { "x-openrouter-cache-status": reason === "cache" ? "HIT" : "MISS" } },
+          ),
+      });
+      proxy.beginAttempt("mismatch", profile.id);
+      assert.equal((await post(profileInput(profile))).status, 200);
+      assert.equal(proxy.records[0].identityValid, reason === "cache");
+      assert.equal(proxy.records[0].responseCacheHit, reason === "cache");
+      assert.equal(JSON.parse(await readFile(ledgerPath, "utf8")).entries[0].reportedUsd, 0.001);
+      assert.throws(() => proxy.beginAttempt("next", profile.id), /blocked/);
+    });
 });
