@@ -13,7 +13,7 @@ pnpm evaluate:live -- --case CASE_ID
 
 Deterministic mode is the default. It uses a local provider double to test contracts, fixtures and grading; its score does not measure model quality. Live mode explicitly calls the configured cheap OpenRouter route with the existing bounded response size. It reads `OPENROUTER_API_KEY` from the environment or the ignored `.env`; use `XPATHED_ENV_FILE` for another environment file. The checked-in route remains DeepSeek V4.1 Flash through Wafer, with a 4,096-token multi-action output limit and reasoning disabled. Paid usage and reported cost belong in the resulting artifacts; there is no monetary qualification cap.
 
-The wrapper starts only Browser, Resolver and the evaluation fixture in the separate `xpathed-evaluation` Compose project. It stops those containers on completion or failure and preserves artifacts. The development workspace is independent. Set `XPATHED_EVALUATION_PROJECT` to a different project name for concurrent runs; a lock prevents overlapping runs in one project, and existing containers from another checkout are rejected. No host browser port is needed.
+The wrapper starts only Browser, Resolver and the evaluation fixture in the separate `xpathed-evaluation` Compose project. It stops those containers on completion or failure and preserves artifacts. The development workspace is independent. For concurrent runs, set `XPATHED_EVALUATION_PROJECT` to a name beginning with `xpathed-evaluation-`; other project names are rejected before Docker is invoked. A lock prevents overlapping runs in one project. Existing containers from another checkout or belonging to services other than Browser, Resolver and the evaluation fixture are rejected before teardown. No host browser port is needed.
 
 Output defaults to a new directory under ignored `.artifacts/evaluation/`. `--output` selects a new host directory, mounted as `/artifacts` in the runner. Existing output directories are rejected to protect previous evidence. Before starting evaluation services, a marker round-trip verifies Docker can read and write that exact host directory. With a VM-backed Docker engine such as Colima, choose a shared path under this checkout; an unshared temporary directory fails before any resolution calls. Defaults are one repetition, seed 1, sequential execution, no retries and a 45-second operation timeout. `--repetitions`, `--seed` and `--timeout-ms` declare changes before the run. A later rerun is a new artifact directory, not a replacement for the first attempt.
 
@@ -29,7 +29,7 @@ The initial labelled suite is development/regression evidence, not a genuine uns
 
 Each run writes:
 
-- `manifest.json`: the complete selected case definitions, declared trial order/settings, code/tree and dependency fingerprints, versions and incomplete qualification policy.
+- `manifest.json`: the complete selected case definitions, declared trial order/settings, code/tree and dependency fingerprints, versions and incomplete qualification policy. Its configuration registry retains effective nonsecret gateway settings and prompt/schema hashes by configuration ID independently of expiring page evidence; it is enriched atomically as attempts finish.
 - `trials/<attempt>.json`: each original result or operational failure, observations and permitted evidence, including separate mutation/fresh-resolution results.
 - `summary.json`: separate grading and coverage results, timing/usage/cost aggregates and qualification status.
 - `summary.txt`: a readable report of the same run.

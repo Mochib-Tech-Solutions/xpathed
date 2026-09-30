@@ -32,6 +32,10 @@ node --input-type=module -e 'import { parseOptions } from "./evaluation/run.mjs"
 
 export COMPOSE_PROJECT_NAME=${XPATHED_EVALUATION_PROJECT:-xpathed-evaluation}
 case "$COMPOSE_PROJECT_NAME" in ''|*[!a-z0-9_-]*) echo "Invalid evaluation project name" >&2; exit 2 ;; esac
+case "$COMPOSE_PROJECT_NAME" in
+  xpathed-evaluation|xpathed-evaluation-?*) ;;
+  *) echo "Evaluation project must be xpathed-evaluation or start with xpathed-evaluation-" >&2; exit 2 ;;
+esac
 evaluation_lock="${TMPDIR:-/tmp}/$COMPOSE_PROJECT_NAME.lock"
 if ! mkdir "$evaluation_lock" 2>/dev/null; then
   echo "An evaluation already owns $COMPOSE_PROJECT_NAME; choose XPATHED_EVALUATION_PROJECT for a parallel run" >&2
@@ -73,6 +77,11 @@ project_dir=$(pwd -P)
 for container in $(docker ps -aq --filter "label=com.docker.compose.project=$COMPOSE_PROJECT_NAME"); do
   owner=$(docker inspect --format '{{ index .Config.Labels "com.docker.compose.project.working_dir" }}' "$container")
   if [ "$owner" != "$project_dir" ]; then echo "Evaluation project belongs to another checkout" >&2; exit 2; fi
+  service=$(docker inspect --format '{{ index .Config.Labels "com.docker.compose.service" }}' "$container")
+  case "$service" in
+    browser|resolver|evaluation-fixture) ;;
+    *) echo "Evaluation project contains a non-evaluation service: $service" >&2; exit 2 ;;
+  esac
 done
 mkdir -p "$(dirname "$XPATHED_EVALUATION_OUTPUT")"
 mkdir "$XPATHED_EVALUATION_OUTPUT"

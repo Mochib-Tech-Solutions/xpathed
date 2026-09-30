@@ -1,6 +1,15 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { buildPlan, validateCases, parseOptions, toArtifact, prune, main, replay } from "./run.mjs";
+import {
+  buildPlan,
+  validateCases,
+  parseOptions,
+  toArtifact,
+  prune,
+  main,
+  replay,
+  configurationRecord,
+} from "./run.mjs";
 import { createServer } from "node:http";
 import { once } from "node:events";
 import { mkdtemp, mkdir, writeFile, readFile, rm } from "node:fs/promises";
@@ -21,6 +30,46 @@ const example = {
     actions: [{ step: 1, action: "click", outcome: "found", target: { selector: "button" } }],
   },
 };
+
+test("durable run configuration keeps effective settings but excludes page content and credentials", () => {
+  const record = configurationRecord({
+    result: {
+      configurationId: "config",
+      diagnostics: { model: "model", provider: "route", strategy: "strategy", promptVersion: "6" },
+    },
+    evidence: {
+      systemPrompt: "system",
+      outputSchema: '{"type":"object"}',
+      configurationJson: JSON.stringify({
+        Model: "model",
+        Provider: "route",
+        effective: {
+          endpoint: "https://example.test/api/",
+          timeoutSeconds: "30",
+          captureVersion: "4",
+          stateVersion: "2",
+          interactabilityVersion: "2",
+          xpathVersion: "3",
+          modelInputBudgetBytes: 512000,
+          maximumActions: 16,
+          responseCache: false,
+          request: {
+            model: "model",
+            max_tokens: 4096,
+            reasoning: { enabled: false },
+            provider: { only: ["route"], allow_fallbacks: false },
+            messages: [{ role: "user", content: "PRIVATE_PAGE" }],
+            apiKey: "PRIVATE_KEY",
+          },
+        },
+      }),
+    },
+  });
+  assert.equal(record.effective.request.max_tokens, 4096);
+  assert.equal(record.effective.timeoutSeconds, "30");
+  assert.match(record.promptHash, /^[a-f0-9]{64}$/);
+  assert.doesNotMatch(JSON.stringify(record), /PRIVATE_PAGE|PRIVATE_KEY/);
+});
 
 test("the run rejects family leakage before contacting the browser", () => {
   assert.throws(

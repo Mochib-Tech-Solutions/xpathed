@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { mkdir, readFile, writeFile, readdir, rm } from "node:fs/promises";
+import { mkdir, readFile, writeFile, readdir, rm, rename } from "node:fs/promises";
 import { resolve, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { setTimeout as delay } from "node:timers/promises";
@@ -143,6 +143,66 @@ export function toArtifact(manifest, trial, grade) {
       runId: manifest.id,
     },
   };
+}
+
+export function configurationRecord(trial) {
+  const evidence = trial.evidence;
+  const configuration = evidence?.configurationJson ? JSON.parse(evidence.configurationJson) : {};
+  const effective = configuration.effective;
+  const pick = (value, keys) =>
+    Object.fromEntries(
+      keys.filter((key) => Object.hasOwn(value ?? {}, key)).map((key) => [key, value[key]]),
+    );
+  return {
+    configurationId: trial.result?.configurationId ?? "unavailable",
+    model: configuration.Model ?? trial.result?.diagnostics?.model ?? null,
+    provider: configuration.Provider ?? trial.result?.diagnostics?.provider ?? null,
+    strategy: configuration.Strategy ?? trial.result?.diagnostics?.strategy ?? null,
+    promptVersion: configuration.PromptVersion ?? trial.result?.diagnostics?.promptVersion ?? null,
+    promptHash: evidence?.systemPrompt ? hash(evidence.systemPrompt) : null,
+    schemaHash: evidence?.outputSchema ? hash(evidence.outputSchema) : null,
+    effective: effective
+      ? {
+          ...pick(effective, [
+            "strategy",
+            "promptVersion",
+            "captureVersion",
+            "stateVersion",
+            "interactabilityVersion",
+            "xpathVersion",
+            "endpoint",
+            "timeoutSeconds",
+            "modelInputBudgetBytes",
+            "responseCache",
+            "maximumActions",
+          ]),
+          request: pick(effective.request, [
+            "model",
+            "stream",
+            "max_tokens",
+            "reasoning",
+            "provider",
+            "plugins",
+          ]),
+        }
+      : null,
+  };
+}
+
+async function retainConfigurations(output, manifest, trial) {
+  for (const attempt of [trial, trial.mutation?.fresh].filter(Boolean)) {
+    const record = configurationRecord(attempt);
+    if (
+      record.configurationId !== "unavailable" &&
+      (!manifest.configurations[record.configurationId]?.effective || record.effective)
+    )
+      manifest.configurations[record.configurationId] = record;
+  }
+  delete manifest.contentHash;
+  manifest.contentHash = hash(manifest);
+  const temporary = join(output, "manifest.pending.json");
+  await writeFile(temporary, JSON.stringify(manifest, null, 2) + "\n");
+  await rename(temporary, join(output, "manifest.json"));
 }
 
 async function request(url, body, timeoutMs = 45000, headers = {}) {
@@ -396,6 +456,7 @@ async function fingerprints() {
     "src/Browser/Sessions/BrowserCaptureScript.cs",
     "src/Resolver/Services/CandidateSelectionStrategy.cs",
     "src/Resolver/Services/ActionSelectionStrategy.cs",
+    "src/Resolver/Services/OpenRouterGateway.cs",
     "docker/browser/Dockerfile",
     "docker/compose.yaml",
   ];
@@ -496,6 +557,7 @@ export async function main(args = process.argv.slice(2)) {
     id: randomUUID(),
     createdAt: new Date().toISOString(),
     mode: options.mode,
+    configurations: {},
     cases,
     plan,
     code: await fingerprints(),
@@ -527,6 +589,7 @@ export async function main(args = process.argv.slice(2)) {
       join(options.output, "imports", `${trial.id}.json`),
       toArtifact(manifest, trial, grade),
     );
+    await retainConfigurations(options.output, manifest, trial);
     trials.push(trial);
     console.log(
       `${grade.passed ? "PASS" : "FAIL"} ${trial.caseId} #${trial.repetition}: ${grade.failures.map((f) => f.category).join(", ") || "declared checks passed"}`,
