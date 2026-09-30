@@ -159,7 +159,7 @@ test("A plural current-page prompt keeps independent targets, blocked state, mis
       assessmentUnsupported: 0,
     });
     assert.equal(result.diagnostics.modelCalls, 1);
-    assert.equal(result.diagnostics.promptVersion, "5");
+    assert.equal(result.diagnostics.promptVersion, "6");
     assert.ok(
       result.actions.every(
         (action) =>
@@ -354,7 +354,7 @@ test("ClientApi preserves disabled, off-screen and hover assessments and scopes 
         assert.equal(result.target.interactability.status, status);
         assert.equal(result.target.interactability.action, action);
         assert.equal(result.target.state.version, "2");
-        assert.equal(result.diagnostics.promptVersion, "4");
+        assert.equal(result.diagnostics.promptVersion, "5");
         assert.equal(result.target.xpaths.length, 1);
       } else assert.match(result.diagnostics.message, /eligible current-page scope/);
       const input = JSON.stringify(await json(`${fixture}/provider-request`));

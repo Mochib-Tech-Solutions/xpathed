@@ -3,7 +3,7 @@ namespace Xpathed.Browser.Sessions;
 internal static class BrowserCaptureScript
 {
     public const string Capture = """
-        identity => {
+        async identity => {
           let environment = JSON.parse(identity.environment);
           const frame = JSON.parse(identity.frame);
           const capturedDocument = document;
@@ -15,6 +15,7 @@ internal static class BrowserCaptureScript
           let textCache = new WeakMap();
           let labelCache = new WeakMap();
           let exposureCache = new WeakMap();
+          let intersections = new WeakMap();
           let modalityUnknown = false;
           const currentModal = () => {
             const modals = [...document.querySelectorAll('dialog:modal')];
@@ -129,31 +130,41 @@ internal static class BrowserCaptureScript
           };
           const textControl = element => element.isContentEditable || element.localName === 'textarea' ||
             element.localName === 'input' && ['text','search','email','url','tel','password','number'].includes(element.type);
+          const fillControl = element => textControl(element) || element.localName === 'input' &&
+            ['date','month','week','time','datetime-local'].includes(element.type);
           const geometry = element => {
             const { x, y, width, height } = element.getBoundingClientRect();
             return { x: environment.x + x * environment.scaleX, y: environment.y + y * environment.scaleY,
               width: width * environment.scaleX, height: height * environment.scaleY };
           };
           const intersection = (a, b) => ({ left: Math.max(a.left, b.left), top: Math.max(a.top, b.top), right: Math.min(a.right, b.right), bottom: Math.min(a.bottom, b.bottom) });
-          const visibleRect = element => {
-            const rect = geometry(element);
-            let clip = intersection({ left: rect.x, top: rect.y, right: rect.x + rect.width, bottom: rect.y + rect.height },
-              intersection(environment.clip, { left: environment.x, top: environment.y, right: environment.x + innerWidth * environment.scaleX, bottom: environment.y + innerHeight * environment.scaleY }));
-            for (let ancestor = element.parentElement; ancestor; ancestor = ancestor.parentElement) {
+          const observeIntersections = async elements => {
+            const pending = new Set(elements);
+            intersections = new WeakMap();
+            if (!pending.size) return;
+            checkBudget();
+            let observer, timeout;
+            try {
+              await new Promise((resolve, reject) => {
+                timeout = setTimeout(() => reject(budgetExceeded), Math.max(0, deadline - performance.now()));
+                observer = new IntersectionObserver(entries => {
+                  for (const entry of entries) {
+                    const { x, y, width, height } = entry.intersectionRect;
+                    intersections.set(entry.target, { x, y, width, height });
+                    pending.delete(entry.target);
+                  }
+                  if (!pending.size) resolve();
+                }, { root: document });
+                for (const element of pending) observer.observe(element);
+              });
               checkBudget();
-              const css = cssFor(ancestor), box = geometry(ancestor);
-              const scaleX = ancestor.offsetWidth ? box.width / ancestor.offsetWidth : environment.scaleX;
-              const scaleY = ancestor.offsetHeight ? box.height / ancestor.offsetHeight : environment.scaleY;
-              if (['hidden','clip','scroll','auto'].includes(css.overflowX)) {
-                clip.left = Math.max(clip.left, box.x + ancestor.clientLeft * scaleX);
-                clip.right = Math.min(clip.right, box.x + (ancestor.clientLeft + ancestor.clientWidth) * scaleX);
-              }
-              if (['hidden','clip','scroll','auto'].includes(css.overflowY)) {
-                clip.top = Math.max(clip.top, box.y + ancestor.clientTop * scaleY);
-                clip.bottom = Math.min(clip.bottom, box.y + (ancestor.clientTop + ancestor.clientHeight) * scaleY);
-              }
-            }
-            return clip;
+            } finally { clearTimeout(timeout); observer?.disconnect(); }
+          };
+          const visibleRect = element => {
+            const rect = intersections.get(element);
+            if (!rect || rect.width <= 0 || rect.height <= 0) return { left:0, top:0, right:0, bottom:0 };
+            return intersection(environment.clip, { left: environment.x + rect.x * environment.scaleX, top: environment.y + rect.y * environment.scaleY,
+              right: environment.x + (rect.x + rect.width) * environment.scaleX, bottom: environment.y + (rect.y + rect.height) * environment.scaleY });
           };
           const pointFor = element => { const clip = visibleRect(element); return { x: (clip.left + clip.right) / 2, y: (clip.top + clip.bottom) / 2 }; };
           const receivesPoint = (element, point) => {
@@ -174,7 +185,7 @@ internal static class BrowserCaptureScript
               rendered: rendered(element),
               inViewport: rect.right > rect.left && rect.bottom > rect.top,
               enabled: environment.enabled !== false && !element.matches(':disabled') && !element.closest('[aria-disabled="true"]'),
-              editable: textControl(element) && !element.readOnly && element.getAttribute('aria-readonly') !== 'true',
+              editable: fillControl(element) && !element.readOnly && element.getAttribute('aria-readonly') !== 'true',
               selected: ({ true: true, false: false }[element.getAttribute('aria-selected')] ?? null),
               selectedOptionCount: element.localName === 'select' ? element.selectedOptions.length : null,
               checked: element.matches('input[type=checkbox],input[type=radio]') ? element.checked : ({ true: true, false: false }[element.getAttribute('aria-checked')] ?? null)
@@ -191,7 +202,7 @@ internal static class BrowserCaptureScript
             const custom = editable ? !element.isContentEditable && !element.matches('input,textarea') && ['textbox','searchbox','spinbutton'].includes(semanticRole) :
               action === 'select' ? element.localName !== 'select' && ['combobox','listbox'].includes(semanticRole) :
               ['check','uncheck'].includes(action) ? !element.matches('input[type=checkbox],input[type=radio]') && ['checkbox','radio','switch'].includes(semanticRole) : false;
-            const compatible = custom || (editable ? textControl(element) :
+            const compatible = custom || (editable ? (action === 'type' ? textControl(element) : fillControl(element)) :
               action === 'select' ? element.localName === 'select' :
               action === 'upload' ? element.matches('input[type=file]') :
               ['focus', 'blur', 'press'].includes(action) ? element.isContentEditable || element.matches('input,textarea,select,button,a[href],summary,[tabindex]') :
@@ -246,11 +257,17 @@ internal static class BrowserCaptureScript
               eligibleCount++;
               if (eligibleCount > 2000) complete = false;
               if (!complete) continue;
-              const candidate = describe(element, candidates.length);
-              bytes += new TextEncoder().encode(JSON.stringify(candidate)).length + 1;
-              if (bytes > 512000) { complete = false; continue; }
               nodes.push(element);
-              candidates.push(candidate);
+            }
+            if (complete) {
+              await observeIntersections([...nodes, ...frameElements]);
+              for (const element of nodes) {
+                checkBudget();
+                const candidate = describe(element, candidates.length);
+                bytes += new TextEncoder().encode(JSON.stringify(candidate)).length + 1;
+                if (bytes > 512000) { complete = false; break; }
+                candidates.push(candidate);
+              }
             }
           } catch (error) {
             if (error !== budgetExceeded) throw error;
@@ -259,15 +276,16 @@ internal static class BrowserCaptureScript
           if (!complete) { nodes.length = 0; candidates.length = 0; }
           const literal = value => !value.includes("'") ? `'${value}'` : !value.includes('"') ? `"${value}"` : `concat(${value.split("'").map(part => `'${part}'`).join(`,"'",`)})`;
           const tag = element => element.namespaceURI === 'http://www.w3.org/1999/xhtml' ? element.localName : `*[local-name()=${literal(element.localName)}]`;
-          const testAttributes = ['data-testid', 'data-test', 'data-cy', 'data-qa'];
+          const testAttributes = ['data-testid', 'data-test-id', 'data-test', 'data-cy', 'data-qa'];
           const stableAttributes = ['id', 'name', 'aria-label', 'placeholder', 'alt', 'title'];
           const attributes = (element, names) => names.filter(name => {
             const value = element.getAttribute(name);
-            return value && !/https?:\/\//u.test(value) && (name !== 'id' || !/(?:[a-f\d]{16}|\d{5}|^:|^\d+$)/iu.test(value));
+            return value && !/https?:\/\//u.test(value) && (name !== 'id' || !/(?:[a-f\d]{16}|\d{5}|^:|^\d+$|[a-f\d]{8}-[a-f\d]{4}-[a-f\d]{4}-[a-f\d]{4}-[a-f\d]{12})/iu.test(value));
           }).map(name => `@${name}=${literal(element.getAttribute(name))}`);
           const xpathsFor = element => {
             const xpaths = [];
             const add = xpath => {
+              checkBudget();
               const matches = document.evaluate(xpath, document, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
               if (matches.snapshotLength !== 1 || matches.snapshotItem(0) !== element) return false;
               xpaths.push(xpath);
@@ -284,14 +302,28 @@ internal static class BrowserCaptureScript
               if (labelText && element.id && associatedLabel.htmlFor === element.id && add(`//${tag(element)}[@id=//label[normalize-space(.)=${literal(labelText)}]/@for]`)) return xpaths;
             }
             for (const predicate of semanticPredicates) if (add(`//${tag(element)}[${predicate}]`)) return xpaths;
+            const targetPredicates = [...testPredicates, ...stablePredicates];
+            for (let first = 0; first < targetPredicates.length; first++) {
+              for (let second = first + 1; second < targetPredicates.length; second++) {
+                if (add(`//${tag(element)}[${targetPredicates[first]} and ${targetPredicates[second]}]`)) return xpaths;
+              }
+            }
             for (let ancestor = element.parentElement; ancestor && ancestor !== document.body; ancestor = ancestor.parentElement) {
               checkBudget();
               const predicates = [...attributes(ancestor, testAttributes), ...attributes(ancestor, stableAttributes)];
               const heading = ancestor.querySelector(':scope > legend,:scope > h1,:scope > h2,:scope > h3,:scope > h4,:scope > h5,:scope > h6');
               if (heading && text(heading)) predicates.push(`${tag(heading)}[normalize-space(.)=${literal(text(heading))}]`);
-              for (const context of predicates) {
-                for (const predicate of [...testPredicates, ...stablePredicates, ...semanticPredicates]) if (add(`//${tag(ancestor)}[${context}]//${tag(element)}[${predicate}]`)) return xpaths;
-                if (add(`//${tag(ancestor)}[${context}]//${tag(element)}`)) return xpaths;
+              if (ancestor.matches('tr,[role=row]')) {
+                for (const cell of ancestor.children) {
+                  if (cell.matches('td,th,[role=cell],[role=rowheader],[role=gridcell]') && text(cell))
+                    predicates.push(`${tag(cell)}[normalize-space(.)=${literal(text(cell))}]`);
+                }
+              }
+              const prefixes = predicates.map(context => `//${tag(ancestor)}[${context}]`);
+              if (ancestor.matches('header,footer,nav,main,aside')) prefixes.push(`//${tag(ancestor)}`);
+              for (const prefix of prefixes) {
+                for (const predicate of [...targetPredicates, ...semanticPredicates]) if (add(`${prefix}//${tag(element)}[${predicate}]`)) return xpaths;
+                if (add(`${prefix}//${tag(element)}`)) return xpaths;
               }
             }
             if (!xpaths.length) {
@@ -306,9 +338,13 @@ internal static class BrowserCaptureScript
           };
           return {
             frameElements,
-            updateEnvironment(value, budgetMs) {
-              environment = value ? JSON.parse(value) : { x:0, y:0, scaleX:1, scaleY:1, exposed:true, rendered:true, clip:{left:0,top:0,right:innerWidth,bottom:innerHeight} };
-              reset(budgetMs);
+            async updateEnvironment(value, budgetMs) {
+              try {
+                environment = value ? JSON.parse(value) : { x:0, y:0, scaleX:1, scaleY:1, exposed:true, rendered:true, clip:{left:0,top:0,right:innerWidth,bottom:innerHeight} };
+                reset(budgetMs);
+                await observeIntersections([...nodes, ...frameElements]);
+                return {};
+              } catch (error) { if (error === budgetExceeded) return { errorCode: 'validation_budget_exceeded' }; throw error; }
             },
             receivesPoint(element, point, budgetMs) { reset(budgetMs); return receivesPoint(element, point); },
             point(candidateId, budgetMs) {

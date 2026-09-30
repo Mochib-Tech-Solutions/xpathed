@@ -24,7 +24,7 @@ test("actual OpenRouter route resolves scoped frames, offscreen context, expande
       [
         "frames",
         "2",
-        "Click all Approval buttons inside the Payroll frame, clear Notes in Payroll, and hover Help in the footer. Also pause for two seconds, navigate to example.com, and drag the first Approval button onto Help.",
+        "Click all Approval buttons inside the Payroll frame, clear Notes in Payroll, fill Notes in Payroll, type into Notes in Payroll, double-click the first Approval button in Payroll, right-click the first Approval button in Payroll, and hover Help in the footer. Also pause for two seconds, navigate to example.com, and drag the first Approval button onto Help.",
         "partial",
       ],
       [
@@ -103,24 +103,48 @@ test("actual OpenRouter route resolves scoped frames, offscreen context, expande
         assert.equal(result.contractVersion, "2");
         assert.equal(
           result.actions.length,
-          7,
+          11,
           "All intended plural and compound actions must be represented",
         );
         assert.deepEqual(
           result.actions.map((action) => action.action),
-          ["click", "click", "clear", "hover", "unsupported", "unsupported", "unsupported"],
+          [
+            "click",
+            "click",
+            "clear",
+            "fill",
+            "type",
+            "double_click",
+            "right_click",
+            "hover",
+            "unsupported",
+            "unsupported",
+            "unsupported",
+          ],
         );
         assert.deepEqual(
           result.actions.map((action) => action.outcome),
-          ["found", "found", "found", "found", "unsupported", "unsupported", "unsupported"],
+          [
+            "found",
+            "found",
+            "found",
+            "found",
+            "found",
+            "found",
+            "found",
+            "found",
+            "unsupported",
+            "unsupported",
+            "unsupported",
+          ],
         );
-        assert.ok(result.actions.slice(4).every((action) => action.code === "unsupported_action"));
+        assert.ok(result.actions.slice(8).every((action) => action.code === "unsupported_action"));
         assert.ok(
-          result.actions.slice(0, 3).every((action) => action.target.frame.chain.length === 2),
+          result.actions.slice(0, 7).every((action) => action.target.frame.chain.length === 2),
         );
-        assert.equal(result.actions[3].target.frame.id, "main");
-        assert.equal(result.actions[3].target.state.inViewport, false);
-        assert.equal(result.summary.blocked, 3);
+        assert.equal(result.actions[7].target.frame.id, "main");
+        assert.equal(result.actions[7].target.state.inViewport, false);
+        assert.equal(result.summary.blocked, 5);
         assert.equal(result.summary.readinessUnknown, 0);
         assert.ok(
           result.actions.every(
@@ -139,6 +163,10 @@ test("actual OpenRouter route resolves scoped frames, offscreen context, expande
           ["frame-approval-first"],
           ["frame-approval-second"],
           ["frame-notes"],
+          ["frame-notes"],
+          ["frame-notes"],
+          ["frame-approval-first"],
+          ["frame-approval-first"],
           ["footer-help"],
         ];
         await json(`${fixture}/oracle?run=${run}`, "POST", { targets });

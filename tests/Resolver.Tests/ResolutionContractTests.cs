@@ -11,6 +11,42 @@ namespace Xpathed.Resolver.Tests;
 
 public sealed class ResolutionContractTests
 {
+    [Fact]
+    public async Task CompactModelInputPreservesCandidatesAndMeaningWithoutDuplicateOrPrivateState()
+    {
+        var capture = JsonNode.Parse(new DeterministicServicesHandler().CaptureBody)!;
+        var candidates = capture["candidates"]!.AsArray();
+        var second = candidates[0]!.DeepClone();
+        second["id"] = "other-save";
+        second["text"] = "Save changes";
+        second["state"]!["enabled"] = false;
+        second["state"]!["readonly"] = true;
+        candidates.Add(second);
+        capture["coverage"]!["eligibleCount"] = 2;
+        capture["coverage"]!["capturedCount"] = 2;
+        var handler = new DeterministicServicesHandler { CaptureBody = capture.ToJsonString() };
+        await using var application = CreateApplication(handler);
+        using var client = application.CreateClient();
+        using var response = await client.PostAsJsonAsync("/pages/page-1/resolve", new { instruction = "Click Save in Profile", documentId = "document-1" });
+        var result = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("found", result.GetProperty("outcome").GetString());
+        using var input = JsonDocument.Parse(handler.ModelRequest.GetProperty("messages")[1].GetProperty("content").GetString()!);
+        var sent = input.RootElement.GetProperty("candidates");
+        Assert.Equal(2, sent.GetArrayLength());
+        Assert.Equal("button-save", sent[0].GetProperty("id").GetString());
+        Assert.Equal("Save", sent[0].GetProperty("label").GetString());
+        Assert.Equal("Profile", sent[0].GetProperty("scope")[0].GetString());
+        Assert.Equal(20, sent[0].GetProperty("geometry").GetProperty("x").GetDouble());
+        Assert.False(sent[0].TryGetProperty("text", out _));
+        Assert.False(sent[0].TryGetProperty("placeholder", out _));
+        Assert.False(sent[0].GetProperty("state").TryGetProperty("checked", out _));
+        Assert.False(sent[0].GetProperty("state").TryGetProperty("version", out _));
+        Assert.False(sent[0].GetProperty("state").GetProperty("editable").GetBoolean());
+        Assert.Equal("Save changes", sent[1].GetProperty("text").GetString());
+        Assert.False(sent[1].GetProperty("state").GetProperty("enabled").GetBoolean());
+        Assert.True(sent[1].GetProperty("state").GetProperty("readonly").GetBoolean());
+    }
+
     [Theory]
     [InlineData("1", false)]
     [InlineData("2", false)]

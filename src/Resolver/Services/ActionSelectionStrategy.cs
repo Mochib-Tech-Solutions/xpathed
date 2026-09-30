@@ -20,8 +20,12 @@ internal static class ActionSelectionStrategy
         Unless the instruction explicitly orders individual targets, use capture order within a plural step.
         Explicitly ordered individual targets receive separate steps so their requested order is preserved.
         An existing intended candidate is found even when disabled, readonly or incompatible with the action. Browser reports these limitations; do not convert them to unsupported or not_found.
-        Supported actions: click, double_click, right_click, hover, fill (including type), clear, select, check (including radio), uncheck,
+        Supported actions: click, double_click, right_click, hover, fill, type, clear, select, check (including radio), uncheck,
         press (element-directed key press), focus, blur, upload (visible file controls), inspect.
+        Preserve the requested interaction: fill/replace/set text is fill; explicit type/append/character-by-character input is type.
+        Keep double-click and right-click distinct from click. Explicit click remains click even on a checkbox or radio.
+        Selecting/checking a checkbox or radio is check; clearing its checked state is uncheck. Dropdown option selection is select on the control.
+        Several values or options for one control do not mean several target elements. Do not invent a target for an unscoped key press.
         Wait-for-element, validate-element and scroll-to-element wording maps to inspect: identify the existing element without waiting, asserting or scrolling.
         Navigation without an element, timed pauses and two-target drag-and-drop are unsupported_action.
         Frame labels and ancestor scope disambiguate repeated controls. A candidate's frame is part of its identity.

@@ -92,6 +92,26 @@ async function submitInstruction(user: ReturnType<typeof userEvent.setup>) {
 }
 
 describe("Workspace resolution", () => {
+  it.each([
+    ["1", "double_click", "double-click"],
+    ["2", "type", "type"],
+  ])("shows the interpreted action in contract %s", async (contractVersion, action, label) => {
+    mockApi(() =>
+      Promise.resolve(
+        Response.json({
+          ...found,
+          contractVersion,
+          action,
+          actions: [{ actionId: "a1", order: 1, action, outcome: "found", target: found.target }],
+        }),
+      ),
+    );
+    const user = await openWorkspace();
+    await submitInstruction(user);
+    expect(await screen.findByText(`Action: ${label}`)).toBeVisible();
+    expect(screen.getByText(found.target.xpaths[0]!)).toBeVisible();
+  });
+
   it("shows the frame chain separately from the document XPath and selected state", async () => {
     mockApi(() =>
       Promise.resolve(

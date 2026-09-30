@@ -17,8 +17,8 @@ public sealed partial class ResolutionService(IHttpClientFactory clients, OpenRo
         var schema = multiple ? ActionSelectionStrategy.Schema : CandidateSelectionStrategy.Schema;
         var outputTokens = multiple ? ActionSelectionStrategy.OutputTokens : 512;
         var strategy = configuration["Resolution:Strategy"] ?? "candidate-selection-v1";
-        var diagnostics = new ResolutionDiagnostics { Stage = "configuration", Strategy = strategy, PromptVersion = multiple ? "5" : "4" };
-        var configurationId = gateway.ConfigurationId(strategy, prompt, schema, diagnostics.ModelInputBudgetBytes, outputTokens, diagnostics.PromptVersion);
+        var diagnostics = new ResolutionDiagnostics { Stage = "configuration", Strategy = strategy, PromptVersion = multiple ? "6" : "5" };
+        var configurationId = gateway.ConfigurationId(strategy, prompt, schema, diagnostics.ModelInputBudgetBytes, outputTokens, diagnostics.PromptVersion, multiple ? ActionSelectionStrategy.MaximumActions : 1);
         try
         {
             if (strategy != "candidate-selection-v1")

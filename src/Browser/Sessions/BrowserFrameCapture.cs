@@ -18,11 +18,9 @@ internal sealed class BrowserFrameCapture(IFrame frame, IJSHandle handle, Target
 
     public async Task RefreshAsync(int budgetMs)
     {
-        if (Parent is null)
-        {
-            await Handle.EvaluateAsync("(capture, budgetMs) => capture.updateEnvironment(null, budgetMs)", budgetMs);
-        }
-        else
+        var timer = System.Diagnostics.Stopwatch.StartNew();
+        string? environment = null;
+        if (Parent is not null)
         {
             var info = await Parent.Handle.EvaluateAsync<JsonElement>("(capture, args) => capture.frameInfo(args.owner, args.budgetMs)", new { owner = Owner, budgetMs });
             if (info.TryGetProperty("errorCode", out _))
@@ -34,7 +32,13 @@ internal sealed class BrowserFrameCapture(IFrame frame, IJSHandle handle, Target
             {
                 throw new ApiException(409, "stale_capture", "An ancestor frame changed after capture.");
             }
-            await Handle.EvaluateAsync("(capture, args) => capture.updateEnvironment(args.environment, args.budgetMs)", new { environment = info.GetProperty("environment").GetRawText(), budgetMs });
+            environment = info.GetProperty("environment").GetRawText();
+        }
+        var updated = await Handle.EvaluateAsync<JsonElement>("(capture, args) => capture.updateEnvironment(args.environment, args.budgetMs)",
+            new { environment, budgetMs = Math.Max(0, budgetMs - timer.ElapsedMilliseconds) });
+        if (updated.TryGetProperty("errorCode", out _))
+        {
+            throw new ApiException(409, "validation_budget_exceeded", "Viewport observation exceeded its processing budget.");
         }
     }
 }

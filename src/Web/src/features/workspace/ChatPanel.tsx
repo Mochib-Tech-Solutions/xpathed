@@ -253,6 +253,7 @@ export default function ChatPanel({
                           </p>
                         ))}
                         <div className="space-y-2 text-xs text-muted-foreground">
+                          {action.action && <p>Action: {action.action.replaceAll("_", "-")}</p>}
                           <p>
                             {target.interactability?.status === "ready"
                               ? "Interaction checks passed."

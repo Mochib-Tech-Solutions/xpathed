@@ -1,5 +1,6 @@
 using System.Text.Encodings.Web;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Text.Unicode;
 using Xpathed.Common.Contracts;
 using Xpathed.Common.Http;
@@ -18,8 +19,12 @@ internal static class CandidateSelectionStrategy
         Disabled, readonly, transparent, zero-area, covered and off-screen targets remain eligible; finding them does not mean they are interactable.
         Return the action and target only. Browser code assesses interaction limitations; never infer event success.
         An existing intended candidate is found even when disabled, readonly or incompatible with the action. Browser reports these limitations; do not convert them to unsupported or not_found.
-        Supported actions: click, double_click, right_click, hover, fill (including type), clear, select, check (including radio), uncheck,
+        Supported actions: click, double_click, right_click, hover, fill, type, clear, select, check (including radio), uncheck,
         press (element-directed key press), focus, blur, upload (visible file controls), inspect.
+        Preserve the requested interaction: fill/replace/set text is fill; explicit type/append/character-by-character input is type.
+        Keep double-click and right-click distinct from click. Explicit click remains click even on a checkbox or radio.
+        Selecting/checking a checkbox or radio is check; clearing its checked state is uncheck. Dropdown option selection is select on the control.
+        Do not invent a target for an unscoped key press.
         Wait-for-element, validate-element and scroll-to-element wording maps to inspect: identify the existing element without waiting, asserting or scrolling.
         Navigation without an element, timed pauses and two-target drag-and-drop are unsupported_action.
         Frame labels and ancestor scope disambiguate repeated controls. A candidate's frame is part of its identity.
@@ -37,7 +42,11 @@ internal static class CandidateSelectionStrategy
          "required":["outcome","action","candidateId"],"additionalProperties":false}
         """);
 
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web) { Encoder = JavaScriptEncoder.Create(UnicodeRanges.All) };
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
+    {
+        Encoder = JavaScriptEncoder.Create(UnicodeRanges.All),
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+    };
 
     public static string PrepareInput(string instruction, CandidateCapture capture) =>
         JsonSerializer.Serialize(new
@@ -48,12 +57,12 @@ internal static class CandidateSelectionStrategy
             {
                 candidate.Id,
                 candidate.Tag,
-                candidate.Role,
-                candidate.Text,
-                candidate.Label,
-                candidate.Placeholder,
-                candidate.Scope,
-                candidate.State,
+                role = string.IsNullOrEmpty(candidate.Role) ? null : candidate.Role,
+                text = string.IsNullOrEmpty(candidate.Text) || candidate.Text == candidate.Label ? null : candidate.Text,
+                label = string.IsNullOrEmpty(candidate.Label) ? null : candidate.Label,
+                placeholder = string.IsNullOrEmpty(candidate.Placeholder) ? null : candidate.Placeholder,
+                scope = candidate.Scope.Length == 0 ? null : candidate.Scope,
+                state = new { candidate.State.Rendered, candidate.State.InViewport, candidate.State.Enabled, candidate.State.Editable, candidate.State.Readonly },
                 candidate.Geometry,
                 frame = candidate.Frame is null ? null : new { candidate.Frame.Id, labels = candidate.Frame.Chain.Select(ancestor => ancestor.Label) }
             })

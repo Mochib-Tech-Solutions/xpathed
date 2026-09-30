@@ -15,7 +15,8 @@ const oracleScript = `<script>
       const endpoint = '?page=' + encodeURIComponent(location.pathname);
       const response = await fetch('/oracle' + endpoint);
       if (response.status === 204) return;
-      const { xpaths = [], replaceTarget, reload, click, open, focusPopup, close, cookie, scrollToY, slowFrame } = await response.json();
+      const { xpaths = [], replaceTarget, reload, click, open, focusPopup, close, cookie, scrollToY, slowFrame, mutateXpath } = await response.json();
+      if (mutateXpath) window.mutateXpathFixture();
       if (slowFrame) {
         const frame = document.querySelector('iframe');
         const rect = frame.getBoundingClientRect.bind(frame);
@@ -34,6 +35,7 @@ const oracleScript = `<script>
       await fetch('/oracle-result' + endpoint, { method: 'POST', body: JSON.stringify({ matches, scrollY, clicks: document.querySelector('#expected-target')?.dataset.clicks ?? '0', nodeCount: document.querySelectorAll('*').length,
         cookie: document.cookie, openerPath: window.opener?.location.pathname ?? null, focused: document.hasFocus(),
         activeElement: document.activeElement?.id, events: window.observedEvents ?? {},
+        values: [...document.querySelectorAll('[data-observe-value]')].map(element => element.value),
         innerWidth, innerHeight, outerWidth, outerHeight, screenWidth: screen.width, screenHeight: screen.height }) });
       if (close) window.close();
       if (reload === 'hash') location.hash = 'changed';
@@ -829,6 +831,60 @@ test("The single preferred XPath escapes both quote types and uses meaningful co
   );
 });
 
+test("Saved semantic XPaths survive generated IDs, wrappers and reordered duplicate controls", async () => {
+  await withFixture(
+    `<label for="a1b2c3d4-e5f6-47a8-b9c0-d1e2f3a4b5c6">Country</label><input id="a1b2c3d4-e5f6-47a8-b9c0-d1e2f3a4b5c6" data-oracle="country">
+    <div id="contacts"><input name="contact" placeholder="Email" data-oracle="email"><input name="contact" placeholder="Phone"><input name="backup" placeholder="Email"></div>
+    <table><tr><td>Alice</td><td><button data-oracle="alice">Approve</button></td></tr><tr><td>Bob</td><td><button>Approve</button></td></tr></table>
+    <header><button>Help</button></header><footer><button data-oracle="footer">Help</button></footer>
+    <button data-test-id="stable-save" data-oracle="save">Save</button>
+    <script>window.mutateXpathFixture = () => {
+      const country = document.querySelector('[data-oracle="country"]');
+      country.id = 'new-generated-country'; document.querySelector('label').htmlFor = country.id;
+      const tbody = document.querySelector('tbody'); tbody.prepend(tbody.lastElementChild);
+      for (const selector of ['[data-oracle="country"]','[data-oracle="email"]','[data-oracle="footer"]','[data-oracle="save"]']) {
+        const node = document.querySelector(selector), wrapper = document.createElement('div');
+        node.before(wrapper); wrapper.append(node); node.className = 'changed-style';
+      }
+      document.querySelector('#contacts').prepend(document.querySelector('input[name="backup"]'));
+      const extra = document.createElement('button'); extra.textContent = 'Help'; document.querySelector('header').prepend(extra);
+      document.querySelector('[data-oracle="save"]').textContent = 'Save changes';
+    };</script>`,
+    async (session, page) => {
+      const capture = await request(`/pages/${page.pageId}/capture`, {
+        documentId: page.documentId,
+      });
+      const cases = [
+        ["country", (candidate) => candidate.label === "Country"],
+        ["email", (candidate) => candidate.tag === "input" && candidate.placeholder === "Email"],
+        [
+          "alice",
+          (candidate) =>
+            candidate.tag === "button" && candidate.scope.some((scope) => scope.includes("Alice")),
+        ],
+        ["footer", (candidate) => candidate.label === "Help" && candidate.scope.includes("footer")],
+        ["save", (candidate) => candidate.label === "Save"],
+      ];
+      const paths = [];
+      for (const [expected, matches] of cases) {
+        const candidate = capture.candidates.find(matches);
+        assert.ok(candidate, expected);
+        const { target } = await request(`/pages/${page.pageId}/selection`, {
+          documentId: page.documentId,
+          captureId: capture.captureId,
+          candidateId: candidate.id,
+          action: "inspect",
+        });
+        assert.equal(target.xpaths.length, 1);
+        paths.push(target.xpaths[0]);
+      }
+      const expected = cases.map(([id]) => [id]);
+      assert.deepEqual((await verify(paths)).matches, expected);
+      assert.deepEqual((await observe({ xpaths: paths, mutateXpath: true })).matches, expected);
+    },
+  );
+});
+
 test("Positional XPath is a verified last fallback when identical elements have no distinguishing context", async () => {
   await withFixture(
     `<div><span data-oracle="expected-target">Same</span><span>Same</span></div>`,
@@ -961,6 +1017,62 @@ test("Superseded captures, fabricated candidates, replaced nodes and manual relo
       409,
       "stale_capture",
     );
+  });
+});
+
+test("Native date and time controls support passive fill and clear without typing or mutation", async () => {
+  const types = [
+    ["date", "2030-06-15"],
+    ["month", "2030-06"],
+    ["week", "2030-W24"],
+    ["time", "12:30"],
+    ["datetime-local", "2030-06-15T12:30"],
+  ];
+  const markup =
+    types
+      .flatMap(([type, value]) =>
+        [false, true].map(
+          (readonly) =>
+            `<input type="${type}" aria-label="${type} ${readonly ? "readonly" : "writable"}" value="${value}" data-observe-value ${readonly ? "readonly" : ""}>`,
+        ),
+      )
+      .join("") +
+    `<script>window.observedEvents={};for(const name of ['click','input','change','focusin','keydown','keyup'])document.addEventListener(name,()=>window.observedEvents[name]=(window.observedEvents[name]??0)+1,true);</script>`;
+  await withFixture(markup, async (session, page) => {
+    const before = await observe();
+    const capture = await request(`/pages/${page.pageId}/capture`, { documentId: page.documentId });
+    for (const [type] of types)
+      for (const readonly of [false, true]) {
+        const candidate = capture.candidates.find(
+          (entry) => entry.label === `${type} ${readonly ? "readonly" : "writable"}`,
+        );
+        assert.ok(candidate);
+        for (const action of ["fill", "clear", "type"]) {
+          const { target } = await request(`/pages/${page.pageId}/selection`, {
+            documentId: page.documentId,
+            captureId: capture.captureId,
+            candidateId: candidate.id,
+            action,
+          });
+          assert.equal(
+            target.interactability.checks.compatibleControl,
+            action === "type" ? "fail" : "pass",
+            `${type}: ${action}`,
+          );
+          assert.equal(target.interactability.checks.keyboard, "unknown");
+          assert.equal(target.state.editable, !readonly);
+          assert.equal(target.interactability.checks.writable, readonly ? "fail" : "pass");
+          assert.equal(
+            target.interactability.status,
+            action === "type" || readonly ? "blocked" : "unknown",
+          );
+        }
+      }
+    const after = await observe();
+    assert.deepEqual(after.values, before.values);
+    assert.deepEqual(after.events, before.events);
+    assert.equal(after.activeElement, before.activeElement);
+    assert.equal(after.scrollY, before.scrollY);
   });
 });
 
@@ -1201,6 +1313,31 @@ test("Scaled clipping and section context survive iframe boundaries while reflec
       assert.ok(buttons[0].scope.includes("Employee"));
       assert.ok(buttons[1].scope.includes("Customer"));
       assert.equal(capture.unsupportedBoundaryCount, 2);
+    },
+  );
+});
+
+test("A visible fixed-position search control escapes a non-containing overflow ancestor", async () => {
+  await withFixture(
+    `<div style="overflow:hidden;width:0;height:0"><header style="position:fixed;left:20px;top:20px">
+      <button id="expected-target">Search</button></header></div>
+    <script>const button = document.querySelector('#expected-target'); const rect = button.getBoundingClientRect();
+      window.observedEvents = { receivesPointer: document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2) === button };</script>`,
+    async (session, page) => {
+      assert.equal((await observe()).events.receivesPointer, true);
+      const capture = await request(`/pages/${page.pageId}/capture`, {
+        documentId: page.documentId,
+      });
+      const candidate = capture.candidates.find((candidate) => candidate.label === "Search");
+      const { target } = await request(`/pages/${page.pageId}/selection`, {
+        documentId: page.documentId,
+        captureId: capture.captureId,
+        candidateId: candidate.id,
+        action: "click",
+      });
+      assert.equal(target.state.inViewport, true);
+      assert.equal(target.interactability.status, "ready");
+      assert.equal(target.interactability.checks.pointerReception, "pass");
     },
   );
 });
