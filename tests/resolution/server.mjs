@@ -80,8 +80,8 @@ const server = createServer(async (request, response) => {
       if (!target) throw new Error("Independent fixture target absent from provider input");
       output = {
         id: "deterministic-fixture",
-        model: "openai/gpt-6-luna",
-        provider: "OpenAI",
+        model: "deepseek/deepseek-v4.1-flash",
+        provider: "Wafer",
         choices: [
           {
             finish_reason: "stop",

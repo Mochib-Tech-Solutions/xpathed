@@ -103,7 +103,7 @@ Root commands are defined in `package.json`. Host C# build and formatting comman
 
 GitHub Actions selects affected .NET projects, Web and repository tooling from changed paths. Shared code selects its consumers; documentation-only changes skip application builds. Solution changes also build `Xpathed.slnx`. Formatting, lint, build and validation failures feed one final `check` result.
 
-Docker definitions have a separate validation job. CI does not build application images or start the Docker system. The explicit resolution checks start a separate `xpathed-resolution` stack on loopback port 8081 and stop its containers afterward; the live check runs Browser and Resolver without ClientApi or PostgreSQL. Live model evaluation, release qualification and verified branch/review controls are later roadmap work.
+Docker definitions have a separate validation job. CI does not build application images or start the Docker system. The live check pins DeepSeek V4.1 Flash through Wafer with reasoning disabled, a 512-token output cap and explicit provider price ceilings. It makes at most two requests and checks reported cost against a one-cent total. The explicit resolution checks start a separate `xpathed-resolution` stack on loopback port 8081 and stop its containers afterward; the live check runs Browser and Resolver without ClientApi or PostgreSQL. Live model evaluation, release qualification and verified branch/review controls are later roadmap work.
 
 ## Roadmap
 

@@ -38,7 +38,7 @@ public sealed class ResolutionContractTests
         await using var application = CreateApplication(new DeterministicServicesHandler
         {
             ProviderBody = """
-                {"id":"generation-unknown","model":"openai/gpt-6-luna","provider":"OpenAI",
+                {"id":"generation-unknown","model":"deepseek/deepseek-v4.1-flash","provider":"Wafer",
                  "choices":[{"finish_reason":"stop","message":{"content":"{\"outcome\":\"found\",\"action\":\"click\",\"candidateId\":\"invented\"}"}}],
                  "usage":{"prompt_tokens":140,"completion_tokens":15,"total_tokens":155,"cost":0.0000215,"completion_tokens_details":{"reasoning_tokens":0}}}
                 """
@@ -53,7 +53,7 @@ public sealed class ResolutionContractTests
         var diagnostics = result.GetProperty("diagnostics");
         Assert.Equal("provider_unknown_candidate", diagnostics.GetProperty("code").GetString());
         Assert.Equal("generation-unknown", diagnostics.GetProperty("generationId").GetString());
-        Assert.Equal("OpenAI", diagnostics.GetProperty("provider").GetString());
+        Assert.Equal("Wafer", diagnostics.GetProperty("provider").GetString());
         Assert.Equal(140, diagnostics.GetProperty("usage").GetProperty("inputTokens").GetInt64());
         Assert.Equal(0, diagnostics.GetProperty("usage").GetProperty("reasoningTokens").GetInt64());
         Assert.Equal(JsonValueKind.Null, diagnostics.GetProperty("usage").GetProperty("cachedTokens").ValueKind);
@@ -374,9 +374,15 @@ public sealed class ResolutionContractTests
         using var response = await client.PostAsJsonAsync("/pages/page-1/resolve", new { instruction = "Click Save", documentId = "document-1" });
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = handler.ModelRequest;
-        Assert.Equal("openai/gpt-6-luna", body.GetProperty("model").GetString());
-        Assert.Equal("none", body.GetProperty("reasoning").GetProperty("effort").GetString());
-        Assert.Equal("openai", body.GetProperty("provider").GetProperty("only")[0].GetString());
+        Assert.Equal("deepseek/deepseek-v4.1-flash", body.GetProperty("model").GetString());
+        Assert.False(body.GetProperty("reasoning").GetProperty("enabled").GetBoolean());
+        Assert.False(body.TryGetProperty("service_tier", out _));
+        Assert.Equal(512, body.GetProperty("max_tokens").GetInt32());
+        Assert.Equal("wafer", body.GetProperty("provider").GetProperty("only")[0].GetString());
+        var prices = body.GetProperty("provider").GetProperty("max_price");
+        Assert.Equal(0.06m, prices.GetProperty("prompt").GetDecimal());
+        Assert.Equal(0.45m, prices.GetProperty("completion").GetDecimal());
+        Assert.Equal(0m, prices.GetProperty("request").GetDecimal());
         Assert.False(body.GetProperty("provider").GetProperty("allow_fallbacks").GetBoolean());
         Assert.True(body.GetProperty("provider").GetProperty("require_parameters").GetBoolean());
         Assert.True(body.GetProperty("response_format").GetProperty("json_schema").GetProperty("strict").GetBoolean());

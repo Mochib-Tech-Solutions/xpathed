@@ -53,13 +53,13 @@ Diagnostics also include `stage`, safe `code`/`message`, `modelCalls`, `strategy
 
 `OpenRouterGateway` handles transport/provider responses; `CandidateSelectionStrategy` defines the prompt, selection contract and validation. This keeps model configuration distinct from resolution strategy without adding unused gateway adapters.
 
-The initial route is `openai/gpt-6-luna` via OpenRouter's `openai` provider with reasoning `none`, strict JSON schema, standard service tier, 512 output tokens and no fallback, context compression, response healing or tools. The public route research and settings are in [the OpenRouter note](research/2026-09-29-openrouter-resolution.md). Advertised capability does not establish authenticated access; live smoke evidence must come from an explicitly invoked run.
+The initial route is `deepseek/deepseek-v4.1-flash` via OpenRouter's `wafer` provider with reasoning disabled, strict JSON schema, 512 output tokens and no fallback, context compression, response healing or tools. Provider prices are capped at $0.06 per million input tokens and $0.45 per million output tokens, with no per-request fee; a route above those limits must fail. The public route research and settings are in [the OpenRouter note](research/2026-09-29-openrouter-resolution.md). The live smoke pins this cheap route, makes at most two small requests, and stops if reported cost is missing or exceeds half a cent per call; total cost must remain below one cent. The dated research note records the authenticated two-case smoke check and its actual usage; this does not qualify other workloads or models.
 
 | Setting | Purpose |
 | --- | --- |
 | `OPENROUTER_API_KEY` | Ignored local `.env`; mapped to resolver `OpenRouter__ApiKey` |
-| `OPENROUTER_MODEL` | Default `openai/gpt-6-luna`; a different model requires supported settings and fresh verification |
-| `OPENROUTER_PROVIDER` | Default `openai`; explicit serving route |
+| `OPENROUTER_MODEL` | Default `deepseek/deepseek-v4.1-flash`; a different model requires supported settings and fresh verification |
+| `OPENROUTER_PROVIDER` | Default `wafer`; explicit serving route |
 | `OpenRouter__BaseUrl` | Default OpenRouter API; overridden only by the deterministic local test stack |
 | `OpenRouter__TimeoutSeconds` | Provider call timeout, default 30 seconds; greater than zero and at most 600 |
 | `Resolution__Strategy` | Default and sole implemented strategy `candidate-selection-v1`; other values fail explicitly |

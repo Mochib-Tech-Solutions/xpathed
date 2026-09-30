@@ -37,7 +37,7 @@ Run commands from the repository root, using the RTK prefix required above. `pac
 - `pnpm run setup` prepares configuration and workspace dependencies; `pnpm dev` runs Docker development mode.
 - `pnpm check:dotnet`, `pnpm check:web` and `pnpm check:tooling` validate the affected area. `pnpm check` is the full local gate.
 - `pnpm format` applies formatting; `pnpm format:check` verifies it. C# builds enforce the shared recommended analyzers and warnings as errors.
-- `pnpm test:resolution` runs deterministic real-browser resolution checks in an isolated Docker stack; `pnpm test:resolution:live` explicitly exercises OpenRouter with the local API key. These remain outside CI service startup.
+- `pnpm test:resolution` runs deterministic real-browser resolution checks in an isolated Docker stack; `pnpm test:resolution:live` explicitly exercises OpenRouter with the local API key. These remain outside CI service startup. Keep live tests on the documented cheap route, retain price/output limits and report actual cost; use deterministic responses for other checks.
 - `pnpm docker:check` validates Docker definitions. `pnpm docker:build` builds images, and `pnpm docker:down` stops project containers without deleting database data.
 
 Keep CI jobs independent and selected by relevant changes. Docker image builds and service startup remain explicit operations outside CI. Update `Xpathed.slnx` and `scripts/ci-changes.mjs` when adding projects. Validate behavior at the appropriate boundary; report actual checks rather than inferring success from configuration alone.

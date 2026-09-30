@@ -39,7 +39,7 @@ internal sealed class DeterministicServicesHandler : HttpMessageHandler
             ProviderRequestCount++;
             ModelRequest = await request.Content!.ReadFromJsonAsync<JsonElement>(cancellationToken);
             return Json(ProviderBody ?? """
-                {"id":"generation-1","model":"openai/gpt-6-luna","provider":"OpenAI","service_tier":"default",
+                {"id":"generation-1","model":"deepseek/deepseek-v4.1-flash","provider":"Wafer","service_tier":"default",
                  "choices":[{"finish_reason":"stop","message":{"content":"{\"outcome\":\"found\",\"action\":\"click\",\"candidateId\":\"button-save\"}"}}],
                  "usage":{"prompt_tokens":140,"completion_tokens":15,"total_tokens":155,"cost":0.0000215,"completion_tokens_details":{"reasoning_tokens":0}}}
                 """, ProviderStatus);

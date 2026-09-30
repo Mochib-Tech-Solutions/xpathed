@@ -10,8 +10,8 @@ namespace Xpathed.Resolver.Services;
 
 public sealed class OpenRouterGateway(IHttpClientFactory clients, IConfiguration configuration)
 {
-    public string Model { get; } = configuration["OpenRouter:Model"] ?? "openai/gpt-6-luna";
-    public string Provider { get; } = configuration["OpenRouter:Provider"] ?? "openai";
+    public string Model { get; } = configuration["OpenRouter:Model"] ?? "deepseek/deepseek-v4.1-flash";
+    public string Provider { get; } = configuration["OpenRouter:Provider"] ?? "wafer";
 
     private readonly string? apiKey = configuration["OpenRouter:ApiKey"];
     private readonly string endpoint = (configuration["OpenRouter:BaseUrl"] ?? "https://openrouter.ai/api/v1/").TrimEnd('/') + "/";
@@ -48,10 +48,9 @@ public sealed class OpenRouterGateway(IHttpClientFactory clients, IConfiguration
     {
         model = Model,
         stream = false,
-        service_tier = "default",
         max_tokens = 512,
-        reasoning = new { effort = "none" },
-        provider = new { only = new[] { Provider }, order = new[] { Provider }, allow_fallbacks = false, require_parameters = true },
+        reasoning = new { enabled = false },
+        provider = new { only = new[] { Provider }, order = new[] { Provider }, allow_fallbacks = false, require_parameters = true, max_price = new { prompt = 0.06m, completion = 0.45m, request = 0m } },
         plugins = new[] { new { id = "context-compression", enabled = false } },
         messages = new[]
         {

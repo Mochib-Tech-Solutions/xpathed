@@ -18,6 +18,7 @@ async function json(url, method = "GET", body) {
 test("actual OpenRouter route resolves a known target and genuine absence without the client or database", async () => {
   const session = await json(`${browser}/sessions`, "POST");
   const run = randomUUID();
+  let totalCostUsd = 0;
   try {
     const page = await json(`${browser}/pages/${session.pageId}/navigate`, "POST", {
       url: `${fixture}/fixture?run=${run}`,
@@ -54,8 +55,15 @@ test("actual OpenRouter route resolves a known target and genuine absence withou
       assert.equal(result.diagnostics.modelCalls, 1);
       assert.equal(result.diagnostics.modelInputComplete, true);
       assert.match(result.diagnostics.generationId ?? "", /^gen-/);
-      assert.match(result.diagnostics.model ?? "", /gpt-6-luna/);
-      assert.match(result.diagnostics.provider ?? "", /openai/i);
+      assert.equal(result.diagnostics.model, "deepseek/deepseek-v4.1-flash");
+      assert.equal(result.diagnostics.provider?.toLowerCase(), "wafer");
+      const cost = result.diagnostics.usage?.cost;
+      assert.ok(
+        Number.isFinite(cost) && cost >= 0 && cost <= 0.005,
+        "Stop if reported cost is unavailable or exceeds half a cent",
+      );
+      totalCostUsd += cost;
+      assert.ok(totalCostUsd < 0.01, "The two-call smoke check must cost less than one cent");
       assert.equal(result.sessionId, session.sessionId);
       assert.equal(result.pageId, session.pageId);
       assert.equal(result.documentId, page.documentId);
@@ -77,6 +85,7 @@ test("actual OpenRouter route resolves a known target and genuine absence withou
         assert.equal(observed.scrollY, 0);
       } else assert.equal(result.target, null);
     }
+    console.log(JSON.stringify({ requests: 2, totalCostUsd }));
   } finally {
     await fetch(`${browser}/sessions/${session.sessionId}`, { method: "DELETE" });
   }
