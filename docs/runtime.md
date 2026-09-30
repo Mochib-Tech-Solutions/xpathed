@@ -2,13 +2,13 @@
 
 ## Services
 
-| Service | Responsibility | Internal endpoint |
-| --- | --- | --- |
-| `web` | React chat/browser workspace, static files and HTTP/WebSocket proxy | `:8080`; published at `127.0.0.1:8080` |
-| `client-api` | Client endpoints and EF Core/PostgreSQL connection | `http://client-api:8080` |
-| `resolver` | Stateless inspection and instruction resolution for the supplied managed page | `http://resolver:8080` |
-| `browser` | Playwright, live contexts/pages, display and noVNC transport | `http://browser:8080` |
-| `db` | PostgreSQL, named persistent volume | `db:5432` |
+| Service      | Responsibility                                                                | Internal endpoint                      |
+| ------------ | ----------------------------------------------------------------------------- | -------------------------------------- |
+| `web`        | React chat/browser workspace, static files and HTTP/WebSocket proxy           | `:8080`; published at `127.0.0.1:8080` |
+| `client-api` | Client endpoints and EF Core/PostgreSQL connection                            | `http://client-api:8080`               |
+| `resolver`   | Stateless inspection and instruction resolution for the supplied managed page | `http://resolver:8080`                 |
+| `browser`    | Playwright, live contexts/pages, display and noVNC transport                  | `http://browser:8080`                  |
+| `db`         | PostgreSQL, named persistent volume                                           | `db:5432`                              |
 
 Each browser session owns a Chromium process, an isolated browser context, up to eight managed pages, one Xvfb display and one loopback-only x11vnc listener. ASP.NET bridges binary WebSocket traffic directly to VNC; no debugging or raw VNC port is published. CDP is used internally to keep each Chromium window fullscreen and bring the active page to the front. No browser objects cross an HTTP boundary.
 
@@ -18,20 +18,22 @@ The resolver receives the same `pageId` as the client. It asks the browser servi
 
 Paths below are available through `web`. JSON uses camelCase.
 
-| Method and path | Request | Response |
-| --- | --- | --- |
-| `POST /api/sessions` | Empty | `{sessionId, pageId, viewPath}` |
-| `GET /api/sessions/{sessionId}` | Empty | `{sessionId, activePageId, activationVersion, viewPath, pages}`; `pages` contains page states |
-| `POST /api/sessions/{sessionId}/pages` | Empty | Session state after adding and activating a blank tab |
-| `POST /api/pages/{pageId}/activate` | Empty | Session state after selecting the tab |
-| `DELETE /api/pages/{pageId}` | Empty | Session state after closing the tab; closing the last creates a blank tab |
-| `DELETE /api/sessions/{sessionId}` | Empty | `204`; repeated deletion succeeds |
-| `GET /api/pages/{pageId}` | Empty | `{sessionId, pageId, documentId, url, title, blockedPopups}` |
-| `POST /api/pages/{pageId}/navigate` | `{ "url": "https://example.com" }` | Updated page state |
-| `POST /api/pages/{pageId}/resolve` | `{instruction, documentId}` | [Version 1 resolution result](resolution.md) |
-| `POST /api/pages/{pageId}/inspect` | Empty | `{ "inspectedBy": "resolver", "page": { ... } }` |
-| `GET /view/{sessionId}` | WebSocket upgrade with an allowed Origin | Binary RFB/noVNC stream |
-| `GET /health` | Empty | Client API and database readiness; `503` when DB is unavailable |
+The resolve endpoint currently implements the single-action version-1 contract. The accepted [interactability (#17)](https://github.com/Mochib-Tech-Solutions/xpathed/issues/17) and [multi-action (#18)](https://github.com/Mochib-Tech-Solutions/xpathed/issues/18) prerequisites will define compatibility and new result fields before coverage, persistence and evaluation use them. This planning update changes no runtime endpoint or supported behavior.
+
+| Method and path                        | Request                                  | Response                                                                                      |
+| -------------------------------------- | ---------------------------------------- | --------------------------------------------------------------------------------------------- |
+| `POST /api/sessions`                   | Empty                                    | `{sessionId, pageId, viewPath}`                                                               |
+| `GET /api/sessions/{sessionId}`        | Empty                                    | `{sessionId, activePageId, activationVersion, viewPath, pages}`; `pages` contains page states |
+| `POST /api/sessions/{sessionId}/pages` | Empty                                    | Session state after adding and activating a blank tab                                         |
+| `POST /api/pages/{pageId}/activate`    | Empty                                    | Session state after selecting the tab                                                         |
+| `DELETE /api/pages/{pageId}`           | Empty                                    | Session state after closing the tab; closing the last creates a blank tab                     |
+| `DELETE /api/sessions/{sessionId}`     | Empty                                    | `204`; repeated deletion succeeds                                                             |
+| `GET /api/pages/{pageId}`              | Empty                                    | `{sessionId, pageId, documentId, url, title, blockedPopups}`                                  |
+| `POST /api/pages/{pageId}/navigate`    | `{ "url": "https://example.com" }`       | Updated page state                                                                            |
+| `POST /api/pages/{pageId}/resolve`     | `{instruction, documentId}`              | [Version 1 resolution result](resolution.md)                                                  |
+| `POST /api/pages/{pageId}/inspect`     | Empty                                    | `{ "inspectedBy": "resolver", "page": { ... } }`                                              |
+| `GET /view/{sessionId}`                | WebSocket upgrade with an allowed Origin | Binary RFB/noVNC stream                                                                       |
+| `GET /health`                          | Empty                                    | Client API and database readiness; `503` when DB is unavailable                               |
 
 Navigation accepts absolute HTTP/HTTPS URLs without embedded credentials. The React address bar supplies `https://` for bare hostnames.
 
@@ -65,19 +67,19 @@ Operation errors use `{code, message, traceId}`. Controller validation returns t
 
 ## Configuration
 
-| Setting | Default / purpose |
-| --- | --- |
-| `XPATHED_PORT` | Host web port, `8080`; export before Compose |
-| `POSTGRES_PASSWORD` | Generated in ignored `.env`; required by Compose |
-| `ConnectionStrings__Database` | Client API PostgreSQL connection |
-| `BrowserUrl` | Internal browser base URL, `http://browser:8080` |
-| `ResolverUrl` | Client API resolver URL, `http://resolver:8080` |
-| `OPENROUTER_API_KEY` | Ignored local `.env` key used only by Resolver; manual browsing requires no key |
+| Setting                                    | Default / purpose                                                                                                         |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------- |
+| `XPATHED_PORT`                             | Host web port, `8080`; export before Compose                                                                              |
+| `POSTGRES_PASSWORD`                        | Generated in ignored `.env`; required by Compose                                                                          |
+| `ConnectionStrings__Database`              | Client API PostgreSQL connection                                                                                          |
+| `BrowserUrl`                               | Internal browser base URL, `http://browser:8080`                                                                          |
+| `ResolverUrl`                              | Client API resolver URL, `http://resolver:8080`                                                                           |
+| `OPENROUTER_API_KEY`                       | Ignored local `.env` key used only by Resolver; manual browsing requires no key                                           |
 | `OPENROUTER_MODEL` / `OPENROUTER_PROVIDER` | Initial route `deepseek/deepseek-v4.1-flash` / `wafer`; see [resolution configuration](resolution.md#model-configuration) |
-| `ViewerOrigins` | Comma-separated exact allowed viewer origins; Compose includes localhost and 127.0.0.1 |
-| `MaxSessions` | Browser capacity, default 4; allowed 1–16 |
-| `XPATHED_URL` | Vite API upstream destination |
-| `XPATHED_BROWSER_URL` | Separate Vite viewer upstream in development |
+| `ViewerOrigins`                            | Comma-separated exact allowed viewer origins; Compose includes localhost and 127.0.0.1                                    |
+| `MaxSessions`                              | Browser capacity, default 4; allowed 1–16                                                                                 |
+| `XPATHED_URL`                              | Vite API upstream destination                                                                                             |
+| `XPATHED_BROWSER_URL`                      | Separate Vite viewer upstream in development                                                                              |
 
 `pnpm dev` applies `docker/compose.dev.yaml` over `docker/compose.yaml` and runs all five services in containers, with Vite and `dotnet watch` for development. `docker/compose.sh` keeps paths and `.env` relative to the canonical repository root. Compose synchronizes source files and rebuilds images when dependency manifests change. `pnpm docker:up` uses production runtime images. Only the web port is published on loopback in either mode. Stop the previous mode with `pnpm docker:down` before switching. Both use the same PostgreSQL volume.
 
