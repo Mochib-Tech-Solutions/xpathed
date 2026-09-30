@@ -1,0 +1,7 @@
+# Resolve one action across current-page targets
+
+The user's later clarification on 2026-09-30 defines basic resolution as one interaction per command, applied to one or more current-page elements: “click all confirmation buttons in the list” has one action and several targets. This supersedes the basic-workspace scope in [ADR-0008](0008-resolve-multiple-current-page-actions.md) and the workspace opt-in in [ADR-0010](0010-version-action-lists-with-request-owned-cost.md); mixed interactions and sequential workflows are unsupported as a whole rather than partially interpreted.
+
+The workspace sends contract version 3, with one top-level action and up to 16 independently resolved targets in the existing `actions` array. Reusing that wire shape preserves Browser validation, diagnostics and historical readers; versions 1 and 2 retain their existing behavior. Each found target has one same-node-verified XPath and its own passive state/readiness observations, while usage and cost remain request-owned. The chat shows the shared action once, target results and a compact partial summary. Resolution still performs no page actions, scrolling or future-state simulation.
+
+Evaluation of basic mode grades the shared action and complete intended target set. A valid XPath for a subset does not establish semantic completeness, and single-target external annotations do not establish multi-target coverage. Historical version-2 action-list evaluations remain separately identified.

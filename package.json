@@ -49,7 +49,10 @@
     "diagnostics": "scripts/diagnostics.sh",
     "evaluate": "scripts/evaluate.sh",
     "evaluate:live": "scripts/evaluate.sh --mode live",
-    "evaluate:replay": "node evaluation/run.mjs --replay"
+    "evaluate:replay": "node evaluation/run.mjs --replay",
+    "datasets:fetch": "node evaluation/dataset-sources.mjs",
+    "datasets:import": "node evaluation/datasets.mjs",
+    "evaluate:dataset": "node evaluation/dataset-run.mjs"
   },
   "devDependencies": {
     "prettier": "3.9.9"

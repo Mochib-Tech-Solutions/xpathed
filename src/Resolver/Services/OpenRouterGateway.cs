@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Globalization;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
@@ -12,6 +13,8 @@ public sealed class OpenRouterGateway(IHttpClientFactory clients, IConfiguration
 {
     public string Model { get; } = configuration["OpenRouter:Model"] ?? "deepseek/deepseek-v4.1-flash";
     public string Provider { get; } = configuration["OpenRouter:Provider"] ?? "wafer";
+
+    internal Dictionary<string, decimal>? EvaluationPriceLimits { get; set; }
 
     private readonly string? apiKey = configuration["OpenRouter:ApiKey"];
     private readonly string endpoint =
@@ -115,13 +118,7 @@ public sealed class OpenRouterGateway(IHttpClientFactory clients, IConfiguration
             stream = false,
             max_tokens = outputTokens,
             reasoning = new { enabled = false },
-            provider = new
-            {
-                only = new[] { Provider },
-                order = new[] { Provider },
-                allow_fallbacks = false,
-                require_parameters = true,
-            },
+            provider = ProviderSettings(),
             plugins = new[] { new { id = "context-compression", enabled = false } },
             messages = new[] { new { role = "system", content = prompt }, new { role = "user", content = input } },
             response_format = new
@@ -135,6 +132,22 @@ public sealed class OpenRouterGateway(IHttpClientFactory clients, IConfiguration
                 },
             },
         };
+
+    private Dictionary<string, object> ProviderSettings()
+    {
+        var settings = new Dictionary<string, object>(StringComparer.Ordinal)
+        {
+            ["only"] = new[] { Provider },
+            ["order"] = new[] { Provider },
+            ["allow_fallbacks"] = false,
+            ["require_parameters"] = true,
+        };
+        if (EvaluationPriceLimits is not null)
+        {
+            settings["max_price"] = EvaluationPriceLimits;
+        }
+        return settings;
+    }
 
     internal async Task<ProviderCompletion> CompleteAsync(
         string prompt,
@@ -152,6 +165,7 @@ public sealed class OpenRouterGateway(IHttpClientFactory clients, IConfiguration
         request.Headers.Add("X-OpenRouter-Cache", "false");
         request.Headers.Add("X-OpenRouter-Metadata", "enabled");
         request.Content = JsonContent.Create(CreateRequest(prompt, input, schema, outputTokens));
+        var providerTimer = Stopwatch.StartNew();
         using var response = await client.SendAsync(request, cancellationToken);
         JsonElement body;
         try
@@ -177,6 +191,7 @@ public sealed class OpenRouterGateway(IHttpClientFactory clients, IConfiguration
         var usage = Property(body, "usage");
         var diagnostics = new ResolutionDiagnostics
         {
+            TimingsMs = new Dictionary<string, double> { ["provider"] = providerTimer.Elapsed.TotalMilliseconds },
             Model = ReadString(body, "model"),
             Provider = ReadString(body, "provider"),
             GenerationId = ReadString(body, "id"),

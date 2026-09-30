@@ -1773,6 +1773,8 @@ test("Native new-window links and feature popups become fullscreen tabs with the
       await waitForSession(session.sessionId, (state) =>
         state.pages.some((entry) => entry.pageId === popupId && entry.url.endsWith("?reused=1")),
       );
+      // Re-establish the opener after navigation so native focus must be observed in the new document.
+      await request(`/pages/${page.pageId}/activate`);
       // Chromium may ignore focus while a reused native window is settling.
       // Establish native focus first, then independently check managed-page routing.
       let nativeFocused = false;

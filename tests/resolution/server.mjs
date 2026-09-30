@@ -49,10 +49,16 @@ const server = createServer(async (request, response) => {
         "/hidden-only",
         "/offscreen",
         "/batch",
+        "/confirmations",
         "/frames",
       ].includes(path)
     ) {
       let html = fixture;
+      if (path === "/confirmations")
+        html = html.replace(
+          /<nav.*?<\/nav>/s,
+          `<button>Confirm</button><ul aria-label="Pending requests"><li>Request one <button data-oracle="confirmation-first">Confirm</button></li><li>Request two <button data-oracle="confirmation-second" disabled>Confirm</button></li><li hidden><button>Confirm</button></li></ul>`,
+        );
       if (path === "/frames")
         html = html.replace(
           "</nav>",
@@ -185,6 +191,7 @@ const server = createServer(async (request, response) => {
                               candidates.filter(
                                 (candidate) =>
                                   (!item.tag || candidate.tag === item.tag) &&
+                                  (!item.scope || candidate.scope?.includes(item.scope)) &&
                                   (!item.frameLabel ||
                                     candidate.frame?.labels.includes(item.frameLabel)) &&
                                   (candidate.label === item.label || candidate.text === item.label),

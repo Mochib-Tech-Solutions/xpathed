@@ -65,17 +65,19 @@ function coverage(value) {
 }
 
 export function gradeTrial(caseSpec, trial) {
+  const offline = caseSpec.track === "offline-selection";
   const failures = [];
   const fail = (category, detail) => failures.push({ category, detail });
   const expected = caseSpec.expected;
   const wanted = expected.actions;
   const metrics = {
-    actionsExpected: wanted.length,
+    actionsExpected: wanted.filter((item) => typeof item.action === "string").length,
     actionsActual: 0,
     actionsCorrect: 0,
     targetsExpected: wanted.filter((action) => action.outcome === "found").length,
     targetsCorrect: 0,
     wrongTargets: 0,
+    duplicateTargets: 0,
     falseNotFound: 0,
   };
   Object.assign(metrics, {
@@ -186,10 +188,18 @@ export function gradeTrial(caseSpec, trial) {
     fail("contract", "Required resolution result/actions are missing or malformed.");
   } else {
     metrics.actionsActual = trial.result.actions.length;
-    if (trial.result.contractVersion !== "2")
-      fail("contract", "Expected multi-action contract version 2.");
-    if (trial.result.action != null || trial.result.target != null)
-      fail("contract", "Version 2 cannot return a legacy top-level action or target.");
+    const contractVersion = offline ? "offline-1" : (caseSpec.contractVersion ?? "2");
+    if (trial.result.contractVersion !== contractVersion)
+      fail("contract", `Expected resolution contract version ${contractVersion}.`);
+    if (trial.result.target != null || (contractVersion === "2" && trial.result.action != null))
+      fail("contract", "Unexpected top-level target or legacy action.");
+    if (
+      contractVersion !== "2" &&
+      trial.result.outcome !== "error" &&
+      (!trial.result.action ||
+        trial.result.actions.some((item) => item?.action !== trial.result.action))
+    )
+      fail("contract", "All target items must share the command's one action.");
     if (
       trial.result.outcome === "error" &&
       (trial.result.actions.length > 0 || trial.result.summary != null)
@@ -216,8 +226,16 @@ export function gradeTrial(caseSpec, trial) {
     )
       fail("action_decomposition", "Required actions are missing or extra actions were returned.");
     const ids = new Set();
+    const selectedTargets = new Set();
+    if (
+      contractVersion !== "2" &&
+      trial.result.outcome !== "error" &&
+      (trial.result.actions.length < 1 || trial.result.actions.length > 16)
+    )
+      fail("contract", "A command must return between one and sixteen target items.");
     for (const [index, action] of trial.result.actions.entries()) {
       const before = failures.length;
+      let duplicateTarget = false;
       const label = wanted[index];
       if (!object(action)) {
         fail("contract", `Action ${index + 1} is malformed.`);
@@ -232,7 +250,7 @@ export function gradeTrial(caseSpec, trial) {
         !label ||
         action.order !== index + 1 ||
         action.step !== label.step ||
-        action.action !== label.action
+        (typeof label.action === "string" && action.action !== label.action)
       )
         fail("action_decomposition", `Action ${index + 1} differs in order, step or action type.`);
       if (action.outcome === "error" && label?.outcome !== "error") {
@@ -247,51 +265,83 @@ export function gradeTrial(caseSpec, trial) {
         metrics.unsupportedCorrect++;
       if (action.outcome === "found") {
         metrics.targetsReturned++;
-        if (
-          action.target?.state?.version !== "2" ||
-          action.target?.interactability?.version !== "2" ||
-          action.target?.interactability?.action !== action.action
-        )
-          fail(
-            "contract",
-            `Action ${index + 1} must return version 2 state and matching action interactability.`,
-          );
-        const paths = action.target?.xpaths;
-        const matches = trial.observation?.actions?.[index]?.matches;
-        if (
-          !Array.isArray(paths) ||
-          paths.length !== 1 ||
-          typeof paths[0] !== "string" ||
-          !paths[0].trim()
-        )
-          fail("contract", `Action ${index + 1} must return exactly one XPath.`);
-        const correct =
-          Array.isArray(paths) &&
-          paths.length > 0 &&
-          Array.isArray(matches) &&
-          matches.length === paths.length &&
-          matches.every((match) => match?.count === 1 && match.intended === true);
-        if (!correct) {
-          fail(
-            "target_identity",
-            `Action ${index + 1} does not uniquely identify the intended node.`,
-          );
-          metrics.wrongTargets++;
-        } else if (label?.outcome === "found") metrics.targetsCorrect++;
+        if (contractVersion !== "2" && action.target?.candidateId) {
+          if (selectedTargets.has(action.target.candidateId)) {
+            duplicateTarget = true;
+            metrics.duplicateTargets++;
+            fail(
+              "target_identity",
+              "The same candidate was returned more than once for one command.",
+            );
+          }
+          selectedTargets.add(action.target.candidateId);
+        }
+        if (offline) {
+          const target = action.target;
+          if (!object(target) || Object.keys(target).some((key) => key !== "candidateId"))
+            fail(
+              "contract",
+              "Offline selection cannot claim browser XPath, geometry or readiness evidence.",
+            );
+          if (
+            typeof target?.candidateId !== "string" ||
+            target.candidateId !== label?.target?.candidateId
+          ) {
+            metrics.wrongTargets++;
+            fail(
+              "target_identity",
+              `Target ${index + 1} differs from its independent source mapping.`,
+            );
+          } else if (!duplicateTarget) metrics.targetsCorrect++;
+        } else {
+          if (
+            action.target?.state?.version !== "2" ||
+            action.target?.interactability?.version !== "2" ||
+            action.target?.interactability?.action !== action.action
+          )
+            fail(
+              "contract",
+              `Action ${index + 1} must return version 2 state and matching action interactability.`,
+            );
+          const paths = action.target?.xpaths;
+          const matches = trial.observation?.actions?.[index]?.matches;
+          if (
+            !Array.isArray(paths) ||
+            paths.length !== 1 ||
+            typeof paths[0] !== "string" ||
+            !paths[0].trim()
+          )
+            fail("contract", `Action ${index + 1} must return exactly one XPath.`);
+          const correct =
+            Array.isArray(paths) &&
+            paths.length > 0 &&
+            Array.isArray(matches) &&
+            matches.length === paths.length &&
+            matches.every((match) => match?.count === 1 && match.intended === true);
+          if (!correct) {
+            fail(
+              "target_identity",
+              `Action ${index + 1} does not uniquely identify the intended node.`,
+            );
+            metrics.wrongTargets++;
+          } else if (label?.outcome === "found" && !duplicateTarget) metrics.targetsCorrect++;
+        }
       } else if (action.target != null) {
         fail("contract", `Action ${index + 1} returned a target for a non-found outcome.`);
       }
       if (label?.state) {
+        if (offline) fail("contract", "Historical state is unavailable in offline selection.");
         if (!matchesPartial(action.target?.state, label.state))
           fail("target_state", `Action ${index + 1} state differs from its label.`);
         else metrics.stateCorrect++;
       }
       if (label?.interactability) {
+        if (offline) fail("contract", "Historical readiness is unavailable in offline selection.");
         if (!matchesPartial(action.target?.interactability, label.interactability))
           fail("interactability", `Action ${index + 1} readiness differs from its label.`);
         else metrics.readinessCorrect++;
       }
-      if (label && failures.length === before) metrics.actionsCorrect++;
+      if (label?.action && failures.length === before) metrics.actionsCorrect++;
     }
     metrics.decompositionCorrect =
       (requestError && expected.outcome !== "error") ||
@@ -301,6 +351,17 @@ export function gradeTrial(caseSpec, trial) {
         ? 0
         : 1;
   }
+  metrics.missingTargets = Math.max(0, metrics.targetsExpected - metrics.targetsCorrect);
+  // Extra returned entries include wrong nodes and duplicate occurrences; duplicateTargets separates the latter.
+  metrics.extraTargets = Math.max(0, metrics.targetsReturned - metrics.targetsCorrect);
+  metrics.targetSetsExpected = metrics.targetsExpected > 0 ? 1 : 0;
+  metrics.targetSetsComplete =
+    metrics.targetSetsExpected &&
+    !metrics.missingTargets &&
+    !metrics.extraTargets &&
+    !metrics.duplicateTargets
+      ? 1
+      : 0;
   metrics.semanticFailure = failures.some(({ category }) =>
     [
       "action_decomposition",
@@ -348,6 +409,11 @@ function aggregate(entries) {
     "targetsReturned",
     "targetsCorrect",
     "wrongTargets",
+    "missingTargets",
+    "extraTargets",
+    "duplicateTargets",
+    "targetSetsExpected",
+    "targetSetsComplete",
     "falseNotFound",
     "unsupportedExpected",
     "unsupportedCorrect",
@@ -368,6 +434,9 @@ function aggregate(entries) {
   }
   metrics.actionAccuracy = metrics.actionsExpected
     ? metrics.actionsCorrect / metrics.actionsExpected
+    : null;
+  metrics.targetSetCompleteness = metrics.targetSetsExpected
+    ? metrics.targetSetsComplete / metrics.targetSetsExpected
     : null;
   metrics.topOneAccuracy = metrics.targetsExpected
     ? metrics.targetsCorrect / metrics.targetsExpected
@@ -442,6 +511,55 @@ function aggregate(entries) {
   };
 }
 
+function datasetForecast(manifest, trials) {
+  const measured = trials.filter(
+    (trial) =>
+      number(trial.result?.diagnostics?.usage?.inputTokens) !== null &&
+      number(trial.result?.diagnostics?.usage?.outputTokens) !== null,
+  );
+  const mean = (key) =>
+    measured.length
+      ? measured.reduce((sum, trial) => sum + trial.result.diagnostics.usage[key], 0) /
+        measured.length
+      : null;
+  const input = mean("inputTokens"),
+    output = mean("outputTokens");
+  const pricing = manifest.pricing;
+  const perRecord =
+    input !== null && pricing
+      ? input * Number(pricing.prompt) +
+        output * Number(pricing.completion) +
+        Number(pricing.request ?? 0)
+      : null;
+  return {
+    basis:
+      "Sample mean tokens at recorded route prices; extrapolation, not a spending authorization or worst-case bound",
+    sampleSelection: manifest.selection,
+    measuredTrials: measured.length,
+    inputTokensPerRecord: input,
+    outputTokensPerRecord: output,
+    repetitions: manifest.plan.repetitions,
+    pricing: pricing ?? null,
+    splits: Object.fromEntries(
+      Object.entries(manifest.inventory?.splits ?? {}).map(([split, inventory]) => {
+        const eligible = inventory.statuses?.["offline-eligible"] ?? 0;
+        return [
+          split,
+          {
+            eligible,
+            projectedUsd:
+              perRecord === null ? null : eligible * perRecord * manifest.plan.repetitions,
+            limitation:
+              split === manifest.selection?.split
+                ? "Pilot may not represent the full split"
+                : "Extrapolated from another split; no held-out inference was performed",
+          },
+        ];
+      }),
+    ),
+  };
+}
+
 export function summarize(manifest, trials) {
   const cases = new Map(manifest.cases.map((caseSpec) => [caseSpec.id, caseSpec]));
   const order = manifest.plan.caseOrder;
@@ -507,7 +625,7 @@ export function summarize(manifest, trials) {
   }
   const entries = [...first.values()];
   const groups = Object.fromEntries(
-    ["family", "split", "category"].map((key) => [
+    ["family", "split", "category", "dataset", "track"].map((key) => [
       key,
       Object.fromEntries(
         [...new Set(entries.map((entry) => cases.get(entry.caseId)[key] ?? "unspecified"))]
@@ -526,6 +644,14 @@ export function summarize(manifest, trials) {
     qualification: "incomplete",
     mode: manifest.mode ?? "unavailable",
     modelQualityMeasured: manifest.mode === "live",
+    ...(manifest.track === "offline-selection"
+      ? {
+          inventory: manifest.inventory,
+          forecast: datasetForecast(manifest, trials),
+          measurement: manifest.measurement,
+          unavailable: manifest.unavailable,
+        }
+      : {}),
     plannedTrials: planned.size,
     completedTrials,
     missingTrials: planned.size - completedTrials,

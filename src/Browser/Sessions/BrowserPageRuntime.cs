@@ -26,6 +26,8 @@ internal sealed class BrowserPageRuntime(IPage page, long order)
             {
                 DocumentId = Guid.NewGuid().ToString("N");
                 focusContextId = null;
+                // Playwright's CDP session restores emulated focus when the document changes.
+                _ = RestoreNativeFocusAsync(focused);
             }
             InvalidateCapture();
             _ = ClearHighlightAsync();
@@ -48,6 +50,7 @@ internal sealed class BrowserPageRuntime(IPage page, long order)
             new Dictionary<string, object> { ["enabled"] = false }
         );
         await Highlight.SendAsync("Runtime.enable");
+        await Highlight.SendAsync("Page.enable");
         Highlight.Event("Runtime.bindingCalled").OnEvent += (_, message) =>
         {
             if (message is { } value && value.TryGetProperty("name", out var name) && name.GetString() == FocusBinding)
@@ -69,6 +72,26 @@ internal sealed class BrowserPageRuntime(IPage page, long order)
                     "if (window === top) { const notify = () => { if (document.hasFocus()) globalThis.xpathedFocus(''); }; addEventListener('focus', notify); notify(); }",
             }
         );
+    }
+
+    private async Task RestoreNativeFocusAsync(Action<BrowserPageRuntime> focused)
+    {
+        if (Highlight is null)
+        {
+            return;
+        }
+        try
+        {
+            await Highlight.SendAsync(
+                "Emulation.setFocusEmulationEnabled",
+                new Dictionary<string, object> { ["enabled"] = false }
+            );
+            if (await HasNativeFocusAsync())
+            {
+                focused(this);
+            }
+        }
+        catch (PlaywrightException) { }
     }
 
     public async Task ShowAsync()

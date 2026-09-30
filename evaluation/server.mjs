@@ -2,7 +2,12 @@ import { createServer } from "node:http";
 import { readFileSync } from "node:fs";
 import { renderFixture } from "./fixtures.mjs";
 
-const manifest = JSON.parse(readFileSync(new URL("./cases.json", import.meta.url), "utf8"));
+const manifest = JSON.parse(
+  readFileSync(
+    process.env.XPATHED_EVALUATION_SUITE || new URL("./cases.json", import.meta.url),
+    "utf8",
+  ),
+);
 
 export function createFixtureServer({
   cases = manifest.cases,

@@ -215,6 +215,52 @@ async function observeXpaths(run, xpaths) {
   assert.fail("Independent fixture observation did not arrive");
 }
 
+test("One click command resolves every confirmation in the requested list as separate targets", async () => {
+  await json(`${fixture}/scenario`, "POST", {
+    name: "batch",
+    actions: [1, 0].map((index) => ({
+      step: 1,
+      instruction: "Click all confirmation buttons in Pending requests",
+      action: "click",
+      outcome: "found",
+      label: "Confirm",
+      scope: "Pending requests",
+      index,
+    })),
+  });
+  const session = await json(`${client}/api/sessions`, "POST");
+  const run = randomUUID();
+  try {
+    const page = await json(`${client}/api/pages/${session.pageId}/navigate`, "POST", {
+      url: `${fixture}/confirmations?run=${run}`,
+    });
+    const before = await observeXpaths(run, []);
+    const result = await json(`${client}/api/pages/${page.pageId}/resolve`, "POST", {
+      instruction: "Click all confirmation buttons in the Pending requests list",
+      documentId: page.documentId,
+      contractVersion: "3",
+    });
+    assert.equal(result.contractVersion, "3");
+    assert.equal(result.action, "click");
+    assert.equal(result.actions.length, 2);
+    assert.ok(result.actions.every((item) => item.action === "click" && item.outcome === "found"));
+    assert.equal(result.summary.found, 2);
+    assert.equal(result.summary.blocked, 1);
+    assert.equal(result.diagnostics.modelCalls, 1);
+    const observed = await observeXpaths(
+      run,
+      result.actions.map((item) => item.target.xpaths[0]),
+    );
+    assert.deepEqual(observed.matches, [["confirmation-first"], ["confirmation-second"]]);
+    assert.equal(observed.clicks, 0);
+    assert.deepEqual(observed.events, before.events);
+    const provider = await json(`${fixture}/provider-request`);
+    assert.doesNotMatch(JSON.stringify(provider), /confirmation-first|confirmation-second/);
+  } finally {
+    await fetch(`${client}/api/sessions/${session.sessionId}`, { method: "DELETE" });
+  }
+});
+
 test("An independent plural oracle detects omitted actions despite valid returned XPaths", async () => {
   await json(`${fixture}/scenario`, "POST", {
     name: "batch",

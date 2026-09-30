@@ -52,6 +52,38 @@ test("a unique XPath passes only when the independent oracle identifies the inte
   assert.equal(gradeTrial(caseSpec, missing).passed, false);
 });
 
+test("version 3 requires one shared action and independently correct target items", () => {
+  const spec = { ...caseSpec, contractVersion: "3" };
+  const actual = trial();
+  actual.result.contractVersion = "3";
+  actual.result.action = "click";
+  assert.equal(gradeTrial(spec, actual).passed, true);
+  actual.result.action = "hover";
+  assert.equal(gradeTrial(spec, actual).passed, false);
+});
+
+test("offline identity grading rejects wrong targets and fabricated browser evidence", () => {
+  const spec = {
+    ...caseSpec,
+    track: "offline-selection",
+    expected: {
+      outcome: "found",
+      actions: [{ step: 1, action: "click", outcome: "found", target: { candidateId: "c2" } }],
+    },
+  };
+  const actual = trial();
+  actual.result.contractVersion = "offline-1";
+  actual.result.action = "click";
+  actual.result.actions[0].target = { candidateId: "c2" };
+  actual.observation = {};
+  assert.equal(gradeTrial(spec, actual).passed, true);
+  assert.equal(gradeTrial(spec, actual).metrics.readinessExpected, 0);
+  actual.result.actions[0].target.candidateId = "c1";
+  assert.equal(gradeTrial(spec, actual).metrics.wrongTargets, 1);
+  actual.result.actions[0].target = { candidateId: "c2", xpaths: ["//button"] };
+  assert.equal(gradeTrial(spec, actual).passed, false);
+});
+
 test("decomposition, ordered outcomes, partial state and request summary are independent assertions", () => {
   const expected = structuredClone(caseSpec);
   expected.expected.actions[0].state = { enabled: false };
@@ -413,4 +445,136 @@ test("malformed versioned results and capture leaks fail even when resolution al
     error: { code: "observation_failed" },
   };
   assert.equal(gradeTrial(errorCase, leaked).metrics.privacyLeak, true);
+});
+
+test("offline forecast preserves unmeasured usage and labels cross-split extrapolation", () => {
+  const spec = {
+    id: "sample",
+    dataset: "phrasenode",
+    split: "train",
+    family: "page",
+    track: "offline-selection",
+    expected: {
+      outcome: "found",
+      actions: [{ step: 1, outcome: "found", target: { candidateId: "n1" } }],
+    },
+  };
+  const manifest = {
+    track: "offline-selection",
+    mode: "live",
+    cases: [spec],
+    plan: { caseOrder: [spec.id], repetitions: 1 },
+    selection: { split: "train" },
+    inventory: {
+      splits: {
+        train: { statuses: { "offline-eligible": 100 } },
+        test: { statuses: { "offline-eligible": 20 } },
+      },
+    },
+    pricing: { prompt: "0.0000001", completion: "0.000001" },
+  };
+  assert.equal(summarize(manifest, []).forecast.splits.train.projectedUsd, null);
+  const report = summarize(manifest, [
+    {
+      caseId: spec.id,
+      result: {
+        contractVersion: "offline-1",
+        outcome: "found",
+        action: "inspect",
+        actions: [
+          {
+            actionId: "a1",
+            order: 1,
+            step: 1,
+            action: "inspect",
+            outcome: "found",
+            target: { candidateId: "n1" },
+          },
+        ],
+        diagnostics: { usage: { inputTokens: 1000, outputTokens: 100, cost: 0.0002 } },
+      },
+    },
+  ]);
+  assert.equal(report.forecast.measuredTrials, 1);
+  assert.ok(Math.abs(report.forecast.splits.train.projectedUsd - 0.02) < 1e-12);
+  assert.match(report.forecast.splits.test.limitation, /another split/);
+});
+
+test("one interaction cannot duplicate a candidate to inflate target completeness", () => {
+  const expected = {
+    outcome: "found",
+    actions: [1, 2].map((step) => ({
+      step,
+      action: "click",
+      outcome: "found",
+      target: { candidateId: "n1" },
+    })),
+  };
+  const grade = gradeTrial(
+    { track: "offline-selection", expected },
+    {
+      result: {
+        contractVersion: "offline-1",
+        outcome: "found",
+        action: "click",
+        actions: [1, 2].map((step) => ({
+          actionId: `a${step}`,
+          order: step,
+          step,
+          action: "click",
+          outcome: "found",
+          target: { candidateId: "n1" },
+        })),
+      },
+    },
+  );
+  assert.equal(grade.passed, false);
+  assert.ok(grade.failures.some((item) => /more than once/.test(item.detail)));
+});
+
+test("plural reports distinguish missing, extra, duplicate and wrong targets", () => {
+  const spec = {
+    track: "offline-selection",
+    expected: {
+      outcome: "found",
+      actions: ["n1", "n2"].map((candidateId, i) => ({
+        step: i + 1,
+        action: "click",
+        outcome: "found",
+        target: { candidateId },
+      })),
+    },
+  };
+  for (const [ids, missing, extra, duplicate, wrong, complete] of [
+    [["n1", "n2"], 0, 0, 0, 0, 1],
+    [["n1"], 1, 0, 0, 0, 0],
+    [["n1", "n2", "n3"], 0, 1, 0, 1, 0],
+    [["n1", "n1"], 1, 1, 1, 1, 0],
+    [["n9", "n2"], 1, 1, 0, 1, 0],
+  ]) {
+    const result = {
+      contractVersion: "offline-1",
+      outcome: "found",
+      action: "click",
+      actions: ids.map((candidateId, i) => ({
+        actionId: `a${i + 1}`,
+        step: i + 1,
+        order: i + 1,
+        action: "click",
+        outcome: "found",
+        target: { candidateId },
+      })),
+    };
+    const { metrics } = gradeTrial(spec, { result });
+    assert.deepEqual(
+      [
+        metrics.missingTargets,
+        metrics.extraTargets,
+        metrics.duplicateTargets,
+        metrics.wrongTargets,
+        metrics.targetSetsComplete,
+      ],
+      [missing, extra, duplicate, wrong, complete],
+    );
+  }
 });

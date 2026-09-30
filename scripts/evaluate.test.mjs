@@ -60,3 +60,22 @@ test("evaluation refuses existing development services before teardown", (t) => 
   assert.match(result.stderr, /non-evaluation service/);
   assert.doesNotMatch(result.calls, /\bdown\b|\bup\b|\brun\b/);
 });
+
+test("custom dataset suites cannot enter live mode or read outside the checkout", (t) => {
+  const directory = mkdtempSync(join(tmpdir(), "xpathed-custom-suite-"));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  const path = join(directory, "suite.json");
+  writeFileSync(path, '{"version":"1","cases":[]}');
+  const live = spawnSync("sh", ["scripts/evaluate.sh", "--mode", "live", "--suite", path], {
+    encoding: "utf8",
+    cwd: resolve(import.meta.dirname, ".."),
+  });
+  assert.equal(live.status, 2);
+  assert.match(live.stderr, /deterministic evaluation only/);
+  const outside = spawnSync("sh", ["scripts/evaluate.sh", "--suite", path], {
+    encoding: "utf8",
+    cwd: resolve(import.meta.dirname, ".."),
+  });
+  assert.notEqual(outside.status, 0);
+  assert.match(outside.stderr, /under this checkout/);
+});
