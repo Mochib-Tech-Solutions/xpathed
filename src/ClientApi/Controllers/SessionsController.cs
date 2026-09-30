@@ -12,13 +12,25 @@ public sealed class SessionsController(IHttpClientFactory clients) : ControllerB
 
     [HttpGet("{id}")]
     public Task Get(string id) =>
-        HttpForwarder.ForwardAsync(HttpContext, clients.CreateClient("browser"), $"/sessions/{Uri.EscapeDataString(id)}");
+        HttpForwarder.ForwardAsync(
+            HttpContext,
+            clients.CreateClient("browser"),
+            $"/sessions/{Uri.EscapeDataString(id)}"
+        );
 
     [HttpPost("{id}/pages")]
     public Task CreatePage(string id) =>
-        HttpForwarder.ForwardAsync(HttpContext, clients.CreateClient("browser"), $"/sessions/{Uri.EscapeDataString(id)}/pages");
+        HttpForwarder.ForwardAsync(
+            HttpContext,
+            clients.CreateClient("browser"),
+            $"/sessions/{Uri.EscapeDataString(id)}/pages"
+        );
 
     [HttpDelete("{id}")]
     public Task Delete(string id) =>
-        HttpForwarder.ForwardAsync(HttpContext, clients.CreateClient("browser"), $"/sessions/{Uri.EscapeDataString(id)}");
+        HttpForwarder.ForwardAsync(
+            HttpContext,
+            clients.CreateClient("browser"),
+            $"/sessions/{Uri.EscapeDataString(id)}"
+        );
 }
