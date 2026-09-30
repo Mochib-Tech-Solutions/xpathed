@@ -37,6 +37,8 @@ Comparison directories retain `manifest.json`, each original `trials/` entry, `s
 
 ## Compare and qualify models
 
+The dated [qualification report](research/model-qualification-report.md) records measured latency, correctness, costs and the decision to leave defaults unchanged.
+
 `pnpm evaluate:qualify` uses the same browser execution and independent grader, with the profiles in `evaluation/qualification-profiles.json`. It compares the baseline prompt/schema/DOM on standard Luna/OpenAI, Gemini/Google AI Studio and DeepSeek/Wafer routes. Model-specific reasoning and caching settings are explicit, fingerprinted and checked against current endpoint metadata. The optional `deepseek-concise` profile changes only the contract-3 prompt and records its own prompt version; it is an experimental development variant. Application defaults stay unchanged.
 
 ```sh
