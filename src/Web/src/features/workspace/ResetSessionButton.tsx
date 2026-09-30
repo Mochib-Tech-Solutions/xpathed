@@ -24,7 +24,7 @@ export default function ResetSessionButton({ disabled, onConfirm }: Props) {
       <AlertDialogContent>
         <AlertDialogTitle>Reset session?</AlertDialogTitle>
         <AlertDialogDescription>
-          Your page, chat and browsing state will be cleared.
+          All tabs, chat history and browsing state will be cleared.
         </AlertDialogDescription>
         <div className="mt-3 flex justify-end gap-2">
           <AlertDialogCancel>Cancel</AlertDialogCancel>
