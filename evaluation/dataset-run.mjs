@@ -24,6 +24,11 @@ export const datasetProfiles = [
     id: "deepseek-deepinfra",
     provider: "deepinfra/fp8",
   },
+  {
+    ...profiles.find((profile) => profile.id === "luna"),
+    id: "luna-azure",
+    provider: "azure",
+  },
 ];
 
 const hash = (text) => createHash("sha256").update(text).digest("hex");
