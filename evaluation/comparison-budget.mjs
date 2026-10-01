@@ -30,7 +30,10 @@ function declaredProfiles(profiles) {
   if (!Array.isArray(profiles) || !profiles.length) throw new Error("No approved profiles");
   const ids = new Set();
   return profiles.map((profile) => {
-    const allowed = approved[profile?.model];
+    const allowed =
+      profile?.id === "deepseek-deepinfra" && profile.model === model
+        ? { provider: "deepinfra/fp8", reasoning: { enabled: false } }
+        : approved[profile?.model];
     if (
       !allowed ||
       typeof profile.id !== "string" ||
@@ -498,10 +501,13 @@ export async function createBudgetProxy({
       record.status = result.status;
       record.headers = Object.fromEntries(
         [...result.headers].filter(([key]) =>
-          /^(x-openrouter-|x-request-id$|retry-after$|cache-control$|age$)/i.test(key),
+          /^(x-openrouter-|x-generation-id$|x-request-id$|retry-after$|cache-control$|age$)/i.test(
+            key,
+          ),
         ),
       );
       record.responseReuseDisabled = true;
+      await retain(record);
       record.response = safe(await result.text());
       const payload = JSON.parse(record.response);
       record.response = safe(payload);
@@ -549,6 +555,43 @@ export async function createBudgetProxy({
     } catch (error) {
       blocked ||= current.reservation != null;
       record.error = safe(String(error.message));
+      const generationId = record.headers?.["x-generation-id"];
+      if (current.reservation && record.reportedUsd == null && generationId) {
+        record.chargeRecovery = { generationId, status: null };
+        try {
+          const recovery = await fetchImpl(
+            `${upstream}/generation?id=${encodeURIComponent(generationId)}`,
+            {
+              method: "GET",
+              headers: { Authorization: `Bearer ${apiKey}` },
+              signal: AbortSignal.timeout(10000),
+            },
+          );
+          record.chargeRecovery.status = recovery.status;
+          if (!recovery.ok) throw new Error("Generation metadata is unavailable");
+          const { data } = await recovery.json();
+          const profile = current.profile;
+          if (
+            data?.id !== generationId ||
+            !profile.acceptedModels.includes(data.model) ||
+            ![profile.provider, profile.endpoint.provider_name].some(
+              (provider) =>
+                typeof provider === "string" &&
+                provider.toLowerCase() === data.provider_name?.toLowerCase(),
+            ) ||
+            !Number.isFinite(data.total_cost) ||
+            data.total_cost < 0 ||
+            data.total_cost > current.reservation.reservedUsd
+          )
+            throw new Error("Generation metadata does not verify the reserved charge");
+          record.reportedUsd = data.total_cost;
+          record.reportedCostSource = "generation";
+          current.reservation.reportedUsd = data.total_cost;
+          await persist(record, "reconciliation");
+        } catch (recoveryError) {
+          record.chargeRecovery.error = safe(String(recoveryError.message));
+        }
+      }
       record.elapsedMs = performance.now() - started;
       try {
         await retain(record);
