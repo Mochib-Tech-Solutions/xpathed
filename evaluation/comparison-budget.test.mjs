@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { once } from "node:events";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { access, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import test from "node:test";
@@ -62,14 +62,85 @@ async function setup(
   proxy.server.listen(0, "127.0.0.1");
   await once(proxy.server, "listening");
   const base = `http://127.0.0.1:${proxy.server.address().port}/api/v1`;
-  const post = (body = input) =>
+  const post = (body = input, signal) =>
     fetch(`${base}/chat/completions`, {
       method: "POST",
+      signal,
       headers: { "Content-Type": "application/json" },
       body: typeof body === "string" ? body : JSON.stringify(body),
     });
   return { proxy, post, base, calls, ledgerPath, fetchImpl };
 }
+
+test("shutdown retains late provider accounting after the caller disconnects", async (t) => {
+  for (const outcome of ["reply", "failure"])
+    await t.test(outcome, async (t) => {
+      const started = Promise.withResolvers();
+      const upstream = Promise.withResolvers();
+      const retained = [];
+      const { proxy, post, ledgerPath, fetchImpl } = await setup(t, {
+        completion: () => {
+          started.resolve();
+          return upstream.promise;
+        },
+        onRecord: async (record) => retained.push(record),
+      });
+      const connection = once(proxy.server, "connection");
+      const controller = new AbortController();
+      proxy.beginAttempt("disconnected");
+      const request = post(input, controller.signal);
+      const [socket] = await connection;
+      const disconnected = once(socket, "close");
+      await started.promise;
+      controller.abort();
+      await assert.rejects(request, /abort/i);
+      await disconnected;
+      const serverClosed = once(proxy.server, "close");
+      let firstClosed = false;
+      let secondClosed = false;
+      let drained = false;
+      const draining = proxy.awaitIdle().then(() => (drained = true));
+      const first = proxy.close().then(() => (firstClosed = true));
+      const second = proxy.close().then(() => (secondClosed = true));
+      try {
+        await serverClosed;
+        await new Promise((resolve) => setImmediate(resolve));
+        assert.equal(firstClosed, false, "closing the HTTP server must not abandon inference");
+        assert.equal(secondClosed, false, "every close caller must await accounting");
+        assert.equal(drained, false, "evidence snapshots must wait for upstream accounting");
+        await access(`${ledgerPath}.lock`);
+        assert.equal(proxy.budget.pendingCharges, 1);
+        if (outcome === "reply")
+          upstream.resolve(
+            Response.json({
+              id: "late-generation",
+              model,
+              provider: "Wafer",
+              usage: { cost: 0.001, prompt_tokens: 50, completion_tokens: 20 },
+              choices: [],
+            }),
+          );
+        else upstream.reject(new Error("Upstream timed out"));
+        await Promise.all([first, second, draining]);
+        await assert.rejects(access(`${ledgerPath}.lock`), /ENOENT/);
+        const entry = JSON.parse(await readFile(ledgerPath, "utf8")).entries[0];
+        assert.equal(entry.reportedUsd, outcome === "reply" ? 0.001 : null);
+        assert.equal(retained.at(-1).reportedUsd, entry.reportedUsd);
+        assert.equal(retained.at(-1).forwarded, true);
+        if (outcome === "failure") {
+          assert.match(retained.at(-1).error, /Upstream timed out/);
+          await assert.rejects(
+            createBudgetProxy({ apiKey: "key", ledgerPath, fetchImpl }),
+            /Unreconciled/,
+          );
+        }
+      } finally {
+        upstream.resolve(Response.json({ usage: { cost: 0.001 }, choices: [] }));
+        await Promise.all([first, second]);
+        await new Promise((resolve) => setImmediate(resolve));
+      }
+    });
+});
 
 test("proxy reserves before payment, pins the effective route, accounts actual cost and refuses retries", async (t) => {
   const retained = [];
@@ -244,6 +315,13 @@ const qualificationProfiles = [
     maxTokens: 1024,
   },
   { id: "flash", model, provider: "wafer", reasoning: { enabled: false }, maxTokens: 1024 },
+  {
+    id: "qwen",
+    model: "qwen/qwen3.8-flash",
+    provider: "alibaba",
+    reasoning: { enabled: false },
+    maxTokens: 4096,
+  },
 ];
 const profileMetadata = (url) => {
   const profile = qualificationProfiles.find((item) => url.includes(item.model));
@@ -321,14 +399,14 @@ test("qualification pins each approved profile and reserves the highest tier and
     proxy.beginAttempt(profile.id, profile.id);
     assert.equal((await post(profileInput(profile))).status, 200);
   }
-  assert.equal(calls.length, 3);
+  assert.equal(calls.length, 4);
   assert.deepEqual(proxy.budget, {
     ceilingUsd: 5,
-    spentUsd: 0.003,
-    remainingUsd: 4.997,
+    spentUsd: 0.004,
+    remainingUsd: 4.996,
     pendingCharges: 0,
   });
-  assert.equal(JSON.parse(await readFile(ledgerPath, "utf8")).entries.length, 3);
+  assert.equal(JSON.parse(await readFile(ledgerPath, "utf8")).entries.length, 4);
   for (const [index, call] of calls.entries()) {
     const profile = qualificationProfiles[index];
     const request = JSON.parse(call.options.body);
@@ -385,6 +463,8 @@ test("unapproved profiles and unknown price overrides fail closed at startup", a
     { ...qualificationProfiles[0], provider: "openai/fast" },
     { ...qualificationProfiles[1], reasoning: { enabled: false } },
     { ...qualificationProfiles[2], model: "deepseek/latest" },
+    { ...qualificationProfiles[3], provider: "alibaba/fast" },
+    { ...qualificationProfiles[3], reasoning: { enabled: true } },
   ])
     await assert.rejects(createBudgetProxy({ apiKey: "key", profiles: [profile] }), /Unapproved/);
   const directory = await mkdtemp(join(tmpdir(), "xpathed-unbounded-price-"));
@@ -404,6 +484,24 @@ test("unapproved profiles and unknown price overrides fail closed at startup", a
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
+});
+
+test("Qwen refuses enabled reasoning or a different provider before payment", async (t) => {
+  const profile = qualificationProfiles.find((item) => item.id === "qwen");
+  const { proxy, post, calls } = await setup(t, {
+    profiles: [profile],
+    metadata: profileMetadata,
+  });
+  const valid = profileInput(profile);
+  const invalid = [
+    { ...valid, reasoning: { enabled: true } },
+    { ...valid, provider: { ...valid.provider, only: ["alibaba/fast"] } },
+  ];
+  for (const [index, request] of invalid.entries()) {
+    proxy.beginAttempt(`qwen-invalid-${index}`, profile.id);
+    assert.equal((await post(request)).status, 400);
+  }
+  assert.equal(calls.length, 0);
 });
 
 test("cache hits remain explicit evidence despite unique generation IDs", async (t) => {

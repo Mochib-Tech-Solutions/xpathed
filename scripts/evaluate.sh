@@ -135,7 +135,7 @@ for container in $(docker ps -aq --filter "label=com.docker.compose.project=$COM
   case "$service" in
     browser|resolver|evaluation-fixture) ;;
     stagehand) if [ "$comparison" != true ]; then echo "Comparison service belongs to a different runner" >&2; exit 2; fi ;;
-    resolver-luna|resolver-gemini|resolver-deepseek-concise) if [ "$qualification" != true ]; then echo "Qualification service belongs to a different runner" >&2; exit 2; fi ;;
+    resolver-luna|resolver-gemini|resolver-deepseek-concise|resolver-qwen) if [ "$qualification" != true ]; then echo "Qualification service belongs to a different runner" >&2; exit 2; fi ;;
     *) echo "Evaluation project contains a non-evaluation service: $service" >&2; exit 2 ;;
   esac
 done
@@ -160,7 +160,7 @@ fi
 rm "$XPATHED_EVALUATION_OUTPUT/.mount-check"
 if [ "$qualification" = true ]; then
   mkdir -p .artifacts/datasets
-  compose up --build --wait browser resolver resolver-luna resolver-gemini resolver-deepseek-concise evaluation-fixture
+  compose up --build --wait browser resolver resolver-luna resolver-gemini resolver-deepseek-concise resolver-qwen evaluation-fixture
 elif [ "$comparison" = true ]; then
   mkdir -p .artifacts/datasets
   compose up --build --wait browser resolver evaluation-fixture stagehand
@@ -170,7 +170,7 @@ fi
 compose exec -T evaluation-fixture node /checks/ready.mjs http://browser:8080/health http://resolver:8080/health http://evaluation-fixture:8090/health
 echo "Evaluation artifacts: $XPATHED_EVALUATION_OUTPUT"
 if [ "$qualification" = true ]; then
-  compose exec -T evaluation-fixture node /checks/ready.mjs http://resolver-luna:8080/health http://resolver-gemini:8080/health http://resolver-deepseek-concise:8080/health
+  compose exec -T evaluation-fixture node /checks/ready.mjs http://resolver-luna:8080/health http://resolver-gemini:8080/health http://resolver-deepseek-concise:8080/health http://resolver-qwen:8080/health
   browser_binary_hash=$(compose exec -T browser sh -c 'sha256sum /ms-playwright/chromium-*/chrome-linux*/chrome' | awk '{print $1}')
   compose exec -T -e "XPATHED_BROWSER_BINARY_SHA256=$browser_binary_hash" evaluation-fixture node /evaluation/qualify.mjs "$@"
 elif [ "$comparison" = true ]; then
