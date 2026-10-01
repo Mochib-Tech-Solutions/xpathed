@@ -17,7 +17,7 @@
     "No fresh holdout claim; original dev split remains exposed development evidence",
     "Not the contract4/prompt8 viewport benchmark"
   ],
-  "reviewStatus": "Completed independent full-payload and source-label review; no paid results yet",
+  "reviewStatus": "Completed independent full-payload and source-label review; execution is reported separately",
   "selectedCases": [
     {
       "caseId": "phrasenode-db978249f30c2c27d84a36a8",

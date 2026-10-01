@@ -1,6 +1,6 @@
 # Expanded original-labelled evaluation
 
-2026-10-01. Follow-up to [issue #50](https://github.com/Mochib-Tech-Solutions/xpathed/issues/50).
+2026-10-01. Follow-up to [issue #50](https://github.com/Mochib-Tech-Solutions/xpathed/issues/50). **860 distinct requests are reviewed and prepared; 53 were attempted before repeated provider timeouts stopped measurement.** This is a coverage expansion with partial results, not a completed replacement baseline.
 
 ## Selection
 
@@ -8,17 +8,17 @@ The frozen candidate pool contains 1,000 previously unselected original PhraseNo
 
 The import contains 3,719 eligible development cases across 183 families. Removing those 202 previous records leaves 3,517 cases across 182 families. Selection includes every remaining select target and literal color-word case, then fills the least-represented families first. Within each family it prioritizes rare control types, unnamed targets and lexical cues, breaking ties with SHA-256 ranks seeded by 47. No model outcome determines inclusion. The remaining 2,517 cases form a retained reserve queue; they are not approved inputs or completed tests.
 
-| Candidate coverage                         | Count |
-| ------------------------------------------ | ----: |
-| Links                                      |   483 |
-| Inputs                                     |   326 |
-| Buttons                                    |   156 |
-| Selects                                    |    35 |
-| Targets without text, label or placeholder |   231 |
-| Pages with at most 100 candidates          |    43 |
-| Pages with 101–250 candidates              |   200 |
-| Pages with 251–500 candidates              |   335 |
-| Pages with more than 500 candidates        |   422 |
+| Candidate coverage                           | Count |
+| -------------------------------------------- | ----: |
+| Links                                        |   483 |
+| Inputs                                       |   326 |
+| Buttons                                      |   156 |
+| Selects                                      |    35 |
+| Targets without text, label or placeholder   |   231 |
+| Cases on pages with at most 100 candidates   |    43 |
+| Cases on pages with 101–250 candidates       |   200 |
+| Cases on pages with 251–500 candidates       |   335 |
+| Cases on pages with more than 500 candidates |   422 |
 
 The selected instructions contain 47 spatial, 61 ordinal, five color-word, 21 plural-word and 179 input-verb matches. These overlapping lexical counts describe sampling, not independently labelled actions or visual behavior. Original instructions and singleton target IDs remain unchanged. Missing appearance or geometry is a representation limitation; it is not silently supplied or treated as a verified visual label.
 
@@ -44,8 +44,26 @@ At the 2026-10-01 preparation snapshot, the pinned route advertised $0.05 per mi
 
 Only reviewed inputs can run. Each bounded batch must fit the reconciled remaining ledger using fresh route rates and exact prepared requests; each actual request separately reserves its maximum before inference. Reported costs release unused capacity for the next batch. Unknown charges, identity failures and accounting failures stop continuation; original failed attempts are never retried or removed. No priority serving or scheduled paid CI is introduced.
 
-## Measurement status
+## Partial measurement
 
-Preparation and independent review are complete. The launch failed before inference because the pinned Wafer route changed to non-enabled status `-2` in [OpenRouter endpoint metadata](https://openrouter.ai/api/v1/models/deepseek/deepseek-v4.1-flash/endpoints). The 2026-10-01 15:48 UTC [execution receipt](expanded-labelled-evaluation-execution.json) records **0/860 paid attempts and $0 new charges**. The dedicated evaluation key remains at $0.00738552 from the earlier viewport runs, and the ledger retains the same 1,529 entries and entry hash. Provider fallback remains disabled; substituting another route would change the frozen serving configuration.
+The first launch stopped before inference because the pinned Wafer route changed to non-enabled status `-2` in [OpenRouter endpoint metadata](https://openrouter.ai/api/v1/models/deepseek/deepseek-v4.1-flash/endpoints). It recovered at 15:55 UTC. The saved preflight-resumption receipt freezes paid source revision `49793a2` before the first call; the intervening change from the initial plan's `fb144f9` revision updated only the report and preflight receipt. All three paid waves retain identical code/binary fingerprints and unchanged prepared requests. The initial zero-call failure remains in the [execution evidence](expanded-labelled-evaluation-execution.json).
 
-This is a prepared, reviewed expansion with a blocked live measurement, not an accuracy or latency result. Issue #50 remains open until the paid run and report can finish. Retain the failed preflight and frozen queue when resuming; no source target should be relabelled or selected based on future outcomes. Offline elapsed time includes request preparation, child-process startup and inline GitHub budget accounting; it is not browser HTTP or UI latency. The eventual report must retain all original attempts, charges and timing scopes.
+The seven-case pilot included the largest prepared input and each target type and candidate-count band. It completed 7/7 correct. The next wave stopped after 38/100 attempts on a timeout without usage or generation identity. After manual accounting review retained its full original reservation, a new frozen queue excluded all 45 actual attempts, including that timeout, and resumed only never-attempted cases. That wave stopped after 8/100 attempts on another missing-charge timeout. Original interrupted manifests and results were preserved. The final unresolved charge blocks further paid calls; **807 cases remain unattempted**, not silently excluded or scored as successful.
+
+| Retained measurement                        |                      Result |
+| ------------------------------------------- | --------------------------: |
+| Attempts / frozen plan                      |                    53 / 860 |
+| Families attempted / reviewed               |                    46 / 180 |
+| Exact whole-response target correctness     |            36 / 53 (67.92%) |
+| Failed actual attempts                      |                          17 |
+| Known provider charges                      | $0.04142443 across 51 calls |
+| Unknown charges, full reservations retained |  $0.01538460 across 2 calls |
+| Offline elapsed p50 / p95                   |           6,834 / 29,491 ms |
+
+Failures comprise seven wrong-target responses, four incorrect outcome responses, three malformed model responses, one incomplete decomposition and two provider timeouts. All 53 attempts and all 807 unattempted cases remain visible in the frozen-plan report. There are 51 verified unique generation identities; the timeouts have no invented identities or charges. The interrupted prefix is not representative of all 860 reviewed cases and does not establish a new model ranking, an accuracy improvement or release qualification.
+
+Offline elapsed includes preparation and child-process startup. Both the .NET diagnostic named `provider` and proxy elapsed also include inline GitHub budget accounting; they are not pure inference or browser/UI response measurements. Reservation and reconciliation medians are approximately 1,465 and 1,502 ms respectively, retained separately without subtracting them to claim application latency. The previous current-view HTTP measurement remains the appropriate source for viewport-context efficiency and response-time comparisons.
+
+The expanded run consumes **$0.05680903** including both full unknown-charge reservations. Across the entire campaign, **$2.0919348558 is consumed and $7.9080651442 remains**. The dedicated evaluation key reports **$0.04880995 total usage**, exactly its previous $0.00738552 plus the 51 known new charges. Account-level usage does not establish an individual timeout's charge: both `reportedUsd` values remain null. The first new timeout's reservation was explicitly reviewed; the second remains unresolved. No ceiling or provider setting was changed to continue through that stop.
+
+Issue #50 remains open for the remaining measurement. Resume only the 807 cases without actual attempts after accounting and provider availability are resolved, preserving the original queue, failures and provider configuration. Use the recorded paid source revision `49793a2` with the retained private artifacts. Private `run-reviewed.mjs --resume-unattempted` checks original source provenance, actual attempt identities, orphan provider evidence and per-case request allocations before dispatch; it never reviews unknown charges automatically. The private aggregator replays all retained grades, validates actual requests and billing records, and distinguishes repeated unattempted plan entries from prohibited repeated actual attempts. Safe aggregate data and hashes are retained in the execution evidence; raw payloads remain private.
