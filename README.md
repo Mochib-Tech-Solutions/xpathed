@@ -124,8 +124,8 @@ Offline dataset prompt experiments use the explicit, versioned `--prompt-variant
 
 GitHub Issues hold the live requirements, dependencies and progress. The next capabilities are:
 
-- [Qualify fast model configurations (#9)](https://github.com/Mochib-Tech-Solutions/xpathed/issues/9).
-- [Extend verified PR/post-merge controls (#10)](https://github.com/Mochib-Tech-Solutions/xpathed/issues/10) and [add release promotion, rollback and drift monitoring (#11)](https://github.com/Mochib-Tech-Solutions/xpathed/issues/11).
+- [Add release promotion, rollback and drift monitoring (#11)](https://github.com/Mochib-Tech-Solutions/xpathed/issues/11).
+- [Enable eligible branch protection and verify actual Copilot review (#41)](https://github.com/Mochib-Tech-Solutions/xpathed/issues/41).
 
 These links describe planned work, not available features. Hosting and presentation work are deferred. Consult the live tickets before starting a slice; research notes may describe alternatives that were not adopted.
 
