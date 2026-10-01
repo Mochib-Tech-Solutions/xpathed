@@ -79,6 +79,27 @@ test("live release coverage blocks reused or absent holdout before any inference
     ],
   };
   assert.equal(qualificationCoverage(fresh).ready, true);
+  const currentView = {
+    ...fresh,
+    cases: fresh.cases.map((c) => ({ ...c, contractVersion: "4" })),
+  };
+  const currentViewReport = qualificationCoverage(currentView);
+  assert.equal(currentViewReport.ready, false);
+  assert.ok(currentViewReport.blockers.some((s) => /current-view qualification policy/i.test(s)));
+  const mixed = {
+    ...fresh,
+    cases: [
+      ...fresh.cases,
+      {
+        ...base,
+        id: "current-view-compatibility",
+        family: "current-view-compatibility",
+        contractVersion: "4",
+        deterministicOnly: true,
+      },
+    ],
+  };
+  assert.equal(qualificationCoverage(mixed).ready, false);
   fresh.cases[1].previousSplit = "development";
   assert.equal(qualificationCoverage(fresh).ready, false);
   delete fresh.cases[1].previousSplit;

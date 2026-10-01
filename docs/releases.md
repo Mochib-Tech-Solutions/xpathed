@@ -28,6 +28,8 @@ Success means the referenced evidence meets this verification contract. Without 
 
 No retained model currently qualifies. The existing exposed families are regression data; fresh independent held-out families with explicitly versioned current-view coverage are required before new release qualification. The contract-4 baseline is development evidence, not a qualifying replacement for the legacy contract-3 suite. Synthetic positive tests exercise the verifier without qualifying a real model or spending money.
 
+The current release policy covers legacy contracts. Live workflow preflight and evidence sealing explicitly reject contract 4 until a separately versioned current-view qualification policy is frozen. Adding current-view cases alone does not make them eligible, and a legacy-only seal cannot qualify the current-view client default. Historical policy results remain unchanged.
+
 Promotion, operational rollback and drift notifications remain in #11. Paid scheduled monitoring remains deferred; only manually dispatched qualification is authorized. The current environment-selected runtime default stays unchanged; verification alone never creates an approved-release pointer or switches models.
 
 ## Private Docker artifact bundles
