@@ -4,8 +4,9 @@ internal static class BrowserHighlightScript
 {
     public const string Create = """
         selectedNodes => {
-          let host, canvas, animation;
+          let host, canvas, animation, spotlightStarted;
           const nodes = [...new Set(selectedNodes)];
+          const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
           const clear = () => {
             cancelAnimationFrame(animation);
             host?.remove(); host = canvas = null;
@@ -23,8 +24,7 @@ internal static class BrowserHighlightScript
             const context = canvas.getContext('2d');
             context.setTransform(scale, 0, 0, scale, 0, 0);
             context.clearRect(0, 0, innerWidth, innerHeight);
-            context.fillStyle = 'rgba(59,130,246,0.18)';
-            context.strokeStyle = 'rgb(37,99,235)'; context.lineWidth = 2;
+            const boxes = [];
             for (const node of nodes) {
               let left = 0, top = 0, right = innerWidth, bottom = innerHeight, visible = true;
               for (let current = node; current; current = current.parentElement) {
@@ -38,11 +38,39 @@ internal static class BrowserHighlightScript
                 if (current.matches('dialog:modal, :popover-open')) break;
               }
               if (!visible || right <= left || bottom <= top) continue;
-              context.save(); context.beginPath(); context.rect(left, top, right-left, bottom-top); context.clip();
               for (const rect of node.getClientRects()) {
-                context.fillRect(rect.x, rect.y, rect.width, rect.height);
-                context.strokeRect(rect.x, rect.y, rect.width, rect.height);
+                const x = Math.max(left, rect.left), y = Math.max(top, rect.top);
+                const width = Math.min(right, rect.right) - x, height = Math.min(bottom, rect.bottom) - y;
+                if (width > 0 && height > 0) boxes.push({rect, left, top, right, bottom, x, y, width, height});
               }
+            }
+            if (spotlightStarted === undefined && boxes.some(box => box.width <= 24 || box.height <= 24)) {
+              spotlightStarted = performance.now();
+            }
+            const opacity = reducedMotion.matches || spotlightStarted === undefined
+              ? 0 : 0.35 * Math.min(1, Math.max(0, (1200 - (performance.now() - spotlightStarted)) / 600));
+            if (opacity > 0 && boxes.length) {
+              context.fillStyle = `rgba(0,0,0,${opacity})`;
+              context.fillRect(0, 0, innerWidth, innerHeight);
+              context.globalCompositeOperation = 'destination-out';
+              context.fillStyle = 'black';
+              for (const box of boxes) {
+                const width = Math.max(48, box.width + 24), height = Math.max(48, box.height + 24);
+                context.beginPath();
+                context.roundRect(box.x + (box.width-width)/2, box.y + (box.height-height)/2, width, height, 12);
+                context.fill();
+              }
+              context.globalCompositeOperation = 'source-over';
+            }
+            for (const {rect, left, top, right, bottom, x, y, width, height} of boxes) {
+              context.save(); context.beginPath(); context.rect(left, top, right-left, bottom-top); context.clip();
+              context.fillStyle = 'rgba(59,130,246,0.18)';
+              context.fillRect(rect.x, rect.y, rect.width, rect.height);
+              // Both edges remain distinguishable on light, dark and patterned page content.
+              context.strokeStyle = 'black'; context.lineWidth = 8;
+              context.strokeRect(x, y, width, height);
+              context.strokeStyle = 'white'; context.lineWidth = 4;
+              context.strokeRect(x, y, width, height);
               context.restore();
             }
             animation = requestAnimationFrame(draw);
