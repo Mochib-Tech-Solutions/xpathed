@@ -1,0 +1,535 @@
+import assert from "node:assert/strict";
+import { spawnSync, execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import {
+  mkdtempSync,
+  writeFileSync,
+  rmSync,
+  mkdirSync,
+  cpSync,
+  readFileSync,
+  realpathSync,
+  statSync,
+  symlinkSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import test from "node:test";
+import { gradeTrial } from "../evaluation/grader.mjs";
+
+const hash = (value) =>
+  createHash("sha256")
+    .update(typeof value === "string" || Buffer.isBuffer(value) ? value : JSON.stringify(value))
+    .digest("hex");
+async function workspace(t) {
+  const cwd = realpathSync(mkdtempSync(join(tmpdir(), "xpathed-release-")));
+  t.after(() => rmSync(cwd, { recursive: true, force: true }));
+  cpSync("evaluation", join(cwd, "evaluation"), { recursive: true });
+  mkdirSync(join(cwd, "scripts"));
+  cpSync("scripts/release.mjs", join(cwd, "scripts/release.mjs"));
+  writeFileSync(join(cwd, ".gitignore"), ".artifacts/\n");
+  const write = (path, value) =>
+    writeFileSync(join(cwd, path), JSON.stringify(value, null, 2) + "\n");
+  const now = Date.now();
+  const time = (offset) => new Date(now + offset).toISOString();
+  const cases = Array.from({ length: 34 }, (_, i) => ({
+    id: `case-${i}`,
+    family: i < 30 ? `held-${Math.floor(i / 3)}` : `family-${i}`,
+    split: i < 30 ? "held-out" : [30, 32].includes(i) ? "regression" : "development",
+    contractVersion: "3",
+    instruction: "Click the labelled buttons",
+    fixture: "synthetic",
+    setupRevision: "1",
+    review: { status: "reviewed", reviewer: "synthetic", reviewedAt: time(-5000) },
+    category: "target",
+    viewport: { width: 1280, height: 800 },
+    expected: {
+      outcome: i === 32 ? "not_found" : "found",
+      actions: ([0, 33].includes(i) ? [1, 2] : [1]).map((step) => ({
+        step,
+        action: "click",
+        outcome: i === 32 ? "not_found" : "found",
+        ...(i === 32 ? {} : { target: { selector: `#button-${step}` } }),
+      })),
+      summary: { processingComplete: true },
+    },
+  }));
+  const suite = { version: "1", cases };
+  write("evaluation/qualification-cases.json", suite);
+  const git = (...args) => execFileSync("git", args, { cwd, encoding: "utf8" }).trim();
+  git("init", "--quiet");
+  git("add", ".");
+  git(
+    "-c",
+    "user.name=Release test",
+    "-c",
+    "user.email=release@example.invalid",
+    "commit",
+    "--quiet",
+    "-m",
+    "Synthetic source",
+  );
+  const sha = git("rev-parse", "HEAD");
+  const { fingerprints, configurationRecord } = await import(`file://${cwd}/evaluation/run.mjs`);
+  const { profiles, baselineEvidence, selectQualificationCases, compatibilityCases } = await import(
+    `file://${cwd}/evaluation/qualify.mjs`
+  );
+  const { defaultPolicy, summarizeQualification } = await import(
+    `file://${cwd}/evaluation/qualification-policy.mjs`
+  );
+  const profile = profiles.find((item) => item.id === "deepseek");
+  const code = await fingerprints(cwd);
+  const build = (phase, pilot) => {
+    const selected = selectQualificationCases(cases, {
+      mode: "live",
+      splits: phase === "pilot" ? ["development"] : defaultPolicy.requiredSplits,
+    });
+    const path = `.artifacts/${phase}`;
+    mkdirSync(join(cwd, path, "trials"), { recursive: true });
+    const manifest = {
+      version: "1",
+      kind: "model-qualification",
+      id: `${phase}-run`,
+      createdAt: time(-4000),
+      mode: "live",
+      phase,
+      ...selected,
+      sourceManifestHash: hash(suite),
+      profiles: [profile],
+      baselineEvidence: pilot ? baselineEvidence(pilot) : null,
+      plan: {
+        repetitions: 1,
+        caseOrder: selected.cases.map((s) => s.id),
+        trials: selected.cases.map((s, i) => ({
+          id: hash(`${phase}-${i}`).slice(0, 32),
+          caseId: s.id,
+          profileId: profile.id,
+          repetition: 1,
+          attempt: 1,
+        })),
+      },
+      code,
+      browserBinarySha256: "b".repeat(64),
+      policy: defaultPolicy,
+      qualification: {
+        policySha256: hash(defaultPolicy),
+        frozenAt: time(-3000),
+        heldOutStartedAt: phase === "pilot" ? null : time(-2000),
+        baselineRunIds: pilot ? [pilot.manifest.id] : [],
+      },
+    };
+    const makeTrial = (planned, mode = "live") => {
+      const spec = cases.find((s) => s.id === planned.caseId);
+      const trial = {
+        ...planned,
+        createdAt: time(-1000),
+        mode,
+        elapsedMs: 500,
+        provider: [
+          {
+            forwarded: true,
+            identityValid: true,
+            requestedIdentity: { model: profile.model, provider: profile.provider },
+            observedIdentity: { generationId: planned.id },
+            responseReuseDisabled: true,
+            responseCacheHit: false,
+            reportedUsd: 0.001,
+          },
+        ],
+        result: {
+          configurationId: "c".repeat(64),
+          contractVersion: "3",
+          action: "click",
+          outcome: spec.expected.outcome,
+          summary: { processingComplete: true },
+          actions: spec.expected.actions.map(({ step, outcome }) => ({
+            actionId: `a${step}`,
+            order: step,
+            step,
+            action: "click",
+            outcome,
+            ...(outcome === "found"
+              ? {
+                  target: {
+                    candidateId: `c${step}`,
+                    xpaths: [`//button[@id='button-${step}']`],
+                    state: { version: "2" },
+                    interactability: { version: "2", action: "click" },
+                  },
+                }
+              : {}),
+          })),
+        },
+        observation: {
+          actions: spec.expected.actions.map(() => ({ matches: [{ count: 1, intended: true }] })),
+        },
+        evidence: {
+          systemPrompt: "Synthetic fixture prompt",
+          outputSchema: "{}",
+          configurationJson: JSON.stringify({
+            Model: profile.model,
+            Provider: profile.provider,
+            Strategy: "candidate-selection-v1",
+            PromptVersion: "7",
+            effective: {
+              responseCache: false,
+              request: {
+                model: profile.model,
+                stream: false,
+                plugins: [{ id: "context-compression", enabled: false }],
+                max_tokens: profile.maxTokens,
+                reasoning: profile.reasoning,
+                provider: {
+                  only: [profile.provider],
+                  order: [profile.provider],
+                  allow_fallbacks: false,
+                  require_parameters: true,
+                },
+              },
+            },
+          }),
+        },
+      };
+      trial.configuration = configurationRecord(trial);
+      write(`${path}/trials/${trial.id}.json`, trial);
+      return trial;
+    };
+    const trials = manifest.plan.trials.map((p) => makeTrial(p));
+    const compatibility = compatibilityCases(cases).map((spec, i) => {
+      const trial = makeTrial(
+        {
+          id: hash(`${phase}-compat-${i}`).slice(0, 32),
+          caseId: spec.id,
+          profileId: profile.id,
+          repetition: 1,
+          attempt: 1,
+        },
+        "deterministic",
+      );
+      return {
+        id: trial.id,
+        caseId: trial.caseId,
+        profileId: trial.profileId,
+        grade: gradeTrial(spec, trial),
+      };
+    });
+    write(`${path}/compatibility.json`, compatibility);
+    manifest.contentHash = hash(manifest);
+    write(`${path}/manifest.json`, manifest);
+    write(`${path}/summary.json`, summarizeQualification(manifest, trials));
+    return { manifest, trials, path };
+  };
+  const pilot = build("pilot");
+  const confirmation = build("confirmation", pilot);
+  assert.equal(
+    summarizeQualification(confirmation.manifest, confirmation.trials).profiles.deepseek
+      .qualification.status,
+    "qualified",
+  );
+  const run = (...args) =>
+    spawnSync(process.execPath, ["scripts/release.mjs", ...args], {
+      cwd,
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        XPATHED_CODE_REVISION: "",
+        XPATHED_TREE_HASH: "",
+        XPATHED_WORKSPACE: "",
+      },
+    });
+  const seal = () =>
+    run(
+      "seal",
+      "--confirmation",
+      confirmation.path,
+      "--pilot",
+      pilot.path,
+      "--profile",
+      profile.id,
+      "--source-sha",
+      sha,
+      "--output",
+      ".artifacts/candidate.json",
+    );
+  return { cwd, write, run, seal, sha, pilot, confirmation };
+}
+
+test("verify checks the externally pinned digest before reading referenced evidence", (t) => {
+  const directory = realpathSync(mkdtempSync(join(tmpdir(), "xpathed-release-")));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  const candidate = join(directory, "candidate.json");
+  writeFileSync(candidate, JSON.stringify({ confirmation: "/missing/private-evidence" }));
+  const result = spawnSync(
+    process.execPath,
+    ["scripts/release.mjs", "verify", candidate, "--sha256", "a".repeat(64)],
+    { encoding: "utf8" },
+  );
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /Candidate SHA-256 mismatch/);
+  assert.doesNotMatch(result.stderr, /private-evidence/);
+});
+
+test("seal rejects unsafe, missing, duplicate and unplanned trial files before replay", async (t) => {
+  const work = await workspace(t);
+  const manifest = work.confirmation.manifest;
+  const original = structuredClone(manifest);
+  const saveManifest = () => {
+    delete manifest.contentHash;
+    manifest.contentHash = hash(manifest);
+    work.write(`${work.confirmation.path}/manifest.json`, manifest);
+  };
+  manifest.plan.trials[0].id = "../outside";
+  saveManifest();
+  assert.match(work.seal().stderr, /Invalid trial identity/);
+  Object.assign(manifest, structuredClone(original));
+  manifest.plan.trials[1].id = manifest.plan.trials[0].id;
+  saveManifest();
+  assert.match(work.seal().stderr, /Invalid trial identity/);
+  Object.assign(manifest, original);
+  saveManifest();
+  const first = work.confirmation.trials[0];
+  const path = `${work.confirmation.path}/trials/${first.id}.json`;
+  rmSync(join(work.cwd, path));
+  assert.match(work.seal().stderr, /trial files/);
+  work.write(path, first);
+  work.write(`${work.confirmation.path}/trials/extra.json`, first);
+  assert.match(work.seal().stderr, /trial files/);
+  rmSync(join(work.cwd, `${work.confirmation.path}/trials/extra.json`));
+  rmSync(join(work.cwd, path));
+  symlinkSync(join(work.cwd, `${work.pilot.path}/manifest.json`), join(work.cwd, path));
+  assert.match(work.seal().stderr, /regular file|symlink/i);
+});
+
+test("seal and verify bind qualified evidence without activating a default or overwriting files", async (t) => {
+  const work = await workspace(t);
+  const sealed = work.seal();
+  assert.equal(sealed.status, 0, sealed.stderr);
+  const file = join(work.cwd, ".artifacts/candidate.json");
+  const bytes = readFileSync(file);
+  const candidate = JSON.parse(bytes);
+  assert.equal(candidate.status, "evidence-only-verified");
+  assert.equal(candidate.defaultActivated, false);
+  assert.equal(candidate.sourceSha, work.sha);
+  assert.equal(statSync(file).mode & 0o777, 0o600);
+  const verified = work.run("verify", file, "--sha256", hash(bytes));
+  assert.equal(verified.status, 0, verified.stderr);
+  assert.equal(work.seal().status, 1);
+  assert.deepEqual(readFileSync(file), bytes);
+});
+
+test("live runner compatibility evidence is regraded and included without becoming qualification attempts", async (t) => {
+  const work = await workspace(t);
+  const result = work.seal();
+  assert.equal(result.status, 0, result.stderr);
+  const candidate = JSON.parse(readFileSync(join(work.cwd, ".artifacts/candidate.json")));
+  assert.equal(
+    Object.keys(candidate.files).filter((p) => p.endsWith("/compatibility.json")).length,
+    2,
+  );
+  const path = `${work.confirmation.path}/compatibility.json`;
+  const records = JSON.parse(readFileSync(join(work.cwd, path)));
+  records[0].grade.passed = false;
+  work.write(path, records);
+  const verified = work.run(
+    "verify",
+    ".artifacts/candidate.json",
+    "--sha256",
+    hash(readFileSync(join(work.cwd, ".artifacts/candidate.json"))),
+  );
+  assert.equal(verified.status, 1);
+  assert.match(verified.stderr, /compatibility/i);
+});
+
+test("seal rejects expired original evidence and self-consistent configuration drift", async (t) => {
+  const work = await workspace(t);
+  const trial = work.confirmation.trials[0];
+  const original = structuredClone(trial);
+  const path = `${work.confirmation.path}/trials/${trial.id}.json`;
+  const { configurationRecord } = await import(`file://${work.cwd}/evaluation/run.mjs`);
+  const save = () => {
+    trial.configuration = configurationRecord(trial);
+    work.write(path, trial);
+  };
+  trial.createdAt = new Date(Date.now() - 31 * 86400000).toISOString();
+  save();
+  assert.match(work.seal().stderr, /expired|timestamp/i);
+  for (const change of [
+    (t) => {
+      t.evidence.systemPrompt = "";
+    },
+    (t) => {
+      t.evidence.outputSchema = "";
+    },
+    (t) => {
+      const c = JSON.parse(t.evidence.configurationJson);
+      c.Model = c.effective.request.model = "other/model";
+      t.evidence.configurationJson = JSON.stringify(c);
+    },
+    (t) => {
+      const c = JSON.parse(t.evidence.configurationJson);
+      c.effective.request.reasoning = { effort: "high" };
+      t.evidence.configurationJson = JSON.stringify(c);
+    },
+    (t) => {
+      const c = JSON.parse(t.evidence.configurationJson);
+      c.effective.request.max_tokens = 8000;
+      t.evidence.configurationJson = JSON.stringify(c);
+    },
+    (t) => {
+      const c = JSON.parse(t.evidence.configurationJson);
+      c.effective.request.provider.allow_fallbacks = true;
+      t.evidence.configurationJson = JSON.stringify(c);
+    },
+    (t) => {
+      const c = JSON.parse(t.evidence.configurationJson);
+      c.effective.responseCache = true;
+      t.evidence.configurationJson = JSON.stringify(c);
+    },
+    (t) => {
+      const c = JSON.parse(t.evidence.configurationJson);
+      c.effective.request.stream = true;
+      t.evidence.configurationJson = JSON.stringify(c);
+    },
+    (t) => {
+      const c = JSON.parse(t.evidence.configurationJson);
+      c.effective.request.plugins = [{ id: "context-compression", enabled: true }];
+      t.evidence.configurationJson = JSON.stringify(c);
+    },
+    (t) => {
+      t.evidence.systemPrompt = "Different but present prompt";
+    },
+  ]) {
+    Object.assign(trial, structuredClone(original));
+    change(trial);
+    save();
+    assert.match(work.seal().stderr, /configuration|prompt|schema/i);
+  }
+});
+
+test("seal requires the entire independently graded compatibility inventory", async (t) => {
+  const work = await workspace(t);
+  const path = `${work.confirmation.path}/compatibility.json`;
+  const records = JSON.parse(readFileSync(join(work.cwd, path)));
+  const removed = records.pop();
+  work.write(path, records);
+  rmSync(join(work.cwd, `${work.confirmation.path}/trials/${removed.id}.json`));
+  assert.match(work.seal().stderr, /compatibility inventory/i);
+});
+
+test("replayed qualification cannot hide an omitted case or a failed attempt behind a saved approval", async (t) => {
+  const work = await workspace(t);
+  const { summarizeQualification } = await import(
+    `file://${work.cwd}/evaluation/qualification-policy.mjs`
+  );
+  const manifest = work.confirmation.manifest;
+  const original = structuredClone(manifest);
+  const omitted = manifest.plan.trials.find((p) => p.caseId === "case-32");
+  manifest.plan.trials = manifest.plan.trials.filter((p) => p.id !== omitted.id);
+  const remaining = work.confirmation.trials.filter((p) => p.id !== omitted.id);
+  delete manifest.contentHash;
+  manifest.contentHash = hash(manifest);
+  work.write(`${work.confirmation.path}/manifest.json`, manifest);
+  rmSync(join(work.cwd, `${work.confirmation.path}/trials/${omitted.id}.json`));
+  const report = summarizeQualification(manifest, remaining);
+  assert.equal(
+    report.profiles.deepseek.qualification.status,
+    "qualified",
+    "policy alone does not certify the entire reviewed source suite",
+  );
+  work.write(`${work.confirmation.path}/summary.json`, report);
+  assert.match(work.seal().stderr, /complete.*plan/i);
+  Object.assign(manifest, original);
+  work.write(`${work.confirmation.path}/manifest.json`, manifest);
+  const missing = work.confirmation.trials.find((p) => p.id === omitted.id);
+  work.write(`${work.confirmation.path}/trials/${missing.id}.json`, missing);
+  for (const trial of work.confirmation.trials) {
+    trial.elapsedMs = 5000;
+    work.write(`${work.confirmation.path}/trials/${trial.id}.json`, trial);
+  }
+  rmSync(join(work.cwd, `${work.confirmation.path}/summary.json`));
+  assert.match(work.seal().stderr, /not qualified/i);
+});
+
+test("seal binds the actual clean source, browser, policy and original pilot rather than supplied approval labels", async (t) => {
+  const work = await workspace(t);
+  const m = work.confirmation.manifest;
+  const original = structuredClone(m);
+  rmSync(join(work.cwd, `${work.confirmation.path}/summary.json`));
+  for (const [change, expected] of [
+    [
+      (value) => {
+        value.code.revision = "f".repeat(40);
+      },
+      /source/i,
+    ],
+    [
+      (value) => {
+        value.browserBinarySha256 = null;
+      },
+      /browser/i,
+    ],
+    [
+      (value) => {
+        value.browserBinarySha256 = "a".repeat(64);
+      },
+      /Chromium/i,
+    ],
+    [
+      (value) => {
+        value.policy.deadlineMs = 9999;
+      },
+      /policy/i,
+    ],
+    [
+      (value) => {
+        value.baselineEvidence.manifestHash = "a".repeat(64);
+      },
+      /baseline/i,
+    ],
+    [
+      (value) => {
+        value.createdAt = new Date(Date.now() - 31 * 86400000).toISOString();
+      },
+      /expired/i,
+    ],
+    [
+      (value) => {
+        value.sourceManifestHash = "a".repeat(64);
+      },
+      /suite/i,
+    ],
+  ]) {
+    Object.assign(m, structuredClone(original));
+    change(m);
+    delete m.contentHash;
+    m.contentHash = hash(m);
+    work.write(`${work.confirmation.path}/manifest.json`, m);
+    const result = work.seal();
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, expected);
+  }
+  Object.assign(m, original);
+  work.write(`${work.confirmation.path}/manifest.json`, m);
+  work.write("untracked-source.json", {});
+  assert.match(work.seal().stderr, /clean checkout/i);
+});
+
+test("verify rejects later evidence edits even when edited trials would still qualify", async (t) => {
+  const work = await workspace(t);
+  assert.equal(work.seal().status, 0);
+  const candidate = ".artifacts/candidate.json";
+  const digest = hash(readFileSync(join(work.cwd, candidate)));
+  const trial = work.confirmation.trials[0];
+  trial.elapsedMs = 600;
+  work.write(`${work.confirmation.path}/trials/${trial.id}.json`, trial);
+  const { summarizeQualification } = await import(
+    `file://${work.cwd}/evaluation/qualification-policy.mjs`
+  );
+  work.write(
+    `${work.confirmation.path}/summary.json`,
+    summarizeQualification(work.confirmation.manifest, work.confirmation.trials),
+  );
+  const result = work.run("verify", candidate, "--sha256", digest);
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /Candidate evidence changed/);
+});
