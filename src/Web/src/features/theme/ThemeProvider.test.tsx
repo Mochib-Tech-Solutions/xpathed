@@ -10,9 +10,6 @@ function ThemeControls() {
   return (
     <>
       <output aria-label="Selected theme">{theme}</output>
-      <button type="button" onClick={() => setTheme("system")}>
-        System
-      </button>
       <button type="button" onClick={() => setTheme("light")}>
         Light
       </button>
@@ -32,53 +29,50 @@ function renderTheme() {
 }
 
 describe("ThemeProvider", () => {
-  it.each([false, true])("defaults to the system preference when dark is %s", (dark) => {
+  it.each([false, true])("defaults to dark when the system dark preference is %s", (dark) => {
     mockSystemTheme(dark);
     renderTheme();
 
-    expect(screen.getByLabelText("Selected theme")).toHaveTextContent("system");
-    expect(document.documentElement.style.colorScheme).toBe(dark ? "dark" : "light");
-    expect(document.documentElement.classList.contains("dark")).toBe(dark);
+    expect(screen.getByLabelText("Selected theme")).toHaveTextContent("dark");
+    expect(document.documentElement.style.colorScheme).toBe("dark");
+    expect(document.documentElement.classList.contains("dark")).toBe(true);
   });
 
-  it("follows system changes while System is selected", () => {
+  it("keeps the dark default when the system changes", () => {
     const setSystemDark = mockSystemTheme();
     renderTheme();
 
     act(() => setSystemDark(true));
     expect(document.documentElement.style.colorScheme).toBe("dark");
     act(() => setSystemDark(false));
-    expect(document.documentElement.style.colorScheme).toBe("light");
-    expect(screen.getByLabelText("Selected theme")).toHaveTextContent("system");
+    expect(document.documentElement.style.colorScheme).toBe("dark");
+    expect(screen.getByLabelText("Selected theme")).toHaveTextContent("dark");
   });
 
-  it("stops applying system changes after unmount", () => {
+  it("keeps dark after unmount and system changes", () => {
     const setSystemDark = mockSystemTheme();
     const view = renderTheme();
     view.unmount();
 
     act(() => setSystemDark(true));
 
-    expect(document.documentElement.style.colorScheme).toBe("light");
+    expect(document.documentElement.style.colorScheme).toBe("dark");
   });
 
-  it.each(["light", "dark", "system"] as const)(
-    "persists %s and restores it on remount",
-    async (theme) => {
-      mockSystemTheme(theme === "light");
-      localStorage.setItem("xpathed.theme", theme === "dark" ? "light" : "dark");
-      const user = userEvent.setup();
-      const view = renderTheme();
+  it.each(["light", "dark"] as const)("persists %s and restores it on remount", async (theme) => {
+    mockSystemTheme(theme === "light");
+    localStorage.setItem("xpathed.theme", theme === "dark" ? "light" : "dark");
+    const user = userEvent.setup();
+    const view = renderTheme();
 
-      await user.click(screen.getByRole("button", { name: new RegExp(`^${theme}$`, "i") }));
-      expect(localStorage.getItem("xpathed.theme")).toBe(theme);
-      view.unmount();
-      renderTheme();
+    await user.click(screen.getByRole("button", { name: new RegExp(`^${theme}$`, "i") }));
+    expect(localStorage.getItem("xpathed.theme")).toBe(theme);
+    view.unmount();
+    renderTheme();
 
-      expect(screen.getByLabelText("Selected theme")).toHaveTextContent(theme);
-      expect(document.documentElement.style.colorScheme).toBe(theme === "system" ? "light" : theme);
-    },
-  );
+    expect(screen.getByLabelText("Selected theme")).toHaveTextContent(theme);
+    expect(document.documentElement.style.colorScheme).toBe(theme);
+  });
 
   it.each(["light", "dark"] as const)("keeps explicit %s mode when the system changes", (theme) => {
     const setSystemDark = mockSystemTheme(theme !== "dark");
@@ -94,12 +88,12 @@ describe("ThemeProvider", () => {
     expect(document.documentElement.style.colorScheme).toBe(theme);
   });
 
-  it("falls back to System for an invalid stored preference", () => {
+  it.each(["system", "sepia"])("uses dark for stored preference %s", (saved) => {
     mockSystemTheme(true);
-    localStorage.setItem("xpathed.theme", "sepia");
+    localStorage.setItem("xpathed.theme", saved);
     renderTheme();
 
-    expect(screen.getByLabelText("Selected theme")).toHaveTextContent("system");
+    expect(screen.getByLabelText("Selected theme")).toHaveTextContent("dark");
     expect(document.documentElement.style.colorScheme).toBe("dark");
   });
 
@@ -110,7 +104,7 @@ describe("ThemeProvider", () => {
     });
     renderTheme();
 
-    expect(screen.getByLabelText("Selected theme")).toHaveTextContent("system");
+    expect(screen.getByLabelText("Selected theme")).toHaveTextContent("dark");
     expect(document.documentElement.style.colorScheme).toBe("dark");
   });
 
@@ -122,9 +116,9 @@ describe("ThemeProvider", () => {
     const user = userEvent.setup();
     renderTheme();
 
-    await user.click(screen.getByRole("button", { name: "Dark" }));
+    await user.click(screen.getByRole("button", { name: "Light" }));
 
-    expect(screen.getByLabelText("Selected theme")).toHaveTextContent("dark");
-    expect(document.documentElement.style.colorScheme).toBe("dark");
+    expect(screen.getByLabelText("Selected theme")).toHaveTextContent("light");
+    expect(document.documentElement.style.colorScheme).toBe("light");
   });
 });

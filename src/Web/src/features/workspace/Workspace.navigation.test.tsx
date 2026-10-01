@@ -58,6 +58,11 @@ describe("Workspace navigation", () => {
     expect(address).toHaveFocus();
     expect(screen.queryByRole("button", { name: "Open browser" })).not.toBeInTheDocument();
     expect(fetch).not.toHaveBeenCalled();
+    const strip = screen.getByRole("tablist", { name: "Browser tabs" });
+    expect(screen.getByRole("tab", { name: "New tab" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tabpanel")).toHaveAccessibleName("New tab");
+    expect(screen.getByRole("button", { name: "New tab" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Close all tabs" })).toBeDisabled();
     await user.type(address, "example.test{Enter}");
 
     await waitFor(() =>
@@ -72,6 +77,9 @@ describe("Workspace navigation", () => {
       }),
     );
     expect(address).toHaveValue("https://example.test/");
+    expect(screen.getByRole("tablist", { name: "Browser tabs" })).toBe(strip);
+    expect(screen.getAllByRole("tab")).toHaveLength(1);
+    expect(screen.getByRole("tab", { name: "Example" })).toHaveAttribute("aria-selected", "true");
   });
   it("keeps the browser and address after a navigation failure so the user can retry", async () => {
     let attempts = 0;

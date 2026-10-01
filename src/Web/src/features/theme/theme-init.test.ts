@@ -6,12 +6,12 @@ const bootstrap = readFileSync("public/theme-init.js", "utf8");
 
 describe("prepaint theme bootstrap", () => {
   it.each([
-    { saved: null, systemDark: false, expected: "light" },
+    { saved: null, systemDark: false, expected: "dark" },
     { saved: null, systemDark: true, expected: "dark" },
     { saved: "light", systemDark: true, expected: "light" },
     { saved: "dark", systemDark: false, expected: "dark" },
-    { saved: "system", systemDark: true, expected: "dark" },
-    { saved: "sepia", systemDark: true, expected: "dark" },
+    { saved: "system", systemDark: false, expected: "dark" },
+    { saved: "sepia", systemDark: false, expected: "dark" },
   ])(
     "applies $expected before React for preference=$saved and systemDark=$systemDark",
     ({ saved, systemDark, expected }) => {
@@ -24,8 +24,8 @@ describe("prepaint theme bootstrap", () => {
     },
   );
 
-  it("uses the system preference when storage is blocked", () => {
-    mockSystemTheme(true);
+  it("uses dark when storage is blocked", () => {
+    mockSystemTheme(false);
     vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
       throw new DOMException("Storage is blocked", "SecurityError");
     });

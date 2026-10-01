@@ -810,7 +810,7 @@ describe("Workspace resolution", () => {
     mockApi(() => pending);
     const user = await openWorkspace();
     await submitInstruction(user);
-    const theme = screen.getByRole("button", { name: /^Theme:/ });
+    const theme = screen.getByRole("button", { name: "Switch to light theme" });
     await user.click(theme);
     await user.keyboard("{Escape}");
     await act(async () => {
@@ -969,7 +969,7 @@ describe("Workspace resolution", () => {
     );
     expect(screen.getByRole("textbox", { name: "Describe an element" })).toHaveValue("");
     expect(screen.getByRole("textbox", { name: "Describe an element" })).toBeDisabled();
-    expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "New tab" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByRole("textbox", { name: "Page address" })).toHaveValue("");
     expect(screen.getByRole("textbox", { name: "Page address" })).toHaveFocus();
     expect(globalThis.fetch).toHaveBeenCalledWith(
@@ -1035,7 +1035,9 @@ describe("Workspace resolution", () => {
     await user.click(
       within(screen.getByRole("alertdialog")).getByRole("button", { name: "Close all tabs" }),
     );
-    await waitFor(() => expect(screen.queryByRole("tablist")).not.toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByRole("tab", { name: "New tab" })).toHaveAttribute("aria-selected", "true"),
+    );
     await user.type(screen.getByRole("textbox", { name: "Page address" }), "fresh.test{Enter}");
     expect(await screen.findByRole("tab", { name: "Fresh page" })).toBeInTheDocument();
     await act(() =>
