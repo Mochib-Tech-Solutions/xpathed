@@ -8,6 +8,7 @@ import { pathToFileURL } from "node:url";
 import { pipeline } from "node:stream/promises";
 import { createGunzip, gunzipSync } from "node:zlib";
 import { verify as verifyBundle } from "./release-bundle.mjs";
+import { verifyExposure } from "./release-state.mjs";
 
 const ensure = (condition, message) => {
   if (!condition) throw new Error(message);
@@ -18,7 +19,31 @@ const safe = (path) =>
   /^\.artifacts\/[a-zA-Z0-9_./-]+$/.test(path) &&
   !path.split("/").some((p) => ["", ".", ".."].includes(p));
 
-export async function fetchRelease(repo, tag, candidateSha256, destination) {
+export const fetchRelease = (repo, tag, candidateSha256, destination) =>
+  fetch(repo, tag, candidateSha256, destination);
+
+export async function fetchApprovedRelease(snapshot, destination) {
+  const release = snapshot.state.current;
+  ensure(
+    release?.status === "qualified" && release.contractVersion === "4",
+    "No compatible approved release exists",
+  );
+  ensure(
+    snapshot.state.history.at(-1)?.to === release.candidateSha256 &&
+      snapshot.state.history.some(
+        (entry) => entry.operation === "promote" && entry.to === release.candidateSha256,
+      ),
+    "Approved release audit is missing",
+  );
+  ensure(
+    release.monitoring?.version === 1,
+    "Approved monitoring receipt is missing; fresh verification is required",
+  );
+  verifyExposure(snapshot, release);
+  return fetch(snapshot.repo, release.tag, release.candidateSha256, destination, release);
+}
+
+async function fetch(repo, tag, candidateSha256, destination, approved = null) {
   ensure(
     /^[\w.-]+\/[\w.-]+$/.test(repo) &&
       /^candidate-\d+-\d+$/.test(tag) &&
@@ -45,31 +70,49 @@ export async function fetchRelease(repo, tag, candidateSha256, destination) {
         "configuration.json",
         "source.tar",
         "images.tar.gz.part-*",
-        "release-evidence.json.gz",
+        ...(approved ? [] : ["release-evidence.json.gz"]),
       ].flatMap((p) => ["--pattern", p]),
     ],
     { stdio: "inherit" },
   );
   const archivePath = join(download, "release-evidence.json.gz");
-  const archiveBytes = await readFile(archivePath);
-  const archive = JSON.parse(gunzipSync(archiveBytes, { maxOutputLength: 256 * 1024 * 1024 }));
+  let archiveBytes, candidate;
+  if (approved) {
+    candidate = {
+      sourceSha: approved.sourceSha,
+      profile: approved.profile,
+      bundleSha256: approved.bundleSha256,
+      bundle: approved.monitoring.bundle,
+      suite: approved.monitoring.suite,
+    };
+  } else {
+    archiveBytes = await readFile(archivePath);
+    const archive = JSON.parse(gunzipSync(archiveBytes, { maxOutputLength: 256 * 1024 * 1024 }));
+    ensure(
+      archive.version === 1 &&
+        safe(archive.candidateFile) &&
+        archive.candidateSha256 === candidateSha256,
+      "Published evidence differs from pinned candidate",
+    );
+    const candidateBytes = Buffer.from(
+      archive.files?.[archive.candidateFile]?.data ?? "",
+      "base64",
+    );
+    ensure(hash(candidateBytes) === candidateSha256, "Candidate digest mismatch");
+    candidate = JSON.parse(candidateBytes);
+    ensure(
+      candidate.version === 2 &&
+        candidate.status === "artifact-bound-evidence-verified" &&
+        candidate.artifact?.sourceSha === candidate.sourceSha &&
+        candidate.configurations?.[`${candidate.profile}:4`]?.promptVersion === "8",
+      "Candidate is not a compatible current-view artifact",
+    );
+  }
   ensure(
-    archive.version === 1 &&
-      safe(archive.candidateFile) &&
-      archive.candidateSha256 === candidateSha256,
-    "Published evidence differs from pinned candidate",
-  );
-  const candidateBytes = Buffer.from(archive.files?.[archive.candidateFile]?.data ?? "", "base64");
-  ensure(hash(candidateBytes) === candidateSha256, "Candidate digest mismatch");
-  const candidate = JSON.parse(candidateBytes);
-  ensure(
-    candidate.version === 2 &&
-      candidate.status === "artifact-bound-evidence-verified" &&
-      /^[a-f\d]{40}$/.test(candidate.sourceSha ?? "") &&
+    /^[a-f\d]{40}$/.test(candidate.sourceSha ?? "") &&
       safe(candidate.bundle) &&
-      candidate.artifact?.sourceSha === candidate.sourceSha &&
-      candidate.configurations?.[`${candidate.profile}:4`]?.promptVersion === "8",
-    "Candidate is not a compatible current-view artifact",
+      candidate.suite === "evaluation/current-view-qualification-cases.json",
+    "Invalid approved source, bundle or suite",
   );
   try {
     execFileSync("git", ["cat-file", "-e", `${candidate.sourceSha}^{commit}`], { stdio: "pipe" });
@@ -111,12 +154,18 @@ export async function fetchRelease(repo, tag, candidateSha256, destination) {
     createGunzip(),
     createWriteStream(join(bundle, "images.tar"), { flags: "wx", mode: 0o600 }),
   );
-  await verifyBundle(bundle, candidate.bundleSha256);
-  execFileSync(
-    process.execPath,
-    ["scripts/release-archive.mjs", "restore", archivePath, "--sha256", hash(archiveBytes)],
-    { cwd: source, stdio: "inherit" },
+  const verified = await verifyBundle(bundle, candidate.bundleSha256);
+  ensure(
+    verified.manifest.sourceSha === candidate.sourceSha &&
+      verified.manifest.profileId === candidate.profile,
+    "Approved bundle identity mismatch",
   );
+  if (!approved)
+    execFileSync(
+      process.execPath,
+      ["scripts/release-archive.mjs", "restore", archivePath, "--sha256", hash(archiveBytes)],
+      { cwd: source, stdio: "inherit" },
+    );
   const suite = JSON.parse(await readFile(join(source, candidate.suite), "utf8"));
   const { gradeTrial } = await import(pathToFileURL(join(source, "evaluation/grader.mjs")));
   const policy = JSON.parse(
@@ -125,9 +174,42 @@ export async function fetchRelease(repo, tag, candidateSha256, destination) {
   ensure(
     Array.isArray(suite.sentinels) &&
       suite.sentinels.length > 0 &&
-      new Set(suite.sentinels).size === suite.sentinels.length,
+      new Set(suite.sentinels).size === suite.sentinels.length &&
+      suite.sentinels.every((id) =>
+        suite.cases.some(
+          (c) =>
+            c.id === id &&
+            c.contractVersion === "4" &&
+            ["development", "regression"].includes(c.split),
+        ),
+      ),
     "Frozen sentinel membership is missing",
   );
+  if (approved) {
+    ensure(
+      hash(JSON.stringify(suite)) === approved.monitoring.suiteSha256,
+      "Approved suite mismatch",
+    );
+    ensure(hash(JSON.stringify(policy)) === approved.policySha256, "Approved policy mismatch");
+    ensure(
+      hash(JSON.stringify(suite.sentinels)) === approved.sentinelSha256,
+      "Approved sentinel membership mismatch",
+    );
+    ensure(
+      Array.isArray(approved.sentinelBaseline) &&
+        approved.sentinelBaseline.length === suite.sentinels.length &&
+        new Set(approved.sentinelBaseline.map((t) => t.caseId)).size === suite.sentinels.length &&
+        approved.sentinelBaseline.every(
+          (t) =>
+            suite.sentinels.includes(t.caseId) &&
+            Number.isFinite(t.elapsedMs) &&
+            t.elapsedMs >= 0 &&
+            t.elapsedMs <= policy.deadlineMs,
+        ),
+      "Approved sentinel baseline is invalid",
+    );
+    return { source, candidate, release: approved };
+  }
   const measured = [];
   for (const run of [candidate.pilot, candidate.confirmation]) {
     const manifest = JSON.parse(await readFile(join(source, run, "manifest.json"), "utf8"));
@@ -171,6 +253,12 @@ export async function fetchRelease(repo, tag, candidateSha256, destination) {
       sentinelSha256: hash(JSON.stringify(suite.sentinels)),
       sentinelBaseline: measured,
       exposure: candidate.exposure,
+      monitoring: {
+        version: 1,
+        bundle: candidate.bundle,
+        suite: candidate.suite,
+        suiteSha256: hash(JSON.stringify(suite)),
+      },
     },
   };
 }
