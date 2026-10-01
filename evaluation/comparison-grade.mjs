@@ -1,6 +1,8 @@
 // Both adapters submit the same target-only result shape. Readiness is graded separately.
 // Singleton adapters retain their first suggestion; this grader never searches later suggestions.
-export function gradeComparison(spec, trial) {
+export function gradeComparison(spec, trial, budgetPolicy = "local-ceiling") {
+  if (!["local-ceiling", "provider-limit"].includes(budgetPolicy))
+    throw new Error("Unknown comparison accounting policy");
   const labels = spec.expected.actions;
   const actionTypes = new Set(labels.map((item) => item.action));
   if (actionTypes.size !== 1) throw new Error("Comparison cases require one shared action.");
@@ -123,7 +125,13 @@ export function gradeComparison(spec, trial) {
         "One fresh model and provider call with response reuse disabled was not verified.",
       );
     for (const record of forwarded ?? []) {
-      if (
+      if (budgetPolicy === "provider-limit") {
+        if (
+          record.reportedUsd != null &&
+          (!Number.isFinite(record.reportedUsd) || record.reportedUsd < 0)
+        )
+          fail("accounting", "A provider call has an invalid reported charge.");
+      } else if (
         !Number.isFinite(record.reservedUsd) ||
         record.reservedUsd <= 0 ||
         !Number.isFinite(record.reportedUsd) ||

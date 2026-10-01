@@ -199,7 +199,7 @@ export function buildMatrixPlan(cases, selectedProfiles, options) {
   };
 }
 
-export function forecastPilot(pilot, planned, prices, budget) {
+export function forecastPilot(pilot, planned, prices) {
   const byProfile = {};
   for (const profileId of [...new Set(planned.map((t) => t.profileId))]) {
     const calls = pilot.trials
@@ -207,20 +207,31 @@ export function forecastPilot(pilot, planned, prices, budget) {
       .flatMap((t) => t.provider ?? [])
       .filter((p) => p.forwarded);
     const price = prices[profileId]?.pricing ?? prices[profileId];
-    if (
+    const unavailable =
       !calls.length ||
       calls.some(
         (p) =>
           !Number.isFinite(p.usage?.prompt_tokens) ||
+          p.usage.prompt_tokens < 0 ||
           !Number.isFinite(p.usage?.completion_tokens) ||
-          !Number.isFinite(p.reportedUsd),
+          p.usage.completion_tokens < 0,
       )
-    )
-      throw new Error(`Pilot has incomplete billed token/cost evidence for ${profileId}`);
-    if (
-      ![Number(price?.prompt), Number(price?.completion)].every((p) => Number.isFinite(p) && p > 0)
-    )
-      throw new Error(`Current route pricing unavailable for ${profileId}`);
+        ? "Pilot token evidence unavailable"
+        : ![price?.prompt, price?.completion, price?.request ?? 0].every(
+              (p) => p != null && Number.isFinite(Number(p)) && Number(p) >= 0,
+            )
+          ? "Current route pricing unavailable"
+          : null;
+    if (unavailable) {
+      byProfile[profileId] = {
+        samples: calls.length,
+        plannedCalls: planned.filter((p) => p.profileId === profileId).length,
+        projectedUsd: null,
+        conservativeProjectionUsd: null,
+        unavailable,
+      };
+      continue;
+    }
     const tokens = (key) => calls.map((p) => p.usage[key]).sort((a, b) => a - b);
     const distribution = (values) => ({
       mean: values.reduce((a, b) => a + b, 0) / values.length,
@@ -249,17 +260,17 @@ export function forecastPilot(pilot, planned, prices, budget) {
         2,
     };
   }
-  const projectedUsd = Object.values(byProfile).reduce(
-    (sum, p) => sum + p.conservativeProjectionUsd,
-    0,
-  );
+  const projectedUsd = Object.values(byProfile).some((p) => p.conservativeProjectionUsd == null)
+    ? null
+    : Object.values(byProfile).reduce((sum, p) => sum + p.conservativeProjectionUsd, 0);
   return {
     basis:
-      "Pilot token distributions at current pinned route rates; twice observed maxima for screening, per-call reservations remain authoritative",
+      "Informational pilot token projection at current route rates; provider key limits govern spending",
+    budgetPolicy: "provider-limit",
     byProfile,
     projectedUsd,
-    remainingUsd: budget.remainingUsd,
-    fits: Number.isFinite(budget.remainingUsd) && projectedUsd <= budget.remainingUsd,
+    remainingUsd: null,
+    fits: null,
   };
 }
 
@@ -607,6 +618,7 @@ export async function main(args = process.argv.slice(2)) {
             { mode: 0o600 },
           ),
       });
+      manifest.accounting = { version: 1, budgetPolicy: "provider-limit" };
       manifest.pricing = Object.fromEntries(proxy.profiles.map((p) => [p.id, p.pricing]));
       manifest.routeMetadata = proxy.profiles;
       if (suite.baseline) {
@@ -623,29 +635,18 @@ export async function main(args = process.argv.slice(2)) {
           }),
         );
         await save(join(output, "forecast.json"), manifest.preparedForecast);
-        if (!manifest.preparedForecast.fits)
-          throw new Error(
-            "Combined paired baseline forecast exceeds remaining shared budget; no paid calls made",
-          );
         if (options.forecastOnly) {
           manifest.measurement.forecastOnly = true;
           manifest.contentHash = hash(manifest);
           await save(join(output, "manifest.json"), manifest);
           console.log(
-            `Prepared ${manifest.preparedForecast.reservations.length} requests; maximum USD ${manifest.preparedForecast.projectedUsd}; remaining USD ${manifest.preparedForecast.remainingUsd}; no paid calls made.`,
+            `Prepared ${manifest.preparedForecast.reservations.length} requests; estimated upper USD ${manifest.preparedForecast.projectedUsd ?? "unavailable"}; provider key limits apply; no paid calls made.`,
           );
           return 0;
         }
       }
       if (pilot) {
-        manifest.forecast = forecastPilot(
-          pilot,
-          manifest.plan.trials,
-          manifest.pricing,
-          proxy.budget,
-        );
-        if (!manifest.forecast.fits)
-          throw new Error("Pilot forecast exceeds remaining shared budget");
+        manifest.forecast = forecastPilot(pilot, manifest.plan.trials, manifest.pricing);
       }
       proxy.server.listen(8091, "0.0.0.0");
       await once(proxy.server, "listening");
@@ -667,11 +668,10 @@ export async function main(args = process.argv.slice(2)) {
       if (trial.accountingError) throw new Error(trial.accountingError);
       if (
         options.mode === "live" &&
-        (proxy.budget.pendingCharges ||
-          trial.provider.some((p) => p.identityValid === false || p.responseCacheHit))
+        trial.provider.some((p) => p.identityValid === false || p.responseCacheHit)
       )
         throw new Error(
-          "Provider charge, identity or response-cache gate failed; remaining planned attempts were not run",
+          "Provider identity or response-cache gate failed; remaining planned attempts were not run",
         );
     }
   } catch (error) {

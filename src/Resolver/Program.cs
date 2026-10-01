@@ -19,6 +19,11 @@ builder.Services.AddTransient<OpenRouterGateway>();
 builder.Services.AddTransient<ResolutionService>();
 builder.Services.AddSingleton<ProviderAccounting>();
 var app = builder.Build();
+if (app.Configuration["Evaluation:ContextPlanning"] is not (null or "jev-v1"))
+{
+    throw new InvalidOperationException("Unknown evaluation context-planning mode.");
+}
+
 app.UseApiErrors();
 app.UseMiddleware<ServiceOriginMiddleware>();
 app.MapControllers();

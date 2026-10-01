@@ -43,6 +43,7 @@ test("deterministic evaluation selects its runtime, fixture, and runner dependen
     "tests/resolution/ready.mjs",
     "docker/compose.yaml",
     "docker/compose.evaluation.yaml",
+    "docker/compose.context.yaml",
     "docker/compose.sh",
     "docker/browser/seccomp.json",
     "docker/resolver/Dockerfile",

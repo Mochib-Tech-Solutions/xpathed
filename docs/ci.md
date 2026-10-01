@@ -12,15 +12,15 @@ Installation uses Git's native `core.hooksPath` and worktree configuration. It e
 
 `pre-commit` reads staged paths, including deletions and both sides of renames, and reuses `scripts/ci-changes.mjs`:
 
-| Changed inputs | Local checks |
-| --- | --- |
-| .NET service or its tests | Locked restore, CSharpier, native style checks, Release build/analyzers and the owning unit tests |
-| Common or shared .NET configuration | All dependent .NET services and unit tests |
-| Solution/build selection | Solution build in addition to selected service checks |
-| React/TypeScript workspace | Prettier, ESLint, project typecheck, all frontend tests and Vite build |
-| Repository tooling or hooks | Configuration formatting, script syntax and Node tooling tests |
-| Docker definitions | Compose configuration and Buildx checks |
-| Documentation only | No application builds or tests |
+| Changed inputs                      | Local checks                                                                                      |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------- |
+| .NET service or its tests           | Locked restore, CSharpier, native style checks, Release build/analyzers and the owning unit tests |
+| Common or shared .NET configuration | All dependent .NET services and unit tests                                                        |
+| Solution/build selection            | Solution build in addition to selected service checks                                             |
+| React/TypeScript workspace          | Prettier, ESLint, project typecheck, all frontend tests and Vite build                            |
+| Repository tooling or hooks         | Configuration formatting, script syntax and Node tooling tests                                    |
+| Docker definitions                  | Compose configuration and Buildx checks                                                           |
+| Documentation only                  | No application builds or tests                                                                    |
 
 Full-project checks preserve TypeScript configuration and catch dependencies beyond the staged files. Nothing is autoformatted or staged. When executable inputs are selected, unstaged tracked or untracked source/configuration causes rejection before any checks run. Stage the intended changes or set unrelated edits aside yourself; the hook never stashes work. Unstaged documentation and ignored outputs do not block code checks. The hook also rejects index/source changes detected after checking. Keep ignored generated files and dependencies current; this is local feedback, not a hermetic build.
 
@@ -66,7 +66,7 @@ Only these explicit paths are uploaded. Local datasets, environment files, user 
 
 Inspect the failing job and `gate.json` before rerunning. **Rerun the entire workflow**, not only failed jobs: every selected receipt must belong to the same attempt. GitHub's **Re-run all jobs** or `gh run rerun RUN_ID` creates a fresh attempt without mixing earlier results. A new commit gets its own PR check; after merge, verify the separate push run against the merged SHA.
 
-Local gate tests run through `pnpm test:tooling`; they exercise the public receipt/verification CLI, including negative status, identity, coverage and artifact cases. Use `pnpm evaluate` for the real-browser suite. Paid model testing remains separate from these automatic checks. The manually dispatched [release workflow](releases.md#manual-github-qualification) uses a dedicated secret and durable shared budget; it has no PR, push or schedule trigger.
+Local gate tests run through `pnpm test:tooling`; they exercise the public receipt/verification CLI, including negative status, identity, coverage and artifact cases. Use `pnpm evaluate` for the real-browser suite. Paid model testing remains separate from these automatic checks. The manually dispatched [release workflow](releases.md#manual-github-qualification) uses a dedicated secret and durable shared accounting. Provider key limits control spending; the workflow has no local monetary ceiling or PR, push or schedule trigger.
 
 ## Account controls remain separate
 

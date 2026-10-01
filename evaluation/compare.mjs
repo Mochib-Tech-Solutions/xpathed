@@ -143,7 +143,7 @@ export function summarizePairs(manifest, trials) {
       calls: paid.length,
       unreportedCharges: rows
         .flatMap((t) => t.provider ?? [])
-        .filter((r) => r.reservedUsd != null && r.reportedUsd == null).length,
+        .filter((r) => (r.forwarded || r.reservedUsd != null) && r.reportedUsd == null).length,
       usage: {
         prompt_tokens: sumUsage((u) => u?.prompt_tokens),
         completion_tokens: sumUsage((u) => u?.completion_tokens),
@@ -152,7 +152,7 @@ export function summarizePairs(manifest, trials) {
       },
       reportedUsd: rows
         .flatMap((t) => t.provider ?? [])
-        .some((r) => r.reservedUsd != null && r.reportedUsd == null)
+        .some((r) => (r.forwarded || r.reservedUsd != null) && r.reportedUsd == null)
         ? null
         : rows.flatMap((t) => t.provider ?? []).reduce((sum, r) => sum + (r.reportedUsd ?? 0), 0),
       knownReportedUsd: rows
@@ -206,6 +206,7 @@ export async function main(args = process.argv.slice(2)) {
           t.grade = gradeComparison(
             manifest.cases.find((c) => c.id === t.caseId),
             t,
+            manifest.accounting?.budgetPolicy,
           );
           trials.push(t);
         } catch (error) {
@@ -225,6 +226,7 @@ export async function main(args = process.argv.slice(2)) {
     id: randomUUID(),
     createdAt: new Date().toISOString(),
     mode: options.mode,
+    accounting: { version: 1, budgetPolicy: "provider-limit" },
     cases,
     plan: buildPlan(cases, options),
     code: await fingerprints(),
@@ -419,7 +421,7 @@ export async function main(args = process.argv.slice(2)) {
       }
     }
     for (const arm of arms) {
-      arm.grade = gradeComparison(spec, arm);
+      arm.grade = gradeComparison(spec, arm, manifest.accounting.budgetPolicy);
       await save(join(output, "trials", `${arm.id}.json`), arm);
     }
     return arms;
