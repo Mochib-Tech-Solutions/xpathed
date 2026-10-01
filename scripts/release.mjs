@@ -72,14 +72,16 @@ function configuration(trial, profile) {
   );
   JSON.parse(trial.evidence.outputSchema);
   const request = recorded.effective?.request;
-  const promptVersion =
-    trial.result?.contractVersion === "3"
-      ? profile.variant === "concise"
-        ? "7-concise-1"
-        : "7"
-      : trial.result?.contractVersion === "2"
-        ? "6"
-        : "5";
+  ensure(
+    trial.result?.contractVersion !== "4",
+    "Contract 4 requires a separately frozen current-view qualification policy",
+  );
+  const promptVersion = {
+    1: "5",
+    2: "6",
+    3: profile.variant === "concise" ? "7-concise-1" : "7",
+  }[trial.result?.contractVersion];
+  ensure(typeof promptVersion === "string", "Unsupported release qualification contract");
   ensure(
     /^[a-f\d]{64}$/.test(recorded.configurationId ?? "") &&
       recorded.model === profile.model &&
