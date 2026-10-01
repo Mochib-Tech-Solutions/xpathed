@@ -425,9 +425,12 @@ function summarizeLiveChecks(manifest, trials) {
     planned: entries.length,
     correct,
     correctCompleteWithinDeadline: onTime,
-    reportedUsd: charges.every((p) => Number.isFinite(p.reportedUsd))
-      ? charges.reduce((sum, p) => sum + p.reportedUsd, 0)
-      : null,
+    reportedUsd:
+      complete &&
+      charges.length === entries.length &&
+      charges.every((p) => Number.isFinite(p.reportedUsd))
+        ? charges.reduce((sum, p) => sum + p.reportedUsd, 0)
+        : null,
     entries,
     defaultActivated: false,
   };

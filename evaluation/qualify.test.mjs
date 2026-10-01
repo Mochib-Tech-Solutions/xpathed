@@ -115,6 +115,7 @@ test("frozen sentinel monitoring separates semantic drift, latency and infrastru
     "latency_regression",
   );
   assert.equal(summarizeMonitoring(manifest, []).status, "infrastructure_failure");
+  assert.equal(summarizeMonitoring(manifest, []).reportedUsd, null);
   assert.equal(
     summarizeMonitoring(manifest, [{ ...trial, provider: [] }]).status,
     "infrastructure_failure",
