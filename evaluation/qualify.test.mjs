@@ -14,6 +14,8 @@ import {
   baselineEvidence,
   assertFrozenImplementation,
   profiles,
+  compatibilityCases,
+  main,
 } from "./qualify.mjs";
 import { fingerprints } from "./run.mjs";
 
@@ -58,6 +60,53 @@ test("held-out calls require a recorded pilot; unsupported filters cannot silent
   assert.throws(() => parseQualificationOptions(["--phase", "confirmation"]), /pilot/);
   assert.throws(() => parseQualificationOptions(["--profile", "unknown"]), /profile/);
   assert.throws(() => parseQualificationOptions(["--split", "test"]), /split/);
+});
+
+test("a reviewed suite override retains current-view cases and legacy exclusions", () => {
+  const options = parseQualificationOptions(["--suite", "evaluation/viewport-baseline-cases.json"]);
+  assert.equal(options.suite, "evaluation/viewport-baseline-cases.json");
+  const { cases, exclusions } = selectQualificationCases(
+    ["2", "3", "4"].map((contractVersion) => ({
+      id: `v${contractVersion}`,
+      contractVersion,
+      split: "development",
+    })),
+    options,
+  );
+  assert.deepEqual(
+    cases.map(({ id }) => id),
+    ["v3", "v4"],
+  );
+  assert.equal(exclusions[0].caseId, "v2");
+  assert.throws(() => parseQualificationOptions(["--suite", "one", "--suite", "two"]), /Repeated/);
+});
+
+test("forecast-only preparation is explicit and cannot silently enable inference", () => {
+  assert.equal(
+    parseQualificationOptions(["--mode", "live", "--forecast-only", "true"]).forecastOnly,
+    true,
+  );
+  assert.equal(parseQualificationOptions([]).forecastOnly, false);
+  assert.throws(() => parseQualificationOptions(["--forecast-only", "yes"]), /forecast/);
+  assert.throws(() => parseQualificationOptions(["--forecast-only", "true"]), /live/);
+});
+
+test("compatibility checks each selected contract independently before inference", () => {
+  const suite = ["3", "4"].flatMap((contractVersion) =>
+    ["positive", "absent", "plural"].map((kind) => ({
+      id: `${kind}-${contractVersion}`,
+      contractVersion,
+      split: "development",
+      expected: {
+        actions:
+          kind === "plural"
+            ? [{ outcome: "found" }, { outcome: "found" }]
+            : [{ outcome: kind === "positive" ? "found" : "not_found" }],
+      },
+    })),
+  );
+  assert.equal(compatibilityCases(suite).length, 6);
+  assert.throws(() => compatibilityCases(suite.filter((c) => c.id !== "plural-4")), /contract 4/);
 });
 
 test("Qwen is an explicit baseline profile without changing the default matrix", () => {
@@ -151,6 +200,7 @@ test("replay preserves absent planned attempts and rejects swapped trial identit
   const planned = { id: "test", caseId: spec.id, profileId: "deepseek", repetition: 1, attempt: 1 };
   const manifest = {
     kind: "model-qualification",
+    profiles: [{ id: "deepseek" }],
     cases: [spec],
     plan: { trials: [planned] },
     code: { files },
@@ -165,6 +215,13 @@ test("replay preserves absent planned attempts and rejects swapped trial identit
   await assert.rejects(readRun(directory), /identity mismatch/);
   await writeFile(join(directory, "trials", "test.json"), JSON.stringify(planned));
   assert.equal((await readRun(directory)).trials.length, 1);
+  assert.equal(await main(["--replay", directory]), 0);
+  await writeFile(
+    join(directory, "trials", "test.json"),
+    JSON.stringify({ ...planned, accountingError: "Final reconciliation failed" }),
+  );
+  assert.equal(await main(["--replay", directory]), 1);
+  await writeFile(join(directory, "trials", "test.json"), JSON.stringify(planned));
   manifest.code.revision = "a".repeat(40);
   manifest.profiles = [{ id: "deepseek" }];
   const artifact = releaseArtifact(manifest.code.revision);
@@ -321,4 +378,24 @@ test("an unflagged baseline privacy failure cannot be discarded before held-out 
       (f) => f.caseId === "ordinary" && f.category === "privacy",
     ),
   );
+});
+
+test("paired baselines keep each pair adjacent and alternate which contract runs first", () => {
+  const cases = ["a", "b", "c", "d"].flatMap((pairId) =>
+    ["3", "4"].map((contractVersion) => ({
+      id: `${pairId}-${contractVersion}`,
+      pairId,
+      contractVersion,
+    })),
+  );
+  const options = { seed: 47, repetitions: 1, timeoutMs: 45000 };
+  const plan = buildMatrixPlan(cases, [{ id: "deepseek" }], options);
+  assert.deepEqual(plan, buildMatrixPlan(cases, [{ id: "deepseek" }], options));
+  for (let index = 0; index < plan.trials.length; index += 2) {
+    const pair = plan.trials
+      .slice(index, index + 2)
+      .map((t) => cases.find((c) => c.id === t.caseId));
+    assert.equal(pair[0].pairId, pair[1].pairId);
+    assert.equal(pair[0].contractVersion, index % 4 === 0 ? "3" : "4");
+  }
 });

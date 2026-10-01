@@ -117,6 +117,8 @@ export function gradeTrial(caseSpec, trial) {
   if (metrics.privacyLeak) fail("privacy", "A privacy sentinel reached retained result/evidence.");
   if (metrics.oracleLeak)
     fail("oracle_leak", "Oracle information reached model-visible or returned evidence.");
+  if (trial?.accountingError != null)
+    fail("contract", "Evaluation provider accounting did not settle successfully.");
   if (trial?.observation?.passiveStateUnchanged === false)
     fail("passive_state", "Resolution changed page state beyond the permitted highlight.");
   metrics.savedLocator = null;
@@ -174,6 +176,29 @@ export function gradeTrial(caseSpec, trial) {
         ),
       )
     : null;
+  metrics.accountingSource = metrics.usage ? "response_diagnostics" : "unavailable";
+  if (Array.isArray(trial?.provider)) {
+    const calls = trial.provider.filter((record) => record?.forwarded === true);
+    const sum = (value) => {
+      const values = calls.map((call) => number(value(call)));
+      return values.length
+        ? values.every((value) => value !== null)
+          ? number(values.reduce((total, value) => total + value, 0))
+          : null
+        : trial.result?.diagnostics?.modelCalls === 0
+          ? 0
+          : null;
+    };
+    metrics.accountingSource = "provider_records";
+    metrics.reportedCostUsd = sum((call) => call.reportedUsd);
+    metrics.usage = {
+      inputTokens: sum((call) => call.usage?.prompt_tokens),
+      outputTokens: sum((call) => call.usage?.completion_tokens),
+      totalTokens: sum((call) => call.usage?.total_tokens),
+      reasoningTokens: sum((call) => call.usage?.completion_tokens_details?.reasoning_tokens),
+      cachedTokens: sum((call) => call.usage?.prompt_tokens_details?.cached_tokens),
+    };
+  }
   metrics.stageTimingsMs = object(trial?.result?.diagnostics?.timingsMs)
     ? Object.fromEntries(
         Object.entries(trial.result.diagnostics.timingsMs).map(([key, value]) => [
@@ -501,6 +526,13 @@ function aggregate(entries) {
       ["inputTokens", "outputTokens", "totalTokens", "reasoningTokens", "cachedTokens"].map(
         (key) => [key, totals(grades.map((grade) => grade.metrics.usage?.[key]))],
       ),
+    ),
+    accountingSources: Object.fromEntries(
+      ["provider_records", "response_diagnostics", "unavailable"].map((source) => [
+        source,
+        grades.filter((grade) => (grade.metrics.accountingSource ?? "unavailable") === source)
+          .length,
+      ]),
     ),
     savedLocator: {
       trials: mutations.length,

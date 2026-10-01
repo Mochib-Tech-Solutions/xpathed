@@ -27,6 +27,7 @@ internal sealed class DeterministicServicesHandler : HttpMessageHandler
     public HttpStatusCode SelectionStatus { get; init; } = HttpStatusCode.OK;
     public string? SelectionBody { get; init; }
     public JsonElement ModelRequest { get; private set; }
+    public JsonElement CaptureRequest { get; private set; }
     public int SelectionRequestCount { get; private set; }
     public int ProviderRequestCount { get; private set; }
 
@@ -42,6 +43,7 @@ internal sealed class DeterministicServicesHandler : HttpMessageHandler
         }
         if (path == "/pages/page-1/capture")
         {
+            CaptureRequest = await request.Content!.ReadFromJsonAsync<JsonElement>(cancellationToken);
             return Json(CaptureBody);
         }
         if (path == "/api/v1/chat/completions")

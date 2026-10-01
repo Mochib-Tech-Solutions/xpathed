@@ -74,6 +74,8 @@ public sealed class ControllerContractTests(WebApplicationFactory<HealthControll
     [Theory]
     [InlineData("capture", "{}")]
     [InlineData("capture", "{\"documentId\":null}")]
+    [InlineData("capture", "{\"documentId\":\"document\",\"scope\":\"visible\"}")]
+    [InlineData("capture", "{\"documentId\":\"document\",\"scope\":null}")]
     [InlineData("selection", "{}")]
     [InlineData("selection", "{\"documentId\":\"document\",\"captureId\":\"capture\"}")]
     [InlineData("selections", "{\"documentId\":\"document\",\"captureId\":\"capture\",\"actions\":[null]}")]

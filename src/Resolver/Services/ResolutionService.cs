@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Xpathed.Common.Contracts;
 using Xpathed.Common.Diagnostics;
 using Xpathed.Common.Http;
@@ -10,13 +11,31 @@ public sealed partial class ResolutionService(
     IHttpClientFactory clients,
     OpenRouterGateway gateway,
     IConfiguration configuration,
-    ILogger<ResolutionService> logger
+    ILogger<ResolutionService> logger,
+    ProviderAccounting accounting
 )
 {
     private string SingleInteractionPrompt =>
         configuration["Resolution:PromptVariant"] == "concise"
             ? ActionSelectionStrategy.ConciseSingleInteractionPrompt
             : ActionSelectionStrategy.SingleInteractionPrompt;
+
+    private string PromptFor(string version) =>
+        version switch
+        {
+            "4" => ActionSelectionStrategy.CurrentViewPrompt,
+            "3" => SingleInteractionPrompt,
+            "2" => ActionSelectionStrategy.Prompt,
+            _ => CandidateSelectionStrategy.Prompt,
+        };
+
+    private static JsonElement SchemaFor(string version) =>
+        version switch
+        {
+            "4" => ActionSelectionStrategy.CurrentViewSchema,
+            "2" or "3" => ActionSelectionStrategy.Schema,
+            _ => CandidateSelectionStrategy.Schema,
+        };
 
     public Task<ResolutionResult> ResolveAsync(
         string pageId,
@@ -42,8 +61,7 @@ public sealed partial class ResolutionService(
             attemptId,
             value => input = value
         );
-        var multiple = request.ContractVersion is "2" or "3";
-        var singleInteraction = request.ContractVersion == "3";
+        var multiple = request.ContractVersion is "2" or "3" or "4";
         var sensitive =
             DiagnosticSanitizer.IsSensitiveInstruction(request.Instruction)
             || DiagnosticSanitizer.IsSensitiveAction(result.Action)
@@ -55,10 +73,8 @@ public sealed partial class ResolutionService(
                 : "sanitized",
             sensitive ? DiagnosticSanitizer.Redacted : DiagnosticSanitizer.RedactInstruction(request.Instruction),
             sensitive || input is null ? null : DiagnosticSanitizer.SanitizeJson(input),
-            singleInteraction ? SingleInteractionPrompt
-                : multiple ? ActionSelectionStrategy.Prompt
-                : CandidateSelectionStrategy.Prompt,
-            (multiple ? ActionSelectionStrategy.Schema : CandidateSelectionStrategy.Schema).GetRawText(),
+            PromptFor(request.ContractVersion),
+            SchemaFor(request.ContractVersion).GetRawText(),
             DiagnosticSanitizer.SanitizeJson(
                 JsonSerializer.Serialize(
                     new
@@ -72,10 +88,8 @@ public sealed partial class ResolutionService(
                         outputTokens = multiple ? ActionSelectionStrategy.OutputTokens : 512,
                         effective = gateway.DescribeConfiguration(
                             result.Diagnostics.Strategy,
-                            singleInteraction ? SingleInteractionPrompt
-                                : multiple ? ActionSelectionStrategy.Prompt
-                                : CandidateSelectionStrategy.Prompt,
-                            multiple ? ActionSelectionStrategy.Schema : CandidateSelectionStrategy.Schema,
+                            PromptFor(request.ContractVersion),
+                            SchemaFor(request.ContractVersion),
                             result.Diagnostics.ModelInputBudgetBytes,
                             multiple ? ActionSelectionStrategy.OutputTokens : 512,
                             result.Diagnostics.PromptVersion,
@@ -98,15 +112,21 @@ public sealed partial class ResolutionService(
     )
     {
         var timer = Stopwatch.StartNew();
+        var requestCancellation = cancellationToken;
+        using var deadline =
+            request.ContractVersion == "4" ? CancellationTokenSource.CreateLinkedTokenSource(cancellationToken) : null;
+        if (deadline is not null)
+        {
+            deadline.CancelAfter(TimeSpan.FromSeconds(2));
+            cancellationToken = deadline.Token;
+        }
         var attemptId = suppliedAttemptId ?? Guid.NewGuid().ToString("N");
         CandidateCapture? capture = null;
-        var multiple = request.ContractVersion is "2" or "3";
-        var singleInteraction = request.ContractVersion == "3";
-        var prompt =
-            singleInteraction ? SingleInteractionPrompt
-            : multiple ? ActionSelectionStrategy.Prompt
-            : CandidateSelectionStrategy.Prompt;
-        var schema = multiple ? ActionSelectionStrategy.Schema : CandidateSelectionStrategy.Schema;
+        var providerCompleted = false;
+        var multiple = request.ContractVersion is "2" or "3" or "4";
+        var singleInteraction = request.ContractVersion is "3" or "4";
+        var prompt = PromptFor(request.ContractVersion);
+        var schema = SchemaFor(request.ContractVersion);
         var outputTokens = multiple ? ActionSelectionStrategy.OutputTokens : 512;
         var strategy = configuration["Resolution:Strategy"] ?? "candidate-selection-v1";
         var diagnostics = new ResolutionDiagnostics
@@ -114,7 +134,8 @@ public sealed partial class ResolutionService(
             Stage = "configuration",
             Strategy = strategy,
             PromptVersion =
-                singleInteraction ? (configuration["Resolution:PromptVariant"] == "concise" ? "7-concise-1" : "7")
+                request.ContractVersion == "4" ? "8"
+                : singleInteraction ? (configuration["Resolution:PromptVariant"] == "concise" ? "7-concise-1" : "7")
                 : multiple ? "6"
                 : "5",
         };
@@ -150,7 +171,7 @@ public sealed partial class ResolutionService(
             using var browser = clients.CreateClient("browser");
             using var captureResponse = await browser.PostAsJsonAsync(
                 $"/pages/{Uri.EscapeDataString(pageId)}/capture",
-                new CaptureRequest(request.DocumentId),
+                new CaptureRequest(request.DocumentId, request.ContractVersion == "4" ? "current_view" : "page"),
                 cancellationToken
             );
             await EnsureBrowserSuccessAsync(captureResponse, cancellationToken);
@@ -166,6 +187,7 @@ public sealed partial class ResolutionService(
                 || string.IsNullOrWhiteSpace(capture.CaptureId)
                 || capture.FrameId != "main"
                 || capture.UnsupportedBoundaryCount < 0
+                || capture.Scope != (request.ContractVersion == "4" ? "current_view" : "page")
             )
             {
                 throw new ApiException(502, "invalid_browser_capture", "The browser returned an invalid capture.");
@@ -188,8 +210,11 @@ public sealed partial class ResolutionService(
             }
             if (
                 capture.Coverage.CapturedCount != capture.Candidates.Length
-                || capture.Coverage.EligibleCount != capture.Candidates.Length
-                || capture.Coverage.ScannedCount < capture.Candidates.Length
+                || capture.Coverage.ExcludedOffscreenCount < 0
+                || request.ContractVersion != "4" && capture.Coverage.ExcludedOffscreenCount != 0
+                || capture.Coverage.EligibleCount
+                    != (long)capture.Candidates.Length + capture.Coverage.ExcludedOffscreenCount
+                || capture.Coverage.ScannedCount < capture.Coverage.EligibleCount
                 || capture.Candidates.Any(candidate =>
                     candidate is null
                     || string.IsNullOrWhiteSpace(candidate.Id)
@@ -202,6 +227,7 @@ public sealed partial class ResolutionService(
                     || candidate.Scope is null
                     || candidate.State is null
                     || candidate.Geometry is null
+                    || request.ContractVersion == "4" && !ValidCurrentViewCandidate(candidate)
                     || !ValidFrame(candidate.Frame, request.DocumentId)
                 )
                 || capture.Candidates.Select(candidate => candidate.Id).Distinct(StringComparer.Ordinal).Count()
@@ -232,8 +258,64 @@ public sealed partial class ResolutionService(
                 );
             }
             observeInput?.Invoke(input);
-            diagnostics = diagnostics with { ModelCalls = 1 };
-            var completion = await gateway.CompleteAsync(prompt, input, schema, cancellationToken, outputTokens);
+            cancellationToken.ThrowIfCancellationRequested();
+            ProviderCompletion completion;
+            if (request.ContractVersion == "4")
+            {
+                ResolutionDiagnostics? received = null;
+                var pending = accounting.Start(token =>
+                    gateway.CompleteAsync(
+                        prompt,
+                        input,
+                        schema,
+                        token,
+                        outputTokens,
+                        observed => Volatile.Write(ref received, observed),
+                        estimateCost: false
+                    )
+                );
+                diagnostics = diagnostics with { ModelCalls = 1, ProviderAccounting = "pending" };
+                try
+                {
+                    completion = await pending.WaitAsync(cancellationToken);
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    var known = Volatile.Read(ref received);
+                    if (known is not null)
+                    {
+                        diagnostics = diagnostics with
+                        {
+                            Model = known.Model,
+                            Provider = known.Provider,
+                            GenerationId = known.GenerationId,
+                            FinishReason = known.FinishReason,
+                            Usage = known.Usage,
+                            ProviderAccounting = known.Usage?.Cost is not null ? "completed" : "unavailable",
+                        };
+                    }
+                    _ = accounting.ObserveLateAsync(
+                        pending,
+                        traceId,
+                        attemptId,
+                        configurationId,
+                        known is not null && !requestCancellation.IsCancellationRequested,
+                        () => Volatile.Read(ref received)
+                    );
+                    throw;
+                }
+                catch
+                {
+                    diagnostics = diagnostics with { ProviderAccounting = "unavailable" };
+                    throw;
+                }
+            }
+            else
+            {
+                diagnostics = diagnostics with { ModelCalls = 1 };
+                completion = await gateway.CompleteAsync(prompt, input, schema, cancellationToken, outputTokens);
+            }
+            providerCompleted = true;
             diagnostics = diagnostics with
             {
                 Model = completion.Diagnostics.Model,
@@ -242,15 +324,27 @@ public sealed partial class ResolutionService(
                 FinishReason = completion.Diagnostics.FinishReason,
                 Usage = completion.Diagnostics.Usage,
                 CostEstimate = completion.Diagnostics.CostEstimate,
+                ProviderAccounting =
+                    request.ContractVersion == "4"
+                        ? completion.Diagnostics.Usage?.Cost is not null
+                            ? "completed"
+                            : "unavailable"
+                        : null,
             };
             diagnostics.TimingsMs["model"] = timer.Elapsed.TotalMilliseconds - diagnostics.TimingsMs["capture"];
             if (completion.Diagnostics.Code is { } code)
             {
                 throw new ApiException(502, code, "OpenRouter could not return a valid selection.");
             }
+            cancellationToken.ThrowIfCancellationRequested();
             if (multiple)
             {
-                var selections = ActionSelectionStrategy.Select(completion.Content!, capture, singleInteraction);
+                var selections = ActionSelectionStrategy.Select(
+                    completion.Content!,
+                    capture,
+                    singleInteraction,
+                    request.ContractVersion == "4"
+                );
                 diagnostics = diagnostics with { Stage = "selection" };
                 var requestedActions = selections
                     .Select((item, index) => new ActionSelection($"a{index + 1}", item.CandidateId, item.Action))
@@ -309,12 +403,18 @@ public sealed partial class ResolutionService(
                                 {
                                     "current_state_dependency" =>
                                         "This step depends on a future page state. No earlier action was executed.",
+                                    "appearance_unavailable" =>
+                                        "The requested appearance cannot be established from the captured CSS evidence.",
                                     "ambiguous" => "The instruction does not identify one intended target.",
-                                    "unsupported_action" => singleInteraction
+                                    "unsupported_action" => request.ContractVersion == "4"
+                                        ? "Use one supported interaction type per command. It may target several elements in the current view; mixed interactions are unsupported."
+                                    : singleInteraction
                                         ? "Use one supported interaction type per command. It may target several current-page elements; mixed interactions are unsupported."
-                                        : "This interaction is outside the supported action families.",
+                                    : "This interaction is outside the supported action families.",
                                     _ => item.Outcome == "not_found"
-                                        ? "No matching element found in the eligible current-page scope."
+                                        ? request.ContractVersion == "4"
+                                            ? "No matching element found in the current view."
+                                            : "No matching element found in the eligible current-page scope."
                                         : null,
                                 };
                             return new ActionResolution(
@@ -412,7 +512,10 @@ public sealed partial class ResolutionService(
             {
                 diagnostics = diagnostics with
                 {
-                    Message = "No matching element found in the eligible current-page scope.",
+                    Message =
+                        request.ContractVersion == "4"
+                            ? "No matching element found in the current view."
+                            : "No matching element found in the eligible current-page scope.",
                 };
             }
             return Result(selection.Outcome, selection.Action, validated.Target);
@@ -421,8 +524,20 @@ public sealed partial class ResolutionService(
         {
             return Failure(error.Code, error.Message);
         }
-        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException) when (requestCancellation.IsCancellationRequested)
         {
+            if (request.ContractVersion == "4" && providerCompleted)
+            {
+                accounting.Record(diagnostics, traceId, attemptId, configurationId);
+            }
+            throw;
+        }
+        catch (OperationCanceledException)
+        {
+            if (deadline?.IsCancellationRequested == true)
+            {
+                return Failure("resolution_timeout", "Resolution exceeded its two-second server processing deadline.");
+            }
             return Failure(
                 diagnostics.Stage == "model" ? "provider_timeout" : "browser_timeout",
                 "An upstream service did not respond in time."
@@ -442,6 +557,14 @@ public sealed partial class ResolutionService(
 
         ResolutionResult Failure(string code, string message)
         {
+            var stage = diagnostics.Stage == "selection" ? "validation" : diagnostics.Stage;
+            if (stage is "capture" or "model" or "validation")
+            {
+                diagnostics.TimingsMs[stage] =
+                    timer.Elapsed.TotalMilliseconds
+                    - (stage == "capture" ? 0 : diagnostics.TimingsMs.GetValueOrDefault("capture"))
+                    - (stage == "validation" ? diagnostics.TimingsMs.GetValueOrDefault("model") : 0);
+            }
             diagnostics = diagnostics with { Code = code, Message = message };
             LogFailure(logger, diagnostics.Stage, code, "error", traceId, attemptId, configurationId, attemptId);
             return Result("error", null, null);
@@ -449,6 +572,10 @@ public sealed partial class ResolutionService(
 
         ResolutionResult Result(string outcome, string? action, ResolvedTarget? target)
         {
+            if (outcome != "error")
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+            }
             diagnostics.TimingsMs["total"] = timer.Elapsed.TotalMilliseconds;
             return new ResolutionResult(
                 request.ContractVersion,
@@ -483,6 +610,35 @@ public sealed partial class ResolutionService(
         string configurationId,
         string evidenceReference
     );
+
+    private static bool ValidCurrentViewCandidate(CandidateElement candidate) =>
+        candidate.State.InViewport
+        && double.IsFinite(candidate.Geometry.X)
+        && double.IsFinite(candidate.Geometry.Y)
+        && double.IsFinite(candidate.Geometry.Width)
+        && candidate.Geometry.Width > 0
+        && double.IsFinite(candidate.Geometry.Height)
+        && candidate.Geometry.Height > 0
+        && candidate.Appearance is { Limitations: { Length: <= 8 } } appearance
+        && (appearance.BackgroundColor is null || OpaqueColor().IsMatch(appearance.BackgroundColor))
+        && (appearance.TextColor is null || OpaqueColor().IsMatch(appearance.TextColor))
+        && (appearance.BorderColor is null || OpaqueColor().IsMatch(appearance.BorderColor))
+        && appearance.Limitations.All(value =>
+            value
+                is "complex_effects"
+                    or "background_image"
+                    or "pseudo_element_appearance"
+                    or "replaced_content"
+                    or "background_transparent"
+                    or "unsupported_color"
+                    or "mixed_border_colors"
+        );
+
+    [GeneratedRegex(
+        @"^rgb\((?:0|[1-9]\d?|1\d{2}|2[0-4]\d|25[0-5]), (?:0|[1-9]\d?|1\d{2}|2[0-4]\d|25[0-5]), (?:0|[1-9]\d?|1\d{2}|2[0-4]\d|25[0-5])\)$",
+        RegexOptions.CultureInvariant
+    )]
+    private static partial Regex OpaqueColor();
 
     private static bool ValidTarget(ResolvedTarget? target, string? candidateId, string action, TargetFrame? frame) =>
         target is not null

@@ -17,6 +17,7 @@ builder.Services.AddHttpClient(
 builder.Services.AddHttpClient("openrouter");
 builder.Services.AddTransient<OpenRouterGateway>();
 builder.Services.AddTransient<ResolutionService>();
+builder.Services.AddSingleton<ProviderAccounting>();
 var app = builder.Build();
 app.UseApiErrors();
 app.UseMiddleware<ServiceOriginMiddleware>();

@@ -20,16 +20,15 @@ export async function checkKeyBudget(key, remainingUsd, fetchImpl = fetch) {
     data.limit_reset !== null ||
     !Number.isFinite(data.limit) ||
     data.limit <= 0 ||
-    data.limit > 5 ||
     !Number.isFinite(data.limit_remaining) ||
     data.limit_remaining <= 0 ||
     data.limit_remaining > data.limit ||
     !Number.isFinite(remainingUsd) ||
-    data.limit_remaining > remainingUsd + 1e-9 ||
+    remainingUsd <= 0 ||
     (data.expires_at != null && !(Date.parse(data.expires_at) > Date.now()))
   )
     throw new Error(
-      "Evaluation key needs a positive non-resetting cap within the remaining shared $5 campaign, and must not be expired or a management key. " +
+      "Evaluation key needs a positive non-resetting cap and balance, and must not be expired or a management key. The authoritative shared $5 campaign must also have a positive balance. " +
         JSON.stringify({
           managementKey:
             typeof data?.is_management_key === "boolean" ? data.is_management_key : "unavailable",
@@ -144,7 +143,8 @@ async function main() {
   await save();
   if (mode !== "deterministic") {
     const { githubBudget } = await import("../evaluation/github-budget.mjs");
-    const { validateBudgetLedger } = await import("../evaluation/comparison-budget.mjs");
+    const { readEvaluationKey, validateBudgetLedger } =
+      await import("../evaluation/comparison-budget.mjs");
     if (
       env.XPATHED_BUDGET_GITHUB_REPOSITORY?.toLowerCase() !== env.GITHUB_REPOSITORY?.toLowerCase()
     )
@@ -160,7 +160,7 @@ async function main() {
       spentUsd: spent,
       remainingUsd: Math.max(0, remote.ledger.ceilingUsd - spent),
     };
-    report.key = await checkKeyBudget(env.OPENROUTER_API_KEY, report.budget.remainingUsd);
+    report.key = await checkKeyBudget(await readEvaluationKey(env), report.budget.remainingUsd);
     await save();
   }
   console.log(JSON.stringify(report, null, 2));
