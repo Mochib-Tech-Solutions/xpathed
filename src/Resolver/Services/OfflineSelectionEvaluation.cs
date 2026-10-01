@@ -41,17 +41,17 @@ public static class OfflineSelectionEvaluation
                 );
             }
             var variant = Environment.GetEnvironmentVariable("XPATHED_EVALUATION_PROMPT_VARIANT");
-            if (variant is not (null or "baseline" or "declarative-inspect"))
+            if (variant is not (null or "baseline" or "intent-cardinality"))
             {
                 throw new ApiException(400, "invalid_offline_prompt_variant", "Unknown offline prompt variant.");
             }
-            if (variant == "declarative-inspect")
+            if (variant == "intent-cardinality")
             {
                 prompt +=
-                    "\nAn element description without an explicit interaction is an inspect request. "
-                    + "Identify its intended candidate using available text and scope; absence of an action verb alone is not unsupported_action. "
-                    + "Keep genuine ambiguity unsupported and preserve all existing plural and workflow rules.";
-                promptVersion = "7-declarative-inspect-1";
+                    "\nReturn multiple targets only when the instruction requests multiple distinct elements, including plural/all requests. "
+                    + "Multiple words in one target description, or alternative candidate matches for it, do not themselves request multiple targets. "
+                    + "Preserve genuine ambiguity instead of returning alternatives.";
+                promptVersion = "7-intent-cardinality-1";
             }
             diagnostics = diagnostics with { PromptVersion = promptVersion };
             var input = await ReadInputAsync(args[1]);
