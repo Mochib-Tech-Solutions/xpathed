@@ -64,11 +64,20 @@ jobs:
           if [ -f "$bundle/manifest.json" ] && [ -f .artifacts/release-ci/bundle-sha256.txt ]; then
             digest=$(cat .artifacts/release-ci/bundle-sha256.txt)
             node scripts/release-bundle.mjs verify "$bundle" --sha256 "$digest"
+            mkdir -p .artifacts/release-ci/transport
+            gzip -1c "$bundle/images.tar" | split -b 1000000000 -d -a 4 - .artifacts/release-ci/transport/images.tar.gz.part-
+            for asset in "$bundle/manifest.json" "$bundle/configuration.json" "$bundle/source.tar" .artifacts/release-ci/transport/images.tar.gz.part-*; do
+              if [ "$(stat -c %s "$asset")" -ge 2147483648 ]; then
+                echo "Release asset exceeds GitHub's 2 GiB limit: $asset" >&2
+                exit 1
+              fi
+            done
             tag="candidate-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-            printf 'Packaged candidate; no default activation. Qualification is established only by verified evidence.\n\nManifest SHA-256: %s\nSource: %s\n' "$digest" "$GITHUB_SHA" > .artifacts/release-ci/release-notes.md
-            gh release create "$tag" --target "$GITHUB_SHA" --prerelease --title "$tag" --notes-file .artifacts/release-ci/release-notes.md \
-              "$bundle/manifest.json" "$bundle/configuration.json" "$bundle/source.tar" "$bundle/images.tar" \
+            printf 'Packaged candidate; no default activation. Qualification is established only by verified evidence. Concatenate images.tar.gz.part-* in numeric order and decompress to images.tar before bundle verification.\n\nManifest SHA-256: %s\nSource: %s\n' "$digest" "$GITHUB_SHA" > .artifacts/release-ci/release-notes.md
+            gh release create "$tag" --target "$GITHUB_SHA" --draft --prerelease --title "$tag" --notes-file .artifacts/release-ci/release-notes.md \
+              "$bundle/manifest.json" "$bundle/configuration.json" "$bundle/source.tar" .artifacts/release-ci/transport/images.tar.gz.part-* \
               .artifacts/release-ci/bundle-sha256.txt
+            gh release edit "$tag" --draft=false
           fi
       - name: Retain private results and original failures
         if: always()
@@ -78,6 +87,7 @@ jobs:
           path: |
             .artifacts/release-ci/
             !.artifacts/release-ci/bundle/
+            !.artifacts/release-ci/transport/
           include-hidden-files: true
           if-no-files-found: error
           retention-days: 30
