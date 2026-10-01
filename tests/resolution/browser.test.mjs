@@ -1174,6 +1174,54 @@ test("Saved semantic XPaths survive generated IDs, wrappers and reordered duplic
   );
 });
 
+test("Saved user-facing XPaths survive ID changes and scoped duplicates but reject changed meaning", async () => {
+  await withFixture(
+    `<section aria-label="Profile"><button id="save-profile" data-oracle="save">Save changes</button>
+    <label for="country">Country</label><input id="country" data-oracle="country"></section>
+    <script>let mutation = 0; window.mutateXpathFixture = () => {
+      const save = document.querySelector('[data-oracle="save"]');
+      if (++mutation === 1) {
+        save.id = 'save-profile-updated';
+        const duplicate = save.cloneNode(true); duplicate.id = 'other-save';
+        duplicate.setAttribute('data-oracle', 'other-save'); document.body.prepend(duplicate);
+        const country = document.querySelector('[data-oracle="country"]');
+        country.id = 'country-updated'; document.querySelector('label').htmlFor = country.id;
+        const wrapper = document.createElement('div'); save.before(wrapper); wrapper.append(save);
+      } else {
+        const replacement = save.cloneNode(true); replacement.textContent = 'Cancel replacement';
+        replacement.setAttribute('data-oracle', 'replacement'); save.replaceWith(replacement);
+      }
+    };</script>`,
+    async (session, page) => {
+      const capture = await request(`/pages/${page.pageId}/capture`, {
+        documentId: page.documentId,
+      });
+      const paths = [];
+      for (const label of ["Save changes", "Country"]) {
+        const candidate = capture.candidates.find((entry) => entry.label === label);
+        assert.ok(candidate, label);
+        const { target } = await request(`/pages/${page.pageId}/selection`, {
+          documentId: page.documentId,
+          captureId: capture.captureId,
+          candidateId: candidate.id,
+          action: "inspect",
+        });
+        assert.equal(target.xpaths.length, 1);
+        paths.push(target.xpaths[0]);
+      }
+      assert.deepEqual((await verify(paths)).matches, [["save"], ["country"]]);
+      assert.deepEqual((await observe({ xpaths: paths, mutateXpath: true })).matches, [
+        ["save"],
+        ["country"],
+      ]);
+      assert.deepEqual((await observe({ xpaths: paths, mutateXpath: true })).matches, [
+        [],
+        ["country"],
+      ]);
+    },
+  );
+});
+
 test("Positional XPath is a verified last fallback when identical elements have no distinguishing context", async () => {
   await withFixture(
     `<div><span data-oracle="expected-target">Same</span><span>Same</span></div>`,
@@ -1460,7 +1508,7 @@ test("Nested frame targets retain document XPath identity and main viewport geom
         action: "click",
       });
       assert.equal(target.frame.id, candidate.frame.id);
-      assert.deepEqual(target.xpaths, ["//button[@id='expected-target']"]);
+      assert.equal(target.xpaths.length, 1);
       assert.deepEqual(target.geometry, { x: 150, y: 150, width: 120, height: 40 });
       assert.equal(target.interactability.status, "ready");
       assert.deepEqual((await observe({ xpaths: target.xpaths }, "/inner")).matches, [
