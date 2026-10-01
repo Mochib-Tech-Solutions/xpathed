@@ -46,7 +46,11 @@ export function classifyChanges(paths) {
       )
     )
       web = tooling = true;
-    if (/^(scripts\/|\.github\/workflows\/|package(-lock)?\.json$|global\.json$)/.test(path))
+    if (
+      /^(scripts\/|\.githooks\/|\.github\/workflows\/|package(-lock)?\.json$|global\.json$)/.test(
+        path,
+      )
+    )
       tooling = true;
     if (
       /^(docker\/|\.dockerignore$|\.env\.example$)/.test(path) ||
