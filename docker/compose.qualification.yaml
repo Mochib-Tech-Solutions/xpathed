@@ -46,5 +46,7 @@ services:
     environment:
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
       XPATHED_BUDGET_PATH: /budget/experiment-budget.json
+      XPATHED_BUDGET_GITHUB_REPOSITORY: ${XPATHED_BUDGET_GITHUB_REPOSITORY:-}
+      GH_TOKEN: ${GH_TOKEN:-}
     volumes:
       - ./.artifacts/datasets:/budget

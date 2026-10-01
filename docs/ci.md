@@ -24,7 +24,7 @@ Only these explicit paths are uploaded. Local datasets, environment files, user 
 
 Inspect the failing job and `gate.json` before rerunning. **Rerun the entire workflow**, not only failed jobs: every selected receipt must belong to the same attempt. GitHub's **Re-run all jobs** or `gh run rerun RUN_ID` creates a fresh attempt without mixing earlier results. A new commit gets its own PR check; after merge, verify the separate push run against the merged SHA.
 
-Local gate tests run through `pnpm test:tooling`; they exercise the public receipt/verification CLI, including negative status, identity, coverage and artifact cases. Use `pnpm evaluate` for the real-browser suite. Paid model testing remains a separate explicit operation under the existing shared budget; no provider secrets or paid CI are configured.
+Local gate tests run through `pnpm test:tooling`; they exercise the public receipt/verification CLI, including negative status, identity, coverage and artifact cases. Use `pnpm evaluate` for the real-browser suite. Paid model testing remains separate from these automatic checks. The manually dispatched [release workflow](releases.md#manual-github-qualification) uses a dedicated secret and durable shared budget; it has no PR, push or schedule trigger.
 
 ## Account controls remain separate
 
