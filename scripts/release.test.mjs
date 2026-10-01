@@ -27,6 +27,7 @@ async function workspace(t) {
   cpSync("evaluation", join(cwd, "evaluation"), { recursive: true });
   mkdirSync(join(cwd, "scripts"));
   cpSync("scripts/release.mjs", join(cwd, "scripts/release.mjs"));
+  cpSync("scripts/release-bundle.mjs", join(cwd, "scripts/release-bundle.mjs"));
   writeFileSync(join(cwd, ".gitignore"), ".artifacts/\n");
   const write = (path, value) =>
     writeFileSync(join(cwd, path), JSON.stringify(value, null, 2) + "\n");
@@ -237,7 +238,7 @@ async function workspace(t) {
         XPATHED_WORKSPACE: "",
       },
     });
-  const seal = () =>
+  const seal = (...extra) =>
     run(
       "seal",
       "--confirmation",
@@ -250,9 +251,178 @@ async function workspace(t) {
       sha,
       "--output",
       ".artifacts/candidate.json",
+      ...extra,
     );
-  return { cwd, write, run, seal, sha, pilot, confirmation };
+  const bindArtifact = () => {
+    const bundle = ".artifacts/bundle";
+    mkdirSync(join(cwd, bundle));
+    execFileSync("git", ["archive", "--format=tar", "--output", `${bundle}/source.tar`, sha], {
+      cwd,
+    });
+    writeFileSync(join(cwd, bundle, "images.tar"), "Synthetic image archive; no Docker execution");
+    write(`${bundle}/configuration.json`, {
+      version: 1,
+      profile,
+      resolverEnvironment: {
+        OpenRouter__Model: profile.model,
+        OpenRouter__Provider: profile.provider,
+      },
+      secretsRequired: ["OpenRouter__ApiKey"],
+      runtimeDefaults: "frozen-in-images",
+      defaultActivated: false,
+    });
+    const platform = { os: "linux", architecture: "amd64" };
+    const images = ["browser", "resolver"].map((component, index) => ({
+      component,
+      id: `sha256:${String(index + 1).repeat(64)}`,
+      ...platform,
+      sourceSha: sha,
+    }));
+    const files = Object.fromEntries(
+      ["source.tar", "images.tar", "configuration.json"].map((name) => {
+        const bytes = readFileSync(join(cwd, bundle, name));
+        return [name, { sha256: hash(bytes), bytes: bytes.length }];
+      }),
+    );
+    write(`${bundle}/manifest.json`, {
+      version: 1,
+      status: "packaged-unqualified",
+      defaultActivated: false,
+      sourceSha: sha,
+      profileId: profile.id,
+      platform,
+      images,
+      files,
+    });
+    const digest = hash(readFileSync(join(cwd, bundle, "manifest.json")));
+    const artifact = {
+      version: 1,
+      bundleManifestSha256: digest,
+      sourceSha: sha,
+      profileId: profile.id,
+      images,
+      platform,
+    };
+    const observed = images.map((image, index) => ({
+      component: image.component,
+      imageId: image.id,
+      containerId: String(index + 3).repeat(64),
+    }));
+    for (const run of [pilot, confirmation]) {
+      run.manifest.qualification.artifact = structuredClone(artifact);
+      if (run === confirmation) run.manifest.baselineEvidence = baselineEvidence(pilot);
+      delete run.manifest.contentHash;
+      run.manifest.contentHash = hash(run.manifest);
+      write(`${run.path}/manifest.json`, run.manifest);
+      write(`${run.path}/artifact-before.json`, { version: 1, artifact, observed });
+      write(`${run.path}/artifact-receipt.json`, {
+        version: 1,
+        artifact,
+        before: observed,
+        after: observed,
+      });
+    }
+    return {
+      bundle,
+      digest,
+      artifact,
+      observed,
+      seal: () => seal("--bundle", bundle, "--bundle-sha256", digest),
+    };
+  };
+  return { cwd, write, run, seal, sha, pilot, confirmation, bindArtifact };
 }
+
+test("artifact-bound sealing verifies both original container attestations and the pinned bundle", async (t) => {
+  const work = await workspace(t);
+  const bound = work.bindArtifact();
+  const result = bound.seal();
+  assert.equal(result.status, 0, result.stderr);
+  const file = join(work.cwd, ".artifacts/candidate.json");
+  const bytes = readFileSync(file);
+  const candidate = JSON.parse(bytes);
+  assert.equal(candidate.status, "artifact-bound-evidence-verified");
+  assert.equal(candidate.defaultActivated, false);
+  assert.deepEqual(candidate.artifact, bound.artifact);
+  assert.equal(
+    Object.keys(candidate.files).filter((path) => path.endsWith("artifact-receipt.json")).length,
+    2,
+  );
+  const verified = work.run("verify", file, "--sha256", hash(bytes));
+  assert.equal(verified.status, 0, verified.stderr);
+});
+
+test("artifact-bound sealing fails closed for missing, swapped or downgraded identities and receipts", async (t) => {
+  const work = await workspace(t);
+  const bound = work.bindArtifact();
+  const originals = [work.pilot, work.confirmation].map((run) => structuredClone(run.manifest));
+  const saveManifest = (run) => {
+    delete run.manifest.contentHash;
+    run.manifest.contentHash = hash(run.manifest);
+    work.write(`${run.path}/manifest.json`, run.manifest);
+  };
+  assert.match(
+    work.seal().stderr,
+    /artifact.*bundle/i,
+    "Artifact claims cannot be downgraded to legacy seals",
+  );
+  for (const run of [work.pilot, work.confirmation]) {
+    for (const change of [
+      (m) => {
+        delete m.qualification.artifact;
+      },
+      (m) => {
+        m.qualification.artifact.images[0].id = `sha256:${"9".repeat(64)}`;
+      },
+      (m) => {
+        m.qualification.artifact.bundleManifestSha256 = "f".repeat(64);
+      },
+    ]) {
+      change(run.manifest);
+      saveManifest(run);
+      const result = bound.seal();
+      assert.equal(result.status, 1);
+      assert.match(result.stderr, /artifact/i);
+      run.manifest = structuredClone(originals[run === work.pilot ? 0 : 1]);
+      saveManifest(run);
+    }
+    for (const name of ["artifact-before.json", "artifact-receipt.json"]) {
+      const path = `${run.path}/${name}`;
+      const original = readFileSync(join(work.cwd, path));
+      rmSync(join(work.cwd, path));
+      assert.equal(bound.seal().status, 1, "Missing attestations cannot qualify images");
+      writeFileSync(join(work.cwd, path), original);
+    }
+    const path = `${run.path}/artifact-receipt.json`;
+    const original = JSON.parse(readFileSync(join(work.cwd, path)));
+    for (const change of [
+      (r) => {
+        r.after[0].imageId = `sha256:${"9".repeat(64)}`;
+      },
+      (r) => {
+        r.after[0].containerId = "9".repeat(64);
+      },
+      (r) => {
+        r.before.reverse();
+      },
+      (r) => {
+        r.after.pop();
+      },
+      (r) => {
+        r.artifact.profileId = "qwen";
+      },
+    ]) {
+      const changed = structuredClone(original);
+      change(changed);
+      work.write(path, changed);
+      assert.match(bound.seal().stderr, /attestation/i);
+    }
+    work.write(path, original);
+  }
+  const wrongBundle = work.seal("--bundle", bound.bundle, "--bundle-sha256", "0".repeat(64));
+  assert.equal(wrongBundle.status, 1);
+  assert.match(wrongBundle.stderr, /SHA-256 mismatch/i);
+});
 
 test("verify checks the externally pinned digest before reading referenced evidence", (t) => {
   const directory = realpathSync(mkdtempSync(join(tmpdir(), "xpathed-release-")));

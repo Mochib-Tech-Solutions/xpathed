@@ -58,6 +58,7 @@
     "release:bundle": "node scripts/release-bundle.mjs create",
     "release:bundle:verify": "node scripts/release-bundle.mjs verify",
     "release:bundle:restore": "node scripts/release-bundle.mjs restore",
+    "release:evaluate": "node scripts/release-evaluate.mjs",
     "evaluate:replay": "node evaluation/run.mjs --replay",
     "datasets:fetch": "node evaluation/dataset-sources.mjs",
     "datasets:import": "node evaluation/datasets.mjs",

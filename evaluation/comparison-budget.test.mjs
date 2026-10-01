@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { once } from "node:events";
 import { access, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -22,13 +23,19 @@ const input = { model, messages: [{ role: "user", content: "Find Save" }], max_t
 
 async function setup(
   t,
-  { completion, ceilingUsd, initial, onRecord, profiles, metadata = pricing } = {},
+  { completion, ceilingUsd, initial, onRecord, profiles, metadata = pricing, github } = {},
 ) {
   const directory = await mkdtemp(join(tmpdir(), "xpathed-comparison-budget-"));
+  let proxy;
+  t.after(async () => {
+    await proxy?.close();
+    await rm(directory, { recursive: true, force: true });
+  });
   const ledgerPath = join(directory, "experiment-budget.json");
   if (initial) await writeFile(ledgerPath, JSON.stringify(initial));
   const calls = [];
   const fetchImpl = async (url, options) => {
+    if (url.startsWith("https://api.github.com/")) return github.fetch(url, options);
     if (url.endsWith("/endpoints"))
       return Response.json(typeof metadata === "function" ? metadata(url) : metadata);
     calls.push({ url, options });
@@ -47,17 +54,15 @@ async function setup(
           choices: [],
         });
   };
-  const proxy = await createBudgetProxy({
+  proxy = await createBudgetProxy({
     apiKey: "test-provider-secret",
     ledgerPath,
     fetchImpl,
     ceilingUsd,
     onRecord,
     profiles,
-  });
-  t.after(async () => {
-    await proxy.close();
-    await rm(directory, { recursive: true, force: true });
+    githubRepository: github ? "Example/Private" : "",
+    githubToken: github ? "test-github-secret" : "",
   });
   proxy.server.listen(0, "127.0.0.1");
   await once(proxy.server, "listening");
@@ -71,6 +76,229 @@ async function setup(
     });
   return { proxy, post, base, calls, ledgerPath, fetchImpl };
 }
+
+function githubBudget(initial) {
+  let ledger = structuredClone(initial);
+  const authority = "github:example/private:evaluation-budget:experiment-budget.json";
+  return {
+    get ledger() {
+      return structuredClone(ledger);
+    },
+    async fetch(url, options) {
+      assert.equal(options.headers.Authorization, "Bearer test-github-secret");
+      assert.equal(new URL(url).pathname, "/repos/example/private/contents/experiment-budget.json");
+      const sha = () =>
+        createHash("sha1")
+          .update(JSON.stringify(ledger, null, 2) + "\n")
+          .digest("hex");
+      if (options.method === "GET") {
+        assert.equal(new URL(url).searchParams.get("ref"), "evaluation-budget");
+        return Response.json({
+          type: "file",
+          encoding: "base64",
+          sha: sha(),
+          content: Buffer.from(JSON.stringify(ledger)).toString("base64"),
+        });
+      }
+      assert.equal(options.method, "PUT");
+      const body = JSON.parse(options.body);
+      assert.equal(body.branch, "evaluation-budget");
+      if (body.sha !== sha()) return Response.json({}, { status: 409 });
+      ledger = JSON.parse(Buffer.from(body.content, "base64").toString("utf8"));
+      assert.equal(ledger.remoteAuthority, authority);
+      return Response.json({ content: { sha: sha() } });
+    },
+  };
+}
+
+test("a fresh hosted proxy preserves authoritative historical spend and durably reserves before inference", async (t) => {
+  const previous = { id: "historical", reservedUsd: 2, reportedUsd: 1.5 };
+  const github = githubBudget({
+    version: 1,
+    ceilingUsd: 5,
+    remoteAuthority: "github:example/private:evaluation-budget:experiment-budget.json",
+    entries: [previous],
+  });
+  const { proxy, post, ledgerPath } = await setup(t, {
+    github,
+    completion: () => {
+      assert.deepEqual(github.ledger.entries[0], previous);
+      assert.equal(github.ledger.entries.length, 2);
+      assert.equal(github.ledger.entries[1].reportedUsd, null);
+      return Response.json({ usage: { cost: 0.001 } });
+    },
+  });
+  assert.equal(proxy.budget.spentUsd, 1.5);
+  proxy.beginAttempt("hosted-attempt");
+  assert.equal((await post()).status, 200);
+  assert.equal(github.ledger.entries[1].reportedUsd, 0.001);
+  assert.deepEqual(JSON.parse(await readFile(ledgerPath, "utf8")), github.ledger);
+});
+
+test("missing remote state cannot initialize a new campaign and local spending cannot substitute for it", async (t) => {
+  for (const status of [404, 403, 503]) {
+    await assert.rejects(
+      setup(t, {
+        initial: { version: 1, ceilingUsd: 5, entries: [] },
+        github: { fetch: async () => Response.json({ message: "test-github-secret" }, { status }) },
+      }),
+      (error) =>
+        /GitHub budget read failed/.test(error.message) &&
+        !error.message.includes("test-github-secret"),
+    );
+  }
+  await assert.rejects(
+    setup(t, {
+      github: githubBudget({ version: 1, ceilingUsd: 5, entries: [] }),
+    }),
+    /authority mismatch/,
+  );
+});
+
+test("conflicting hosted writers cannot forward a request from a stale ledger", async (t) => {
+  const github = githubBudget({
+    version: 1,
+    ceilingUsd: 5,
+    remoteAuthority: "github:example/private:evaluation-budget:experiment-budget.json",
+    entries: [],
+  });
+  const first = await setup(t, { github });
+  const second = await setup(t, { github });
+  first.proxy.beginAttempt("current-writer");
+  assert.equal((await first.post()).status, 200);
+  second.proxy.beginAttempt("stale-writer");
+  assert.equal((await second.post()).status, 502);
+  assert.equal(second.calls.length, 0);
+  assert.throws(() => second.proxy.beginAttempt("retry"), /blocked/);
+  assert.equal(github.ledger.entries.length, 1);
+  assert.equal(github.ledger.entries[0].attemptId, "current-writer");
+});
+
+test("remote reconciliation failure retains a blocking reservation even when local accounting knows the cost", async (t) => {
+  const github = githubBudget({
+    version: 1,
+    ceilingUsd: 5,
+    remoteAuthority: "github:example/private:evaluation-budget:experiment-budget.json",
+    entries: [],
+  });
+  const originalFetch = github.fetch;
+  let failWrites = false;
+  github.fetch = (url, options) =>
+    failWrites && options.method === "PUT"
+      ? Promise.reject(new Error("test-github-secret transport failure"))
+      : originalFetch(url, options);
+  const { proxy, post, calls } = await setup(t, {
+    github,
+    completion: () => {
+      failWrites = true;
+      return Response.json({ usage: { cost: 0.001 } });
+    },
+  });
+  proxy.beginAttempt("unreconciled-remotely");
+  const response = await post();
+  assert.equal(response.status, 502);
+  assert.ok(!(await response.text()).includes("test-github-secret"));
+  assert.equal(calls.length, 1);
+  assert.equal(github.ledger.entries[0].reportedUsd, null);
+  assert.throws(() => proxy.beginAttempt("next"), /blocked/);
+  await assert.rejects(setup(t, { github }), /Unreconciled/);
+});
+
+test("an ambiguous remote reservation write never forwards and blocks the next hosted run", async (t) => {
+  const github = githubBudget({
+    version: 1,
+    ceilingUsd: 5,
+    remoteAuthority: "github:example/private:evaluation-budget:experiment-budget.json",
+    entries: [],
+  });
+  const { proxy, post, calls } = await setup(t, { github });
+  const originalFetch = github.fetch;
+  github.fetch = async (url, options) => {
+    const response = await originalFetch(url, options);
+    if (options.method === "PUT") throw new Error("Lost receipt with test-github-secret");
+    return response;
+  };
+  proxy.beginAttempt("lost-receipt");
+  const response = await post();
+  assert.equal(response.status, 502);
+  assert.ok(!(await response.text()).includes("test-github-secret"));
+  assert.equal(calls.length, 0);
+  assert.equal(github.ledger.entries[0].reportedUsd, null);
+  await assert.rejects(setup(t, { github }), /Unreconciled/);
+});
+
+test("caller cancellation leaves the remote reservation blocking until provider accounting completes", async (t) => {
+  const github = githubBudget({
+    version: 1,
+    ceilingUsd: 5,
+    remoteAuthority: "github:example/private:evaluation-budget:experiment-budget.json",
+    entries: [],
+  });
+  const started = Promise.withResolvers();
+  const upstream = Promise.withResolvers();
+  const { proxy, post } = await setup(t, {
+    github,
+    completion: () => {
+      started.resolve();
+      return upstream.promise;
+    },
+  });
+  proxy.beginAttempt("cancelled-client");
+  const controller = new AbortController();
+  const request = post(input, controller.signal);
+  await started.promise;
+  controller.abort();
+  await assert.rejects(request, /abort/i);
+  try {
+    assert.equal(github.ledger.entries[0].reportedUsd, null);
+    await assert.rejects(setup(t, { github }), /Unreconciled/);
+  } finally {
+    upstream.reject(new Error("Provider result unavailable"));
+    await proxy.awaitIdle();
+  }
+  assert.equal(github.ledger.entries[0].reportedUsd, null);
+  await assert.rejects(setup(t, { github }), /Unreconciled/);
+});
+
+test("a migrated local ledger cannot spend without its matching remote authority", async (t) => {
+  const initial = {
+    version: 1,
+    ceilingUsd: 5,
+    remoteAuthority: "github:example/private:evaluation-budget:experiment-budget.json",
+    entries: [],
+  };
+  await assert.rejects(setup(t, { initial }), /authority/i);
+  await assert.rejects(
+    setup(t, {
+      initial: {
+        ...initial,
+        remoteAuthority: "github:example/other:evaluation-budget:experiment-budget.json",
+      },
+      github: githubBudget(initial),
+    }),
+    /authority/i,
+  );
+});
+
+test("startup failures never expose provider or GitHub authentication values", async (t) => {
+  await assert.rejects(
+    setup(t, {
+      github: githubBudget({
+        version: 1,
+        ceilingUsd: 5,
+        remoteAuthority: "github:example/private:evaluation-budget:experiment-budget.json",
+        entries: [],
+      }),
+      metadata: () => {
+        throw new Error("test-provider-secret test-github-secret unavailable");
+      },
+    }),
+    (error) =>
+      !error.message.includes("test-provider-secret") &&
+      !error.message.includes("test-github-secret") &&
+      /unavailable/.test(error.message),
+  );
+});
 
 test("shutdown retains late provider accounting after the caller disconnects", async (t) => {
   for (const outcome of ["reply", "failure"])

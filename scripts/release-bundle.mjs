@@ -109,7 +109,7 @@ async function command(program, args, input, env = process.env) {
   }
 }
 
-async function localDocker() {
+export async function localDockerHost() {
   ensure(
     !process.env.DOCKER_HOST || process.env.DOCKER_HOST.startsWith("unix:///"),
     "Private bundles require a local Unix Docker endpoint",
@@ -119,6 +119,15 @@ async function localDocker() {
   const host =
     (!process.env.DOCKER_CONTEXT && process.env.DOCKER_HOST) ||
     descriptions[0]?.Endpoints?.docker?.Host;
+  ensure(
+    typeof host === "string" && host.startsWith("unix:///"),
+    "Private bundles require a local Unix Docker endpoint",
+  );
+  return host;
+}
+
+export async function localDocker(frozenHost) {
+  const host = frozenHost ?? (await localDockerHost());
   ensure(
     typeof host === "string" && host.startsWith("unix:///"),
     "Private bundles require a local Unix Docker endpoint",
@@ -361,7 +370,7 @@ async function create(options) {
   }
 }
 
-async function verify(directory, digest) {
+export async function verify(directory, digest) {
   directory = resolve(directory);
   const bytes = await smallFile(join(directory, "manifest.json"));
   ensure(/^[a-f\d]{64}$/.test(digest ?? "") && hash(bytes) === digest, "Manifest SHA-256 mismatch");
@@ -388,6 +397,16 @@ async function verify(directory, digest) {
   return { directory, manifest };
 }
 
+export async function restoreVerified({ directory, manifest }, docker) {
+  ensure(
+    isDeepStrictEqual(await dockerPlatform(docker), manifest.platform),
+    "Restore daemon platform differs from bundle",
+  );
+  await docker(["image", "load", "--input", join(directory, "images.tar")]);
+  for (const image of manifest.images)
+    await inspect(docker, image.id, image.component, manifest.sourceSha, manifest.platform);
+}
+
 async function main() {
   process.umask(0o077);
   const [operation, ...args] = process.argv.slice(2);
@@ -399,13 +418,7 @@ async function main() {
     const { directory, manifest } = await verify(args[0], args[2]);
     if (operation === "restore") {
       const docker = await localDocker();
-      ensure(
-        isDeepStrictEqual(await dockerPlatform(docker), manifest.platform),
-        "Restore daemon platform differs from bundle",
-      );
-      await docker(["image", "load", "--input", join(directory, "images.tar")]);
-      for (const image of manifest.images)
-        await inspect(docker, image.id, image.component, manifest.sourceSha, manifest.platform);
+      await restoreVerified({ directory, manifest }, docker);
     }
     console.log(
       `Bundle ${operation === "restore" ? "images restored" : "integrity verified"}; unqualified, runtime default unchanged.`,

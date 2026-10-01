@@ -38,6 +38,7 @@ test("deterministic evaluation selects its runtime, fixture, and runner dependen
     "evaluation/fixtures.mjs",
     "scripts/evaluate.sh",
     "scripts/evaluate.test.mjs",
+    "scripts/release-evaluate.mjs",
     "scripts/ci-browser.mjs",
     "tests/resolution/ready.mjs",
     "docker/compose.yaml",

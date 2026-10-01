@@ -1,6 +1,6 @@
 # Release evidence verification
 
-This is the first slice of [#11](https://github.com/Mochib-Tech-Solutions/xpathed/issues/11): an offline check of qualification evidence against an exact source revision. It makes no provider calls and leaves the application configuration unchanged.
+Release tooling for [#11](https://github.com/Mochib-Tech-Solutions/xpathed/issues/11) verifies evidence, preserves candidate images, and explicitly evaluates those exact images. Offline verification makes no provider calls; live evaluation is separately authorized and budgeted. All commands leave the application default unchanged.
 
 ## Seal and verify
 
@@ -22,13 +22,13 @@ The seal references existing local evidence instead of copying it. Preserve its 
 
 Both commands require the actual clean Git checkout and source fingerprints to match the candidate. The confirmation must cover the current reviewed eligible cases and required splits under the frozen policy. The verifier checks original trial identities and completeness, configuration and profile settings, browser identity, the linked pilot and its recomputed baseline, and the selected confirmation profile's recomputed qualification result. A saved passing summary is not approval. Missing, malformed, altered, incomplete, expired or unqualified evidence returns a nonzero exit code.
 
-Success means the referenced evidence meets this verification contract. It does not attest a deployed image or authenticate provider execution: someone able to fabricate evidence before sealing could also produce a digest for it. Optional local build fingerprints are observations, not proof of deployed binaries. Signed provenance and durable evidence archives are separate work.
+Success means the referenced evidence meets this verification contract. Without the optional bundle flags below, it does not attest a deployed image. Neither form authenticates provider execution: someone able to fabricate evidence before sealing could also produce a digest for it. Optional local build fingerprints are observations, not proof of deployed binaries. Signed provenance and durable evidence archives are separate work.
 
 ## Current boundary
 
 No retained model currently qualifies. The existing exposed families are regression data; fresh independent held-out families are required before new release qualification. Synthetic positive tests exercise the verifier without qualifying a real model or spending money.
 
-Promotion, rollback, durable release retention and drift notifications remain in #11. Paid scheduled monitoring remains deferred under the no-paid-CI rule. The current environment-selected runtime default stays unchanged; verification alone never creates an approved-release pointer or switches models.
+Promotion, operational rollback and drift notifications remain in #11. Paid scheduled monitoring remains deferred; only manually dispatched qualification is authorized. The current environment-selected runtime default stays unchanged; verification alone never creates an approved-release pointer or switches models.
 
 ## Private Docker artifact bundles
 
@@ -48,8 +48,42 @@ Retain the printed manifest digest separately. The bundle contains the source ar
 
 Restoration verifies the bundle before loading its images into Docker, then checks their immutable IDs and platform. It supports the recorded Linux architecture and does not start containers, update application tags, change defaults or access a registry. Docker image stores can represent IDs differently, so cross-store restoration is not guaranteed; mismatched IDs fail rather than being treated as equivalent. It restores Browser/Resolver images only, not Web, ClientApi or database state. Keep the bundle unchanged during verification/restoration. A digest provides integrity relative to a trusted copy; it is not a signature or independent proof of a build.
 
-Bundle storage is private and local. Image archives can occupy several gigabytes; shared layers affect actual size. They contain no page/provider evidence, so copying a bundle does not extend evidence retention or bypass the evidence verifier's expiry checks. Local storage is not an off-device backup. Keep bundles while needed and remove them explicitly; no automatic image or artifact pruning is added.
+Local bundle storage is private; the manual GitHub workflow also preserves bundles as private Release assets. Image archives can occupy several gigabytes; shared layers affect actual size. They contain no page/provider evidence, so copying a bundle does not extend evidence retention or bypass the evidence verifier's expiry checks. Local storage is not an off-device backup. Keep bundles while needed and remove them explicitly; no automatic image or artifact pruning is added.
 
-No GitHub setup, package registry, new secrets or account upgrade is required. Deterministic CLI tests run in the existing tooling gate; bundle creation and real image roundtrips remain explicit local operations. Branch protection and Copilot verification remain the separate [account follow-up #41](https://github.com/Mochib-Tech-Solutions/xpathed/issues/41). Promotion, exact-image qualification and operational rollback remain in #11.
+Local bundle commands need no GitHub setup, package registry, new secret or account upgrade. Deterministic CLI tests run in the existing tooling gate; remote execution uses the explicit manual workflow below. Branch protection and Copilot verification remain the separate [account follow-up #41](https://github.com/Mochib-Tech-Solutions/xpathed/issues/41). Successful real-model qualification, promotion and operational rollback remain in #11.
 
 The [Docker/Git research notes](research/2026-10-01-private-release-bundles.md) explain tag-free image export, archive identity and platform limits.
+
+## Evaluate saved images
+
+Use the bundle's exact clean source checkout and one matching profile. The wrapper verifies and restores the images, creates an isolated Compose project, and starts only Browser, the selected Resolver and the pinned fixture. Runtime images use full IDs with building and pulling disabled; setup may download the separately pinned fixture image. Container image and ownership checks run before and after evaluation; replacement containers, mismatched images and cleanup failures fail the run.
+
+```sh
+pnpm release:evaluate --bundle .artifacts/releases/my-bundle --sha256 EXPECTED_MANIFEST_SHA256 \
+  --mode deterministic --profile deepseek --split development,regression \
+  --output .artifacts/evaluation/bundle-check
+```
+
+Live pilot and confirmation use the same command with `--mode live`, the complete respective splits, and a recorded `--pilot` for confirmation. Preserve one attempt per case. The artifact identity in both manifests must match; rebuilding even from the same source creates a different candidate when image IDs differ.
+
+To seal image-bound live qualification evidence, add `--bundle DIRECTORY --bundle-sha256 DIGEST` to `release:seal`. It verifies both runs' pre/post container receipts against the bundle and records `artifact-bound-evidence-verified`. Omitting the bundle cannot downgrade artifact-bearing evidence to the legacy seal. The original evidence expiry still applies. These observations are integrity checks, not signed attestation or automatic promotion.
+
+## Manual GitHub qualification
+
+The **Release qualification** Actions workflow accepts only a manual dispatch from `main`, checks out the exact dispatched SHA, and supports one selected profile:
+
+- `preflight`: read the authoritative ledger and OpenRouter key metadata, report remaining budget and qualification coverage; no inference or image build.
+- `deterministic`: build and preserve a candidate, then exercise its exact images with controlled responses; no provider key or inference.
+- `live`: require fresh reviewed held-out coverage and no declared capability gaps before building or billing. Run a complete development pilot and confirmation under the existing policy, then require successful artifact-bound sealing. An unqualified model fails this workflow even when the measurement itself completed.
+
+The current exposed cases do not meet fresh held-out requirements. Preflight success verifies setup, not release readiness. This first hosted path accepts reviewed default-branch source; arbitrary release-branch dispatch, approved-default selection, rollback activation and scheduled monitoring remain separate work. Deterministic authored fixtures are engineering evidence, not original dataset model-quality scores.
+
+Set the repository Actions secret `OPENROUTER_EVAL_API_KEY` to an ordinary dedicated inference key with a positive non-resetting cap within the campaign's remaining allowance. The workflow reads `/api/v1/key` and rejects unbounded, resetting, expired or management keys. Do not put a management key, personal GitHub token, local `.env` or runtime application key in this workflow. GitHub's job token supplies repository contents access; only the evaluation fixture's proxy receives credentials. Standard routes, original attempts and existing per-request reservations remain enforced.
+
+Before enabling hosted spending, migrate the existing `.artifacts/datasets/experiment-budget.json` intact to `experiment-budget.json` on the private `evaluation-budget` branch. Preserve the original ceiling, entries and reservation reviews and add `remoteAuthority: "github:mochib-tech-solutions/xpathed:evaluation-budget:experiment-budget.json"`. Verify the remote content before marking the local copy with the identical authority. Keep an independent private backup. Never bootstrap a fresh empty campaign, run an older checkout against a pre-migration ledger, delete pending charges, or reset the ledger on a rerun.
+
+Hosted calls set `XPATHED_BUDGET_GITHUB_REPOSITORY` and `GH_TOKEN`. The shared proxy requires the existing authoritative file, reserves through a conditional GitHub update before inference and reconciles afterward. Concurrent updates, persistence failures and unknown charges block further calls. A cancelled runner therefore leaves its reservation visible. A marked local copy refuses independent spending; explicitly configured local callers use the same authority. The dedicated key limit supplements this ledger rather than replacing it. GitHub Actions minutes/storage have their own account budget.
+
+Private candidate Release assets retain the four bundle files plus the independently recorded manifest digest. Download only the four bundle files into the bundle directory; pass the separately retained digest to verification. Assets remain unapproved candidates and are never silently substituted with latest. Private evaluation artifacts retain original failures and evidence for 30 days; Release assets do not extend that evidence deadline. Keep the previous approved release when promotion is later implemented. Publication or upload failure remains a workflow failure.
+
+The hosted runner uses Linux ARM64. Validate its Docker image-store identity and browser sandbox with `deterministic` before enabling live runs. The workflow does not connect to or update the local application. No cron, recurring provider allowance, notification-delivery claim or automatic default change is introduced.
