@@ -21,7 +21,7 @@ const hash = (value) =>
   createHash("sha256")
     .update(typeof value === "string" || Buffer.isBuffer(value) ? value : JSON.stringify(value))
     .digest("hex");
-async function workspace(t) {
+async function workspace(t, { contractVersion = "3", promptVersion = "7" } = {}) {
   const cwd = realpathSync(mkdtempSync(join(tmpdir(), "xpathed-release-")));
   t.after(() => rmSync(cwd, { recursive: true, force: true }));
   cpSync("evaluation", join(cwd, "evaluation"), { recursive: true });
@@ -37,7 +37,7 @@ async function workspace(t) {
     id: `case-${i}`,
     family: i < 30 ? `held-${Math.floor(i / 3)}` : `family-${i}`,
     split: i < 30 ? "held-out" : [30, 32].includes(i) ? "regression" : "development",
-    contractVersion: "3",
+    contractVersion,
     instruction: "Click the labelled buttons",
     fixture: "synthetic",
     setupRevision: "1",
@@ -139,7 +139,7 @@ async function workspace(t) {
         ],
         result: {
           configurationId: "c".repeat(64),
-          contractVersion: "3",
+          contractVersion,
           action: "click",
           outcome: spec.expected.outcome,
           summary: { processingComplete: true },
@@ -171,7 +171,7 @@ async function workspace(t) {
             Model: profile.model,
             Provider: profile.provider,
             Strategy: "candidate-selection-v1",
-            PromptVersion: "7",
+            PromptVersion: promptVersion,
             effective: {
               responseCache: false,
               request: {
@@ -485,6 +485,17 @@ test("seal and verify bind qualified evidence without activating a default or ov
   assert.equal(verified.status, 0, verified.stderr);
   assert.equal(work.seal().status, 1);
   assert.deepEqual(readFileSync(file), bytes);
+});
+
+test("legacy release policy cannot seal current-view evidence with either current or legacy prompts", async (t) => {
+  for (const promptVersion of ["8", "5"]) {
+    await t.test(`prompt ${promptVersion}`, async (t) => {
+      const work = await workspace(t, { contractVersion: "4", promptVersion });
+      const sealed = work.seal();
+      assert.equal(sealed.status, 1, sealed.stdout);
+      assert.match(sealed.stderr, /current-view qualification policy/i);
+    });
+  }
 });
 
 test("live runner compatibility evidence is regraded and included without becoming qualification attempts", async (t) => {
