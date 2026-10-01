@@ -122,6 +122,8 @@ Offline dataset prompt experiments use the explicit, versioned `--prompt-variant
 
 The offline [release verifier](docs/releases.md) seals qualified pilot/confirmation evidence against an exact source revision and checks it again using an independently retained digest. Missing, changed, expired or unqualified evidence fails verification. This does not promote a configuration or change the running application.
 
+Private local [artifact bundles](docs/releases.md#private-docker-artifact-bundles) preserve exact Browser/Resolver runtime images, tracked source and nonsecret profile settings. Bundle verification is offline; restoration loads images without starting the app. Packaging does not qualify a model or create an approved release.
+
 ## Roadmap
 
 GitHub Issues hold the live requirements, dependencies and progress. The next capabilities are:
