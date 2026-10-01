@@ -118,6 +118,8 @@ NODE
 )
 if [ -z "$output" ]; then output=".artifacts/evaluation/$(node -p 'crypto.randomUUID()')"; fi
 export XPATHED_EVALUATION_OUTPUT=$(node -e 'process.stdout.write(require("node:path").resolve(process.argv[1]))' "$output")
+export XPATHED_EVALUATION_UID=$(id -u)
+export XPATHED_EVALUATION_GID=$(id -g)
 compose() {
   if [ -n "${XPATHED_RELEASE_STATE:-}" ]; then
     docker/compose.sh --env-file "$evaluation_env" -f docker/compose.evaluation.yaml -f docker/compose.qualification.yaml -f "$XPATHED_RELEASE_OVERLAY" "$@"

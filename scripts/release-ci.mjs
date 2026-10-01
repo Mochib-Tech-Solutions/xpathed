@@ -29,7 +29,24 @@ export async function checkKeyBudget(key, remainingUsd, fetchImpl = fetch) {
     (data.expires_at != null && !(Date.parse(data.expires_at) > Date.now()))
   )
     throw new Error(
-      "Evaluation key needs a positive non-resetting cap within the remaining shared $5 campaign, and must not be expired or a management key",
+      "Evaluation key needs a positive non-resetting cap within the remaining shared $5 campaign, and must not be expired or a management key. " +
+        JSON.stringify({
+          managementKey:
+            typeof data?.is_management_key === "boolean" ? data.is_management_key : "unavailable",
+          legacyProvisioningKey:
+            typeof data?.is_provisioning_key === "boolean"
+              ? data.is_provisioning_key
+              : "unavailable",
+          limitUsd: Number.isFinite(data?.limit) ? data.limit : "unavailable",
+          remainingUsd: Number.isFinite(data?.limit_remaining)
+            ? data.limit_remaining
+            : "unavailable",
+          reset: [null, "daily", "weekly", "monthly"].includes(data?.limit_reset)
+            ? data.limit_reset
+            : "unavailable",
+          campaignRemainingUsd: remainingUsd,
+          expiryValid: data?.expires_at == null || Date.parse(data.expires_at) > Date.now(),
+        }),
     );
   return {
     limitUsd: data.limit,
