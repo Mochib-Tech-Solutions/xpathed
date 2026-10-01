@@ -42,6 +42,8 @@ Keep independent localhost workspaces isolated with UUID session/page identities
 
 Run commands from the repository root, using the RTK prefix required above. `package.json`, `global.json` and lockfiles are the executable sources for commands and versions.
 
+Use Conventional Commits for every commit and PR title: `type(scope): description`, with optional scope and `!` for breaking changes. Dependency installation enables worktree-local `pre-commit` and `commit-msg` hooks. Before committing code, stage or set aside unstaged source/configuration so checks validate the intended commit. See [local commit checks](docs/ci.md#local-commit-checks) for selection, setup and CI enforcement limits.
+
 - `pnpm run setup` prepares configuration and workspace dependencies; `pnpm dev` replaces the existing development runner for this checkout and Compose project, then runs Docker development mode. Preserve `.env` and database volumes; never replace unrelated projects. A separate checkout needs its own `COMPOSE_PROJECT_NAME` and `XPATHED_PORT`.
 - `pnpm check:dotnet`, `pnpm check:web` and `pnpm check:tooling` validate the affected area. `pnpm check` is the full local gate.
 - `pnpm format` applies formatting; `pnpm format:check` verifies it. C# builds enforce the shared recommended analyzers and warnings as errors. Pinned CSharpier owns whitespace/wrapping at the `.editorconfig` 120-column target; native `dotnet format style` checks semantic style. Restore local tools with `dotnet tool restore`.
