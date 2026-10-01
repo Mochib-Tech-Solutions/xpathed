@@ -1042,6 +1042,154 @@ const profileInput = (profile) => ({
   },
 });
 
+const azureProfile = { ...qualificationProfiles[0], id: "luna-azure", provider: "azure" };
+const azureMetadata = () => {
+  const metadata = profileMetadata(`/models/${azureProfile.model}/endpoints`);
+  const endpoint = metadata.data.endpoints[0];
+  endpoint.tag = "azure";
+  endpoint.provider_name = "Azure";
+  endpoint.supported_parameters = endpoint.supported_parameters.map((parameter) =>
+    parameter === "max_tokens" ? "max_completion_tokens" : parameter,
+  );
+  return metadata;
+};
+
+test("Azure Luna forwards the frozen output cap using its advertised completion parameter", async (t) => {
+  const { proxy, post, calls } = await setup(t, {
+    profiles: [azureProfile],
+    metadata: azureMetadata(),
+    completion: () =>
+      Response.json({
+        model: azureProfile.model,
+        provider: "Azure",
+        id: "azure-generation",
+        usage: { cost: 0.001 },
+      }),
+  });
+  const request = profileInput(azureProfile);
+  const forecast = proxy.forecastRequests([{ id: "azure", profileId: azureProfile.id, request }]);
+  assert.equal(forecast.fits, true);
+  assert.ok(Number.isFinite(forecast.projectedUsd));
+  assert.ok(forecast.projectedUsd > 1024 * 0.00000075);
+  proxy.beginAttempt("azure", azureProfile.id, forecast.projectedUsd, request);
+  assert.equal((await post(request)).status, 200);
+  assert.equal(calls.length, 1);
+  const forwarded = JSON.parse(calls[0].options.body);
+  assert.equal(forwarded.max_completion_tokens, 1024);
+  assert.equal(Object.hasOwn(forwarded, "max_tokens"), false);
+  assert.deepEqual(forwarded.provider.only, ["azure"]);
+  assert.deepEqual(forwarded.reasoning, { effort: "none" });
+  assert.deepEqual(forwarded.prompt_cache_options, { mode: "explicit" });
+  assert.equal(proxy.records[0].identityValid, true);
+  assert.ok(Number.isFinite(proxy.records[0].reservedUsd));
+});
+
+test("Azure Luna rejects conflicting output aliases before reserving or forwarding", async (t) => {
+  const { proxy, post, calls } = await setup(t, {
+    profiles: [azureProfile],
+    metadata: azureMetadata(),
+  });
+  const request = { ...profileInput(azureProfile), max_completion_tokens: 512 };
+  assert.throws(
+    () => proxy.forecastRequests([{ id: "conflict", profileId: azureProfile.id, request }]),
+    /Output limit/,
+  );
+  proxy.beginAttempt("conflict", azureProfile.id);
+  assert.equal((await post(request)).status, 400);
+  assert.equal(calls.length, 0);
+  assert.equal(proxy.budget.spentUsd, 0);
+});
+
+test("the Azure profile ID cannot authorize a different model or lose explicit cache controls", async (t) => {
+  for (const profile of [
+    {
+      ...azureProfile,
+      model,
+      provider: "wafer",
+      reasoning: { enabled: false },
+      promptCacheOptions: undefined,
+    },
+    { ...azureProfile, promptCacheOptions: undefined },
+  ]) {
+    const metadata = azureMetadata();
+    metadata.data.endpoints[0].tag = profile.provider;
+    await assert.rejects(setup(t, { profiles: [profile], metadata }), /Unapproved/);
+  }
+});
+
+test("Azure alias normalization preserves frozen request and allocation guards", async (t) => {
+  const { proxy, post, calls } = await setup(t, {
+    profiles: [azureProfile],
+    metadata: azureMetadata(),
+    completion: () =>
+      Response.json({
+        model: azureProfile.model,
+        provider: "Azure",
+        id: "azure-alias",
+        usage: { cost: 0.001 },
+      }),
+  });
+  const request = profileInput(azureProfile);
+  const alias = { ...request, max_completion_tokens: 1024 };
+  delete alias.max_tokens;
+  const forecast = (request) =>
+    proxy.forecastRequests([{ id: "prepared", profileId: azureProfile.id, request }]).projectedUsd;
+  assert.equal(forecast(request), forecast(alias));
+  assert.equal(forecast(request), forecast({ ...request, max_completion_tokens: 1024 }));
+  proxy.beginAttempt("changed", azureProfile.id, forecast(request), request);
+  assert.equal(
+    (await post({ ...alias, messages: [{ role: "user", content: "Find Help" }] })).status,
+    400,
+  );
+  proxy.beginAttempt("underfunded", azureProfile.id, 0.00001, request);
+  assert.equal((await post(alias)).status, 400);
+  assert.equal(calls.length, 0);
+  assert.equal(proxy.budget.spentUsd, 0);
+  proxy.beginAttempt("equivalent", azureProfile.id, forecast(request), request);
+  assert.equal((await post(alias)).status, 200);
+  assert.equal(calls.length, 1);
+  assert.equal(JSON.parse(calls[0].options.body).max_completion_tokens, 1024);
+});
+
+test("Azure requires its advertised cap and rejects route, tier, reasoning and cache drift", async (t) => {
+  const metadata = azureMetadata();
+  metadata.data.endpoints[0].supported_parameters = [
+    "max_tokens",
+    "reasoning",
+    "response_format",
+    "structured_outputs",
+  ];
+  await assert.rejects(setup(t, { profiles: [azureProfile], metadata }), /required parameters/);
+  for (const profile of [
+    { ...azureProfile, id: "luna" },
+    { ...azureProfile, provider: "azure/eu" },
+    { ...azureProfile, provider: "azure/priority" },
+  ])
+    await assert.rejects(
+      setup(t, { profiles: [profile], metadata: azureMetadata() }),
+      /Unapproved/,
+    );
+  const { proxy, post, calls } = await setup(t, {
+    profiles: [azureProfile],
+    metadata: azureMetadata(),
+  });
+  for (const [index, mutation] of [
+    { provider: { only: ["azure/eu"] } },
+    { service_tier: "priority" },
+    { reasoning: { effort: "low" } },
+    { prompt_cache_options: undefined },
+    { prompt_cache_options: { mode: "automatic" } },
+    { max_tokens: 1023 },
+    { max_tokens: undefined, max_completion_tokens: 1023 },
+    { max_tokens: undefined, max_completion_tokens: 4097 },
+  ].entries()) {
+    proxy.beginAttempt(`reject-${index}`, azureProfile.id);
+    assert.equal((await post({ ...profileInput(azureProfile), ...mutation })).status, 400);
+  }
+  assert.equal(calls.length, 0);
+  assert.equal(proxy.budget.spentUsd, 0);
+});
+
 test("the explicit offline DeepInfra profile pins only its approved standard endpoint", async (t) => {
   const profile = {
     id: "deepseek-deepinfra",
