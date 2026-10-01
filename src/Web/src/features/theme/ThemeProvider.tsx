@@ -12,24 +12,15 @@ function readTheme(): Theme {
   } catch {
     // Theme switching still works when browser storage is unavailable.
   }
-  return "system";
+  return "dark";
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setPreference] = useState<Theme>(readTheme);
 
   useLayoutEffect(() => {
-    const media = window.matchMedia("(prefers-color-scheme: dark)");
-    function applyTheme() {
-      const dark = theme === "dark" || (theme === "system" && media.matches);
-      document.documentElement.classList.toggle("dark", dark);
-      document.documentElement.style.colorScheme = dark ? "dark" : "light";
-    }
-    applyTheme();
-    if (theme === "system") {
-      media.addEventListener("change", applyTheme);
-      return () => media.removeEventListener("change", applyTheme);
-    }
+    document.documentElement.classList.toggle("dark", theme === "dark");
+    document.documentElement.style.colorScheme = theme;
   }, [theme]);
 
   function setTheme(next: Theme) {
