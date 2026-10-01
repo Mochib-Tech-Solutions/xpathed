@@ -1,8 +1,15 @@
 import { createHash } from "node:crypto";
 import defaultPolicy from "./qualification-policy.json" with { type: "json" };
+import currentViewPolicy from "./current-view-qualification-policy.json" with { type: "json" };
 import { gradeTrial, summarize } from "./grader.mjs";
 
-export { defaultPolicy };
+export { defaultPolicy, currentViewPolicy };
+
+export function policyForSuite(suite) {
+  if (suite.qualificationPolicy === "3") return currentViewPolicy;
+  if (suite.qualificationPolicy === undefined) return defaultPolicy;
+  throw new Error("Unknown qualification policy");
+}
 
 const ratio = (passed, total) => ({ passed, total, rate: total ? passed / total : null });
 const identity = (trial) => JSON.stringify([trial.caseId, trial.repetition ?? 1]);
@@ -85,6 +92,7 @@ function assess(manifest, trials, policy) {
   const reasons = [];
   const insufficient = [];
   if (manifest.baseline) insufficient.push("development_baseline_not_release_qualification");
+  if (manifest.monitoring) insufficient.push("monitoring_not_release_qualification");
   const baseline = manifest.baselineEvidence?.profiles?.[manifest.profile.id];
   if (baseline?.criticalFailures?.length) reasons.push("baseline_critical_failure");
   if (baseline?.hardFailures?.length) reasons.push("baseline_hard_invariant_failure");
@@ -149,6 +157,28 @@ function assess(manifest, trials, policy) {
   )
     reasons.push("split_deadline_below_gate");
   const heldOut = entries.filter(({ spec }) => spec.split === "held-out");
+  if (policy.requiredContractVersion) {
+    const current = entries.filter(
+      ({ spec }) => spec.contractVersion === policy.requiredContractVersion,
+    );
+    const held = current.filter(({ spec }) => spec.split === "held-out");
+    if (
+      new Set(held.map(({ spec }) => spec.id)).size < policy.minimumHeldOutTrials ||
+      new Set(held.map(({ spec }) => spec.family)).size < policy.minimumHeldOutFamilies ||
+      policy.requiredSplits.some((split) => !current.some(({ spec }) => spec.split === split))
+    )
+      insufficient.push("current_view_coverage_insufficient");
+    if (manifest.measurement?.latencyProtocol !== policy.latencyProtocol)
+      insufficient.push("latency_protocol_mismatch");
+    if (manifest.plan.repetitions !== 1) insufficient.push("one_attempt_per_case_required");
+    if (
+      current.length &&
+      (rates(current).correctness.rate < policy.minimumCorrectness ||
+        rates(current).correctCompleteWithinDeadline.rate <
+          policy.minimumCorrectCompleteWithinDeadline)
+    )
+      reasons.push("current_view_below_gate");
+  }
   const families = [...new Set(heldOut.map(({ spec }) => spec.family))];
   const successfulFamilies = families.filter((family) =>
     heldOut.filter(({ spec }) => spec.family === family).every(({ onTime }) => onTime),

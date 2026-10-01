@@ -71,7 +71,9 @@ export function parseQualificationOptions(args) {
     seen = new Set();
   for (let i = 0; i < args.length; i += 2) {
     const name = args[i].slice(2);
-    if (["phase", "split", "profile", "pilot", "suite", "forecast-only"].includes(name)) {
+    if (
+      ["phase", "split", "profile", "pilot", "suite", "forecast-only", "sentinels"].includes(name)
+    ) {
       if (seen.has(name) || !args[i + 1] || args[i + 1].startsWith("--"))
         throw new Error("Repeated or missing qualification option");
       seen.add(name);
@@ -90,6 +92,9 @@ export function parseQualificationOptions(args) {
     throw new Error("Replay cannot be combined with qualification options");
   options.splits = options.split.split(",");
   options.profileIds = options.profile.split(",");
+  if (options.sentinels !== undefined && options.sentinels !== "true")
+    throw new Error("Use --sentinels true for the frozen monitoring subset");
+  options.sentinels = options.sentinels === "true";
   if (
     options.splits.some((s) => !["development", "regression", "held-out"].includes(s)) ||
     new Set(options.splits).size !== options.splits.length
@@ -106,30 +111,53 @@ export function parseQualificationOptions(args) {
     throw new Error("Held-out cases require confirmation phase");
   if (options.phase === "confirmation" && !options.pilot)
     throw new Error("Confirmation requires a recorded pilot directory");
+  if (
+    options.sentinels &&
+    (options.phase !== "pilot" ||
+      options.repetitions !== 1 ||
+      options.profileIds.length !== 1 ||
+      options.caseId ||
+      options.forecastOnly)
+  )
+    throw new Error(
+      "Sentinel monitoring uses one profile, one attempt and the complete frozen subset",
+    );
   return options;
 }
 
 export function selectQualificationCases(cases, options) {
+  if (
+    options.sentinelIds &&
+    cases.some((c) => options.sentinelIds.includes(c.id) && c.split === "held-out")
+  )
+    throw new Error(
+      "Sentinels must use development or regression cases, never fresh held-out families",
+    );
   const selected = [],
     exclusions = [];
   for (const item of cases) {
     const reason =
       options.caseId && item.id !== options.caseId
         ? "case filter"
-        : !options.splits.includes(item.split)
-          ? "split filter"
-          : !["3", "4"].includes(item.contractVersion)
-            ? "legacy contract regression track"
-            : item.track === "offline-selection"
-              ? "offline dataset track"
-              : item.mutation
-                ? "saved-locator mutation regression track"
-                : options.mode === "live" &&
-                    (item.provider?.fault ||
-                      item.deterministicOnly ||
-                      item.expected?.outcome === "error")
-                  ? "deterministic compatibility only"
-                  : null;
+        : options.sentinelIds && !options.sentinelIds.includes(item.id)
+          ? "outside frozen sentinel subset"
+          : !options.splits.includes(item.split)
+            ? "split filter"
+            : options.requiredContractVersion &&
+                item.contractVersion !== options.requiredContractVersion
+              ? "legacy contract compatibility track"
+              : !["3", "4"].includes(item.contractVersion)
+                ? "legacy contract regression track"
+                : item.track === "offline-selection"
+                  ? "offline dataset track"
+                  : item.mutation
+                    ? "saved-locator mutation regression track"
+                    : options.mode === "live" &&
+                        (item.provider?.fault ||
+                          item.deterministicOnly ||
+                          item.expected?.outcome === "error")
+                      ? "deterministic compatibility only"
+                      : null;
     if (reason)
       exclusions.push({ caseId: item.id, family: item.family, split: item.split, reason });
     else selected.push(item);
@@ -138,26 +166,37 @@ export function selectQualificationCases(cases, options) {
   return { cases: selected, exclusions };
 }
 
-export function compatibilityCases(allCases) {
+export function compatibilityCases(allCases, preparationCases = []) {
   return [
-    ...new Set(
-      allCases.filter((c) => ["3", "4"].includes(c.contractVersion)).map((c) => c.contractVersion),
-    ),
-  ].flatMap((version) => {
-    const compatibility = allCases.filter(
-      (c) => c.contractVersion === version && c.split !== "held-out" && !c.mutation,
-    );
-    const required = [
-      compatibility.find((c) => c.expected.actions.some((a) => a.outcome === "found")),
-      compatibility.find((c) => c.expected.actions.some((a) => a.outcome === "not_found")),
-      compatibility.find((c) => c.expected.actions.filter((a) => a.outcome === "found").length > 1),
-    ];
-    if (required.some((c) => !c))
-      throw new Error(
-        `Compatibility suite needs positive, absent, and plural cases for contract ${version}`,
-      );
-    return [...new Set([...required, ...compatibility.filter((c) => c.provider?.fault)])];
-  });
+    ...new Map(
+      [
+        ...preparationCases,
+        ...[
+          ...new Set(
+            allCases
+              .filter((c) => ["3", "4"].includes(c.contractVersion))
+              .map((c) => c.contractVersion),
+          ),
+        ].flatMap((version) => {
+          const compatibility = allCases.filter(
+            (c) => c.contractVersion === version && c.split !== "held-out" && !c.mutation,
+          );
+          const required = [
+            compatibility.find((c) => c.expected.actions.some((a) => a.outcome === "found")),
+            compatibility.find((c) => c.expected.actions.some((a) => a.outcome === "not_found")),
+            compatibility.find(
+              (c) => c.expected.actions.filter((a) => a.outcome === "found").length > 1,
+            ),
+          ];
+          if (required.some((c) => !c))
+            throw new Error(
+              `Compatibility suite needs positive, absent, and plural cases for contract ${version}`,
+            );
+          return [...new Set([...required, ...compatibility.filter((c) => c.provider?.fault)])];
+        }),
+      ].map((spec) => [spec.id, spec]),
+    ).values(),
+  ];
 }
 
 export function buildMatrixPlan(cases, selectedProfiles, options) {
@@ -318,6 +357,85 @@ export async function readRun(directory) {
   return { manifest, trials };
 }
 
+export function summarizeMonitoring(manifest, trials) {
+  if (manifest.monitoring !== true || manifest.mode !== "live" || manifest.policy?.version !== "3")
+    throw new Error("Monitoring requires a frozen current-view live run");
+  return summarizeLiveChecks(manifest, trials);
+}
+
+export function assertPilotReady({ manifest, trials }) {
+  if (
+    manifest.phase !== "pilot" ||
+    manifest.mode !== "live" ||
+    manifest.monitoring ||
+    manifest.cases.some((spec) => spec.split === "held-out" || spec.capabilityGap)
+  )
+    throw new Error("Confirmation requires a live development pilot without capability gaps");
+  const report = summarizeLiveChecks(manifest, trials);
+  if (report.status !== "passed")
+    throw new Error(`Pilot failed before held-out reservation: ${report.status}`);
+  return report;
+}
+
+function summarizeLiveChecks(manifest, trials) {
+  const entries = manifest.plan.trials.map((planned) => {
+    const matches = trials.filter(
+      (trial) =>
+        trial.id === planned.id &&
+        trial.caseId === planned.caseId &&
+        trial.profileId === planned.profileId &&
+        trial.attempt === 1,
+    );
+    const trial = matches.length === 1 ? matches[0] : undefined;
+    const spec = manifest.cases.find((item) => item.id === planned.caseId);
+    const grade = gradeTrial(spec, trial);
+    const calls = trial?.provider?.filter((p) => p.forwarded) ?? [];
+    const operational =
+      !trial ||
+      Boolean(trial.accountingError) ||
+      grade.metrics.operationalError ||
+      calls.length !== 1 ||
+      calls.some(
+        (p) => p.identityValid !== true || p.responseCacheHit || !Number.isFinite(p.reportedUsd),
+      );
+    return {
+      caseId: planned.caseId,
+      passed: grade.passed && grade.metrics.processingComplete === true && !operational,
+      operational: Boolean(operational),
+      elapsedMs: trial?.elapsedMs ?? null,
+      failures: grade.failures,
+    };
+  });
+  const complete = entries.length > 0 && trials.length === entries.length;
+  const correct = entries.filter((e) => e.passed).length;
+  const onTime = entries.filter(
+    (e) => e.passed && Number.isFinite(e.elapsedMs) && e.elapsedMs <= manifest.policy.deadlineMs,
+  ).length;
+  const status =
+    !complete || entries.some((e) => e.operational)
+      ? "infrastructure_failure"
+      : correct !== entries.length
+        ? "semantic_drift"
+        : onTime / entries.length < manifest.policy.minimumCorrectCompleteWithinDeadline
+          ? "latency_regression"
+          : "passed";
+  const charges = trials.flatMap((trial) => trial.provider ?? []).filter((p) => p.forwarded);
+  return {
+    status,
+    planned: entries.length,
+    correct,
+    correctCompleteWithinDeadline: onTime,
+    reportedUsd:
+      complete &&
+      charges.length === entries.length &&
+      charges.every((p) => Number.isFinite(p.reportedUsd))
+        ? charges.reduce((sum, p) => sum + p.reportedUsd, 0)
+        : null,
+    entries,
+    defaultActivated: false,
+  };
+}
+
 export function baselineEvidence(pilot) {
   return {
     runId: pilot.manifest.id,
@@ -381,9 +499,15 @@ export function assertFrozenImplementation(current, previous) {
     throw new Error("Implementation changed after pilot: release artifact");
 }
 
-function fixtureProxy(fixture, timeoutMs) {
+export function fixtureProxy(fixture, timeoutMs) {
   return createServer(async (req, res) => {
     try {
+      // Preparation must not seed the Resolver cache with synthetic endpoint prices.
+      if (req.method === "GET" && req.url?.endsWith("/endpoints")) {
+        res.writeHead(404, { "Content-Type": "application/json" });
+        res.end("{}");
+        return;
+      }
       const chunks = [];
       let size = 0;
       for await (const chunk of req) {
@@ -408,7 +532,7 @@ function fixtureProxy(fixture, timeoutMs) {
 
 export async function main(args = process.argv.slice(2)) {
   const options = parseQualificationOptions(args);
-  const { summarizeQualification, defaultPolicy } = await import("./qualification-policy.mjs");
+  const { summarizeQualification, policyForSuite } = await import("./qualification-policy.mjs");
   if (options.replay) {
     const run = await readRun(resolve(options.replay));
     const summary = summarizeQualification(run.manifest, run.trials, run.manifest.policy);
@@ -439,7 +563,25 @@ export async function main(args = process.argv.slice(2)) {
       new URL("./qualification-cases.json", import.meta.url),
   );
   const allCases = validateCases(suite);
-  const { cases, exclusions } = selectQualificationCases(allCases, options);
+  const defaultPolicy = policyForSuite(suite);
+  const preparedAccounting =
+    Boolean(suite.baseline) || defaultPolicy.latencyProtocol === "resolver-http-pre-reserved-v2";
+  if (
+    options.sentinels &&
+    (defaultPolicy.version !== "3" ||
+      !Array.isArray(suite.sentinels) ||
+      !suite.sentinels.length ||
+      new Set(suite.sentinels).size !== suite.sentinels.length ||
+      suite.sentinels.some((id) => !allCases.some((c) => c.id === id)))
+  )
+    throw new Error("Current-view frozen sentinel membership is required");
+  const { cases, exclusions } = selectQualificationCases(allCases, {
+    ...options,
+    requiredContractVersion: defaultPolicy.requiredContractVersion,
+    sentinelIds: options.sentinels ? suite.sentinels : undefined,
+  });
+  if (options.sentinels && cases.length !== suite.sentinels.length)
+    throw new Error("Sentinel selection is incomplete");
   if (
     suite.baseline &&
     (options.phase !== "pilot" ||
@@ -492,6 +634,7 @@ export async function main(args = process.argv.slice(2)) {
     createdAt: now,
     mode: options.mode,
     phase: options.phase,
+    ...(options.sentinels ? { monitoring: true } : {}),
     cases,
     ...(suite.baseline ? { baseline: suite.baseline } : {}),
     exclusions,
@@ -510,12 +653,12 @@ export async function main(args = process.argv.slice(2)) {
       baselineRunIds: pilot ? [pilot.manifest.id] : [],
     },
     measurement: {
-      latencyProtocol: suite.baseline
+      latencyProtocol: preparedAccounting
         ? "resolver-http-pre-reserved-v2"
         : "resolver-http-inline-accounting-v1",
       latency:
         "Resolver HTTP end-to-end, including capture/model/verification; independent fixture setup and grading excluded" +
-        (suite.baseline
+        (preparedAccounting
           ? "; durable budget reservation before execution, reconciliation after provider response and before next trial"
           : "; durable budget reservation and reconciliation inside request timing"),
       serving: "standard",
@@ -538,6 +681,7 @@ export async function main(args = process.argv.slice(2)) {
   };
   const trials = [];
   let proxy, deterministicProxy, runError;
+  const preparedRequests = new Map();
   async function runTrial(spec, planned, mode) {
     const profile = selectedProfiles.find((p) => p.id === planned.profileId);
     const trial = {
@@ -548,11 +692,12 @@ export async function main(args = process.argv.slice(2)) {
       evidence: null,
     };
     if (mode === "live") {
-      if (suite.baseline)
+      if (preparedAccounting)
         await proxy.reserveAttempt(
           trial.id,
           profile.id,
           manifest.preparedForecast.reservations.find((r) => r.id === planned.id).maximumUsd,
+          { preparedRequest: preparedRequests.get(planned.id) },
         );
       else proxy.beginAttempt(trial.id, profile.id);
     }
@@ -560,7 +705,7 @@ export async function main(args = process.argv.slice(2)) {
     trial.configuration = configurationRecord(trial);
     if (mode === "live") {
       await proxy.awaitIdle();
-      if (suite.baseline) {
+      if (preparedAccounting) {
         try {
           await proxy.finishAttempt();
         } catch (error) {
@@ -580,7 +725,9 @@ export async function main(args = process.argv.slice(2)) {
     deterministicProxy.listen(8091, "0.0.0.0");
     await once(deterministicProxy, "listening");
     if (options.mode === "live") {
-      const chosen = suite.baseline ? cases : compatibilityCases(allCases);
+      const chosen = suite.baseline
+        ? cases
+        : compatibilityCases(allCases, preparedAccounting ? cases : []);
       const gates = [];
       for (const spec of chosen)
         for (const profile of selectedProfiles)
@@ -603,6 +750,15 @@ export async function main(args = process.argv.slice(2)) {
       );
       if (gates.some((t) => !t.grade.passed))
         throw new Error("Deterministic compatibility failed; no paid calls made");
+      if (defaultPolicy.version === "3" && options.phase === "confirmation") {
+        assertPilotReady(pilot);
+        const { reserveHoldout } = await import("./release-exposure.mjs");
+        manifest.qualification.exposure = await reserveHoldout(
+          manifest,
+          process.env.XPATHED_BUDGET_GITHUB_REPOSITORY,
+          process.env.GH_TOKEN,
+        );
+      }
       await new Promise((resolve) => deterministicProxy.close(resolve));
       deterministicProxy = null;
       const { createBudgetProxy } = await import("./comparison-budget.mjs");
@@ -621,12 +777,13 @@ export async function main(args = process.argv.slice(2)) {
       manifest.accounting = { version: 1, budgetPolicy: "provider-limit" };
       manifest.pricing = Object.fromEntries(proxy.profiles.map((p) => [p.id, p.pricing]));
       manifest.routeMetadata = proxy.profiles;
-      if (suite.baseline) {
+      if (preparedAccounting) {
         manifest.preparedForecast = proxy.forecastRequests(
           manifest.plan.trials.map((planned) => {
             const prepared = gates.find(
               (gate) => gate.caseId === planned.caseId && gate.profileId === planned.profileId,
             );
+            preparedRequests.set(planned.id, prepared?.evidence?.preparedProviderRequest);
             return {
               id: planned.id,
               profileId: planned.profileId,

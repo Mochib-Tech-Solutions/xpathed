@@ -1,3 +1,5 @@
+import currentViewFixtures from "./current-view-fixtures.json" with { type: "json" };
+
 export const derivedTags = new Set(
   "div span a p button input label textarea select option optgroup form main section article aside nav header footer h1 h2 h3 h4 h5 h6 ul ol li dl dt dd table thead tbody tfoot tr td th caption br hr img strong em b i small pre code blockquote figure figcaption".split(
     " ",
@@ -47,6 +49,7 @@ export function renderDerivedBody(fixture) {
 
 export function renderFixture(key, trial, frame) {
   const pages = {
+    ...currentViewFixtures,
     "viewport-clipped": `<main><h1>Clipped panel</h1><div style="height:100px;overflow:hidden"><iframe id="clipped-panel" title="Clipped panel" src="/frame?trial=${encodeURIComponent(trial)}&name=viewport-clipped-child" style="display:block"></iframe></div></main>`,
     "viewport-clipped-child":
       '<button id="frame-upper">Upper action</button><div style="margin-top:220px"><button id="frame-lower">Lower action</button></div>',

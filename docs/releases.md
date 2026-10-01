@@ -1,6 +1,6 @@
 # Release evidence verification
 
-Release tooling for [#11](https://github.com/Mochib-Tech-Solutions/xpathed/issues/11) verifies evidence, preserves candidate images, and explicitly evaluates those exact images. Offline verification makes no provider calls; live evaluation remains explicitly authorized and uses provider key limits. All commands leave the application default unchanged.
+Release tooling for [#11](https://github.com/Mochib-Tech-Solutions/xpathed/issues/11) verifies evidence, preserves candidate images, and explicitly evaluates those exact images. Offline verification makes no provider calls; live evaluation remains explicitly authorized and uses provider key limits. Verification and monitoring leave the application unchanged. Promotion selects an approval, and explicit activation deploys its exact images.
 
 ## Seal and verify
 
@@ -10,7 +10,8 @@ Use a clean checkout at the revision that produced the evidence. Supply the orig
 mkdir -p -m 700 .artifacts/releases
 pnpm release:seal --confirmation .artifacts/evaluation/confirmation \
   --pilot .artifacts/evaluation/pilot --profile PROFILE_ID \
-  --source-sha FULL_COMMIT_SHA --output .artifacts/releases/candidate.json
+  --source-sha FULL_COMMIT_SHA --suite evaluation/current-view-qualification-cases.json \
+  --output .artifacts/releases/candidate.json
 pnpm release:verify .artifacts/releases/candidate.json --sha256 EXPECTED_SHA256
 ```
 
@@ -26,11 +27,11 @@ Success means the referenced evidence meets this verification contract. Without 
 
 ## Current boundary
 
-No retained model currently qualifies. The existing exposed families are regression data; fresh independent held-out families with explicitly versioned current-view coverage are required before new release qualification. The contract-4 baseline is development evidence, not a qualifying replacement for the legacy contract-3 suite. Synthetic positive tests exercise the verifier without qualifying a real model or spending money.
+A model must pass real qualification before the first approval. Policy 3 uses the reviewed current-view suite and exact source/artifact identity. Existing exposed cases remain development/regression evidence; new held-out families are reserved in private `release-state` by the shared evaluator before any confirmation inference, including local CLI runs. Initialize this authority before a policy-3 live confirmation. Failed or interrupted reservations cannot be reused as fresh qualification. Synthetic verifier tests do not qualify a real model.
 
-The current release policy covers legacy contracts. Live workflow preflight and evidence sealing explicitly reject contract 4 until a separately versioned current-view qualification policy is frozen. Adding current-view cases alone does not make them eligible, and a legacy-only seal cannot qualify the current-view client default. Historical policy results remain unchanged.
+Legacy policy 2 remains unchanged. Policy 3 explicitly requires contract 4, prompt 8, capture 5 and current-view scope; legacy-only evidence cannot qualify the client default. Each policy is frozen with its suite and source before held-out inference.
 
-Promotion, operational rollback and drift notifications remain in #11. Paid scheduled monitoring remains deferred; only manually dispatched qualification is authorized. The current environment-selected runtime default stays unchanged; verification alone never creates an approved-release pointer or switches models.
+Approval, activation and monitoring follow [ADR-0021](adr/0021-monitor-explicitly-approved-current-view-releases.md). A failed qualification leaves the existing application available and produces no approval. Verification alone never switches models.
 
 ## Private Docker artifact bundles
 
@@ -52,7 +53,7 @@ Restoration verifies the bundle before loading its images into Docker, then chec
 
 Local bundle storage is private; the manual GitHub workflow also preserves bundles as private Release assets. Image archives can occupy several gigabytes; shared layers affect actual size. They contain no page/provider evidence, so copying a bundle does not extend evidence retention or bypass the evidence verifier's expiry checks. Local storage is not an off-device backup. Keep bundles while needed and remove them explicitly; no automatic image or artifact pruning is added.
 
-Local bundle commands need no GitHub setup, package registry, new secret or account upgrade. Deterministic CLI tests run in the existing tooling gate; remote execution uses the explicit manual workflow below. Branch protection and Copilot verification remain the separate [account follow-up #41](https://github.com/Mochib-Tech-Solutions/xpathed/issues/41). Successful real-model qualification, promotion and operational rollback remain in #11.
+Local bundle commands need no GitHub setup, package registry, new secret or account upgrade. Deterministic CLI tests run in the existing tooling gate; remote execution uses the explicit manual workflow below. Branch protection and Copilot verification remain the separate [account follow-up #41](https://github.com/Mochib-Tech-Solutions/xpathed/issues/41). Successful real-model qualification and operational receipts are required before claiming release completion.
 
 The [Docker/Git research notes](research/2026-10-01-private-release-bundles.md) explain tag-free image export, archive identity and platform limits.
 
@@ -72,17 +73,17 @@ To seal image-bound live qualification evidence, add `--bundle DIRECTORY --bundl
 
 ## Manual GitHub qualification
 
-The **Release Qualification** Actions workflow accepts only a manual dispatch from `main`, checks out the exact dispatched SHA, and supports one selected profile:
+The **Release Qualification** Actions workflow accepts a maintainer manual dispatch from `main` or a `release/NAME` branch with a successful CI aggregate at the exact source SHA, checks out the exact dispatched SHA, and supports one selected profile:
 
 - `preflight`: read the authoritative ledger and OpenRouter key metadata, report cost accounting, key metadata and qualification coverage; no inference or image build.
 - `deterministic`: build and preserve a candidate, then exercise its exact images with controlled responses; no provider key or inference.
-- `live`: require fresh reviewed held-out coverage and no declared capability gaps before building or billing. Run a complete development pilot and confirmation under the existing policy, then require successful artifact-bound sealing. An unqualified model fails this workflow even when the measurement itself completed.
+- `live`: require fresh reviewed held-out coverage and no declared capability gaps before building or billing. Run the complete current-view development pilot, require every pilot case correct and complete with the frozen latency gate, then run confirmation under policy 3, then require successful artifact-bound sealing. An unqualified model fails this workflow even when the measurement itself completed.
 
-The current exposed cases do not meet fresh held-out requirements. Preflight success verifies setup, not release readiness. This first hosted path accepts reviewed default-branch source; arbitrary release-branch dispatch, approved-default selection, rollback activation and scheduled monitoring remain separate work. Deterministic authored fixtures are engineering evidence, not original dataset model-quality scores.
+Preflight verifies reviewed coverage and previous family exposure before inference. Passing preflight verifies setup, not model quality. Release branches use the same exact-revision CI, private-repository and maintainer gates as main. Deterministic authored fixtures are engineering evidence, not original dataset model-quality scores.
 
-Set the repository Actions secret `OPENROUTER_EVAL_API_KEY` to an ordinary dedicated inference key. Its configured provider-side limit is the spending control; the workflow adds no local monetary ceiling. The workflow passes that secret as `OPENROUTER_EVAL_API_KEY`, matching local evaluation configuration. The workflow reads `/api/v1/key` and reports configured limits without imposing a cap/reset/balance policy; invalid, expired or management credentials remain rejected. Do not put a management key, personal GitHub token, local `.env` or runtime application key in this workflow. GitHub's job token supplies repository contents access; only the evaluation fixture's proxy receives credentials. Standard routes, original attempts and durable per-request accounting remain enforced. General hosted qualification end-to-end latency includes both durable GitHub accounting writes. Provider records expose their reservation/reconciliation `remoteAccountingMs` separately, without subtracting them from qualification latency or weakening the 1s/2s policy. These measurements describe the hosted execution path, not model-only latency; the separate current-view development baseline uses the pre-reserved timing protocol below and cannot qualify a release under this hosted contract.
+Set the repository Actions secret `OPENROUTER_EVAL_API_KEY` to an ordinary dedicated inference key. Its configured provider-side limit is the spending control; the workflow adds no local monetary ceiling. The workflow passes that secret as `OPENROUTER_EVAL_API_KEY`, matching local evaluation configuration. The workflow reads `/api/v1/key` and reports configured limits without imposing a cap/reset/balance policy; invalid, expired or management credentials remain rejected. Do not put a management key, personal GitHub token, local `.env` or runtime application key in this workflow. GitHub's job token supplies repository contents access; only the evaluation fixture's proxy receives credentials. Standard routes, original attempts and durable per-request accounting remain enforced. Historical hosted policy-2 qualification end-to-end latency includes both durable GitHub accounting writes. Provider records expose their reservation/reconciliation `remoteAccountingMs` separately, without subtracting them from qualification latency or weakening the 1s/2s policy. These measurements describe the hosted execution path, not model-only latency; the separate current-view development baseline uses the pre-reserved timing protocol below and cannot qualify a release under this hosted contract.
 
-The current-view paired baseline records `resolver-http-pre-reserved-v2`: record each frozen request estimate durably before starting resolution; validate the actual request identity; return the validated provider response before the remote reconciliation write. Await reconciliation and retained evidence before another attempt or reporting. A failed durable write or invalid identity halts the run; unknown costs and unused estimates remain explicit without a money-based continuation block. This isolates evaluation bookkeeping from the application's unchanged two-second deadline. The original inline-accounting run remains failed evidence; no overhead is subtracted retrospectively. This development protocol does not change release qualification policy.
+The current-view paired baseline records `resolver-http-pre-reserved-v2`: record each frozen request estimate durably before starting resolution; validate the actual request identity; return the validated provider response before the remote reconciliation write. Await reconciliation and retained evidence before another attempt or reporting. A failed durable write or invalid identity halts the run; unknown costs and unused estimates remain explicit without a money-based continuation block. This isolates evaluation bookkeeping from Resolver HTTP timing; the application has no two-second total-response cutoff. The original inline-accounting run remains failed evidence; no overhead is subtracted retrospectively. Policy 3 explicitly adopts this protocol for new release evidence, retaining every original attempt and binding each live request to its prepared payload.
 
 Before enabling hosted spending, migrate the existing `.artifacts/datasets/experiment-budget.json` intact to `experiment-budget.json` on the private `evaluation-budget` branch. Preserve the historical ceiling, entries and reservation reviews, record `budgetPolicy: "provider-limit"`, and add `remoteAuthority: "github:mochib-tech-solutions/xpathed:evaluation-budget:experiment-budget.json"`. Verify the remote content before marking the local copy with the identical authority. Keep an independent private backup. Never bootstrap a fresh empty campaign, run an older checkout against a pre-migration ledger, delete pending charges, or reset the ledger on a rerun.
 
@@ -90,4 +91,50 @@ Hosted calls set `XPATHED_BUDGET_GITHUB_REPOSITORY` and `GH_TOKEN`. The shared p
 
 Private candidate Release assets retain the bundle files plus the independently recorded manifest digest. Image archives use gzip transport split into numbered chunks of at most 1,000,000,000 bytes, safely below GitHub's per-asset limit even when compression is ineffective. In a private transport directory, reconstruct with `cat images.tar.gz.part-* | gzip -d > ../bundle/images.tar`, then verify against the original manifest digest. Missing, reordered or altered chunks cannot pass the original image-archive hash. Keep only the four original bundle files in the bundle directory, with the retained digest separately. Publication first creates a draft and publishes only after all assets upload. The fixture runs as the invoking host UID/GID so private evidence remains readable by the uploader on Linux. Assets remain unapproved candidates and are never silently substituted with latest. Private evaluation artifacts retain original failures and evidence for 30 days; Release assets do not extend that evidence deadline. Keep the previous approved release when promotion is later implemented. Publication or upload failure remains a workflow failure.
 
-The hosted runner uses Linux ARM64. Validate its Docker image-store identity and browser sandbox with `deterministic` before enabling live runs. The workflow does not connect to or update the local application. No cron, recurring provider allowance, notification-delivery claim or automatic default change is introduced.
+The hosted runner uses Linux ARM64. Validate its Docker image-store identity and browser sandbox with `deterministic` before enabling live runs. The workflow does not connect to or update the local application. The separately authorized nightly workflow below uses the evaluation key. No workflow automatically changes the approved default.
+
+## Portable evidence and explicit approval
+
+Version-2 seals use paths under the exact checkout's `.artifacts/` directory. `pnpm release:archive CANDIDATE --sha256 DIGEST OUTPUT` preserves the candidate and every referenced evidence file in a private compressed archive. `pnpm release:archive:restore ARCHIVE --sha256 DIGEST` requires the exact source checkout and restored bundle, rejects unsafe paths/altered inventories and re-verifies the original evidence. It never overwrites existing files. Qualification publishes `release-evidence.json.gz` and `candidate-sha256.txt` alongside the private candidate images. Retain the candidate digest independently before approving it.
+
+Archives preserve the original thirty-day evidence expiry. Private release assets are operator-owned; remove expired page/provider evidence archives under the existing retention policy, retaining nonsecret source/image identities and approval history separately. Archived bytes do not create permanent qualification eligibility. Monitoring fails explicitly if required evidence expires or disappears.
+
+Initialize or inspect the private authoritative approval state:
+
+```sh
+pnpm release:state init
+pnpm release:state status
+```
+
+Select a candidate explicitly through **Release Promotion** or the CLI:
+
+```sh
+pnpm release:promote --tag candidate-RUN-ATTEMPT --sha256 CANDIDATE_DIGEST \
+  --expected-current none --reason "Reviewed exact-image qualification"
+pnpm release:activate --expected-current CANDIDATE_DIGEST
+```
+
+Later promotions require the current approved digest instead of `none`. Approval downloads and verifies the exact source, image archive and qualification evidence, and checks the frozen sentinels against their measured baseline. It uses conditional state writes, records the actor/reason and retains the previous approval. Missing qualification, incompatible contracts, stale evidence, altered assets and concurrent updates fail before selection. There is no implicit `latest` choice.
+
+Local activation refuses another checkout's Compose project or an active development configuration. Stop this checkout's development runner first. Activation uses the verified Browser/Resolver image IDs and nonsecret settings while retaining the application's API key and database volumes. It restarts browser sessions and records actual image/container identity in `.artifacts/releases/deployment.json`. A failed activation is recorded as failed; it never claims the selected approval is already running. The GitHub promotion workflow cannot deploy into a maintainer's local Docker daemon.
+
+Rollback is explicit and requires a still-verifiable previous compatible approval:
+
+```sh
+pnpm release:rollback --expected-current CURRENT_DIGEST --reason "Regression investigation"
+pnpm release:activate --expected-current PREVIOUS_DIGEST
+```
+
+Rollback preserves the displaced approval in the audit. Restoring code/images cannot restore a provider's historical model weights. A first deployment has no qualified predecessor; synthetic rollback tests do not establish an observed real rollback.
+
+## Nightly monitoring and notification checks
+
+**Release Monitoring** runs at 02:17 UTC (03:17 Tunisia) and supports manual dispatch. It shares `paid-evaluation` concurrency with qualification/promotion and uses only `OPENROUTER_EVAL_API_KEY`. Its main-branch orchestrator reads the approved pointer, restores the exact recorded source and images, and executes the frozen sentinel list with the recorded grader, policy and one attempt per case. It does not rebuild latest development code. No approved release means a failed check with no inference, never a substitute model.
+
+Semantic drift, latency regression and infrastructure failures remain distinct in `monitoring.json`. Every failure fails CI and retains private original evidence for thirty days. `release:state status` reports the last started/completed check and approved identity; monitoring never changes approval, activation or the running application. Investigate the recorded run, provider accounting and missing assets before explicitly promoting or rolling back.
+
+Run `pnpm release:monitor` locally for the same live check. Use the workflow's `notification_test` input (or `pnpm release:monitor --notification-test`) for a controlled failure that makes no provider calls and leaves approval unchanged. Confirm the corresponding failure email and the first real scheduled failure separately. Existing manual GitHub failure emails were observed during setup; administrator status alone is not delivery evidence.
+
+GitHub schedules can be delayed or dropped, and email follows the account's notification preferences and schedule actor. The recorded last-completed time exposes a missed run; native Actions email cannot alert for a run that never started. The [research note](research/2026-10-01-release-monitoring-setup.md) links the official notification and scheduling behavior. Do not claim scheduled delivery before observing it.
+
+Sentinels use only development/regression families. The shared evaluator rejects held-out sentinel membership, so an early local monitoring run cannot consume fresh qualification families.

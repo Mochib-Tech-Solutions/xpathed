@@ -65,7 +65,14 @@
     "evaluate:dataset": "node evaluation/dataset-run.mjs",
     "prepare": "node scripts/install-hooks.mjs",
     "hooks:install": "node scripts/install-hooks.mjs",
-    "check:staged": "node scripts/pre-commit.mjs"
+    "check:staged": "node scripts/pre-commit.mjs",
+    "release:archive": "node scripts/release-archive.mjs pack",
+    "release:archive:restore": "node scripts/release-archive.mjs restore",
+    "release:state": "node scripts/release-state.mjs",
+    "release:promote": "node scripts/release-control.mjs promote",
+    "release:rollback": "node scripts/release-control.mjs rollback",
+    "release:activate": "node scripts/release-control.mjs activate",
+    "release:monitor": "node scripts/release-monitor.mjs"
   },
   "devDependencies": {
     "prettier": "3.9.9"
