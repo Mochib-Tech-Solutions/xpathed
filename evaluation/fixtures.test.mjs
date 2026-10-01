@@ -11,11 +11,16 @@ test("qualification cases preserve family boundaries and render without oracle i
     readFileSync(new URL("./qualification-cases.json", import.meta.url), "utf8"),
   );
   const cases = validateCases(suite);
-  const heldOut = cases.filter((c) => c.split === "held-out");
-  assert.ok(new Set(heldOut.map((c) => c.family)).size >= 10);
+  const exposed = cases.filter((c) => c.previousSplit === "held-out");
+  assert.ok(new Set(exposed.map((c) => c.family)).size >= 10);
   assert.ok(
-    heldOut.some((c) => c.expected.actions.filter((a) => a.outcome === "found").length > 1),
+    exposed.some((c) => c.expected.actions.filter((a) => a.outcome === "found").length > 1),
   );
+  for (const spec of exposed) {
+    assert.equal(spec.split, "regression");
+    assert.ok(spec.exposureRunId);
+    assert.ok(Number.isFinite(Date.parse(spec.exposedAt)));
+  }
   for (const spec of cases) {
     assert.equal(spec.contractVersion, "3");
     assert.equal(spec.review.status, "reviewed");

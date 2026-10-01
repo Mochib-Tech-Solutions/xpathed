@@ -9,6 +9,7 @@ const approved = {
   "deepseek/deepseek-v4.1-flash": { provider: "wafer", reasoning: { enabled: false } },
   "openai/gpt-6-luna": { provider: "openai", reasoning: { effort: "none" } },
   "google/gemini-3.8-flash": { provider: "google-ai-studio", reasoning: { effort: "low" } },
+  "qwen/qwen3.8-flash": { provider: "alibaba", reasoning: { enabled: false } },
 };
 const equal = (left, right) =>
   object(left) &&
@@ -347,7 +348,9 @@ export async function createBudgetProxy({
   let current,
     busy = false,
     blocked = false,
-    closed = false;
+    closed = false,
+    idle = Promise.resolve(),
+    closing;
   const safe = (value) => JSON.parse(JSON.stringify(value).replaceAll(apiKey, "[redacted]"));
   const retain = async (record) => {
     await onRecord(safe(record));
@@ -374,6 +377,8 @@ export async function createBudgetProxy({
       });
     current.used = true;
     busy = true;
+    const finished = Promise.withResolvers();
+    idle = finished.promise;
     const started = performance.now();
     const record = {
       id: randomUUID(),
@@ -486,6 +491,7 @@ export async function createBudgetProxy({
       send(reservation ? 502 : 400, { error: { message: record.error } });
     } finally {
       busy = false;
+      finished.resolve();
     }
   });
   return {
@@ -515,14 +521,22 @@ export async function createBudgetProxy({
       attempts.add(id);
       current = { id, profile, used: false };
     },
-    async close() {
-      if (closed) return;
+    awaitIdle() {
+      return idle;
+    },
+    close() {
+      if (closing) return closing;
       closed = true;
-      if (server.listening)
-        await new Promise((resolve, reject) =>
-          server.close((error) => (error ? reject(error) : resolve())),
-        );
-      await rm(lock, { recursive: true });
+      closing = (async () => {
+        if (server.listening)
+          await new Promise((resolve, reject) =>
+            server.close((error) => (error ? reject(error) : resolve())),
+          );
+        // Disconnected callers can close their sockets before upstream accounting finishes.
+        await idle;
+        await rm(lock, { recursive: true });
+      })();
+      return closing;
     },
   };
 }

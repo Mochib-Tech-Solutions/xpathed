@@ -36,6 +36,12 @@ services:
       OpenRouter__Model: deepseek/deepseek-v4.1-flash
       OpenRouter__Provider: wafer
       Resolution__PromptVariant: concise
+  resolver-qwen:
+    <<: *qualification-resolver
+    environment:
+      <<: *qualification-environment
+      OpenRouter__Model: qwen/qwen3.8-flash
+      OpenRouter__Provider: alibaba
   evaluation-fixture:
     environment:
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}

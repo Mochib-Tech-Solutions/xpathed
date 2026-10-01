@@ -99,13 +99,40 @@ test("a fully observed frozen live candidate qualifies without activating a defa
   const report = summarizeQualification(manifest, trials);
   assert.equal(report.profiles.candidate.qualification.status, "qualified");
   assert.equal(report.profiles.candidate.qualification.correctCompleteWithinDeadline.rate, 1);
-  assert.equal(report.profiles.candidate.qualification.correctCompleteWithinGoal.rate, 1);
+  assert.equal(report.profiles.candidate.qualification.correctCompleteWithinGoal.rate, 0);
   assert.equal(report.profiles.candidate.qualification.uncertainty.heldOutFamilies, 10);
   assert.equal(report.profiles.candidate.firstAttempt.latencyMs.p95, 1900);
   assert.ok(
     Math.abs(report.profiles.candidate.firstAttempt.cost.reportedUsd.total - 0.033) < 1e-12,
   );
   assert.equal(report.defaultActivated, false);
+});
+
+test("policy 2 counts only sub-second goals and includes the two-second deadline boundary", () => {
+  const { manifest, trials } = evidence();
+  for (const trial of trials) trial.elapsedMs = 999;
+  trials[0].elapsedMs = 1000;
+  trials[1].elapsedMs = 2000;
+  trials[2].elapsedMs = 2001;
+  const result = summarizeQualification(manifest, trials).profiles.candidate.qualification;
+  assert.equal(result.policyVersion, "2");
+  assert.equal(result.correctCompleteWithinGoal.passed, 30);
+  assert.equal(result.correctCompleteWithinDeadline.passed, 32);
+});
+
+test("recorded policy 1 retains its inclusive two-second goal and three-second deadline", () => {
+  const { manifest, trials } = evidence();
+  const previous = { ...policy, version: "1", goalMs: 2000, deadlineMs: 3000 };
+  manifest.qualification.policySha256 = createHash("sha256")
+    .update(JSON.stringify(previous))
+    .digest("hex");
+  for (const trial of trials) trial.elapsedMs = 2000;
+  trials[0].elapsedMs = 3000;
+  trials[1].elapsedMs = 3001;
+  const result = summarizeQualification(manifest, trials, previous).profiles.candidate
+    .qualification;
+  assert.equal(result.correctCompleteWithinGoal.passed, 31);
+  assert.equal(result.correctCompleteWithinDeadline.passed, 32);
 });
 
 test("quick wrong or incomplete results fail while every original request remains in the denominator", () => {
@@ -176,6 +203,9 @@ test("deterministic, offline, unsealed or small evidence cannot qualify despite 
     },
     ({ manifest }) => {
       manifest.cases[0].family = manifest.cases[10].family;
+    },
+    ({ manifest }) => {
+      for (const spec of manifest.cases) spec.split = "regression";
     },
   ]) {
     const data = evidence();
@@ -289,9 +319,9 @@ test("duplicate and unplanned attempts fail the candidate instead of improving i
   }
 });
 
-test("the two-second goal is distinct from the inclusive three-second qualification deadline", () => {
+test("the sub-second goal is distinct from the inclusive two-second qualification deadline", () => {
   const { manifest, trials } = evidence();
-  for (const trial of trials) trial.elapsedMs = 3000;
+  for (const trial of trials) trial.elapsedMs = 2000;
   const report = summarizeQualification(manifest, trials).profiles.candidate;
   assert.equal(report.qualification.status, "qualified");
   assert.equal(report.qualification.correctCompleteWithinGoal.passed, 0);
