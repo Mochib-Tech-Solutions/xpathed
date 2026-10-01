@@ -9,9 +9,10 @@ export function classifyChanges(paths) {
   let tooling = false;
   let docker = false;
   let solution = false;
+  let browser = false;
   for (const path of paths) {
     if (
-      /^(.github\/workflows\/|scripts\/ci-changes|scripts\/check\.sh$|package(-lock)?\.json$)/.test(
+      /^(\.github\/(workflows|actions)\/|scripts\/ci-(changes|gate)|scripts\/check\.sh$|package(-lock)?\.json$)/.test(
         path,
       )
     ) {
@@ -61,6 +62,12 @@ export function classifyChanges(paths) {
     if (/^tests\/Directory\..*\.(props|targets)$/.test(path))
       projects.forEach((project) => affected.add(project));
     if (path.startsWith("tests/Common.")) projects.forEach((project) => affected.add(project));
+    if (
+      /^(evaluation\/|scripts\/(evaluate[.]|ci-browser[.])|tests\/resolution\/ready\.mjs$|docker\/(browser\/|resolver\/|evaluation-fixture\/|compose\.(yaml|evaluation\.yaml|sh)$)|\.dockerignore$|pnpm-(lock|workspace)\.yaml$|\.npmrc$|\.node-version$|\.nvmrc$)/.test(
+        path,
+      )
+    )
+      browser = true;
   }
   return {
     dotnet: projects.filter((project) => affected.has(project)),
@@ -69,6 +76,7 @@ export function classifyChanges(paths) {
     docker,
     solution,
     persistence: affected.has("ClientApi"),
+    browser: browser || affected.has("Browser") || affected.has("Resolver"),
   };
 }
 
