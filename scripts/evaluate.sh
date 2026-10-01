@@ -148,6 +148,9 @@ for container in $(docker ps -aq --filter "label=com.docker.compose.project=$COM
 done
 mkdir -p "$(dirname "$XPATHED_EVALUATION_OUTPUT")"
 mkdir "$XPATHED_EVALUATION_OUTPUT"
+if [ "$qualification" = true ] || [ "$comparison" = true ]; then
+  mkdir -p .artifacts/datasets
+fi
 compose down
 release_started=false
 cleanup() {
@@ -176,16 +179,13 @@ if ! compose run --rm --no-deps --entrypoint node evaluation-fixture -e '
 fi
 rm "$XPATHED_EVALUATION_OUTPUT/.mount-check"
 if [ -n "${XPATHED_RELEASE_STATE:-}" ]; then
-  mkdir -p .artifacts/datasets
   compose up --no-build --pull never --wait browser "$XPATHED_RELEASE_SERVICE" evaluation-fixture
   XPATHED_RELEASE_ARTIFACT_JSON=$(node scripts/release-evaluate.mjs attest "$XPATHED_RELEASE_STATE" before)
   export XPATHED_RELEASE_ARTIFACT_JSON
   release_started=true
 elif [ "$qualification" = true ]; then
-  mkdir -p .artifacts/datasets
   compose up --build --wait browser resolver resolver-luna resolver-gemini resolver-deepseek-concise resolver-qwen evaluation-fixture
 elif [ "$comparison" = true ]; then
-  mkdir -p .artifacts/datasets
   compose up --build --wait browser resolver evaluation-fixture stagehand
 else
   compose up --build --wait browser resolver evaluation-fixture
