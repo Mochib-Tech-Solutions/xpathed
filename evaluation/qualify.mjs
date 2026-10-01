@@ -399,6 +399,7 @@ export async function main(args = process.argv.slice(2)) {
     await execute(spec, trial, { ...options, mode }, { ...services, resolver: profile.resolver });
     trial.configuration = configurationRecord(trial);
     if (mode === "live") {
+      await proxy.awaitIdle();
       const calls = proxy.records.filter((r) => r.attemptId === trial.id);
       trial.provider = calls.map(({ request, response, ...metadata }) => metadata);
       trial.evidence = { ...trial.evidence, provider: calls };
