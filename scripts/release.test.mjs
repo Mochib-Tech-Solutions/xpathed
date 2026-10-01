@@ -62,7 +62,7 @@ async function workspace(
     },
   }));
   const suite = { version: "1", ...(qualificationPolicy ? { qualificationPolicy } : {}), cases };
-  if (qualificationPolicy) suite.sentinels = ["case-31", "case-0"];
+  if (qualificationPolicy) suite.sentinels = ["case-31", "case-30"];
   const suitePath = qualificationPolicy
     ? "evaluation/current-view-qualification-cases.json"
     : "evaluation/qualification-cases.json";
@@ -488,6 +488,111 @@ test("published candidates require a pinned digest and restore the exact source,
     }).trim(),
     work.sha,
   );
+  const release = JSON.parse(restored.stdout.trim().split("\n").at(-1));
+  const snapshot = {
+    repo: "example/private",
+    state: {
+      current: release,
+      history: [{ operation: "promote", to: digest }],
+      exposures: release.exposure.families.map((family) => ({
+        family,
+        runId: release.exposure.runId,
+        sourceSha: release.sourceSha,
+        reservedAt: release.exposure.reservedAt,
+      })),
+    },
+  };
+  const clock = join(bin, "expired-clock.mjs");
+  writeFileSync(clock, `Date.now = () => ${Date.now() + 31 * 86400000};\n`);
+  const env = {
+    ...process.env,
+    PATH: `${bin}:${process.env.PATH}`,
+    PUBLISHED_FIXTURE: published,
+    NODE_OPTIONS: `--import=${pathToFileURL(clock).href}`,
+  };
+  const monitor = (state, directory) =>
+    spawnSync(
+      process.execPath,
+      [
+        "--input-type=module",
+        "--eval",
+        `import {fetchApprovedRelease} from ${JSON.stringify(module)}; const r=await fetchApprovedRelease(JSON.parse(process.argv[1]),process.argv[2]); console.log(JSON.stringify(r.release));`,
+        JSON.stringify(state),
+        directory,
+      ],
+      { cwd: work.cwd, encoding: "utf8", env },
+    );
+  const expiredPromotion = spawnSync(
+    process.execPath,
+    [
+      "--input-type=module",
+      "--eval",
+      `import {fetchRelease} from ${JSON.stringify(module)}; await fetchRelease('example/private','candidate-1-1',process.argv[1],process.argv[2]);`,
+      digest,
+      ".artifacts/expired-promotion",
+    ],
+    { cwd: work.cwd, encoding: "utf8", env },
+  );
+  assert.notEqual(expiredPromotion.status, 0);
+  assert.match(expiredPromotion.stderr, /expired/);
+  rmSync(join(published, "release-evidence.json.gz"));
+  const monitored = monitor(snapshot, ".artifacts/approved-expired");
+  assert.equal(monitored.status, 0, monitored.stderr);
+  assert.deepEqual(JSON.parse(monitored.stdout.trim().split("\n").at(-1)), release);
+  for (const [name, change, error] of [
+    [
+      "missing-approval",
+      (s) => {
+        s.state.current = null;
+      },
+      /approved/,
+    ],
+    [
+      "missing-receipt",
+      (s) => {
+        delete s.state.current.monitoring;
+      },
+      /receipt/,
+    ],
+    [
+      "missing-audit",
+      (s) => {
+        s.state.history = [];
+      },
+      /audit/,
+    ],
+    [
+      "changed-policy",
+      (s) => {
+        s.state.current.policySha256 = "f".repeat(64);
+      },
+      /policy/,
+    ],
+    [
+      "changed-suite",
+      (s) => {
+        s.state.current.monitoring.suiteSha256 = "f".repeat(64);
+      },
+      /suite/,
+    ],
+    [
+      "changed-baseline",
+      (s) => {
+        s.state.current.sentinelBaseline.pop();
+      },
+      /baseline/,
+    ],
+  ]) {
+    const modified = structuredClone(snapshot);
+    change(modified);
+    const result = monitor(modified, `.artifacts/${name}`);
+    assert.notEqual(result.status, 0, name);
+    assert.match(result.stderr, error, name);
+  }
+  writeFileSync(join(published, "images.tar.gz.part-0000"), gzipSync(Buffer.from("changed image")));
+  const altered = monitor(snapshot, ".artifacts/altered-approved-image");
+  assert.notEqual(altered.status, 0);
+  assert.match(altered.stderr, /mismatch/);
 });
 
 test("artifact-bound sealing fails closed for missing, swapped or downgraded identities and receipts", async (t) => {

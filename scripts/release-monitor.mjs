@@ -3,8 +3,8 @@ import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { resolve, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { isDeepStrictEqual } from "node:util";
-import { readState, saveState, verifyExposure } from "./release-state.mjs";
-import { fetchRelease } from "./release-fetch.mjs";
+import { readState, saveState } from "./release-state.mjs";
+import { fetchApprovedRelease } from "./release-fetch.mjs";
 
 async function main() {
   const forceFailure = process.argv.length === 3 && process.argv[2] === "--notification-test";
@@ -40,15 +40,7 @@ async function main() {
       throw new Error(
         "No approved release exists; refusing to substitute the application default or latest candidate",
       );
-    const staged = await fetchRelease(
-      snapshot.repo,
-      selected.tag,
-      selected.candidateSha256,
-      directory,
-    );
-    if (!isDeepStrictEqual(selected, staged.release))
-      throw new Error("Approved release metadata differs from verified evidence");
-    verifyExposure(snapshot, staged.release);
+    const staged = await fetchApprovedRelease(snapshot, directory);
     const output = ".artifacts/sentinel-run";
     execFileSync(
       process.execPath,
