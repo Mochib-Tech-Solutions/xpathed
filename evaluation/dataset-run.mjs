@@ -17,6 +17,14 @@ export const campaignCeilingUsd = 10;
 const profiles = JSON.parse(
   await readFile(new URL("./qualification-profiles.json", import.meta.url), "utf8"),
 );
+export const datasetProfiles = [
+  ...profiles,
+  {
+    ...profiles.find((profile) => profile.id === "deepseek"),
+    id: "deepseek-deepinfra",
+    provider: "deepinfra/fp8",
+  },
+];
 
 const hash = (text) => createHash("sha256").update(text).digest("hex");
 const json = async (path) => JSON.parse(await readFile(path, "utf8"));
@@ -190,7 +198,11 @@ export function options(args) {
     throw new Error(
       "Live dataset calls require --reviewed-inputs with exact input hashes and privacy review",
     );
-  if (!profiles.some((profile) => profile.id === result.profile && profile.variant === "baseline"))
+  if (
+    !datasetProfiles.some(
+      (profile) => profile.id === result.profile && profile.variant === "baseline",
+    )
+  )
     throw new Error("Offline evaluation requires an approved baseline profile");
   if (!["baseline", "intent-cardinality"].includes(result.promptVariant))
     throw new Error("Unknown offline prompt variant");
@@ -422,7 +434,8 @@ export async function main(args = process.argv.slice(2)) {
     createdAt: new Date().toISOString(),
     mode: opt.mode,
     track: "offline-selection",
-    profile: opt.mode === "live" ? profiles.find((profile) => profile.id === opt.profile) : null,
+    profile:
+      opt.mode === "live" ? datasetProfiles.find((profile) => profile.id === opt.profile) : null,
     promptVariant: opt.mode === "live" ? opt.promptVariant : null,
     preparedPlan,
     timingScope:
