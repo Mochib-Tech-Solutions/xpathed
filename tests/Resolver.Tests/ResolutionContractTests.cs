@@ -12,6 +12,50 @@ namespace Xpathed.Resolver.Tests;
 
 public sealed class ResolutionContractTests
 {
+    [Theory]
+    [InlineData("/pages/page-1/capture", false)]
+    [InlineData("/api/v1/chat/completions", false)]
+    [InlineData("/pages/page-1/selections", false)]
+    [InlineData("/api/v1/chat/completions", true)]
+    public async Task CurrentViewResolutionCompletesBeyondTheTwoSecondLatencyTarget(string slowPath, bool assisted)
+    {
+        var handler = new DeterministicServicesHandler
+        {
+            CaptureBody = CurrentViewCapture(),
+            ProviderBody = BilledSelection(),
+            BeforeRespondAsync = async (path, token) =>
+            {
+                if (path == slowPath)
+                {
+                    await Task.Delay(TimeSpan.FromMilliseconds(2100), token);
+                }
+            },
+        };
+        var envelope = await ResolveContextAsync(handler, assisted ? "jev-v1" : null, "Click Save", assisted);
+        var result = assisted ? envelope.GetProperty("result") : envelope;
+        Assert.Equal("found", result.GetProperty("outcome").GetString());
+        Assert.True(
+            result.GetProperty("diagnostics").GetProperty("timingsMs").GetProperty("total").GetDouble() >= 2000
+        );
+        Assert.Equal(1, handler.ProviderRequestCount);
+        Assert.Equal(1, handler.SelectionRequestCount);
+        Assert.Equal(assisted ? 1 : 0, handler.DecisionRequestCount);
+        Assert.Equal(
+            0.0000215m,
+            result.GetProperty("diagnostics").GetProperty("usage").GetProperty("cost").GetDecimal()
+        );
+        if (assisted)
+        {
+            using var config = JsonDocument.Parse(
+                envelope.GetProperty("evidence").GetProperty("configurationJson").GetString()!
+            );
+            Assert.Equal(
+                JsonValueKind.Null,
+                config.RootElement.GetProperty("effective").GetProperty("serverDeadlineMs").ValueKind
+            );
+        }
+    }
+
     [Fact]
     public async Task EvaluationContextPlanningOmitsOnlyConfidentlyUnneededEvidence()
     {
@@ -381,7 +425,7 @@ public sealed class ResolutionContractTests
     }
 
     [Fact]
-    public async Task EvaluationContextPlanningDeadlinePreservesTheCompletedCaptureTiming()
+    public async Task EvaluationContextPlanningAfterSlowCaptureKeepsWaitingForTheFinalSelection()
     {
         var handler = new DeterministicServicesHandler
         {
@@ -401,18 +445,18 @@ public sealed class ResolutionContractTests
         };
         var envelope = await ResolveContextAsync(handler, "jev-v1", "Click Save");
         var diagnostics = envelope.GetProperty("result").GetProperty("diagnostics");
-        Assert.Equal("resolution_timeout", diagnostics.GetProperty("code").GetString());
-        Assert.Equal("planning", diagnostics.GetProperty("stage").GetString());
-        Assert.Equal(0, handler.ProviderRequestCount);
+        Assert.Equal("found", envelope.GetProperty("result").GetProperty("outcome").GetString());
+        Assert.Equal("complete", diagnostics.GetProperty("stage").GetString());
+        Assert.Equal(1, handler.ProviderRequestCount);
         var timings = diagnostics.GetProperty("timingsMs");
         Assert.True(timings.GetProperty("planning").GetDouble() > 0);
-        Assert.False(timings.TryGetProperty("model", out _));
+        Assert.True(timings.TryGetProperty("model", out _));
         var stages = timings.GetProperty("capture").GetDouble() + timings.GetProperty("planning").GetDouble();
         Assert.True(stages <= timings.GetProperty("total").GetDouble());
     }
 
     [Fact]
-    public async Task EvaluationContextPlanningTimeoutFallsBackWithinTheOriginalDeadline()
+    public async Task EvaluationContextPlanningTimeoutFallsBackWhileResolutionKeepsWaiting()
     {
         var handler = new DeterministicServicesHandler
         {
@@ -431,19 +475,14 @@ public sealed class ResolutionContractTests
             },
         };
         var result = await ResolveContextAsync(handler, "jev-v1", "Click Save");
-        Assert.Equal(
-            "resolution_timeout",
-            result.GetProperty("result").GetProperty("diagnostics").GetProperty("code").GetString()
-        );
-        Assert.InRange(
+        Assert.Equal("found", result.GetProperty("result").GetProperty("outcome").GetString());
+        Assert.True(
             result
                 .GetProperty("result")
                 .GetProperty("diagnostics")
                 .GetProperty("timingsMs")
                 .GetProperty("total")
-                .GetDouble(),
-            1800,
-            2500
+                .GetDouble() >= 2000
         );
         using var config = JsonDocument.Parse(
             result.GetProperty("evidence").GetProperty("configurationJson").GetString()!
@@ -806,8 +845,9 @@ public sealed class ResolutionContractTests
     }
 
     [Fact]
-    public async Task CurrentViewDeadlineCancelsCaptureBeforeAnyProviderCall()
+    public async Task CurrentViewCallerCancellationStopsCaptureBeforeAnyProviderCall()
     {
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var cancelled = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var handler = new DeterministicServicesHandler
         {
@@ -819,6 +859,7 @@ public sealed class ResolutionContractTests
                 }
                 try
                 {
+                    started.TrySetResult();
                     await Task.Delay(TimeSpan.FromSeconds(10), token);
                 }
                 catch (OperationCanceledException)
@@ -830,23 +871,20 @@ public sealed class ResolutionContractTests
         };
         await using var application = CreateApplication(handler);
         using var client = application.CreateClient();
-        using var response = await client.PostAsJsonAsync(
+        using var cancellation = new CancellationTokenSource();
+        var request = client.PostAsJsonAsync(
             "/pages/page-1/resolve",
             new
             {
                 instruction = "Click Save",
                 documentId = "document-1",
                 contractVersion = "4",
-            }
+            },
+            cancellation.Token
         );
-        var result = await response.Content.ReadFromJsonAsync<JsonElement>();
-        Assert.Equal("error", result.GetProperty("outcome").GetString());
-        Assert.Equal("resolution_timeout", result.GetProperty("diagnostics").GetProperty("code").GetString());
-        Assert.InRange(
-            result.GetProperty("diagnostics").GetProperty("timingsMs").GetProperty("total").GetDouble(),
-            1800,
-            3000
-        );
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        cancellation.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => request);
         await cancelled.Task.WaitAsync(TimeSpan.FromSeconds(1));
         Assert.Equal(0, handler.ProviderRequestCount);
         Assert.Equal(0, handler.SelectionRequestCount);
@@ -855,11 +893,7 @@ public sealed class ResolutionContractTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    [InlineData(true, true)]
-    public async Task LateProviderChargesAreLoggedOnceWithoutLateSelection(
-        bool disconnect,
-        bool duringValidation = false
-    )
+    public async Task DisconnectedProviderChargesAreLoggedOnceWithoutLateSelection(bool duringValidation)
     {
         var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -891,23 +925,8 @@ public sealed class ResolutionContractTests
             cancellation.Token
         );
         await started.Task.WaitAsync(TimeSpan.FromSeconds(5));
-        string? attempt = null;
-        if (disconnect)
-        {
-            cancellation.Cancel();
-            await Assert.ThrowsAnyAsync<OperationCanceledException>(async () => await request);
-        }
-        else
-        {
-            using var response = await request;
-            var result = await response.Content.ReadFromJsonAsync<JsonElement>();
-            Assert.Equal("error", result.GetProperty("outcome").GetString());
-            var diagnostics = result.GetProperty("diagnostics");
-            Assert.Equal("resolution_timeout", diagnostics.GetProperty("code").GetString());
-            Assert.Equal("pending", diagnostics.GetProperty("providerAccounting").GetString());
-            Assert.Equal(JsonValueKind.Null, diagnostics.GetProperty("usage").ValueKind);
-            attempt = result.GetProperty("attemptId").GetString();
-        }
+        cancellation.Cancel();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(async () => await request);
         Assert.Equal(0, handler.SelectionRequestCount);
         release.SetResult();
         await logs.Recorded.Task.WaitAsync(TimeSpan.FromSeconds(5));
@@ -915,29 +934,25 @@ public sealed class ResolutionContractTests
         Assert.Equal(0.0000215m, entry["ReportedUsd"]);
         Assert.Equal("generation-1", entry["GenerationId"]);
         Assert.Equal("completed", entry["AccountingStatus"]);
-        if (attempt is not null)
-        {
-            Assert.Equal(attempt, entry["AttemptId"]);
-        }
         Assert.Equal(1, handler.ProviderRequestCount);
         Assert.Equal(0, handler.SelectionRequestCount);
     }
 
     [Theory]
     [InlineData("/pages/page-1/selections")]
-    public async Task CurrentViewTimeoutRetainsChargesAlreadyReported(string slowPath)
+    public async Task CurrentViewTransportTimeoutRetainsChargesAlreadyReported(string slowPath)
     {
-        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var handler = new DeterministicServicesHandler
         {
             CaptureBody = CurrentViewCapture(),
             ProviderBody = BilledSelection(),
-            BeforeRespondAsync = async (path, token) =>
+            BeforeRespondAsync = (path, _) =>
             {
                 if (path == slowPath)
                 {
-                    await release.Task.WaitAsync(token);
+                    throw new TaskCanceledException("Controlled browser transport timeout");
                 }
+                return Task.CompletedTask;
             },
         };
         await using var application = CreateApplication(handler);
@@ -952,19 +967,13 @@ public sealed class ResolutionContractTests
             }
         );
         var result = await response.Content.ReadFromJsonAsync<JsonElement>();
-        Assert.Equal("resolution_timeout", result.GetProperty("diagnostics").GetProperty("code").GetString());
+        Assert.Equal("browser_timeout", result.GetProperty("diagnostics").GetProperty("code").GetString());
         Assert.Equal(
             0.0000215m,
             result.GetProperty("diagnostics").GetProperty("usage").GetProperty("cost").GetDecimal()
         );
         Assert.Equal("completed", result.GetProperty("diagnostics").GetProperty("providerAccounting").GetString());
-        Assert.InRange(
-            result.GetProperty("diagnostics").GetProperty("timingsMs").GetProperty("total").GetDouble(),
-            1800,
-            3000
-        );
         Assert.Empty(result.GetProperty("actions").EnumerateArray());
-        release.TrySetResult();
     }
 
     [Theory]

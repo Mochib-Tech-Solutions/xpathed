@@ -109,7 +109,7 @@ public sealed class OpenRouterGateway(IHttpClientFactory clients, IConfiguration
             promptVersion,
             captureVersion = promptVersion == "8" ? "5" : "4",
             scope = promptVersion == "8" ? "current_view" : "page",
-            serverDeadlineMs = promptVersion == "8" ? (int?)2000 : null,
+            serverDeadlineMs = (int?)null,
             estimateCost = promptVersion != "8",
             stateVersion = "2",
             interactabilityVersion = "2",

@@ -444,7 +444,8 @@ export async function main(args = process.argv.slice(2)) {
     measurement: {
       latency:
         "Resolver HTTP; classifier/capture/final selector/verification included; durable remote accounting outside timed request",
-      deadlineMs: 2000,
+      latencyTargetMs: 2000,
+      abortAtLatencyTarget: false,
       retries: 0,
       qualification: false,
       rawEvidenceDays: 30,

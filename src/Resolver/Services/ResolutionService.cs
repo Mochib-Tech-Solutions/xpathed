@@ -123,13 +123,6 @@ public sealed partial class ResolutionService(
     {
         var timer = Stopwatch.StartNew();
         var requestCancellation = cancellationToken;
-        using var deadline =
-            request.ContractVersion == "4" ? CancellationTokenSource.CreateLinkedTokenSource(cancellationToken) : null;
-        if (deadline is not null)
-        {
-            deadline.CancelAfter(TimeSpan.FromSeconds(2));
-            cancellationToken = deadline.Token;
-        }
         var attemptId = suppliedAttemptId ?? Guid.NewGuid().ToString("N");
         CandidateCapture? capture = null;
         var providerCompleted = false;
@@ -575,10 +568,6 @@ public sealed partial class ResolutionService(
         }
         catch (OperationCanceledException)
         {
-            if (deadline?.IsCancellationRequested == true)
-            {
-                return Failure("resolution_timeout", "Resolution exceeded its two-second server processing deadline.");
-            }
             return Failure(
                 diagnostics.Stage == "model" ? "provider_timeout" : "browser_timeout",
                 "An upstream service did not respond in time."

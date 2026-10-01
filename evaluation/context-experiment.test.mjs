@@ -97,6 +97,19 @@ test("context main rejects unknown options without starting services", async () 
   await assert.rejects(main(["--retry", "2"]), /Unknown context option/);
 });
 
+test("slow correct responses remain correct while missing the latency target", () => {
+  const plan = buildContextPlan([{ id: "slow", contractVersion: "4" }]);
+  const trials = plan.map((trial) => ({ ...trial, elapsedMs: 2500, grade: { passed: true } }));
+  const summary = summarizeContext(plan, trials);
+  for (const arm of Object.values(summary.arms)) {
+    assert.equal(arm.correct, 1);
+    assert.equal(arm.correctWithinTwoSeconds, 0);
+    assert.equal(arm.latencyMs.p50, 2500);
+  }
+  assert.deepEqual(summary.measurementErrors, []);
+  assert.equal(summary.pairs[0].bothCorrect, true);
+});
+
 test("context summary distinguishes setup failures from timed provider failures", () => {
   const plan = buildContextPlan([{ id: "a", contractVersion: "4" }]);
   const trials = plan.map((p) => ({
