@@ -1,6 +1,6 @@
 # Release monitoring setup
 
-Checked 2026-10-01 against official GitHub documentation for #11. This research does not configure account settings, publish artifacts, dispatch workflows or verify email delivery. The current user request authorizes recurring monitoring with `OPENROUTER_EVAL_API_KEY`; older notes deferring that authorization need updating during implementation.
+Checked 2026-10-01 against official GitHub documentation for #11. The initial research below preceded setup; the dated verification section records the later observed results. The current user request authorizes recurring monitoring with `OPENROUTER_EVAL_API_KEY`; ADR-0021 records the implemented authorization.
 
 ## Failure notifications
 
@@ -40,3 +40,41 @@ Design proposal: archive the complete original pilot/confirmation evidence besid
 - A retained failing run and confirmed maintainer email, with runtime activation unchanged.
 
 These are proposed acceptance checks, not completed operations.
+
+## Setup verification — 2026-10-01
+
+Implementation merged in [PR #64](https://github.com/Mochib-Tech-Solutions/xpathed/pull/64), source `ec852f4c714bd28a3a995456a1d8e9cb73609986`. [Merged-main CI](https://github.com/Mochib-Tech-Solutions/xpathed/actions/runs/36931535236) passed. The schedule is enabled at 02:17 UTC (03:17 Tunisia), uses `OPENROUTER_EVAL_API_KEY`, and records approval and monitoring state on the private `release-state` branch. No release is approved.
+
+[Hosted preflight](https://github.com/Mochib-Tech-Solutions/xpathed/actions/runs/36931555935) verified the dedicated evaluation credential and fresh coverage: thirty held-out cases in ten families. The key expires on 2026-10-31 at 11:22 UTC. Rotation must update the evaluation secret before then. Provider key limits remain authoritative; historical unknown charges were preserved.
+
+The [controlled manual monitoring failure](https://github.com/Mochib-Tech-Solutions/xpathed/actions/runs/36931557780) produced an email whose body referenced that exact run. Read-only mailbox inspection confirmed delivery; no account setting was changed. Private recipient details remain excluded. Scheduled delivery has not yet been observed.
+
+The [normal monitoring run](https://github.com/Mochib-Tech-Solutions/xpathed/actions/runs/36934072634), with the test flag false, failed explicitly because no approved release exists. It made no inference calls and did not substitute the running default. Approval history and all five local container/image identities remained unchanged. Web/ClientApi contract checks, database connectivity, Browser and Resolver HTTP health passed afterward. The normal result is retained as the last completed monitoring run.
+
+### Qualification pilots
+
+Each row contains one live attempt per development case. These five-case pilots cannot qualify a release. Reported costs include failures; no charge in these runs is unresolved. Local timings and hosted timings are separate observations, not a controlled route comparison.
+
+| Profile and configuration                  | Environment                  | Correct | Correct within 2 s | p50 / p95, ms | Reported USD |
+| ------------------------------------------ | ---------------------------- | ------: | -----------------: | ------------: | -----------: |
+| DeepSeek/Wafer, prompt 8                   | Hosted exact-image candidate |     3/5 |                3/5 |   1093 / 1295 |  0.000398256 |
+| DeepSeek/Wafer, experimental prompt 9      | Local development            |     3/5 |                3/5 |    945 / 1192 |  0.000431408 |
+| Gemini/Google AI Studio, existing prompt 8 | Local development            |     5/5 |                3/5 |   1838 / 2927 |  0.006375750 |
+| Qwen/Alibaba, existing prompt 8            | Local development            |     3/5 |                1/5 |   2743 / 4146 |  0.000698488 |
+
+The [hosted DeepSeek pilot](https://github.com/Mochib-Tech-Solutions/xpathed/actions/runs/36932485483) returned found targets for a sequential command and invalid per-target actions for a mixed command. The stricter experimental prompt placed whole-command rejection before enumeration, but retained both failures; it was reverted without merging. Its private diff and original request/response evidence remain saved. Gemini classified all five commands correctly, but absence and mixed-command responses exceeded two seconds. Qwen repeated the two semantic failures and exceeded the latency gate. Total reported cost across these twenty calls was **$0.007903902**.
+
+All runs stopped before held-out confirmation. The authoritative exposure inventory remains empty, so the thirty held-out cases remain fresh. No threshold, expected label or qualification result was relaxed. The application continues to use its existing DeepSeek/Wafer configuration, which is operational but unqualified.
+
+Private evidence directories and manifest IDs:
+
+- `.artifacts/releases/live-36932485483/pilot`: `5e8a34c8-240f-4c70-8c55-00e22f9c96a4`.
+- `.artifacts/evaluation/prompt9-development`: `67a23641-7482-442f-9931-3533562b07cd`.
+- `.artifacts/evaluation/gemini-current-view-development`: `c2ae64ef-fce2-4977-95ea-eb7dadd3083e`.
+- `.artifacts/evaluation/qwen-current-view-development`: `99bc70fb-4b81-46a0-aa70-cd3e5edd5b20`.
+
+The failed hosted candidate remains available as private Release assets under `candidate-36932485483-1`, with bundle manifest SHA-256 `fa0262298683b3fd80215515c87c60a02fe5ea20823e4379ea189d0cd14e7c34`. Packaging does not establish qualification. Apply the existing evidence retention policy to all private runs.
+
+### Remaining evidence for issue #11
+
+A candidate must first pass the unchanged development gate, then full exact-image regression and fresh held-out qualification. Until that happens, there is no valid candidate to promote, activate or monitor for model drift. Real rollback also needs a retained qualified predecessor; synthetic rollback checks already cover the implementation boundary. The first scheduled run and its notification delivery remain unobserved. These requirements keep #11 open despite the completed setup.
