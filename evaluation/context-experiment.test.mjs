@@ -97,6 +97,26 @@ test("context main rejects unknown options without starting services", async () 
   await assert.rejects(main(["--retry", "2"]), /Unknown context option/);
 });
 
+test("context summary distinguishes setup failures from timed provider failures", () => {
+  const plan = buildContextPlan([{ id: "a", contractVersion: "4" }]);
+  const trials = plan.map((p) => ({
+    ...p,
+    mode: "live",
+    elapsedMs: 2001,
+    grade: { passed: false },
+    error: { code: "resolution_timeout" },
+  }));
+  assert.deepEqual(summarizeContext(plan, trials).measurementErrors, []);
+  delete trials[1].elapsedMs;
+  trials[1].error.code = "http_400";
+  const summary = summarizeContext(plan, trials);
+  assert.equal(summary.measurementErrors.length, 1);
+  assert.match(summary.measurementErrors[0], /resolution did not start/i);
+  assert.equal(summary.arms.jev.completed, 1);
+  assert.equal(summary.arms.jev.correct, 0);
+  assert.equal(summary.pairs[0].elapsedMsReduction, null);
+});
+
 test("context preflight and live plans both register once at the actual fixture boundary", async () => {
   const { buildContextPreflightPlan } = await import("./context-experiment.mjs");
   const cases = [{ id: "same-reviewed-case", contractVersion: "4" }];

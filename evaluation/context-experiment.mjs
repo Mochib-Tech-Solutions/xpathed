@@ -55,6 +55,9 @@ export function summarizeContext(plan, trials) {
     if (!plan.some((p) => p.id === trial.id && p.arm === trial.arm && p.caseId === trial.caseId))
       throw new Error("Unplanned context attempt");
   }
+  const measurementErrors = trials
+    .filter((trial) => !Number.isFinite(trial.elapsedMs))
+    .map((trial) => `Resolution did not start: ${trial.id}`);
   const generations = new Set(),
     freshnessErrors = [];
   let unverifiedCalls = 0;
@@ -180,13 +183,15 @@ export function summarizeContext(plan, trials) {
       caseId,
       complete: Boolean(control && jev),
       bothCorrect,
-      elapsedMsReduction: bothCorrect && freshness.valid ? delta : null,
+      elapsedMsReduction:
+        bothCorrect && freshness.valid && !measurementErrors.length ? delta : null,
       observedElapsedMsDelta: delta,
       inputBytesReduction:
         Number.isFinite(controlBytes) && Number.isFinite(jevBytes) ? controlBytes - jevBytes : null,
     };
   });
   return {
+    measurementErrors,
     freshness,
     qualified: false,
     scope: "Paired current-view regression experiment; not release qualification",
@@ -393,6 +398,7 @@ async function replay(directory) {
   console.log(JSON.stringify(summary, null, 2));
   return receipt.runError ||
     summary.freshness.errors.length ||
+    summary.measurementErrors.length ||
     summary.arms.control.missing ||
     summary.arms.jev.missing ||
     (manifest.mode === "deterministic" && trials.some((t) => !t.grade.passed))
@@ -575,6 +581,8 @@ export async function main(args = process.argv.slice(2)) {
           `${trial.grade.passed ? "PASS" : "FAIL"} ${trial.arm} ${trial.caseId} ${Math.round(trial.elapsedMs ?? 0)}ms`,
         );
         if (trial.accountingError) throw new Error(trial.accountingError);
+        if (!Number.isFinite(trial.elapsedMs))
+          throw new Error(`Resolution did not start: ${trial.id}`);
         if (trial.provider.some((p) => p.identityValid === false || p.responseCacheHit))
           throw new Error("Provider identity or response reuse failed");
         const freshness = summarizeContext(manifest.plan, trials).freshness;
