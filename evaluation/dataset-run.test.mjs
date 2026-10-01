@@ -167,6 +167,23 @@ test("offline profiles retain the DeepSeek default and accept only approved base
   assert.throws(() => options([...args, "--profile", "qwen", "--mode", "live"]), /reviewed-inputs/);
 });
 
+test("Azure Luna is an explicit offline route with unchanged no-reasoning and cache controls", () => {
+  const args = ["--import", "imported", "--output", "results", "--profile", "luna-azure"];
+  assert.equal(options(args).profile, "luna-azure");
+  const original = profiles.find((profile) => profile.id === "luna");
+  const alternate = datasetProfiles.find((profile) => profile.id === "luna-azure");
+  assert.deepEqual(alternate, { ...original, id: "luna-azure", provider: "azure" });
+  assert.equal(
+    profiles.some((profile) => profile.id === "luna-azure"),
+    false,
+  );
+  assert.equal(datasetProfiles.find((profile) => profile.id === "luna").provider, "openai");
+  const env = profileEnvironment(alternate, "http://127.0.0.1:1234/api/v1/", {});
+  assert.equal(env.OpenRouter__Provider, "azure");
+  assert.equal(env.OpenRouter__ReasoningEffort, "none");
+  assert.equal(env.OpenRouter__PromptCacheMode, "explicit");
+});
+
 test("DeepInfra is an explicit offline route and leaves the default and qualification profiles intact", () => {
   const baseline = profiles.find((profile) => profile.id === "deepseek");
   const alternate = datasetProfiles.find((profile) => profile.id === "deepseek-deepinfra");
