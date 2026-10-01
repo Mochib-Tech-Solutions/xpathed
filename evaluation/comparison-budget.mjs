@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { createServer } from "node:http";
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
-import { assertReconciledCharges, reserveCharge } from "./dataset-run.mjs";
+import { assertReconciledCharges, reserveCharge, unresolvedCharge } from "./dataset-run.mjs";
 
 const model = "deepseek/deepseek-v4.1-flash";
 const approved = {
@@ -504,13 +504,16 @@ export async function createBudgetProxy({
         (sum, entry) => sum + (entry.reportedUsd ?? entry.reservedUsd),
         0,
       );
+      const reviewed = ledger.entries.filter(
+        (entry) => entry.reportedUsd == null && !unresolvedCharge(entry),
+      );
       return {
         ceilingUsd: ledger.ceilingUsd,
         spentUsd,
         remainingUsd: Math.max(0, ledger.ceilingUsd - spentUsd),
-        pendingCharges: ledger.entries.filter(
-          (entry) => entry.reportedUsd == null || entry.reportedUsd > entry.reservedUsd,
-        ).length,
+        pendingCharges: ledger.entries.filter(unresolvedCharge).length,
+        reviewedReserveCharges: reviewed.length,
+        reviewedReserveUsd: reviewed.reduce((sum, entry) => sum + entry.reservedUsd, 0),
       };
     },
     beginAttempt(id, profileId = configured[0].id) {

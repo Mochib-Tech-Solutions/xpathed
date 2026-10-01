@@ -225,6 +225,43 @@ test("the shared spending ceiling includes reservations and refuses the next una
   assert.throws(() => reserveCharge(ledger, NaN, "invalid"), /charge/i);
 });
 
+test("reservation reviews must consume the full maximum with an explicit reason and ISO timestamp", () => {
+  const entry = {
+    reservedUsd: 0.01,
+    reportedUsd: null,
+    reservationReview: {
+      reason: "Explicit resume approval",
+      reviewedAt: "2026-10-01T12:00:00.000Z",
+      chargedUsd: 0.01,
+    },
+  };
+  assert.doesNotThrow(() => assertReconciledCharges({ entries: [entry] }));
+  for (const changed of [
+    { chargedUsd: 0.009 },
+    { chargedUsd: 0.011 },
+    { chargedUsd: "0.01" },
+    { reason: "" },
+    { reason: "  " },
+    { reviewedAt: "yesterday" },
+    { reviewedAt: "2026-10-01" },
+  ])
+    assert.throws(
+      () =>
+        assertReconciledCharges({
+          entries: [{ ...entry, reservationReview: { ...entry.reservationReview, ...changed } }],
+        }),
+      /Unreconciled/,
+    );
+  assert.throws(
+    () => assertReconciledCharges({ entries: [{ ...entry, reportedUsd: 0.02 }] }),
+    /Unreconciled/,
+  );
+  assert.throws(
+    () => assertReconciledCharges({ entries: [entry, { reservedUsd: 0.01, reportedUsd: null }] }),
+    /Unreconciled/,
+  );
+});
+
 test("both live runners block unknown and excessive retained charges until reconciliation", () => {
   for (const reportedUsd of [null, undefined, 0.011]) {
     assert.throws(
