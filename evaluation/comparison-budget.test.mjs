@@ -197,6 +197,101 @@ test("shared ledger lock, previous spend and a lowered ceiling prevent additiona
   assert.equal(JSON.parse(await readFile(ledgerPath, "utf8")).ceilingUsd, 4);
 });
 
+test("an explicit full-reservation review permits reopening without inventing provider cost", async (t) => {
+  const initial = {
+    version: 1,
+    ceilingUsd: 5,
+    entries: [
+      {
+        id: "reviewed-timeout",
+        reservedUsd: 5,
+        reportedUsd: null,
+        reservationReview: {
+          reason: "Operator authorized resume with full maximum charged",
+          reviewedAt: "2026-10-01T12:00:00.000Z",
+          chargedUsd: 5,
+        },
+      },
+    ],
+  };
+  const { proxy, post, calls, ledgerPath } = await setup(t, { initial });
+  assert.equal(proxy.budget.pendingCharges, 0);
+  assert.equal(proxy.budget.spentUsd, 5);
+  assert.equal(proxy.budget.remainingUsd, 0);
+  assert.equal(proxy.budget.reviewedReserveCharges, 1);
+  assert.equal(proxy.budget.reviewedReserveUsd, 5);
+  proxy.beginAttempt("cannot-spend-reviewed-maximum");
+  assert.equal((await post()).status, 400);
+  assert.equal(calls.length, 0);
+  assert.deepEqual(JSON.parse(await readFile(ledgerPath, "utf8")), initial);
+});
+
+test("a reviewed reservation does not automatically review a new unknown charge", async (t) => {
+  const reviewed = {
+    id: "previous",
+    reservedUsd: 0.1,
+    reportedUsd: null,
+    reservationReview: {
+      reason: "Explicit resume approval",
+      reviewedAt: "2026-10-01T12:00:00.000Z",
+      chargedUsd: 0.1,
+    },
+  };
+  const { proxy, post, ledgerPath, fetchImpl } = await setup(t, {
+    initial: { version: 1, ceilingUsd: 5, entries: [reviewed] },
+    completion: () => Response.json({ choices: [], usage: { prompt_tokens: 2 } }),
+  });
+  proxy.beginAttempt("new-unknown");
+  await post();
+  assert.equal(proxy.budget.pendingCharges, 1);
+  assert.equal(proxy.budget.reviewedReserveCharges, 1);
+  assert.equal(proxy.budget.reviewedReserveUsd, 0.1);
+  assert.throws(() => proxy.beginAttempt("blocked"), /blocked/);
+  const retained = JSON.parse(await readFile(ledgerPath, "utf8"));
+  assert.deepEqual(retained.entries[0], reviewed);
+  assert.equal(retained.entries[1].reportedUsd, null);
+  assert.equal(retained.entries[1].reservationReview, undefined);
+  await proxy.close();
+  await assert.rejects(createBudgetProxy({ apiKey: "key", ledgerPath, fetchImpl }), /Unreconciled/);
+});
+
+test("ledger initialization rejects a reduced reservation review before fetching prices", async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), "xpathed-invalid-review-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const ledgerPath = join(directory, "ledger.json");
+  await writeFile(
+    ledgerPath,
+    JSON.stringify({
+      version: 1,
+      ceilingUsd: 5,
+      entries: [
+        {
+          reservedUsd: 1,
+          reportedUsd: null,
+          reservationReview: {
+            reason: "Operator review",
+            reviewedAt: "2026-10-01T12:00:00.000Z",
+            chargedUsd: 0.5,
+          },
+        },
+      ],
+    }),
+  );
+  let calls = 0;
+  await assert.rejects(
+    createBudgetProxy({
+      apiKey: "key",
+      ledgerPath,
+      fetchImpl: async () => {
+        calls++;
+        return Response.json(pricing);
+      },
+    }),
+    /Unreconciled/,
+  );
+  assert.equal(calls, 0);
+});
+
 test("missing, excessive and malformed provider charges retain reservations and block later runs", async (t) => {
   for (const [name, completion] of [
     ["missing", () => Response.json({ choices: [], usage: { prompt_tokens: 2 } })],
@@ -405,6 +500,8 @@ test("qualification pins each approved profile and reserves the highest tier and
     spentUsd: 0.004,
     remainingUsd: 4.996,
     pendingCharges: 0,
+    reviewedReserveCharges: 0,
+    reviewedReserveUsd: 0,
   });
   assert.equal(JSON.parse(await readFile(ledgerPath, "utf8")).entries.length, 4);
   for (const [index, call] of calls.entries()) {
