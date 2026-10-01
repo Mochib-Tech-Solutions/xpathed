@@ -5,6 +5,7 @@ services:
       OpenRouter__ApiKey: deterministic-fixture-only
   evaluation-fixture:
     image: node:24.16.0-bookworm-slim@sha256:2c87ef9bd3c6a3bd4b472b4bec2ce9d16354b0c574f736c476489d09f560a203
+    user: "${XPATHED_EVALUATION_UID:-0}:${XPATHED_EVALUATION_GID:-0}"
     working_dir: /evaluation
     environment:
       XPATHED_WORKSPACE: /workspace
