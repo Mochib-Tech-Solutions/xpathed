@@ -70,6 +70,7 @@ public static class OfflineSelectionEvaluation
             var builder = Host.CreateApplicationBuilder();
             builder.Logging.ClearProviders();
             builder.Services.AddHttpClient("openrouter");
+            builder.Services.AddMemoryCache();
             builder.Services.AddTransient<OpenRouterGateway>();
             using var host = builder.Build();
             var gateway = host.Services.GetRequiredService<OpenRouterGateway>();

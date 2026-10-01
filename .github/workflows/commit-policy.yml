@@ -1,4 +1,4 @@
-name: Commit policy
+name: Conventional Commits
 
 on:
   pull_request:

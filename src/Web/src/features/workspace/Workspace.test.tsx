@@ -481,6 +481,7 @@ describe("Workspace resolution", () => {
     const user = await openWorkspace();
     await submitInstruction(user);
     expect(await screen.findByText("1 target found · 1 missing · 1 blocked")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Partial result" })).toBeVisible();
     expect(screen.getByText(/Hover Contact/)).toBeInTheDocument();
     expect(screen.getByText("I couldn’t find that element on this page.")).toBeInTheDocument();
     expect(screen.getAllByText("Cost unavailable")).toHaveLength(1);
@@ -1209,6 +1210,142 @@ describe("Workspace resolution", () => {
     expect(screen.getByText("Use 4,000 characters or fewer.")).toBeInTheDocument();
   });
 
+  it.each([
+    ["not_found", null, "Target not found", "I couldn’t find that element in the current view."],
+    [
+      "unsupported",
+      "unsupported_action",
+      "Unsupported interaction",
+      "This requested interaction is outside the supported actions.",
+    ],
+    [
+      "unsupported",
+      "current_state_dependency",
+      "Page change required",
+      "This element depends on a page change. Make that change, then try again.",
+    ],
+    [
+      "unsupported",
+      "appearance_unavailable",
+      "Appearance unavailable",
+      "The requested appearance cannot be established from the captured CSS evidence.",
+    ],
+    [
+      "unsupported",
+      "unsupported_scope",
+      "Unsupported page content",
+      "Frame or shadow content is outside this capture's supported scope.",
+    ],
+    [
+      "unsupported",
+      "future_reason",
+      "Unsupported instruction",
+      "The resolver supplied a specific limitation.",
+    ],
+    ["error", "provider_rate_limited", "Resolution failed", "The model provider is rate limited."],
+    [
+      "error",
+      "decomposition_incomplete",
+      "Incomplete response",
+      "The model returned an incomplete response for this instruction.",
+    ],
+  ])("presents %s / %s with its own response", async (outcome, code, title, message) => {
+    mockApi(() =>
+      Promise.resolve(
+        Response.json({
+          ...found,
+          contractVersion: "4",
+          outcome,
+          target: null,
+          action: outcome === "unsupported" ? "unsupported" : "click",
+          actions:
+            outcome === "error"
+              ? []
+              : [
+                  {
+                    actionId: "action-1",
+                    order: 1,
+                    step: 1,
+                    instruction: "Click Pay now",
+                    outcome,
+                    action: outcome === "unsupported" ? "unsupported" : "click",
+                    code,
+                    message,
+                    target: null,
+                  },
+                ],
+          diagnostics: {
+            code: outcome === "error" ? code : null,
+            message: outcome === "error" ? message : null,
+          },
+        }),
+      ),
+    );
+    const user = await openWorkspace();
+    await submitInstruction(user);
+    expect(await screen.findByRole("heading", { name: title })).toBeVisible();
+    expect(screen.getByText(message)).toBeVisible();
+    expect(screen.queryByRole("button", { name: /Copy XPath/ })).not.toBeInTheDocument();
+    if (outcome === "error") expect(screen.getByRole("alert")).toHaveTextContent(message);
+    else expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it.each(["partial", "error"])("preserves per-target errors in a %s result", async (outcome) => {
+    const message = "The target could not be verified because its frame changed.";
+    const failed = {
+      actionId: "a2",
+      order: outcome === "partial" ? 2 : 1,
+      step: 1,
+      instruction: "Click Contact",
+      outcome: "error",
+      action: "click",
+      code: "stale_frame",
+      message,
+      target: null,
+    };
+    mockApi(() =>
+      Promise.resolve(
+        Response.json({
+          ...found,
+          contractVersion: "4",
+          outcome,
+          target: null,
+          actions:
+            outcome === "partial"
+              ? [
+                  {
+                    actionId: "a1",
+                    order: 1,
+                    step: 1,
+                    instruction: "Click Pay now",
+                    outcome: "found",
+                    action: "click",
+                    code: null,
+                    message: null,
+                    target: found.target,
+                  },
+                  failed,
+                ]
+              : [failed],
+          diagnostics: { code: null, message: null },
+        }),
+      ),
+    );
+    const user = await openWorkspace();
+    await submitInstruction(user);
+    expect(await screen.findByRole("alert")).toHaveTextContent(message);
+    expect(screen.getAllByRole("alert")).toHaveLength(1);
+    expect(screen.getAllByRole("heading", { name: "Resolution failed" })).toHaveLength(1);
+    if (outcome === "partial") {
+      expect(screen.getByRole("heading", { name: "Partial result" })).toBeVisible();
+      expect(screen.getByRole("button", { name: "Copy XPath 1" })).toBeVisible();
+      expect(screen.getByText("Pay now", { selector: "bdi" })).toBeVisible();
+    } else {
+      expect(screen.queryByRole("heading", { name: "Partial result" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /Copy XPath/ })).not.toBeInTheDocument();
+    }
+  });
+
   it("reports provider failures as errors rather than semantic absence", async () => {
     mockApi(() =>
       Promise.resolve(
@@ -1233,6 +1370,54 @@ describe("Workspace resolution", () => {
     ).not.toBeInTheDocument();
   });
 
+  it.each(["1", "3", "4"])(
+    "labels ambiguous targets without guessing for contract %s",
+    async (contractVersion) => {
+      const message = "The instruction does not identify one intended target.";
+      mockApi(() =>
+        Promise.resolve(
+          Response.json({
+            ...found,
+            contractVersion,
+            outcome: "unsupported",
+            action: "unsupported",
+            target: null,
+            actions: [
+              {
+                actionId: "action-1",
+                order: 1,
+                step: 1,
+                instruction: "Click the button next to Community",
+                outcome: "unsupported",
+                action: "unsupported",
+                code: "ambiguous",
+                message,
+                target: null,
+              },
+            ],
+            diagnostics: { code: "ambiguous", message },
+          }),
+        ),
+      );
+      const user = await openWorkspace();
+      await user.type(
+        screen.getByRole("textbox", { name: "Describe an element" }),
+        "Click the button next to Community",
+      );
+      await user.click(screen.getByRole("button", { name: "Resolve instruction" }));
+      expect(await screen.findByRole("heading", { name: "Ambiguous target" })).toBeVisible();
+      expect(
+        screen.getByText(
+          "The instruction does not identify a unique target. Specify its exact name, section, or position, such as left or right.",
+        ),
+      ).toBeVisible();
+      expect(screen.queryByRole("button", { name: /Copy XPath/ })).not.toBeInTheDocument();
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+      expect(screen.queryByText("This interaction is not supported yet.")).not.toBeInTheDocument();
+      expect(screen.queryByText(/Departments|Business/)).not.toBeInTheDocument();
+    },
+  );
+
   it("distinguishes unsupported instructions from absence", async () => {
     mockApi(() =>
       Promise.resolve(
@@ -1250,7 +1435,8 @@ describe("Workspace resolution", () => {
     const user = await openWorkspace();
     await submitInstruction(user);
 
-    expect(await screen.findByText("This interaction is not supported yet.")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Unsupported interaction" })).toBeVisible();
+    expect(screen.getByText("Drag and drop is unsupported.")).toBeVisible();
     expect(
       screen.queryByText("I couldn’t find that element on this page."),
     ).not.toBeInTheDocument();

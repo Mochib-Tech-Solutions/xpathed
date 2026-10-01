@@ -15,6 +15,7 @@ builder.Services.AddHttpClient(
     client => client.BaseAddress = new Uri(builder.Configuration["BrowserUrl"] ?? "http://browser:8080")
 );
 builder.Services.AddHttpClient("openrouter");
+builder.Services.AddMemoryCache();
 builder.Services.AddTransient<OpenRouterGateway>();
 builder.Services.AddTransient<ResolutionService>();
 builder.Services.AddSingleton<ProviderAccounting>();

@@ -70,7 +70,7 @@ To seal image-bound live qualification evidence, add `--bundle DIRECTORY --bundl
 
 ## Manual GitHub qualification
 
-The **Release qualification** Actions workflow accepts only a manual dispatch from `main`, checks out the exact dispatched SHA, and supports one selected profile:
+The **Release Qualification** Actions workflow accepts only a manual dispatch from `main`, checks out the exact dispatched SHA, and supports one selected profile:
 
 - `preflight`: read the authoritative ledger and OpenRouter key metadata, report cost accounting, key metadata and qualification coverage; no inference or image build.
 - `deterministic`: build and preserve a candidate, then exercise its exact images with controlled responses; no provider key or inference.
