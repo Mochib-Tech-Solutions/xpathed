@@ -6,6 +6,7 @@ import { once } from "node:events";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { buildContextPlan, summarizeContext } from "./context-experiment.mjs";
+import { createFixtureServer } from "./server.mjs";
 
 test("context comparison pairs each current-view case once, alternating arm order", () => {
   const cases = [
@@ -94,6 +95,36 @@ test("context projection preserves original serialized core and only removes opt
 test("context main rejects unknown options without starting services", async () => {
   const { main } = await import("./context-experiment.mjs");
   await assert.rejects(main(["--retry", "2"]), /Unknown context option/);
+});
+
+test("context preflight and live plans both register once at the actual fixture boundary", async () => {
+  const { buildContextPreflightPlan } = await import("./context-experiment.mjs");
+  const cases = [{ id: "same-reviewed-case", contractVersion: "4" }];
+  const plan = buildContextPlan(cases);
+  const preflight = buildContextPreflightPlan(plan);
+  const server = createFixtureServer({ cases });
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  const register = (trial) =>
+    fetch(`http://127.0.0.1:${server.address().port}/trial`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: trial.id, caseId: trial.caseId }),
+    });
+  try {
+    for (const trial of [...preflight, ...plan]) assert.equal((await register(trial)).status, 200);
+    assert.equal((await register(plan[0])).status, 400);
+    assert.deepEqual(
+      preflight.map((p) => p.liveAttemptId),
+      plan.map((p) => p.id),
+    );
+    assert.deepEqual(
+      preflight.map((p) => [p.caseId, p.arm]),
+      plan.map((p) => [p.caseId, p.arm]),
+    );
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
 });
 
 test("context summary rejects fresh-pair claims for repeated or missing successful generation identities", () => {

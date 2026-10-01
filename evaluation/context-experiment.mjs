@@ -35,6 +35,14 @@ export function buildContextPlan(cases) {
   });
 }
 
+export function buildContextPreflightPlan(plan) {
+  return plan.map((trial) => ({
+    ...trial,
+    id: randomUUID().replaceAll("-", ""),
+    liveAttemptId: trial.id,
+  }));
+}
+
 function quantile(values, fraction) {
   const sorted = values.filter(Number.isFinite).sort((a, b) => a - b);
   return sorted.length ? sorted[Math.max(0, Math.ceil(sorted.length * fraction) - 1)] : null;
@@ -479,7 +487,10 @@ export async function main(args = process.argv.slice(2)) {
     await once(det.server, "listening");
     const preflight = [];
     if (options.mode === "live") await mkdir(join(output, "preflight"), { mode: 0o700 });
-    for (const planned of manifest.plan) {
+    const preflightPlan =
+      options.mode === "live" ? buildContextPreflightPlan(manifest.plan) : manifest.plan;
+    manifest.preflightPlan = preflightPlan;
+    for (const planned of preflightPlan) {
       const trial = await runTrial(planned, "deterministic");
       preflight.push(trial);
       if (options.mode === "deterministic") {
