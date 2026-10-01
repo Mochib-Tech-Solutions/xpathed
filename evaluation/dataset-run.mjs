@@ -109,12 +109,30 @@ export function reserveCharge(ledger, maximumUsd, id) {
   return maximumUsd;
 }
 
-export function assertReconciledCharges(ledger) {
+export function unresolvedCharge(entry) {
+  const review = entry.reservationReview;
+  if (!Number.isFinite(entry.reservedUsd) || entry.reservedUsd <= 0) return true;
   if (
-    ledger.entries.some(
-      (entry) => entry.reportedUsd == null || entry.reportedUsd > entry.reservedUsd,
-    )
+    review != null &&
+    (typeof review !== "object" ||
+      Array.isArray(review) ||
+      typeof review.reason !== "string" ||
+      !review.reason.trim() ||
+      typeof review.reviewedAt !== "string" ||
+      !Number.isFinite(Date.parse(review.reviewedAt)) ||
+      new Date(review.reviewedAt).toISOString() !== review.reviewedAt ||
+      review.chargedUsd !== entry.reservedUsd)
   )
+    return true;
+  return entry.reportedUsd == null
+    ? review == null
+    : !Number.isFinite(entry.reportedUsd) ||
+        entry.reportedUsd < 0 ||
+        entry.reportedUsd > entry.reservedUsd;
+}
+
+export function assertReconciledCharges(ledger) {
+  if (ledger.entries.some(unresolvedCharge))
     throw new Error("Unreconciled prior attempt blocks further paid calls");
 }
 
