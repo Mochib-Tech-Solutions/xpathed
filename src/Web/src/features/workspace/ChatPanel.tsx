@@ -65,7 +65,8 @@ const interactionReasons: Record<string, string> = {
 };
 
 const instructionLimits: Record<string, string> = {
-  ambiguous: "Which element do you mean? Include its name or nearby text.",
+  ambiguous:
+    "The instruction does not identify a unique target. Specify its exact name, section, or position, such as left or right.",
   current_state_dependency:
     "This element depends on a page change. Make that change, then try again.",
   unsupported_action: "This interaction is not supported yet.",
@@ -350,6 +351,9 @@ export default function ChatPanel({
                               ? "I couldn’t find that element in the current view."
                               : "I couldn’t find that element on this page."}
                           </p>
+                        )}
+                        {action.outcome === "unsupported" && action.code === "ambiguous" && (
+                          <h2 className="text-base font-semibold">Ambiguous target</h2>
                         )}
                         {action.outcome === "unsupported" && (
                           <p>

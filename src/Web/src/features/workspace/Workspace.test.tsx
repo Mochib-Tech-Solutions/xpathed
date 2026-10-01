@@ -1233,6 +1233,54 @@ describe("Workspace resolution", () => {
     ).not.toBeInTheDocument();
   });
 
+  it.each(["1", "3", "4"])(
+    "labels ambiguous targets without guessing for contract %s",
+    async (contractVersion) => {
+      const message = "The instruction does not identify one intended target.";
+      mockApi(() =>
+        Promise.resolve(
+          Response.json({
+            ...found,
+            contractVersion,
+            outcome: "unsupported",
+            action: "unsupported",
+            target: null,
+            actions: [
+              {
+                actionId: "action-1",
+                order: 1,
+                step: 1,
+                instruction: "Click the button next to Community",
+                outcome: "unsupported",
+                action: "unsupported",
+                code: "ambiguous",
+                message,
+                target: null,
+              },
+            ],
+            diagnostics: { code: "ambiguous", message },
+          }),
+        ),
+      );
+      const user = await openWorkspace();
+      await user.type(
+        screen.getByRole("textbox", { name: "Describe an element" }),
+        "Click the button next to Community",
+      );
+      await user.click(screen.getByRole("button", { name: "Resolve instruction" }));
+      expect(await screen.findByRole("heading", { name: "Ambiguous target" })).toBeVisible();
+      expect(
+        screen.getByText(
+          "The instruction does not identify a unique target. Specify its exact name, section, or position, such as left or right.",
+        ),
+      ).toBeVisible();
+      expect(screen.queryByRole("button", { name: /Copy XPath/ })).not.toBeInTheDocument();
+      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+      expect(screen.queryByText("This interaction is not supported yet.")).not.toBeInTheDocument();
+      expect(screen.queryByText(/Departments|Business/)).not.toBeInTheDocument();
+    },
+  );
+
   it("distinguishes unsupported instructions from absence", async () => {
     mockApi(() =>
       Promise.resolve(

@@ -56,7 +56,7 @@ All three APIs use controller classes with explicit routes and constructor injec
 
 The browser service exposes the client lifecycle routes without the `/api` prefix. Its read-only inspection is `GET /pages/{pageId}/inspection`. It also owns the stable session stream `/view/{sessionId}`.
 
-The resolver exposes `POST /pages/{pageId}/inspect`. It calls the browser inspection endpoint and returns the result with `inspectedBy: "resolver"`. The resolver also exposes `POST /pages/{pageId}/resolve`; Browser exposes the capture/selection operations in the [resolution contract](resolution.md). Both services provide their own `GET /health` liveness endpoint and can run without the client or database. Resolution uses the server-configured OpenRouter key.
+The resolver exposes `POST /pages/{pageId}/inspect`. It calls the browser inspection endpoint and returns the result with `inspectedBy: "resolver"`. The resolver also exposes `POST /pages/{pageId}/resolve`; Browser exposes the capture/selection operations in the [resolution contract](resolution.md). Both services provide their own `GET /health` liveness endpoint and can run without the client or database. Resolution uses the server-configured OpenRouter key. All contract versions request provider pricing for the reported model; successful rates are cached for five minutes per API base URL, model and provider. A cache miss has a two-second timeout, and lookup failures preserve the result and reported charge. See [cost estimates](resolution.md#cost-estimates).
 
 ## Lifecycle
 
