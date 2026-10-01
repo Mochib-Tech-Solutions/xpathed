@@ -278,7 +278,7 @@ internal static class ActionSelectionStrategy
                 throw new ApiException(
                     422,
                     "decomposition_incomplete",
-                    "The model could not represent the complete instruction within the supported action budget."
+                    "The model returned an incomplete response for this instruction."
                 );
             }
             if (

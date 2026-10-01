@@ -1,6 +1,6 @@
 # CI checks and evidence
 
-The `Check` workflow runs on pull requests, pushes to `main`, merge groups and manual dispatch. Changed paths select independent .NET, persistence, Web, tooling, Docker-configuration and deterministic-browser jobs. Shared inputs select their consumers; documentation-only changes still run selection and the aggregate. Manual dispatch selects every job.
+The `CI` workflow runs on pull requests, pushes to `main`, merge groups and manual dispatch. Changed paths select independent .NET, persistence, Web, tooling, Docker-configuration and deterministic-browser jobs. Shared inputs select their consumers; documentation-only changes still run selection and the aggregate. Manual dispatch selects every job.
 
 Every job checks out `github.sha`: the synthetic merge commit for a pull request, the actual pushed revision on `main`, or the merge-group revision. Superseded PR runs can be cancelled; separate `main` revisions do not cancel each other. A failed post-merge check requires investigation and a corrective PR or an explicitly authorized revert; this workflow does not roll back releases.
 
@@ -36,7 +36,7 @@ ci: validate affected projects before committing
 feat(api)!: change the response contract
 ```
 
-Git supplies the proposed message to `commit-msg`, which checks the header using `scripts/commit-policy.mjs`. The same validator powers the separate **Commit policy / Conventional commits** workflow. It checks the PR title and every commit introduced by the PR, reruns on title edits, and checks commits pushed to `main`. Existing base history is excluded. Fixup/squash placeholders and Git's default merge/revert subjects must be reworded to the convention before publishing; a valid tip does not excuse an invalid earlier commit. Historical PR title edits do not rewrite merged commits.
+Git supplies the proposed message to `commit-msg`, which checks the header using `scripts/commit-policy.mjs`. The same validator powers the separate **Conventional Commits / Conventional commits** workflow. It checks the PR title and every commit introduced by the PR, reruns on title edits, and checks commits pushed to `main`. Existing base history is excluded. Fixup/squash placeholders and Git's default merge/revert subjects must be reworded to the convention before publishing; a valid tip does not excuse an invalid earlier commit. Historical PR title edits do not rewrite merged commits.
 
 Local Git hooks can be bypassed or disabled. CI provides a second check, but merge enforcement requires both `check` and `Conventional commits` as required statuses under an eligible branch-protection/ruleset policy. The naming workflow supports PRs and pushes; add `merge_group` handling before requiring it on a merge queue. The current private-repository plan still rejects ruleset access (verified 2026-10-01); see [account controls](#account-controls-remain-separate) and issue #41. GitHub's default squash and merge subjects use the PR title; verify the final merge message before merging. No history rewrite or account-plan change is part of hook installation.
 
