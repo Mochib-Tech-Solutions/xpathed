@@ -11,6 +11,7 @@ import {
   retainProviderEvidence,
   validProviderCalls,
   finishProviderAttempt,
+  datasetProfiles,
 } from "./dataset-run.mjs";
 import profiles from "./qualification-profiles.json" with { type: "json" };
 import { gradeTrial } from "./grader.mjs";
@@ -160,9 +161,30 @@ test("offline profiles retain the DeepSeek default and accept only approved base
   assert.equal(options(args).profile, "deepseek");
   assert.equal(options([...args, "--profile", "qwen"]).profile, "qwen");
   assert.equal(options([...args, "--profile", "gemini"]).profile, "gemini");
-  for (const profile of ["unknown", "deepseek-concise"])
+  assert.equal(options([...args, "--profile", "deepseek-deepinfra"]).profile, "deepseek-deepinfra");
+  for (const profile of ["unknown", "deepseek-concise", "deepseek-deepinfra-fast"])
     assert.throws(() => options([...args, "--profile", profile]), /baseline profile/);
   assert.throws(() => options([...args, "--profile", "qwen", "--mode", "live"]), /reviewed-inputs/);
+});
+
+test("DeepInfra is an explicit offline route and leaves the default and qualification profiles intact", () => {
+  const baseline = profiles.find((profile) => profile.id === "deepseek");
+  const alternate = datasetProfiles.find((profile) => profile.id === "deepseek-deepinfra");
+  assert.deepEqual(alternate, {
+    ...baseline,
+    id: "deepseek-deepinfra",
+    provider: "deepinfra/fp8",
+  });
+  assert.equal(baseline.provider, "wafer");
+  assert.equal(
+    profiles.some((profile) => profile.id === alternate.id),
+    false,
+  );
+  const env = profileEnvironment(alternate, "http://127.0.0.1:1234/api/v1/", {});
+  assert.equal(env.OpenRouter__Model, "deepseek/deepseek-v4.1-flash");
+  assert.equal(env.OpenRouter__Provider, "deepinfra/fp8");
+  assert.equal(env.OpenRouter__ReasoningEffort, undefined);
+  assert.equal(env.XPATHED_EVALUATION_PROMPT_VARIANT, "baseline");
 });
 
 test("offline model settings match each baseline and clear inherited experimental settings", () => {

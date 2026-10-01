@@ -21,6 +21,95 @@ const pricing = {
 };
 const input = { model, messages: [{ role: "user", content: "Find Save" }], max_tokens: 4096 };
 
+test("body timeout recovers its header-identified charge without inventing a successful response", async (t) => {
+  const { proxy, post, calls, ledgerPath } = await setup(t, {
+    completion: (url) => {
+      if (url.endsWith("/generation?id=gen-timeout"))
+        return Response.json({
+          data: { id: "gen-timeout", model, provider_name: "Wafer", total_cost: 0.001 },
+        });
+      return {
+        status: 200,
+        headers: new Headers({ "X-Generation-Id": "gen-timeout" }),
+        text: async () => {
+          throw new Error("Response body timed out");
+        },
+      };
+    },
+  });
+  proxy.beginAttempt("timeout");
+  const response = await post();
+  assert.equal(response.status, 502);
+  assert.match((await response.json()).error.message, /Response body timed out/);
+  assert.equal(calls.length, 2);
+  assert.equal(calls[1].options.method, "GET");
+  const record = proxy.records[0];
+  assert.equal(record.headers["x-generation-id"], "gen-timeout");
+  assert.equal(record.reportedUsd, 0.001);
+  assert.equal(record.reportedCostSource, "generation");
+  assert.equal(record.response, null);
+  assert.equal(record.identityValid, undefined);
+  assert.equal(record.observedIdentity, undefined);
+  assert.equal(proxy.budget.pendingCharges, 0);
+  assert.equal(JSON.parse(await readFile(ledgerPath, "utf8")).entries[0].reportedUsd, 0.001);
+  assert.throws(() => proxy.beginAttempt("next"), /blocked/);
+});
+
+test("unverified timeout accounting retains its full reservation without retrying inference", async (t) => {
+  for (const [name, header, recovery] of [
+    ["missing header", false, null],
+    ["unavailable lookup", true, () => Response.json({}, { status: 404 })],
+    [
+      "different generation",
+      true,
+      () => Response.json({ data: { id: "other", model, provider_name: "Wafer", total_cost: 0 } }),
+    ],
+    [
+      "different provider",
+      true,
+      () =>
+        Response.json({
+          data: { id: "gen-timeout", model, provider_name: "Other", total_cost: 0 },
+        }),
+    ],
+    [
+      "missing charge",
+      true,
+      () => Response.json({ data: { id: "gen-timeout", model, provider_name: "Wafer" } }),
+    ],
+    [
+      "excessive charge",
+      true,
+      () =>
+        Response.json({
+          data: { id: "gen-timeout", model, provider_name: "Wafer", total_cost: 99 },
+        }),
+    ],
+  ])
+    await t.test(name, async (t) => {
+      const { proxy, post, calls } = await setup(t, {
+        completion: (url) =>
+          url.includes("/generation?")
+            ? recovery()
+            : {
+                status: 200,
+                headers: new Headers(header ? { "X-Generation-Id": "gen-timeout" } : {}),
+                text: async () => {
+                  throw new Error("Body timeout");
+                },
+              },
+      });
+      proxy.beginAttempt("timeout");
+      assert.equal((await post()).status, 502);
+      assert.equal(calls.filter((c) => c.url.endsWith("/chat/completions")).length, 1);
+      assert.equal(calls.length, header ? 2 : 1);
+      assert.equal(proxy.records[0].reportedUsd, null);
+      assert.equal(proxy.budget.pendingCharges, 1);
+      assert.equal(proxy.budget.spentUsd, proxy.records[0].reservedUsd);
+      assert.throws(() => proxy.beginAttempt("next"), /blocked/);
+    });
+});
+
 test("frozen request rejects changed content before reserving or forwarding", async (t) => {
   const { proxy, post, calls } = await setup(t);
   const maximum = proxy.forecastRequests([{ id: "frozen", profileId: "default", request: input }])
@@ -951,6 +1040,60 @@ const profileInput = (profile) => ({
     type: "json_schema",
     json_schema: { name: "selection", strict: true, schema: { type: "object" } },
   },
+});
+
+test("the explicit offline DeepInfra profile pins only its approved standard endpoint", async (t) => {
+  const profile = {
+    id: "deepseek-deepinfra",
+    model,
+    provider: "deepinfra/fp8",
+    reasoning: { enabled: false },
+    maxTokens: 4096,
+  };
+  const metadata = {
+    data: {
+      endpoints: [
+        {
+          ...profileMetadata(`/models/${model}/endpoints`).data.endpoints[0],
+          tag: "deepinfra/fp8",
+          provider_name: "DeepInfra",
+        },
+      ],
+    },
+  };
+  const { proxy, post, calls } = await setup(t, {
+    profiles: [profile],
+    metadata,
+    completion: () =>
+      Response.json({
+        model,
+        provider: "DeepInfra",
+        id: "generation-deepinfra",
+        usage: { cost: 0.001 },
+      }),
+  });
+  for (const [index, mutation] of [
+    { provider: { only: ["deepinfra/turbo"] } },
+    { service_tier: "priority" },
+    { reasoning: { enabled: true } },
+  ].entries()) {
+    proxy.beginAttempt(`rejected-${index}`, profile.id);
+    assert.equal((await post({ ...profileInput(profile), ...mutation })).status, 400);
+  }
+  assert.equal(calls.length, 0);
+  proxy.beginAttempt("standard", profile.id);
+  assert.equal((await post(profileInput(profile))).status, 200);
+  assert.equal(calls.length, 1);
+  assert.deepEqual(JSON.parse(calls[0].options.body).provider.only, ["deepinfra/fp8"]);
+  assert.equal(proxy.records.at(-1).identityValid, true);
+  await assert.rejects(
+    setup(t, { profiles: [{ ...profile, provider: "deepinfra/turbo" }] }),
+    /Unapproved/,
+  );
+  await assert.rejects(
+    setup(t, { profiles: [{ ...profile, id: "arbitrary-route" }] }),
+    /Unapproved/,
+  );
 });
 
 test("qualification pins each approved profile and reserves the highest tier and cache-write cost", async (t) => {
