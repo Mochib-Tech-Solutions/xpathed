@@ -12,6 +12,37 @@ import {
 import { githubBudget } from "./github-budget.mjs";
 
 const model = "deepseek/deepseek-v4.1-flash";
+export const contextPlanningQuestions = Object.freeze({
+  appearance: Object.freeze({
+    type: "noul",
+    instructions:
+      "Does identifying any requested target or reference element require visual color or appearance evidence, including background, foreground, border, image or icon appearance?",
+  }),
+  layout: Object.freeze({
+    type: "noul",
+    instructions:
+      "Does identifying or ordering any requested target or reference element require visual position, direction, distance, size or spatial relations?",
+  }),
+});
+const decisionModel = "typesafe/jev-1.13";
+const decisionProvider = { only: ["typesafe"], order: ["typesafe"], allow_fallbacks: false };
+
+function frozenDecision(request) {
+  if (
+    !object(request) ||
+    !isDeepStrictEqual(Object.keys(request).sort(), ["model", "provider", "questions", "state"]) ||
+    request.model !== decisionModel ||
+    typeof request.state !== "string" ||
+    !request.state.trim() ||
+    request.state.length > 4000 ||
+    !isDeepStrictEqual(request.questions, contextPlanningQuestions) ||
+    !isDeepStrictEqual(request.provider, decisionProvider)
+  )
+    throw new Error(
+      "Context planning requires the frozen Jev questions, route and original instruction",
+    );
+  return structuredClone(request);
+}
 const approved = {
   "deepseek/deepseek-v4.1-flash": { provider: "wafer", reasoning: { enabled: false } },
   "openai/gpt-6-luna": { provider: "openai", reasoning: { effort: "none" } },
@@ -65,7 +96,7 @@ function declaredProfiles(profiles) {
   });
 }
 
-function boundedPricing(endpoint) {
+function boundedPricing(endpoint, freeCompletion = false) {
   const rate = endpoint?.pricing;
   if (
     !rate ||
@@ -108,7 +139,7 @@ function boundedPricing(endpoint) {
     ),
     completion: Math.max(
       ...tiers.flatMap((tier) => [
-        number(tier.completion, true),
+        number(tier.completion, !freeCompletion),
         number(tier.internal_reasoning ?? 0),
       ]),
     ),
@@ -275,11 +306,15 @@ function boundedRequest(body, profile) {
       order: [profile.provider],
       allow_fallbacks: false,
       require_parameters: true,
-      max_price: {
-        prompt: Number((pricing.prompt * 1_000_000).toPrecision(15)),
-        completion: Number((pricing.completion * 1_000_000).toPrecision(15)),
-        request: pricing.request,
-      },
+      ...(profile.budgetPolicy === "provider-limit"
+        ? {}
+        : {
+            max_price: {
+              prompt: Number((pricing.prompt * 1_000_000).toPrecision(15)),
+              completion: Number((pricing.completion * 1_000_000).toPrecision(15)),
+              request: pricing.request,
+            },
+          }),
     },
     plugins: [{ id: "context-compression", enabled: false }],
   };
@@ -292,6 +327,7 @@ function boundedRequest(body, profile) {
 }
 
 function maximumCharge(body, pricing) {
+  if (!pricing) return null;
   return (
     ((Buffer.byteLength(JSON.stringify(body)) + 16384) * pricing.prompt +
       (body.max_tokens ?? body.max_completion_tokens) * pricing.completion +
@@ -301,12 +337,16 @@ function maximumCharge(body, pricing) {
 }
 
 export function validateBudgetLedger(ledger) {
+  const tracking = ledger?.budgetPolicy === "provider-limit";
   if (
     !object(ledger) ||
     ledger.version !== 1 ||
-    !Number.isFinite(ledger.ceilingUsd) ||
-    ledger.ceilingUsd <= 0 ||
-    ledger.ceilingUsd > campaignCeilingUsd ||
+    (ledger.budgetPolicy != null &&
+      !["provider-limit", "local-ceiling"].includes(ledger.budgetPolicy)) ||
+    (!tracking &&
+      (!Number.isFinite(ledger.ceilingUsd) ||
+        ledger.ceilingUsd <= 0 ||
+        ledger.ceilingUsd > campaignCeilingUsd)) ||
     (Object.hasOwn(ledger, "remoteAuthority") &&
       (typeof ledger.remoteAuthority !== "string" ||
         !/^github:[a-z\d][a-z\d-]*\/[a-z\d._-]+:evaluation-budget:experiment-budget\.json$/.test(
@@ -316,8 +356,13 @@ export function validateBudgetLedger(ledger) {
     ledger.entries.some(
       (entry) =>
         !object(entry) ||
-        !Number.isFinite(entry.reservedUsd) ||
-        entry.reservedUsd <= 0 ||
+        (entry.accountingStatus != null &&
+          (!tracking ||
+            entry.accountingStatus !== "not_forwarded" ||
+            entry.forwarded !== false ||
+            entry.reportedUsd != null)) ||
+        (!(tracking && entry.reservedUsd === null) &&
+          (!Number.isFinite(entry.reservedUsd) || entry.reservedUsd <= 0)) ||
         (entry.reportedUsd != null &&
           (!Number.isFinite(entry.reportedUsd) || entry.reportedUsd < 0)),
     )
@@ -332,16 +377,27 @@ export async function createBudgetProxy({
   profiles,
   ledgerPath = resolve(".artifacts/datasets/experiment-budget.json"),
   ceilingUsd = campaignCeilingUsd,
+  budgetPolicy = "provider-limit",
+  contextPlanning = false,
   fetchImpl = fetch,
   onRecord = async () => {},
   githubRepository = process.env.XPATHED_BUDGET_GITHUB_REPOSITORY,
   githubToken = process.env.GH_TOKEN,
 } = {}) {
   const configured = declaredProfiles(profiles);
+  if (!["provider-limit", "local-ceiling"].includes(budgetPolicy))
+    throw new Error("Unknown budget policy");
+  const tracking = budgetPolicy === "provider-limit";
+  if (typeof contextPlanning !== "boolean" || (contextPlanning && !tracking))
+    throw new Error("Context planning requires explicit provider-limit evaluation mode");
+  for (const profile of configured) profile.budgetPolicy = budgetPolicy;
   apiKey ??= await readEvaluationKey();
   if (!apiKey)
     throw new Error("Set OPENROUTER_EVAL_API_KEY for the explicitly requested live evaluation");
-  if (!Number.isFinite(ceilingUsd) || ceilingUsd <= 0 || ceilingUsd > campaignCeilingUsd)
+  if (
+    !tracking &&
+    (!Number.isFinite(ceilingUsd) || ceilingUsd <= 0 || ceilingUsd > campaignCeilingUsd)
+  )
     throw new Error(`Experiment ceiling must be at most $${campaignCeilingUsd} total`);
   const redact = (text) =>
     [apiKey, githubToken]
@@ -350,7 +406,7 @@ export async function createBudgetProxy({
   await mkdir(dirname(ledgerPath), { recursive: true });
   const lock = `${ledgerPath}.lock`;
   await mkdir(lock);
-  let ledger, remote;
+  let ledger, remote, decisionMetadata, decisionPricing;
   const persist = async (record, stage) => {
     await writeFile(`${ledgerPath}.pending`, JSON.stringify(ledger, null, 2) + "\n", {
       mode: 0o600,
@@ -370,7 +426,11 @@ export async function createBudgetProxy({
       ledger = JSON.parse(await readFile(ledgerPath, "utf8"));
     } catch (error) {
       if (error.code !== "ENOENT") throw error;
-      ledger = { version: 1, ceilingUsd, entries: [] };
+      ledger = {
+        version: 1,
+        ...(tracking ? { budgetPolicy, ceilingUsd: null } : { ceilingUsd }),
+        entries: [],
+      };
     }
     if (
       object(ledger) &&
@@ -385,7 +445,9 @@ export async function createBudgetProxy({
       ledger = remote.ledger;
     }
     validateBudgetLedger(ledger);
-    ledger.ceilingUsd = Math.min(ledger.ceilingUsd, ceilingUsd);
+    if ((ledger.budgetPolicy ?? "local-ceiling") !== budgetPolicy)
+      throw new Error("Authoritative ledger budget policy requires explicit migration");
+    if (!tracking) ledger.ceilingUsd = Math.min(ledger.ceilingUsd, ceilingUsd);
     for (const profile of configured) {
       const response = await fetchImpl(`${upstream}${profile.endpointPath}`, {
         signal: AbortSignal.timeout(10000),
@@ -395,7 +457,15 @@ export async function createBudgetProxy({
       profile.endpoint = profile.metadata.data?.endpoints?.find(
         (item) => item.tag === profile.provider,
       );
-      profile.pricing = boundedPricing(profile.endpoint);
+      if (tracking) {
+        if (!profile.endpoint || (profile.endpoint.status != null && profile.endpoint.status !== 0))
+          throw new Error("Approved route is not operational");
+        try {
+          profile.pricing = boundedPricing(profile.endpoint);
+        } catch {
+          profile.pricing = null;
+        }
+      } else profile.pricing = boundedPricing(profile.endpoint);
       const canonical = profile.endpoint.name?.split(" | ").at(-1);
       profile.canonicalModel =
         typeof canonical === "string" && /^[a-z0-9_.-]+\/[a-z0-9_.-]+$/.test(canonical)
@@ -411,6 +481,21 @@ export async function createBudgetProxy({
         )
       )
         throw new Error("Approved route does not advertise the required parameters");
+    }
+    if (contextPlanning) {
+      const response = await fetchImpl(`${upstream}/models/${decisionModel}/endpoints`, {
+        signal: AbortSignal.timeout(10000),
+      });
+      if (!response.ok) throw new Error("Context planning route metadata is unavailable");
+      decisionMetadata = await response.json();
+      const endpoint = decisionMetadata.data?.endpoints?.find((item) => item.tag === "typesafe");
+      if (!endpoint || endpoint.status !== 0 || endpoint.provider_name !== "TypeSafe")
+        throw new Error("The pinned TypeSafe route is not operational");
+      try {
+        decisionPricing = boundedPricing(endpoint, true);
+      } catch {
+        decisionPricing = null;
+      }
     }
     await persist();
   } catch (error) {
@@ -452,6 +537,40 @@ export async function createBudgetProxy({
     await persist(record, "reservation");
     await retain(record);
   };
+  const decisionEstimate = (request) =>
+    decisionPricing
+      ? ((Buffer.byteLength(JSON.stringify(frozenDecision(request))) + 16384) *
+          2 *
+          decisionPricing.prompt +
+          28800 * decisionPricing.completion +
+          decisionPricing.request) *
+        1.2
+      : null;
+  const settleContext = async () => {
+    await idle;
+    await current?.decision?.completion;
+    if (!current?.context || current.settled) return;
+    try {
+      for (const record of records.filter((record) => record.attemptId === current.id)) {
+        if (record.forwarded !== false) continue;
+        record.accountingStatus = "not_forwarded";
+        Object.assign(
+          ledger.entries.find((entry) => entry.id === record.id),
+          {
+            accountingStatus: "not_forwarded",
+            forwarded: false,
+          },
+        );
+      }
+      await persist(current.preparedRecord, "reconciliation");
+      for (const record of records.filter((record) => record.attemptId === current.id))
+        await retain(record);
+      current.settled = true;
+    } catch (error) {
+      blocked = true;
+      throw new Error(redact(String(error.message)));
+    }
+  };
   const server = createServer(async (request, response) => {
     const send = (status, value) => {
       if (response.headersSent || response.destroyed) return;
@@ -462,11 +581,107 @@ export async function createBudgetProxy({
       response.end(JSON.stringify(safe(value)));
     };
     const path = new URL(request.url, "http://evaluation").pathname.replace(/^\/api\/v1/, "");
+    if (request.method === "POST" && path === "/api/alpha/decisions") {
+      const decision = current?.decision;
+      if (!contextPlanning)
+        return send(404, { error: { message: "Context planning is disabled" } });
+      if (closed || blocked || busy || !decision || decision.used || current.used)
+        return send(409, {
+          error: { message: "Decision call is not registered or was already attempted" },
+        });
+      decision.used = true;
+      const finished = Promise.withResolvers();
+      decision.completion = finished.promise;
+      const record = decision.record,
+        started = performance.now();
+      try {
+        const chunks = [];
+        let size = 0;
+        for await (const chunk of request) {
+          size += chunk.length;
+          if (size > 32768) throw new Error("Decision request exceeds its evidence limit");
+          chunks.push(chunk);
+        }
+        const body = frozenDecision(JSON.parse(Buffer.concat(chunks).toString("utf8")));
+        if (!isDeepStrictEqual(body, decision.request))
+          throw new Error("Decision differs from its frozen instruction");
+        record.request = safe(body);
+        record.forwarded = true;
+        const result = await fetchImpl("https://openrouter.ai/api/alpha/decisions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${apiKey}`,
+            "X-OpenRouter-Cache": "false",
+          },
+          body: JSON.stringify(body),
+          signal: AbortSignal.timeout(45000),
+        });
+        record.status = result.status;
+        record.responseCacheHit = [...result.headers].some(
+          ([key, value]) => key.includes("cache") && /(^|[ ,;])hit([ ,;]|$)/i.test(value),
+        );
+        const payload = await result.json();
+        record.response = safe(payload);
+        record.usage = safe(payload.usage ?? null);
+        record.observedIdentity = {
+          model: payload.model ?? null,
+          provider: payload.provider ?? null,
+          generationId: payload.id ?? null,
+          serviceTier: payload.service_tier ?? null,
+        };
+        record.identityValid =
+          [decisionModel, "typesafe/jev-1.13-20260917"].includes(payload.model) &&
+          payload.provider === "TypeSafe" &&
+          typeof payload.id === "string" &&
+          payload.id.startsWith("gen-dec-") &&
+          (payload.service_tier == null || ["standard", "default"].includes(payload.service_tier));
+        record.decisionValid =
+          record.identityValid &&
+          !record.responseCacheHit &&
+          result.ok &&
+          isDeepStrictEqual(Object.keys(payload.answers ?? {}).sort(), ["appearance", "layout"]) &&
+          ["appearance", "layout"].every(
+            (key) =>
+              payload.answers[key]?.type === "noul" &&
+              Number.isFinite(payload.answers[key].noul) &&
+              payload.answers[key].noul >= 0 &&
+              payload.answers[key].noul <= 1,
+          );
+        if (Number.isFinite(payload.usage?.cost) && payload.usage.cost >= 0) {
+          record.reportedUsd = payload.usage.cost;
+          decision.reservation.reportedUsd = payload.usage.cost;
+        } else record.accountingWarning = "Provider charge is unavailable";
+        if (!record.decisionValid) {
+          record.error = "Jev response does not match the frozen decision contract";
+          send(502, { error: { message: record.error } });
+        } else send(result.status, payload);
+      } catch (error) {
+        record.error = safe(String(error.message));
+        send(502, { error: { message: record.error } });
+      } finally {
+        record.elapsedMs = performance.now() - started;
+        try {
+          await retain(record);
+        } catch {
+          blocked = true;
+        }
+        finished.resolve();
+      }
+      return;
+    }
     const metadataProfile = configured.find((profile) => profile.endpointPath === path);
     if (request.method === "GET" && metadataProfile) return send(200, metadataProfile.metadata);
     if (request.method !== "POST" || path !== "/chat/completions")
       return send(404, { error: { message: "Unknown evaluation provider route" } });
-    if (closed || blocked || busy || !current || current.used)
+    if (
+      closed ||
+      blocked ||
+      busy ||
+      !current ||
+      current.used ||
+      (current.decision && !current.decision.used)
+    )
       return send(409, {
         error: {
           message:
@@ -494,13 +709,17 @@ export async function createBudgetProxy({
       record.pricing = pricing;
       record.requestedIdentity = { model: profile.model, provider: profile.provider };
       const body = boundedRequest(JSON.parse(Buffer.concat(chunks).toString("utf8")), profile);
-      if (current.preparedRequest && !isDeepStrictEqual(body, current.preparedRequest))
+      if (
+        current.preparedRequests
+          ? !current.preparedRequests.some((prepared) => isDeepStrictEqual(body, prepared))
+          : current.preparedRequest && !isDeepStrictEqual(body, current.preparedRequest)
+      )
         throw new Error("Inference differs from its frozen prepared request; no paid call made");
       record.request = safe(body);
       const text = JSON.stringify(body);
       // UTF-8 bytes plus framing bound text tokenization; no image/audio inputs are allowed.
       const maximum = maximumCharge(body, pricing);
-      if (maximum > current.maximumUsd)
+      if (!tracking && maximum > current.maximumUsd)
         throw new Error(
           "Prepared request exceeds its frozen baseline allocation; no paid call made",
         );
@@ -555,7 +774,9 @@ export async function createBudgetProxy({
         reservation.reportedUsd = cost;
         record.reportedUsd = cost;
       }
-      blocked = reservation.reportedUsd == null || cost > reservation.reservedUsd;
+      blocked = !tracking && (reservation.reportedUsd == null || cost > reservation.reservedUsd);
+      if (tracking && reservation.reportedUsd == null)
+        record.accountingWarning = "Provider charge is unavailable";
       if (blocked)
         record.error =
           "Provider charge is missing or exceeds its reservation; further calls are blocked";
@@ -568,7 +789,7 @@ export async function createBudgetProxy({
         record.responseElapsedMs = performance.now() - started;
         send(result.status, payload);
       }
-      await persist(record, "reconciliation");
+      if (!current.context) await persist(record, "reconciliation");
       record.elapsedMs = performance.now() - started;
       await retain(record);
       send(result.status, payload);
@@ -576,7 +797,7 @@ export async function createBudgetProxy({
       blocked ||= current.reservation != null;
       record.error = safe(String(error.message));
       const generationId = record.headers?.["x-generation-id"];
-      if (current.reservation && record.reportedUsd == null && generationId) {
+      if (!current.context && current.reservation && record.reportedUsd == null && generationId) {
         record.chargeRecovery = { generationId, status: null };
         try {
           const recovery = await fetchImpl(
@@ -601,7 +822,7 @@ export async function createBudgetProxy({
             ) ||
             !Number.isFinite(data.total_cost) ||
             data.total_cost < 0 ||
-            data.total_cost > current.reservation.reservedUsd
+            (!tracking && data.total_cost > current.reservation.reservedUsd)
           )
             throw new Error("Generation metadata does not verify the reserved charge");
           record.reportedUsd = data.total_cost;
@@ -629,6 +850,11 @@ export async function createBudgetProxy({
     records,
     pricing: configured[0].pricing,
     profiles: configured,
+    contextPlanningMetadata: decisionMetadata ?? null,
+    forecastDecision(request) {
+      if (!contextPlanning) throw new Error("Context planning is disabled");
+      return { maximumUsd: decisionEstimate(frozenDecision(request)), pricing: decisionPricing };
+    },
     forecastRequests(requests) {
       if (
         !Array.isArray(requests) ||
@@ -644,11 +870,13 @@ export async function createBudgetProxy({
         return {
           id,
           profileId,
-          maximumUsd: maximumCharge(body, profile.pricing) * 1.1,
+          maximumUsd: profile.pricing ? maximumCharge(body, profile.pricing) * 1.1 : null,
           preparedBytes: Buffer.byteLength(JSON.stringify(body)),
         };
       });
-      const projectedUsd = reservations.reduce((sum, r) => sum + r.maximumUsd, 0);
+      const projectedUsd = reservations.some((r) => r.maximumUsd == null)
+        ? null
+        : reservations.reduce((sum, r) => sum + r.maximumUsd, 0);
       const remainingUsd = this.budget.remainingUsd;
       return {
         basis:
@@ -656,17 +884,48 @@ export async function createBudgetProxy({
         reservations,
         projectedUsd,
         remainingUsd,
-        fits: Number.isFinite(projectedUsd) && projectedUsd <= remainingUsd,
+        fits: tracking ? true : Number.isFinite(projectedUsd) && projectedUsd <= remainingUsd,
       };
     },
     get budget() {
       const spentUsd = ledger.entries.reduce(
-        (sum, entry) => sum + (entry.reportedUsd ?? entry.reservedUsd),
+        (sum, entry) =>
+          sum +
+          (entry.accountingStatus === "not_forwarded"
+            ? 0
+            : (entry.reportedUsd ?? entry.reservedUsd ?? 0)),
         0,
       );
       const reviewed = ledger.entries.filter(
-        (entry) => entry.reportedUsd == null && !unresolvedCharge(entry),
+        (entry) =>
+          entry.reportedUsd == null &&
+          entry.accountingStatus !== "not_forwarded" &&
+          !unresolvedCharge(entry),
       );
+      if (tracking) {
+        const unknown = ledger.entries.filter(
+          (entry) => entry.reportedUsd == null && entry.accountingStatus !== "not_forwarded",
+        );
+        return {
+          budgetPolicy,
+          ceilingUsd: null,
+          remainingUsd: null,
+          spentUsd: unknown.some((entry) => entry.reservedUsd == null) ? null : spentUsd,
+          knownReportedUsd: ledger.entries.reduce(
+            (sum, entry) => sum + (entry.reportedUsd ?? 0),
+            0,
+          ),
+          unknownChargeRecords: unknown.length,
+          notForwardedRecords: ledger.entries.filter(
+            (entry) => entry.accountingStatus === "not_forwarded",
+          ).length,
+          unknownReservedUsd: unknown.reduce((sum, entry) => sum + (entry.reservedUsd ?? 0), 0),
+          unknownEstimateRecords: unknown.filter((entry) => entry.reservedUsd == null).length,
+          pendingCharges: unknown.filter(unresolvedCharge).length,
+          reviewedReserveCharges: reviewed.length,
+          reviewedReserveUsd: reviewed.reduce((sum, entry) => sum + entry.reservedUsd, 0),
+        };
+      }
       return {
         ceilingUsd: ledger.ceilingUsd,
         spentUsd,
@@ -679,7 +938,10 @@ export async function createBudgetProxy({
     beginAttempt(id, profileId = configured[0].id, maximumUsd = Infinity, preparedRequest) {
       const profile = configured.find((item) => item.id === profileId);
       if (!profile) throw new Error("Unknown inference profile");
-      if (!(maximumUsd > 0) || (maximumUsd !== Infinity && !Number.isFinite(maximumUsd)))
+      if (
+        !(tracking && maximumUsd === null) &&
+        (!(maximumUsd > 0) || (maximumUsd !== Infinity && !Number.isFinite(maximumUsd)))
+      )
         throw new Error("Invalid frozen request allocation");
       if (
         closed ||
@@ -696,16 +958,86 @@ export async function createBudgetProxy({
       attempts.add(id);
       current = { id, profile, used: false, maximumUsd, preparedRequest: frozenRequest };
     },
-    async reserveAttempt(id, profileId, maximumUsd) {
-      if (!Number.isFinite(maximumUsd) || maximumUsd <= 0)
+    async reserveAttempt(id, profileId, maximumUsd, context) {
+      if (!(tracking && maximumUsd === null) && (!Number.isFinite(maximumUsd) || maximumUsd <= 0))
         throw new Error("Prepared attempt requires a finite frozen allocation");
+      let preparedRequests, decisionRequest;
+      if (context != null) {
+        if (
+          !contextPlanning ||
+          !object(context) ||
+          Object.keys(context).some(
+            (key) => !["preparedRequests", "decisionRequest"].includes(key),
+          ) ||
+          !Array.isArray(context.preparedRequests) ||
+          context.preparedRequests.length < 1 ||
+          context.preparedRequests.length > 4
+        )
+          throw new Error("Context evaluation requires one to four frozen chat requests");
+        const profile = configured.find((item) => item.id === profileId);
+        if (!profile) throw new Error("Unknown inference profile");
+        preparedRequests = context.preparedRequests.map((request) =>
+          structuredClone(boundedRequest(request, profile)),
+        );
+        if (context.decisionRequest) {
+          decisionRequest = frozenDecision(context.decisionRequest);
+          if (
+            !preparedRequests.every((request) => {
+              try {
+                return (
+                  JSON.parse(request.messages.find((message) => message.role === "user").content)
+                    .instruction === decisionRequest.state
+                );
+              } catch {
+                return false;
+              }
+            })
+          )
+            throw new Error("Jev state must equal the original prepared LLM instruction");
+        }
+      }
       this.beginAttempt(id, profileId, maximumUsd);
       busy = true;
       const finished = Promise.withResolvers();
       idle = finished.promise;
       current.preparedRecord = newRecord();
       try {
-        await reserve(current.preparedRecord, maximumUsd);
+        if (context != null) {
+          current.context = true;
+          current.preparedRequests = preparedRequests;
+          Object.assign(current.preparedRecord, {
+            kind: "chat",
+            forwarded: false,
+            reservedUsd: maximumUsd,
+          });
+          reserveCharge(ledger, maximumUsd, current.preparedRecord.id);
+          current.reservation = ledger.entries.at(-1);
+          Object.assign(current.reservation, { attemptId: id, kind: "chat" });
+          if (decisionRequest) {
+            const record = newRecord(),
+              maximum = decisionEstimate(decisionRequest);
+            Object.assign(record, {
+              kind: "decision",
+              forwarded: false,
+              reservedUsd: maximum,
+              pricing: decisionPricing,
+              requestedIdentity: { model: decisionModel, provider: "typesafe" },
+            });
+            reserveCharge(ledger, maximum, record.id);
+            const reservation = ledger.entries.at(-1);
+            Object.assign(reservation, { attemptId: id, kind: "decision" });
+            current.decision = {
+              request: decisionRequest,
+              record,
+              reservation,
+              used: false,
+              completion: Promise.resolve(),
+            };
+          }
+          await persist(current.preparedRecord, "reservation");
+          for (const record of records.filter((record) => record.attemptId === id))
+            await retain(record);
+        } else await reserve(current.preparedRecord, maximumUsd);
       } catch (error) {
         blocked = true;
         throw new Error(redact(String(error.message)));
@@ -716,8 +1048,9 @@ export async function createBudgetProxy({
     },
     async finishAttempt() {
       await idle;
+      await settleContext();
       if (!current?.preparedRecord) throw new Error("No prepared attempt to finish");
-      if (!current.used) blocked = true;
+      if (!current.used && !tracking) blocked = true;
       if (blocked)
         throw new Error(
           "Prepared attempt accounting is incomplete or invalid; further calls blocked",
@@ -737,6 +1070,7 @@ export async function createBudgetProxy({
           );
         // Disconnected callers can close their sockets before upstream accounting finishes.
         await idle;
+        await settleContext();
         await rm(lock, { recursive: true });
       })();
       return closing;

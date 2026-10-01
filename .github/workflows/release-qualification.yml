@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: Preflight checks key/budget only; deterministic checks exact images; live requires fresh qualification labels
+        description: Preflight checks credentials/accounting; deterministic checks exact images; live requires fresh qualification labels
         type: choice
         options: [preflight, deterministic, live]
         default: preflight

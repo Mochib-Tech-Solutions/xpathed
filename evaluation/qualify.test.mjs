@@ -144,7 +144,7 @@ test("selection records every exclusion without stripping mutation or changing s
   assert.equal(cases[1].split, "held-out");
 });
 
-test("forecast uses actual pilot token distributions at fresh prices and refuses missing charges", () => {
+test("forecast is informational and preserves unavailable pricing or token evidence", () => {
   const pilot = {
     trials: [
       {
@@ -171,13 +171,18 @@ test("forecast uses actual pilot token distributions at fresh prices and refuses
   assert.equal(result.byProfile.gemini.outputTokens.p95, 30);
   assert.ok(Math.abs(result.byProfile.gemini.projectedUsd - 0.00048) < 1e-12);
   assert.ok(Math.abs(result.projectedUsd - 0.00144) < 1e-12);
-  assert.equal(result.fits, true);
-  assert.equal(forecastPilot(pilot, planned, prices, { remainingUsd: 0.001 }).fits, false);
+  assert.equal(result.fits, null);
+  assert.equal(result.budgetPolicy, "provider-limit");
+  assert.equal(forecastPilot(pilot, planned, prices, { remainingUsd: 0 }).fits, null);
   delete pilot.trials[0].provider[0].reportedUsd;
-  assert.throws(
-    () => forecastPilot(pilot, planned, prices, { remainingUsd: 1 }),
-    /incomplete billed/,
+  assert.equal(forecastPilot(pilot, planned, prices).projectedUsd, result.projectedUsd);
+  delete pilot.trials[0].provider[0].usage;
+  assert.equal(forecastPilot(pilot, planned, prices).projectedUsd, null);
+  assert.match(
+    forecastPilot(pilot, planned, prices).byProfile.gemini.unavailable,
+    /token evidence/,
   );
+  assert.equal(forecastPilot(pilot, planned, {}).projectedUsd, null);
 });
 
 test("replay preserves absent planned attempts and rejects swapped trial identities", async (t) => {

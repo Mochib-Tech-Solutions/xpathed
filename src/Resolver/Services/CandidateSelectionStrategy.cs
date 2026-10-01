@@ -50,13 +50,24 @@ internal static class CandidateSelectionStrategy
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
     };
 
-    public static string PrepareInput(string instruction, CandidateCapture capture) =>
+    public static string PrepareInput(
+        string instruction,
+        CandidateCapture capture,
+        ContextEvidenceSelection? evidence = null
+    ) =>
         JsonSerializer.Serialize(
             new
             {
                 instruction,
                 scope = capture.Scope == "current_view" ? capture.Scope : null,
                 capture.FrameId,
+                evidenceAvailability = evidence is null
+                    ? null
+                    : new
+                    {
+                        appearance = evidence.Appearance ? "included" : "not_requested",
+                        geometry = evidence.Geometry ? "included" : "not_requested",
+                    },
                 candidates = capture.Candidates.Select(candidate => new
                 {
                     candidate.Id,
@@ -84,8 +95,10 @@ internal static class CandidateSelectionStrategy
                             ? null
                             : candidate.State.Readonly,
                     },
-                    candidate.Geometry,
-                    appearance = capture.Scope == "current_view" && candidate.Appearance is { } appearance
+                    geometry = evidence?.Geometry == false ? null : candidate.Geometry,
+                    appearance = evidence?.Appearance != false
+                    && capture.Scope == "current_view"
+                    && candidate.Appearance is { } appearance
                         ? new
                         {
                             appearance.BackgroundColor,

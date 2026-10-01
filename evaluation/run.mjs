@@ -535,6 +535,7 @@ export async function fingerprints(
     "docker/compose.yaml",
     "docker/compose.evaluation.yaml",
     "docker/compose.qualification.yaml",
+    "docker/compose.context.yaml",
     "docker/compose.sh",
     "scripts/evaluate.sh",
     "tests/resolution/ready.mjs",
@@ -646,10 +647,11 @@ export async function replay(path) {
 
 export async function prune(path, now = new Date()) {
   const manifest = await readJson(join(path, "manifest.json"));
+  const context = manifest.kind === "context-experiment" && manifest.version === 1;
   if (
-    manifest.version !== "1" ||
+    (!context && manifest.version !== "1") ||
     !manifest.id ||
-    !Array.isArray(manifest.plan?.trials) ||
+    !Array.isArray(context ? manifest.plan : manifest.plan?.trials) ||
     !manifest.code ||
     !Number.isFinite(Date.parse(manifest.createdAt))
   )
@@ -660,7 +662,13 @@ export async function prune(path, now = new Date()) {
     return "records_deleted";
   }
   if (age < 30 * 86400000) return "retained";
-  for (const sub of ["trials", "imports"])
+  if (context) {
+    delete manifest.preparedRequests;
+    manifest.evidenceAvailability = "expired";
+    // Keep the frozen hash: removed raw evidence intentionally cannot pass replay integrity.
+    await writeFile(join(path, "manifest.json"), JSON.stringify(manifest, null, 2) + "\n");
+  }
+  for (const sub of ["trials", "imports", ...(context ? ["preflight"] : [])])
     for (const file of await readdir(join(path, sub)).catch((error) => {
       if (error.code === "ENOENT") return [];
       throw error;
