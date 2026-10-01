@@ -69,7 +69,15 @@ const instructionLimits: Record<string, string> = {
     "The instruction does not identify a unique target. Specify its exact name, section, or position, such as left or right.",
   current_state_dependency:
     "This element depends on a page change. Make that change, then try again.",
-  unsupported_action: "This interaction is not supported yet.",
+  unsupported_action: "This interaction is not supported.",
+};
+
+const instructionTitles: Record<string, string> = {
+  ambiguous: "Ambiguous target",
+  unsupported_action: "Unsupported interaction",
+  current_state_dependency: "Page change required",
+  appearance_unavailable: "Appearance unavailable",
+  unsupported_scope: "Unsupported page content",
 };
 
 type Props = {
@@ -245,9 +253,10 @@ export default function ChatPanel({
                     <p className="text-xs text-muted-foreground">Earlier result</p>
                   )}
                   {resolution.error && (
-                    <p role="alert" className="text-destructive">
-                      {resolution.error}
-                    </p>
+                    <div role="alert" className="text-destructive">
+                      <h2 className="text-base font-semibold">Request failed</h2>
+                      <p>{resolution.error}</p>
+                    </div>
                   )}
                   {!result && !resolution.error && (
                     <p role="status" className="flex items-center gap-2 text-muted-foreground">
@@ -257,6 +266,9 @@ export default function ChatPanel({
                       />
                       Resolving…
                     </p>
+                  )}
+                  {result?.outcome === "partial" && (
+                    <h2 className="text-base font-semibold">Partial result</h2>
                   )}
                   {result?.summary && actions.length > 1 && (
                     <p className="text-xs text-muted-foreground">
@@ -282,11 +294,19 @@ export default function ChatPanel({
                         Action: {result.action.replaceAll("_", "-")}
                       </p>
                     )}
-                  {result?.outcome === "error" && (
-                    <div role="alert" className="text-destructive">
-                      <p>{result.diagnostics.message || "Something went wrong. Try again."}</p>
-                    </div>
-                  )}
+                  {result?.outcome === "error" &&
+                    (result.contractVersion === "1" || !actions.length) && (
+                      <div role="alert" className="text-destructive">
+                        <h2 className="text-base font-semibold">
+                          {result.diagnostics.code === "decomposition_incomplete"
+                            ? "Incomplete response"
+                            : "Resolution failed"}
+                        </h2>
+                        <p>
+                          {result.diagnostics.message || "The instruction could not be resolved."}
+                        </p>
+                      </div>
+                    )}
                   {actions.map((action) => {
                     const target = action.target;
                     const checks = target?.interactability?.checks;
@@ -346,32 +366,34 @@ export default function ChatPanel({
                             </p>
                           )}
                         {action.outcome === "not_found" && (
-                          <p>
-                            {currentView
-                              ? "I couldn’t find that element in the current view."
-                              : "I couldn’t find that element on this page."}
-                          </p>
-                        )}
-                        {action.outcome === "unsupported" && action.code === "ambiguous" && (
-                          <h2 className="text-base font-semibold">Ambiguous target</h2>
+                          <>
+                            <h2 className="text-base font-semibold">Target not found</h2>
+                            <p>
+                              {currentView
+                                ? "I couldn’t find that element in the current view."
+                                : "I couldn’t find that element on this page."}
+                            </p>
+                          </>
                         )}
                         {action.outcome === "unsupported" && (
-                          <p>
-                            {sharedAction && action.code === "unsupported_action"
-                              ? (action.message ??
-                                (currentView
-                                  ? "Use one action per command. You can target several elements in the current view."
-                                  : "Use one action per command. You can target several elements on this page."))
-                              : (instructionLimits[action.code ?? ""] ??
-                                action.message ??
-                                "This instruction is not supported yet.")}
-                          </p>
+                          <>
+                            <h2 className="text-base font-semibold">
+                              {instructionTitles[action.code ?? ""] ?? "Unsupported instruction"}
+                            </h2>
+                            <p>
+                              {action.code === "ambiguous" ||
+                              action.code === "current_state_dependency"
+                                ? instructionLimits[action.code]
+                                : (action.message ??
+                                  instructionLimits[action.code ?? ""] ??
+                                  "This instruction cannot be resolved within the supported scope.")}
+                            </p>
+                          </>
                         )}
                         {action.outcome === "error" && result?.contractVersion !== "1" && (
                           <div role="alert" className="text-destructive">
-                            <p>
-                              {action.message || "This target could not be resolved. Try again."}
-                            </p>
+                            <h2 className="text-base font-semibold">Resolution failed</h2>
+                            <p>{action.message || "This target could not be resolved."}</p>
                           </div>
                         )}
                         {target && (

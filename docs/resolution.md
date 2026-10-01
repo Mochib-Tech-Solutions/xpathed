@@ -190,6 +190,25 @@ The browser still applies origin checks, session isolation, serialized operation
 
 Ambiguous instructions retain `outcome: "unsupported"` with `code: "ambiguous"` for API compatibility. The client labels them **Ambiguous target** and asks for an exact name, section or position. It does not invent competing candidate names or render an XPath for an unresolved target.
 
+Client response labels follow the resolver outcome and reason code:
+
+| Resolver result | Client response |
+| --- | --- |
+| `found` | Element identity, XPath and reported readiness |
+| `not_found` | Target not found, with the applicable page/view scope |
+| `unsupported` / `ambiguous` | Ambiguous target |
+| `unsupported` / `unsupported_action` | Unsupported interaction |
+| `unsupported` / `current_state_dependency` | Page change required |
+| `unsupported` / `appearance_unavailable` | Appearance unavailable |
+| `unsupported` / `unsupported_scope` | Unsupported page content |
+| Other `unsupported` reasons | Unsupported instruction, retaining the resolver's explanation |
+| `partial` | Partial result with separate target outcomes |
+| `error` / `decomposition_incomplete` | Incomplete response |
+| Other `error` codes | Resolution failed with the resolver's explanation |
+| Request/transport failure without a result | Request failed |
+
+Semantic limitations are not technical-error alerts. Per-target failures retain their own messages without a duplicate generic request error; successful targets remain visible beside failures. Unknown, blocked or unsupported readiness stays separate from target discovery.
+
 Resolved targets optionally include browser-derived `role` and `accessibleName` alongside the existing `tag` and legacy `label`. These additive fields are shared by all three contracts. The accessible name uses the existing sanitized DOM naming policy, including image alt text; an empty name stays empty rather than falling back to descendant content. Older results may omit these fields and retain their label/tag fallback. The browser computes these descriptions; the model does not invent them.
 
 Chat leads with the role/type and uses the accessible name as supporting text, or explicitly reports an unnamed element. It does not fetch images or infer their visual contents. Multi-target replies separate numbered target cards, retaining one shared action and per-target XPath/verification. The UI omits generic execution disclaimers and redundant action-scope suffixes while retaining specific unknown or blocked readiness. Sent and received timestamps are local workspace metadata; resolver duration remains separately labelled. Accessible names receive the same diagnostic redaction as labels.
