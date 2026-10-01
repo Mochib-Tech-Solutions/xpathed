@@ -10,6 +10,13 @@ public sealed class HealthController(AppDbContext database) : ControllerBase
     [HttpGet]
     public async Task<IActionResult> Get(CancellationToken cancellationToken) =>
         await database.Database.CanConnectAsync(cancellationToken)
-            ? Ok(new { service = "client-api", database = "connected" })
+            ? Ok(
+                new
+                {
+                    service = "client-api",
+                    database = "connected",
+                    resolutionContract = "4",
+                }
+            )
             : StatusCode(StatusCodes.Status503ServiceUnavailable);
 }

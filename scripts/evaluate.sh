@@ -17,13 +17,14 @@ case_id=
 output=
 suite=
 forecast_only=
+sentinels=
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --) shift; continue ;;
     --comparison) comparison=true; shift; continue ;;
     --qualification) qualification=true; shift; continue ;;
     --context) context=true; shift; continue ;;
-    --mode|--repetitions|--seed|--timeout-ms|--case|--output|--suite|--phase|--split|--profile|--pilot|--forecast-only)
+    --mode|--repetitions|--seed|--timeout-ms|--case|--output|--suite|--phase|--split|--profile|--pilot|--forecast-only|--sentinels)
       if [ "$#" -lt 2 ]; then echo "Missing value for $1" >&2; exit 2; fi
       case "$1" in
         --mode) mode=$2 ;;
@@ -38,11 +39,13 @@ while [ "$#" -gt 0 ]; do
         --profile) profile=$2 ;;
         --pilot) pilot=$2 ;;
         --forecast-only) forecast_only=$2 ;;
+        --sentinels) sentinels=$2 ;;
       esac
       shift 2 ;;
     *) echo "Unknown evaluation option: $1" >&2; exit 2 ;;
   esac
 done
+if [ -n "$sentinels" ] && [ "$qualification" != true ]; then echo "Sentinels require the qualification runner" >&2; exit 2; fi
 if [ -n "${XPATHED_RELEASE_STATE:-}" ]; then
   if [ "$qualification" != true ] || [ -z "${XPATHED_RELEASE_OVERLAY:-}" ] || [ -z "${XPATHED_RELEASE_SERVICE:-}" ]; then echo "Artifact qualification requires its verified launcher" >&2; exit 2; fi
 fi
@@ -54,7 +57,7 @@ fi
 if [ "$qualification" != true ] && { [ "$phase" != pilot ] || [ "$split" != development ] || [ "$profile" != luna,gemini,deepseek ] || [ -n "$pilot" ]; }; then echo "Qualification options require --qualification" >&2; exit 2; fi
 if [ "$qualification" = true ]; then
   case "$suite" in
-    ''|evaluation/qualification-cases.json|evaluation/viewport-baseline-cases.json) ;;
+    ''|evaluation/qualification-cases.json|evaluation/viewport-baseline-cases.json|evaluation/current-view-qualification-cases.json) ;;
     *) echo "Qualification requires a reviewed built-in suite" >&2; exit 2 ;;
   esac
   suite=${suite:-evaluation/qualification-cases.json}
@@ -80,6 +83,7 @@ if [ -n "$case_id" ]; then set -- "$@" --case "$case_id"; fi
 if [ "$qualification" = true ]; then
   set -- "$@" --phase "$phase" --split "$split" --profile "$profile"
   if [ -n "$forecast_only" ]; then set -- "$@" --forecast-only "$forecast_only"; fi
+  if [ -n "$sentinels" ]; then set -- "$@" --sentinels "$sentinels"; fi
   if [ -n "$pilot" ]; then
     pilot=$(node --input-type=module -e '
       import { realpathSync, statSync } from "node:fs";

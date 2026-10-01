@@ -130,3 +130,12 @@ The qualified resolver release selected for clients that do not request another 
 
 **Qualification**:
 The evaluation of a resolver release against the agreed acceptance criteria before it can become an approved default.
+
+**Sentinel case**:
+An evaluation case frozen with an approved release and repeated to detect changes in its observed behavior.
+
+**Release activation**:
+Deploying an explicitly approved release and checking that its exact components are running.
+
+**Release rollback**:
+Explicitly selecting and activating a retained qualified compatible release. Restoring code cannot restore historical hosted model weights.

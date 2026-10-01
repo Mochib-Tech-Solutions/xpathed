@@ -1,0 +1,24 @@
+{
+  "version": "3",
+  "requiredContractVersion": "4",
+  "latencyProtocol": "resolver-http-pre-reserved-v2",
+  "goalMs": 1000,
+  "deadlineMs": 2000,
+  "minimumCorrectCompleteWithinDeadline": 0.95,
+  "minimumCorrectness": 0.95,
+  "minimumFamilyCorrectness": 0.8,
+  "minimumHeldOutFamilies": 10,
+  "minimumHeldOutTrials": 30,
+  "requiredSplits": ["regression", "held-out"],
+  "hardFailureCategories": [
+    "privacy",
+    "oracle_leak",
+    "passive_state",
+    "target_identity",
+    "contract",
+    "unplanned_trial",
+    "duplicate_trial"
+  ],
+  "basis": "Current-view release policy: contract 4, prompt 8, capture 5. Preserve policy 2 numerical gates. Require 30 distinct held-out current-view cases across 10 independent families, one attempt each. Legacy regression remains compatibility evidence and cannot satisfy current-view coverage. Time the complete Resolver HTTP request, with durable accounting reservation before it and reconciliation after the validated provider response. Retain cold pricing lookup and every original attempt. Freeze this policy and source before held-out inference; no automatic promotion.",
+  "uncertainty": "Minimum coverage is an experiment floor, not statistical certification. Report the 95% Wilson interval over held-out families whose every planned request is correct and complete within the deadline. Authored families are not a random sample of production traffic."
+}

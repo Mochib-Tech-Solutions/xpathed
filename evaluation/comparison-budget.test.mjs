@@ -788,6 +788,16 @@ test("prepared allocation cannot forward an oversized request or retry after an 
   assert.equal(unused.calls.length, 0);
 });
 
+test("a pre-reserved ordinary request binds the exact prepared payload before forwarding", async (t) => {
+  const { proxy, post, calls } = await setup(t);
+  await proxy.reserveAttempt("bound", "default", 0.01, { preparedRequest: input });
+  const changed = structuredClone(input);
+  changed.messages = [{ role: "user", content: "Different instruction" }];
+  assert.equal((await post(changed)).status, 502);
+  assert.equal(calls.length, 0);
+  await assert.rejects(proxy.finishAttempt(), /accounting/);
+});
+
 test("prepared response survives reconciliation failure but settlement fails even for the final attempt", async (t) => {
   const github = githubBudget({
     version: 1,
