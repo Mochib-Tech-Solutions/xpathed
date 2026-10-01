@@ -244,6 +244,13 @@ const qualificationProfiles = [
     maxTokens: 1024,
   },
   { id: "flash", model, provider: "wafer", reasoning: { enabled: false }, maxTokens: 1024 },
+  {
+    id: "qwen",
+    model: "qwen/qwen3.8-flash",
+    provider: "alibaba",
+    reasoning: { enabled: false },
+    maxTokens: 4096,
+  },
 ];
 const profileMetadata = (url) => {
   const profile = qualificationProfiles.find((item) => url.includes(item.model));
@@ -321,14 +328,14 @@ test("qualification pins each approved profile and reserves the highest tier and
     proxy.beginAttempt(profile.id, profile.id);
     assert.equal((await post(profileInput(profile))).status, 200);
   }
-  assert.equal(calls.length, 3);
+  assert.equal(calls.length, 4);
   assert.deepEqual(proxy.budget, {
     ceilingUsd: 5,
-    spentUsd: 0.003,
-    remainingUsd: 4.997,
+    spentUsd: 0.004,
+    remainingUsd: 4.996,
     pendingCharges: 0,
   });
-  assert.equal(JSON.parse(await readFile(ledgerPath, "utf8")).entries.length, 3);
+  assert.equal(JSON.parse(await readFile(ledgerPath, "utf8")).entries.length, 4);
   for (const [index, call] of calls.entries()) {
     const profile = qualificationProfiles[index];
     const request = JSON.parse(call.options.body);
@@ -385,6 +392,8 @@ test("unapproved profiles and unknown price overrides fail closed at startup", a
     { ...qualificationProfiles[0], provider: "openai/fast" },
     { ...qualificationProfiles[1], reasoning: { enabled: false } },
     { ...qualificationProfiles[2], model: "deepseek/latest" },
+    { ...qualificationProfiles[3], provider: "alibaba/fast" },
+    { ...qualificationProfiles[3], reasoning: { enabled: true } },
   ])
     await assert.rejects(createBudgetProxy({ apiKey: "key", profiles: [profile] }), /Unapproved/);
   const directory = await mkdtemp(join(tmpdir(), "xpathed-unbounded-price-"));
@@ -404,6 +413,24 @@ test("unapproved profiles and unknown price overrides fail closed at startup", a
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
+});
+
+test("Qwen refuses enabled reasoning or a different provider before payment", async (t) => {
+  const profile = qualificationProfiles.find((item) => item.id === "qwen");
+  const { proxy, post, calls } = await setup(t, {
+    profiles: [profile],
+    metadata: profileMetadata,
+  });
+  const valid = profileInput(profile);
+  const invalid = [
+    { ...valid, reasoning: { enabled: true } },
+    { ...valid, provider: { ...valid.provider, only: ["alibaba/fast"] } },
+  ];
+  for (const [index, request] of invalid.entries()) {
+    proxy.beginAttempt(`qwen-invalid-${index}`, profile.id);
+    assert.equal((await post(request)).status, 400);
+  }
+  assert.equal(calls.length, 0);
 });
 
 test("cache hits remain explicit evidence despite unique generation IDs", async (t) => {

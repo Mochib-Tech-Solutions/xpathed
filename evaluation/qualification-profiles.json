@@ -28,6 +28,15 @@
     "variant": "baseline"
   },
   {
+    "id": "qwen",
+    "model": "qwen/qwen3.8-flash",
+    "provider": "alibaba",
+    "reasoning": { "enabled": false },
+    "maxTokens": 4096,
+    "resolver": "http://resolver-qwen:8080",
+    "variant": "baseline"
+  },
+  {
     "id": "deepseek-concise",
     "model": "deepseek/deepseek-v4.1-flash",
     "provider": "wafer",

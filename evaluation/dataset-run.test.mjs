@@ -5,8 +5,126 @@ import {
   reserveCharge,
   makeCase,
   lexicalSelection,
+  options,
+  cli,
+  profileEnvironment,
+  retainProviderEvidence,
+  validProviderCalls,
 } from "./dataset-run.mjs";
+import profiles from "./qualification-profiles.json" with { type: "json" };
 import { gradeTrial } from "./grader.mjs";
+import { prune } from "./run.mjs";
+
+test("offline success requires exactly one forwarded call with fresh verified identity", () => {
+  const call = { forwarded: true, identityValid: true, observedIdentity: { generationId: "g1" } };
+  for (const calls of [
+    [],
+    [call, call],
+    [{ ...call, forwarded: false }],
+    [{ ...call, identityValid: undefined }],
+    [{ ...call, observedIdentity: {} }],
+    [{ ...call, responseCacheHit: true }],
+  ])
+    assert.equal(validProviderCalls(calls, new Set()), false);
+  const generations = new Set();
+  assert.equal(validProviderCalls([call], generations), true);
+  assert.equal(validProviderCalls([call], generations), false);
+});
+
+test("offline provider payloads expire with evidence while identity and cost remain", async (t) => {
+  const { mkdtemp, mkdir, writeFile, readFile, rm } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const directory = await mkdtemp(join(tmpdir(), "xpathed-offline-retention-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  await mkdir(join(directory, "trials"));
+  await mkdir(join(directory, "provider"));
+  const trial = { id: "attempt", evidence: null, error: { code: "dataset_trial_error" } };
+  const record = {
+    attemptId: trial.id,
+    request: { private: "input" },
+    response: { private: "output" },
+    reportedUsd: 0.01,
+    observedIdentity: { generationId: "g1" },
+  };
+  retainProviderEvidence(trial, [record]);
+  assert.deepEqual(trial.evidence.provider, [record]);
+  await writeFile(
+    join(directory, "manifest.json"),
+    JSON.stringify({
+      version: "1",
+      id: "run",
+      plan: { trials: [{ id: trial.id }] },
+      code: {},
+      createdAt: "2026-08-01T00:00:00Z",
+    }),
+  );
+  await writeFile(join(directory, "trials", "attempt.json"), JSON.stringify(trial));
+  await writeFile(join(directory, "provider", "record.json"), JSON.stringify(record));
+  assert.equal(await prune(directory, new Date("2026-09-01T00:00:00Z")), "evidence_deleted");
+  const retained = JSON.parse(await readFile(join(directory, "trials", "attempt.json"), "utf8"));
+  assert.equal(retained.evidence, null);
+  assert.equal(retained.provider[0].reportedUsd, 0.01);
+  assert.equal(retained.provider[0].observedIdentity.generationId, "g1");
+  assert.equal(JSON.stringify(retained).includes("private"), false);
+  await assert.rejects(readFile(join(directory, "provider", "record.json")), /ENOENT/);
+});
+
+test("offline profiles retain the DeepSeek default and accept only approved baseline settings", () => {
+  const args = ["--import", "source", "--output", "output"];
+  assert.equal(options(args).profile, "deepseek");
+  assert.equal(options([...args, "--profile", "qwen"]).profile, "qwen");
+  assert.equal(options([...args, "--profile", "gemini"]).profile, "gemini");
+  for (const profile of ["unknown", "deepseek-concise"])
+    assert.throws(() => options([...args, "--profile", profile]), /baseline profile/);
+  assert.throws(() => options([...args, "--profile", "qwen", "--mode", "live"]), /reviewed-inputs/);
+});
+
+test("offline model settings match each baseline and clear inherited experimental settings", () => {
+  for (const profile of profiles.filter((item) => item.variant === "baseline")) {
+    const env = profileEnvironment(profile, "http://127.0.0.1:1234/api/v1/", {
+      OpenRouter__ReasoningEffort: "high",
+      OpenRouter__PromptCacheMode: "wrong",
+      XPATHED_EVALUATION_PRICE_LIMITS: "untrusted",
+    });
+    assert.equal(env.OpenRouter__Model, profile.model);
+    assert.equal(env.OpenRouter__Provider, profile.provider);
+    assert.equal(env.OpenRouter__ReasoningEffort, profile.reasoning.effort);
+    assert.equal(env.OpenRouter__PromptCacheMode, profile.promptCacheOptions?.mode);
+    assert.equal(env.XPATHED_EVALUATION_PRICE_LIMITS, undefined);
+    assert.equal(env.OpenRouter__ApiKey, "dataset-proxy-only");
+  }
+});
+
+test("offline child execution leaves the local proxy responsive and preserves error evidence", async (t) => {
+  const { createServer } = await import("node:http");
+  const { mkdtemp, writeFile, rm } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const directory = await mkdtemp(join(tmpdir(), "xpathed-offline-cli-"));
+  const server = createServer((_request, response) => {
+    response.end(
+      JSON.stringify({ outcome: "error", diagnostics: { code: "provider_malformed_response" } }),
+    );
+  });
+  t.after(async () => {
+    await new Promise((resolve) => server.close(resolve));
+    await rm(directory, { recursive: true, force: true });
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  await writeFile(
+    join(directory, "dotnet"),
+    `#!${process.execPath}\nfetch(process.env.TEST_PROXY).then(r => r.text()).then(text => { console.log(text); process.exitCode = 1; });\n`,
+    { mode: 0o755 },
+  );
+  const result = await cli("input.json", {
+    ...process.env,
+    PATH: `${directory}:${process.env.PATH}`,
+    TEST_PROXY: `http://127.0.0.1:${server.address().port}`,
+  });
+  assert.equal(result.outcome, "error");
+  assert.equal(result.diagnostics.code, "provider_malformed_response");
+});
 
 test("the shared spending ceiling includes reservations and refuses the next unaffordable call", () => {
   const ledger = {

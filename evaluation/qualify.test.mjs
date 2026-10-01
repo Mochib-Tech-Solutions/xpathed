@@ -12,6 +12,7 @@ import {
   readRun,
   baselineEvidence,
   assertFrozenImplementation,
+  profiles,
 } from "./qualify.mjs";
 import { fingerprints } from "./run.mjs";
 
@@ -41,6 +42,23 @@ test("held-out calls require a recorded pilot; unsupported filters cannot silent
   assert.throws(() => parseQualificationOptions(["--phase", "confirmation"]), /pilot/);
   assert.throws(() => parseQualificationOptions(["--profile", "unknown"]), /profile/);
   assert.throws(() => parseQualificationOptions(["--split", "test"]), /split/);
+});
+
+test("Qwen is an explicit baseline profile without changing the default matrix", () => {
+  assert.deepEqual(parseQualificationOptions(["--profile", "qwen"]).profileIds, ["qwen"]);
+  assert.deepEqual(parseQualificationOptions([]).profileIds, ["luna", "gemini", "deepseek"]);
+  assert.deepEqual(
+    profiles.find((profile) => profile.id === "qwen"),
+    {
+      id: "qwen",
+      model: "qwen/qwen3.8-flash",
+      provider: "alibaba",
+      reasoning: { enabled: false },
+      maxTokens: 4096,
+      resolver: "http://resolver-qwen:8080",
+      variant: "baseline",
+    },
+  );
 });
 
 test("selection records every exclusion without stripping mutation or changing splits", () => {
