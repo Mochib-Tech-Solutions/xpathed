@@ -12,6 +12,8 @@ import {
 } from "./run.mjs";
 import { gradeTrial, summarize } from "./grader.mjs";
 
+export const campaignCeilingUsd = 10;
+
 const profiles = JSON.parse(
   await readFile(new URL("./qualification-profiles.json", import.meta.url), "utf8"),
 );
@@ -92,7 +94,7 @@ export function reserveCharge(ledger, maximumUsd, id) {
   if (
     !Number.isFinite(ledger.ceilingUsd) ||
     ledger.ceilingUsd <= 0 ||
-    ledger.ceilingUsd > 5 ||
+    ledger.ceilingUsd > campaignCeilingUsd ||
     !Array.isArray(ledger.entries)
   )
     throw new Error("Invalid budget ledger");
@@ -141,7 +143,7 @@ export function options(args) {
     mode: "deterministic",
     limit: 30,
     seed: 1,
-    budgetUsd: 5,
+    budgetUsd: campaignCeilingUsd,
     split: "train",
     profile: "deepseek",
     promptVariant: "baseline",
@@ -194,8 +196,8 @@ export function options(args) {
   if (result.mode !== "live" && result.promptVariant !== "baseline")
     throw new Error("Experimental prompt variants require live mode");
   result.budgetUsd = Number(result.budgetUsd);
-  if (!(result.budgetUsd > 0 && result.budgetUsd <= 5))
-    throw new Error("Initial experiment ceiling must be at most $5 total");
+  if (!(result.budgetUsd > 0 && result.budgetUsd <= campaignCeilingUsd))
+    throw new Error(`Campaign ceiling must be at most $${campaignCeilingUsd} total`);
   return result;
 }
 
