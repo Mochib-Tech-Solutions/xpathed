@@ -120,6 +120,8 @@ The [independent evaluator](docs/evaluation.md) uses a separate `xpathed-evaluat
 
 Offline dataset prompt experiments use the explicit, versioned `--prompt-variant` option described in [evaluation](docs/evaluation.md#external-datasets); they do not change production defaults. Results and measurement limits are recorded in the [labelled model comparison](docs/research/labelled-model-comparison-report.md) and [paired prompt experiment](docs/research/labelled-prompt-comparison-report.md).
 
+The offline [release verifier](docs/releases.md) seals qualified pilot/confirmation evidence against an exact source revision and checks it again using an independently retained digest. Missing, changed, expired or unqualified evidence fails verification. This does not promote a configuration or change the running application.
+
 ## Roadmap
 
 GitHub Issues hold the live requirements, dependencies and progress. The next capabilities are:

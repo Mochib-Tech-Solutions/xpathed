@@ -53,6 +53,8 @@
     "evaluate:compare:replay": "node evaluation/compare.mjs --replay",
     "evaluate:qualify": "scripts/evaluate.sh --qualification",
     "evaluate:qualify:replay": "node evaluation/qualify.mjs --replay",
+    "release:seal": "node scripts/release.mjs seal",
+    "release:verify": "node scripts/release.mjs verify",
     "evaluate:replay": "node evaluation/run.mjs --replay",
     "datasets:fetch": "node evaluation/dataset-sources.mjs",
     "datasets:import": "node evaluation/datasets.mjs",

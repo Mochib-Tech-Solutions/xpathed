@@ -58,6 +58,8 @@ Before paid calls, deterministic positive, absent, scoped/plural and provider-fa
 
 The qualification manifest links source/dependency/browser fingerprints, full selected cases and exclusions, policy, route metadata and configuration identities. Per-trial artifacts retain nonsecret effective settings and expiring page/provider evidence. Replay uses the recorded runner and grader, checks manifest/trial identities and recomputes results without services. A completed measurement can exit successfully with **no qualified candidate**; inspect the qualification status rather than treating process success as approval. There is no automatic default promotion.
 
+For an offline check that requires an actually qualified profile, use [release evidence sealing and verification](releases.md). It binds the original pilot and confirmation files, regrades both, and requires a clean checkout at the candidate's exact source revision. Ordinary replay success is insufficient for this boundary.
+
 The original legacy contract and saved-locator mutation suite remains separate. Imported PhraseNode and Mind2Web cases retain original split identities and offline-only limitations; these controlled browser results do not claim those corpora were rerun or that reconstructed DOMs reproduce historical readiness. Appearance-only commands expose a known gap: the baseline capture carries geometry but not computed color. That limitation must not disappear into an aggregate score or a full-scope release claim.
 
 ## Cases and oracles
