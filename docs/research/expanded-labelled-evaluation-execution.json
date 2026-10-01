@@ -1,0 +1,22 @@
+{
+  "at": "2026-10-01T15:48:50.049Z",
+  "outcome": "blocked-before-inference",
+  "reason": "Selected route is not enabled according to endpoint metadata",
+  "model": "deepseek/deepseek-v4.1-flash",
+  "provider": "wafer",
+  "routeStatus": -2,
+  "pricing": {
+    "prompt": "0.00000005",
+    "completion": "0.0000006",
+    "input_cache_read": "0.00000004",
+    "discount": 0
+  },
+  "plannedCases": 860,
+  "paidCalls": 0,
+  "reportedUsd": 0,
+  "keyUsageBeforeUsd": 0.00738552,
+  "keyUsageAfterUsd": 0.00738552,
+  "ledgerCeilingUsd": 10,
+  "ledgerEntries": 1529,
+  "ledgerEntriesSha256": "2f0dcd0c00560c7f2d4108fe67b962ba8e3084a9f92a4f03af69ba5767e85137"
+}
