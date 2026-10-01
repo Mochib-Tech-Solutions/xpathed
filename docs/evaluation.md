@@ -82,6 +82,8 @@ Contract 4 also skips optional runtime price lookup; the legacy arm retains it, 
 
 ## Context-planning experiment
 
+The [measured comparison](research/jev-context-comparison-report.md) records the historical hard-cutoff pilot and the fresh metric-only baseline separately. The provisional Jev policy saved no context; it remains evaluation-only. These exposed regression measurements do not qualify a release.
+
 [Issue #48](https://github.com/Mochib-Tech-Solutions/xpathed/issues/48) compares fresh contract-4 control and Jev-assisted attempts on the same 16 authored current-view cases: 32 trials, one attempt per case/arm, alternating which arm runs first. Both arms use the fixed standard DeepSeek V4.1 Flash/DeepInfra FP8 profile. This is a separate development experiment, not a replay of the earlier Wafer baseline or a production configuration change.
 
 ```sh
