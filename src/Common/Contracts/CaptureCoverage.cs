@@ -5,5 +5,6 @@ public sealed record CaptureCoverage(
     int EligibleCount,
     int CapturedCount,
     bool Complete,
-    string? ErrorCode
+    string? ErrorCode,
+    int ExcludedOffscreenCount = 0
 );

@@ -6,6 +6,7 @@ cd "$(dirname "$0")/.."
 export POSTGRES_PASSWORD=configuration-check-only
 export XPATHED_PORT=8080
 export OPENROUTER_API_KEY=configuration-check-only
+export OPENROUTER_EVAL_API_KEY=configuration-check-only
 export XPATHED_EVALUATION_OUTPUT=/tmp/xpathed-evaluation-config-check
 docker/compose.sh --env-file /dev/null config --quiet
 docker/compose.sh --dev --env-file /dev/null config --quiet

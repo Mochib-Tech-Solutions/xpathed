@@ -60,7 +60,9 @@ export default function ResolutionCost({
           ? `Estimated cost: ${usd(estimate.totalCost)}`
           : usage?.cost != null
             ? `Reported cost: ${usd(usage.cost)}`
-            : "Cost unavailable"}
+            : diagnostics.providerAccounting === "pending"
+              ? "Cost pending"
+              : "Cost unavailable"}
       </button>
       {open && (
         <div
@@ -78,6 +80,9 @@ export default function ResolutionCost({
         >
           <div className="max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-lg border border-border bg-popover p-3 text-popover-foreground shadow-md">
             <p className="mb-2 font-medium">Cost breakdown · USD</p>
+            {diagnostics.providerAccounting === "pending" && (
+              <p className="mb-2">The provider may still charge this timed-out request.</p>
+            )}
             <dl className="space-y-1.5">
               {rows.map(([label, value]) => (
                 <div key={label} className="flex justify-between gap-3">

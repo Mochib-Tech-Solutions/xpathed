@@ -15,7 +15,7 @@ The requested interaction, such as clicking, hovering, or selecting an option.
 The result of identifying one action's target in a particular page state, including absence or an unsupported scope. A found action resolution concerns one target and has one preferred verified XPath expression for that target.
 
 **Target set**:
-The distinct elements intended by one action on the current page. Finding only some of those elements does not establish that the target set is complete.
+The distinct elements intended by one action within its declared scope: the current view for workspace requests, the current page for legacy requests. Finding only some of those elements does not establish that the target set is complete.
 
 **Multi-target result**:
 One shared action with independent outcomes for its intended targets. Its partial-result summary separates found targets from missing, unsupported, failed or non-interactable targets.
@@ -53,6 +53,9 @@ A live browser tab within a session. Its page identifier links resolution reques
 
 **Active page**:
 The managed page currently selected for viewing and target resolution. A session has one active page at a time.
+
+**Current view**:
+The active page's viewport at its current scroll position. A target set scoped to the current view concerns that viewport, not every matching element elsewhere on the page.
 
 **Resolution history**:
 The ordered record of instructions and their results for a managed page, including when they were requested and how long resolution took. Historical results describe the page state at that time.
