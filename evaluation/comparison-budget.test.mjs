@@ -302,7 +302,7 @@ test("a fresh hosted proxy preserves authoritative historical spend and durably 
 });
 
 test("a complete prepared forecast bounds both arms before any paid request and blocks growth beyond its allocation", async (t) => {
-  const { proxy, post, calls } = await setup(t);
+  const { proxy, post, calls } = await setup(t, { ceilingUsd: 5 });
   const forecast = proxy.forecastRequests([
     { id: "before", profileId: "default", request: input },
     { id: "after", profileId: "default", request: input },
@@ -597,6 +597,29 @@ test("proxy reserves before payment, pins the effective route, accounts actual c
   proxy.beginAttempt("case:stagehand");
   assert.equal((await post()).status, 200);
   assert.equal(calls.length, 2);
+});
+
+test("the authorized ten-dollar campaign preserves history and still rejects a higher ceiling", async (t) => {
+  const previous = { id: "previous", reservedUsd: 3, reportedUsd: 2 };
+  const github = githubBudget({
+    version: 1,
+    ceilingUsd: 10,
+    remoteAuthority: "github:example/private:evaluation-budget:experiment-budget.json",
+    entries: [previous],
+  });
+  const { proxy, post } = await setup(t, { github });
+  assert.equal(proxy.budget.ceilingUsd, 10);
+  assert.equal(proxy.budget.spentUsd, 2);
+  assert.equal(proxy.budget.remainingUsd, 8);
+  proxy.beginAttempt("next");
+  assert.equal((await post()).status, 200);
+  assert.deepEqual(github.ledger.entries[0], previous);
+  assert.equal(github.ledger.entries.length, 2);
+  await assert.rejects(setup(t, { ceilingUsd: 10.01 }), /at most \$10/);
+  await assert.rejects(
+    setup(t, { initial: { version: 1, ceilingUsd: 10.01, entries: [] } }),
+    /Invalid experiment budget/,
+  );
 });
 
 test("shared ledger lock, previous spend and a lowered ceiling prevent additional payment", async (t) => {
@@ -919,9 +942,9 @@ test("qualification pins each approved profile and reserves the highest tier and
   }
   assert.equal(calls.length, 4);
   assert.deepEqual(proxy.budget, {
-    ceilingUsd: 5,
+    ceilingUsd: 10,
     spentUsd: 0.004,
-    remainingUsd: 4.996,
+    remainingUsd: 9.996,
     pendingCharges: 0,
     reviewedReserveCharges: 0,
     reviewedReserveUsd: 0,

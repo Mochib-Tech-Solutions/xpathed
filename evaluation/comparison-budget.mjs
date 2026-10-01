@@ -3,7 +3,12 @@ import { createServer } from "node:http";
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { parseEnv } from "node:util";
-import { assertReconciledCharges, reserveCharge, unresolvedCharge } from "./dataset-run.mjs";
+import {
+  assertReconciledCharges,
+  campaignCeilingUsd,
+  reserveCharge,
+  unresolvedCharge,
+} from "./dataset-run.mjs";
 import { githubBudget } from "./github-budget.mjs";
 
 const model = "deepseek/deepseek-v4.1-flash";
@@ -278,7 +283,7 @@ export function validateBudgetLedger(ledger) {
     ledger.version !== 1 ||
     !Number.isFinite(ledger.ceilingUsd) ||
     ledger.ceilingUsd <= 0 ||
-    ledger.ceilingUsd > 5 ||
+    ledger.ceilingUsd > campaignCeilingUsd ||
     (Object.hasOwn(ledger, "remoteAuthority") &&
       (typeof ledger.remoteAuthority !== "string" ||
         !/^github:[a-z\d][a-z\d-]*\/[a-z\d._-]+:evaluation-budget:experiment-budget\.json$/.test(
@@ -303,7 +308,7 @@ export async function createBudgetProxy({
   apiKey,
   profiles,
   ledgerPath = resolve(".artifacts/datasets/experiment-budget.json"),
-  ceilingUsd = 5,
+  ceilingUsd = campaignCeilingUsd,
   fetchImpl = fetch,
   onRecord = async () => {},
   githubRepository = process.env.XPATHED_BUDGET_GITHUB_REPOSITORY,
@@ -313,8 +318,8 @@ export async function createBudgetProxy({
   apiKey ??= await readEvaluationKey();
   if (!apiKey)
     throw new Error("Set OPENROUTER_EVAL_API_KEY for the explicitly requested live evaluation");
-  if (!Number.isFinite(ceilingUsd) || ceilingUsd <= 0 || ceilingUsd > 5)
-    throw new Error("Experiment ceiling must be at most $5 total");
+  if (!Number.isFinite(ceilingUsd) || ceilingUsd <= 0 || ceilingUsd > campaignCeilingUsd)
+    throw new Error(`Experiment ceiling must be at most $${campaignCeilingUsd} total`);
   const redact = (text) =>
     [apiKey, githubToken]
       .filter(Boolean)

@@ -226,6 +226,20 @@ test("the shared spending ceiling includes reservations and refuses the next una
   assert.throws(() => reserveCharge(ledger, NaN, "invalid"), /charge/i);
 });
 
+test("dataset runs default to the authorized campaign ceiling and permit only lower overrides", () => {
+  const args = ["--import", "imported", "--output", "results"];
+  assert.equal(options(args).budgetUsd, 10);
+  assert.equal(options([...args, "--budget-usd", "5"]).budgetUsd, 5);
+  assert.throws(() => options([...args, "--budget-usd", "10.01"]), /at most \$10/);
+  const ledger = {
+    ceilingUsd: 10,
+    entries: [{ id: "retained", reservedUsd: 3, reportedUsd: 2 }],
+  };
+  reserveCharge(ledger, 8, "remaining");
+  assert.throws(() => reserveCharge(ledger, 0.01, "too-much"), /budget/);
+  assert.equal(ledger.entries.length, 2);
+});
+
 test("reservation reviews must consume the full maximum with an explicit reason and ISO timestamp", () => {
   const entry = {
     reservedUsd: 0.01,
