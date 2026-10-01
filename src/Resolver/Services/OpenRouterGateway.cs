@@ -4,12 +4,17 @@ using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Microsoft.Extensions.Caching.Memory;
 using Xpathed.Common.Contracts;
 using Xpathed.Common.Http;
 
 namespace Xpathed.Resolver.Services;
 
-public sealed class OpenRouterGateway(IHttpClientFactory clients, IConfiguration configuration)
+public sealed class OpenRouterGateway(
+    IHttpClientFactory clients,
+    IConfiguration configuration,
+    IMemoryCache pricingCache
+)
 {
     public string Model { get; } = configuration["OpenRouter:Model"] ?? "deepseek/deepseek-v4.1-flash";
     public string Provider { get; } = configuration["OpenRouter:Provider"] ?? "wafer";
@@ -110,7 +115,8 @@ public sealed class OpenRouterGateway(IHttpClientFactory clients, IConfiguration
             captureVersion = promptVersion == "8" ? "5" : "4",
             scope = promptVersion == "8" ? "current_view" : "page",
             serverDeadlineMs = (int?)null,
-            estimateCost = promptVersion != "8",
+            estimateCost = true,
+            pricingCacheSeconds = 300,
             stateVersion = "2",
             interactabilityVersion = "2",
             xpathVersion = "4",
@@ -183,8 +189,7 @@ public sealed class OpenRouterGateway(IHttpClientFactory clients, IConfiguration
         JsonElement schema,
         CancellationToken cancellationToken,
         int outputTokens = 512,
-        Action<ResolutionDiagnostics>? observeUsage = null,
-        bool estimateCost = true
+        Action<ResolutionDiagnostics>? observeUsage = null
     )
     {
         using var client = clients.CreateClient("openrouter");
@@ -266,7 +271,7 @@ public sealed class OpenRouterGateway(IHttpClientFactory clients, IConfiguration
             diagnostics with
             {
                 Code = code,
-                CostEstimate = estimateCost ? await EstimateCostAsync(diagnostics, cancellationToken) : null,
+                CostEstimate = await EstimateCostAsync(diagnostics, cancellationToken),
             }
         );
     }
@@ -286,70 +291,81 @@ public sealed class OpenRouterGateway(IHttpClientFactory clients, IConfiguration
         }
         try
         {
-            using var client = clients.CreateClient("openrouter");
-            client.BaseAddress = new Uri(endpoint);
-            client.Timeout = TimeSpan.FromSeconds(2);
-            using var request = new HttpRequestMessage(
-                HttpMethod.Get,
-                $"models/{Uri.EscapeDataString(model[0])}/{Uri.EscapeDataString(model[1])}/endpoints"
-            );
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
-            using var response = await client.SendAsync(request, cancellationToken);
-            if (!response.IsSuccessStatusCode)
-            {
-                return null;
-            }
-            var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
-            var endpoints = Property(Property(body, "data"), "endpoints");
-            if (endpoints.ValueKind != JsonValueKind.Array)
-            {
-                return null;
-            }
-            var prices = endpoints
-                .EnumerateArray()
-                .Where(route =>
-                    string.Equals(
-                        ReadString(route, "provider_name"),
-                        diagnostics.Provider,
-                        StringComparison.OrdinalIgnoreCase
-                    )
-                )
-                .Select(route => Property(route, "pricing"))
-                .ToArray();
+            var key = (typeof(OpenRouterGateway), endpoint, diagnostics.Model, diagnostics.Provider);
             if (
-                prices.Length == 0
-                || prices.Any(price => Property(price, "overrides").ValueKind == JsonValueKind.Array)
+                !pricingCache.TryGetValue<(decimal Input, decimal Output, decimal Request, DateTimeOffset FetchedAt)>(
+                    key,
+                    out var rates
+                )
             )
             {
-                return null;
-            }
-            var rates = prices
-                .Select(price =>
-                    (
-                        Input: ReadPrice(price, "prompt"),
-                        Output: ReadPrice(price, "completion"),
-                        Request: Property(price, "request").ValueKind == JsonValueKind.Undefined
-                            ? 0m
-                            : ReadPrice(price, "request")
+                using var client = clients.CreateClient("openrouter");
+                client.BaseAddress = new Uri(endpoint);
+                client.Timeout = TimeSpan.FromSeconds(2);
+                using var request = new HttpRequestMessage(
+                    HttpMethod.Get,
+                    $"models/{Uri.EscapeDataString(model[0])}/{Uri.EscapeDataString(model[1])}/endpoints"
+                );
+                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+                using var response = await client.SendAsync(request, cancellationToken);
+                if (!response.IsSuccessStatusCode)
+                {
+                    return null;
+                }
+                var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+                var endpoints = Property(Property(body, "data"), "endpoints");
+                if (endpoints.ValueKind != JsonValueKind.Array)
+                {
+                    return null;
+                }
+                var prices = endpoints
+                    .EnumerateArray()
+                    .Where(route =>
+                        string.Equals(
+                            ReadString(route, "provider_name"),
+                            diagnostics.Provider,
+                            StringComparison.OrdinalIgnoreCase
+                        )
                     )
+                    .Select(route => Property(route, "pricing"))
+                    .ToArray();
+                if (
+                    prices.Length == 0
+                    || prices.Any(price => Property(price, "overrides").ValueKind == JsonValueKind.Array)
                 )
-                .Distinct()
-                .ToArray();
-            if (rates is not [{ Input: { } inputRate, Output: { } outputRate, Request: { } requestRate }])
-            {
-                return null;
+                {
+                    return null;
+                }
+                var distinctRates = prices
+                    .Select(price =>
+                        (
+                            Input: ReadPrice(price, "prompt"),
+                            Output: ReadPrice(price, "completion"),
+                            Request: Property(price, "request").ValueKind == JsonValueKind.Undefined
+                                ? 0m
+                                : ReadPrice(price, "request")
+                        )
+                    )
+                    .Distinct()
+                    .ToArray();
+                if (distinctRates is not [{ Input: { } inputRate, Output: { } outputRate, Request: { } requestRate }])
+                {
+                    return null;
+                }
+                rates = (inputRate, outputRate, requestRate, DateTimeOffset.UtcNow);
+                pricingCache.Set(key, rates, TimeSpan.FromMinutes(5));
             }
             // ponytail: listed token rates before cache discounts; reported usage cost remains authoritative.
-            var inputCost = inputTokens * inputRate;
-            var outputCost = outputTokens * outputRate;
+            var inputCost = inputTokens * rates.Input;
+            var outputCost = outputTokens * rates.Output;
             return new ModelCostEstimate(
-                inputRate * 1_000_000,
-                outputRate * 1_000_000,
+                rates.Input * 1_000_000,
+                rates.Output * 1_000_000,
                 inputCost,
                 outputCost,
-                requestRate,
-                inputCost + outputCost + requestRate,
-                DateTimeOffset.UtcNow
+                rates.Request,
+                inputCost + outputCost + rates.Request,
+                rates.FetchedAt
             );
         }
         catch (Exception error)

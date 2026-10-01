@@ -295,8 +295,7 @@ public sealed partial class ResolutionService(
                         schema,
                         token,
                         outputTokens,
-                        observed => Volatile.Write(ref received, observed),
-                        estimateCost: false
+                        observed => Volatile.Write(ref received, observed)
                     )
                 );
                 diagnostics = diagnostics with { ModelCalls = 1, ProviderAccounting = "pending" };

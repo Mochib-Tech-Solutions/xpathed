@@ -1,4 +1,4 @@
-name: Release qualification
+name: Release Qualification
 
 on:
   workflow_dispatch:
