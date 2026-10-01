@@ -2,6 +2,8 @@
 
 2026-10-01. Follow-up to [issue #50](https://github.com/Mochib-Tech-Solutions/xpathed/issues/50). **860 distinct requests are reviewed and prepared; 53 were attempted before repeated provider timeouts stopped measurement.** This is a coverage expansion with partial results, not a completed replacement baseline.
 
+**Later follow-up:** the separately authorized [DeepInfra baseline](deepinfra-labelled-baseline-report.md) completed all 860 reviewed cases. The partial Wafer results and accounting snapshots below are historical and remain unchanged.
+
 ## Selection
 
 The frozen candidate pool contains 1,000 previously unselected original PhraseNode development records across 182 page families and 672 distinct source target nodes. The earlier comparison used 191 reviewed cases from 40 families. The new selection excludes all 200 previously reviewed cases plus two prior privacy exclusions; a later request-level audit removes three identical inputs under different source IDs. The final run does not repeat prior paid requests or mix old timings into its results.
