@@ -111,6 +111,12 @@ test("CI checks the PR title and all introduced commits without linting base his
     () => validateEvent("push", { before: "--all", after: good }, cwd),
     /Invalid event/,
   );
+  git("checkout", "-b", "verbatim", base);
+  git("commit", "--allow-empty", "--cleanup=verbatim", "-m", "  fix: invalid leading spaces");
+  assert.throws(
+    () => validateEvent("push", { before: base, after: git("rev-parse", "HEAD") }, cwd),
+    /type\(scope\)/,
+  );
 });
 
 test("hook installation is idempotent and isolated to a linked worktree", (t) => {
@@ -150,6 +156,8 @@ test("real Git hooks block invalid commits, failed checks and partial staging wi
   write("README.md", "docs only\n");
   git("add", "README.md");
   assert.notEqual(commit("invalid title").status, 0);
+  assert.notEqual(commit("# invalid header\nfix: valid second line").status, 0);
+  assert.notEqual(commit("  fix: invalid leading spaces").status, 0);
   assert.equal(commit("docs: valid title").status, 0);
   assert.equal(spawnSync("test", ["-e", join(cwd, "commands.log")]).status, 1);
   write("src/Web/old name.ts", "new staged value\n");

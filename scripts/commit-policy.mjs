@@ -13,7 +13,7 @@ export function validateMessage(message, label = "Commit") {
 }
 
 export function validateEvent(eventName, event, cwd = process.cwd()) {
-  const git = (...args) => execFileSync("git", args, { cwd, encoding: "utf8" }).trim();
+  const git = (...args) => execFileSync("git", args, { cwd, encoding: "utf8" });
   let base;
   let head;
   if (eventName === "pull_request") {
@@ -43,12 +43,7 @@ export function validateEvent(eventName, event, cwd = process.cwd()) {
 if (import.meta.main) {
   try {
     if (process.argv[2] === "--edit" && process.argv.length === 4)
-      validateMessage(
-        execFileSync("git", ["stripspace", "--strip-comments"], {
-          input: readFileSync(process.argv[3]),
-          encoding: "utf8",
-        }),
-      );
+      validateMessage(readFileSync(process.argv[3], "utf8"));
     else if (process.argv[2] === "--event" && process.argv.length === 3)
       validateEvent(
         process.env.GITHUB_EVENT_NAME,
