@@ -106,7 +106,7 @@ public sealed class OpenRouterGateway(IHttpClientFactory clients, IConfiguration
             captureVersion = "4",
             stateVersion = "2",
             interactabilityVersion = "2",
-            xpathVersion = "3",
+            xpathVersion = "4",
             endpoint = Uri.TryCreate(endpoint, UriKind.Absolute, out var address) ? address.AbsoluteUri : endpoint,
             timeoutSeconds = timeoutSeconds.ToString("R", CultureInfo.InvariantCulture),
             modelInputBudgetBytes,

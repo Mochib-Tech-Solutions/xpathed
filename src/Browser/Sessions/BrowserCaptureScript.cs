@@ -282,6 +282,19 @@ internal static class BrowserCaptureScript
             const value = element.getAttribute(name);
             return value && !/https?:\/\//u.test(value) && (name !== 'id' || !/(?:[a-f\d]{16}|\d{5}|^:|^\d+$|[a-f\d]{8}-[a-f\d]{4}-[a-f\d]{4}-[a-f\d]{4}-[a-f\d]{12})/iu.test(value));
           }).map(name => `@${name}=${literal(element.getAttribute(name))}`);
+          const semanticAttributes = ['aria-label', 'placeholder', 'alt', 'title'];
+          const contextPredicates = ancestor => {
+            const predicates = attributes(ancestor, [...testAttributes, 'aria-label', 'title']);
+            const heading = ancestor.querySelector(':scope > legend,:scope > h1,:scope > h2,:scope > h3,:scope > h4,:scope > h5,:scope > h6');
+            if (heading && text(heading)) predicates.push(`${tag(heading)}[normalize-space(.)=${literal(text(heading))}]`);
+            if (ancestor.matches('tr,[role=row]')) {
+              for (const cell of ancestor.children) {
+                if (cell.matches('td,th,[role=cell],[role=rowheader],[role=gridcell]') && text(cell))
+                  predicates.push(`${tag(cell)}[normalize-space(.)=${literal(text(cell))}]`);
+              }
+            }
+            return predicates;
+          };
           const xpathsFor = element => {
             const xpaths = [];
             const add = xpath => {
@@ -294,14 +307,25 @@ internal static class BrowserCaptureScript
             const testPredicates = attributes(element, testAttributes);
             const stablePredicates = attributes(element, stableAttributes);
             const elementText = text(element);
-            const semanticPredicates = elementText ? [`normalize-space(.)=${literal(elementText)}`] : [];
+            const semanticPredicates = attributes(element, semanticAttributes);
+            if (elementText) semanticPredicates.push(`normalize-space(.)=${literal(elementText)}`);
             if (element.matches(buttonInput) && element.getAttribute('value')) semanticPredicates.push(`@value=${literal(element.getAttribute('value'))}`);
-            for (const predicate of [...testPredicates, ...stablePredicates]) if (add(`//${tag(element)}[${predicate}]`)) return xpaths;
+            for (const predicate of testPredicates) if (add(`//${tag(element)}[${predicate}]`)) return xpaths;
+            for (let ancestor = element.parentElement; ancestor && ancestor !== document.body; ancestor = ancestor.parentElement) {
+              checkBudget();
+              const prefixes = contextPredicates(ancestor).map(context => `//${tag(ancestor)}[${context}]`);
+              if (ancestor.matches('header,footer,nav,main,aside')) prefixes.push(`//${tag(ancestor)}`);
+              for (const prefix of prefixes) {
+                for (const predicate of [...testPredicates, ...semanticPredicates])
+                  if (add(`${prefix}//${tag(element)}[${predicate}]`)) return xpaths;
+              }
+            }
             for (const associatedLabel of element.labels ?? []) {
               const labelText = text(associatedLabel);
               if (labelText && element.id && associatedLabel.htmlFor === element.id && add(`//${tag(element)}[@id=//label[normalize-space(.)=${literal(labelText)}]/@for]`)) return xpaths;
             }
             for (const predicate of semanticPredicates) if (add(`//${tag(element)}[${predicate}]`)) return xpaths;
+            for (const predicate of stablePredicates) if (add(`//${tag(element)}[${predicate}]`)) return xpaths;
             const targetPredicates = [...testPredicates, ...stablePredicates];
             for (let first = 0; first < targetPredicates.length; first++) {
               for (let second = first + 1; second < targetPredicates.length; second++) {
@@ -310,15 +334,7 @@ internal static class BrowserCaptureScript
             }
             for (let ancestor = element.parentElement; ancestor && ancestor !== document.body; ancestor = ancestor.parentElement) {
               checkBudget();
-              const predicates = [...attributes(ancestor, testAttributes), ...attributes(ancestor, stableAttributes)];
-              const heading = ancestor.querySelector(':scope > legend,:scope > h1,:scope > h2,:scope > h3,:scope > h4,:scope > h5,:scope > h6');
-              if (heading && text(heading)) predicates.push(`${tag(heading)}[normalize-space(.)=${literal(text(heading))}]`);
-              if (ancestor.matches('tr,[role=row]')) {
-                for (const cell of ancestor.children) {
-                  if (cell.matches('td,th,[role=cell],[role=rowheader],[role=gridcell]') && text(cell))
-                    predicates.push(`${tag(cell)}[normalize-space(.)=${literal(text(cell))}]`);
-                }
-              }
+              const predicates = [...contextPredicates(ancestor), ...attributes(ancestor, ['id', 'name'])];
               const prefixes = predicates.map(context => `//${tag(ancestor)}[${context}]`);
               if (ancestor.matches('header,footer,nav,main,aside')) prefixes.push(`//${tag(ancestor)}`);
               for (const prefix of prefixes) {
