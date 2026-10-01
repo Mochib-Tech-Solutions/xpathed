@@ -12,6 +12,58 @@ namespace Xpathed.Resolver.Tests;
 public sealed class OfflineEvaluationTests
 {
     [Fact]
+    public async Task DeclarativeVariantChangesOnlyTheVersionedSystemPrompt()
+    {
+        const string input =
+            """{"instruction":"the Save button","candidates":[{"id":"c1","tag":"button","label":"Save"}]}""";
+        var (_, baselineOutput) = await RunAsync(input, prepareOnly: true);
+        var (exitCode, variantOutput) = await RunAsync(input, prepareOnly: true, promptVariant: "declarative-inspect");
+        Assert.Equal(0, exitCode);
+        using var baseline = JsonDocument.Parse(baselineOutput);
+        using var variant = JsonDocument.Parse(variantOutput);
+        var before = baseline.RootElement;
+        var after = variant.RootElement;
+        Assert.Equal("7-declarative-inspect-1", after.GetProperty("promptVersion").GetString());
+        Assert.Equal(before.GetProperty("modelInput").GetString(), after.GetProperty("modelInput").GetString());
+        Assert.Equal(before.GetProperty("schema").GetRawText(), after.GetProperty("schema").GetRawText());
+        Assert.Equal(before.GetProperty("outputTokens").GetInt32(), after.GetProperty("outputTokens").GetInt32());
+        Assert.NotEqual(
+            before.GetProperty("configurationId").GetString(),
+            after.GetProperty("configurationId").GetString()
+        );
+        var prompt = after.GetProperty("prompt").GetString()!;
+        Assert.StartsWith(before.GetProperty("prompt").GetString()!, prompt, StringComparison.Ordinal);
+        Assert.Contains("absence of an action verb", prompt, StringComparison.Ordinal);
+        Assert.Equal(
+            prompt,
+            after
+                .GetProperty("effective")
+                .GetProperty("request")
+                .GetProperty("messages")[0]
+                .GetProperty("content")
+                .GetString()
+        );
+    }
+
+    [Fact]
+    public async Task UnknownPromptVariantIsRejectedBeforeInference()
+    {
+        var (exitCode, output) = await RunAsync(
+            """{"instruction":"Save","candidates":[{"id":"c1","tag":"button","label":"Save"}]}""",
+            prepareOnly: false,
+            endpoint: "http://127.0.0.1:1/api/v1/",
+            promptVariant: "concise"
+        );
+        Assert.Equal(1, exitCode);
+        using var result = JsonDocument.Parse(output);
+        Assert.Equal(
+            "invalid_offline_prompt_variant",
+            result.RootElement.GetProperty("diagnostics").GetProperty("code").GetString()
+        );
+        Assert.Equal(0, result.RootElement.GetProperty("diagnostics").GetProperty("modelCalls").GetInt32());
+    }
+
+    [Fact]
     public async Task PrepareOnlyBuildsTheVersionedRequestWithoutCredentialsOrBrowserClaims()
     {
         var (exitCode, output) = await RunAsync(
@@ -55,6 +107,7 @@ public sealed class OfflineEvaluationTests
 
     [Theory]
     [InlineData("valid", null)]
+    [InlineData("valid_variant", null)]
     [InlineData("unknown", "provider_unknown_candidate")]
     [InlineData("mixed", "provider_malformed_response")]
     [InlineData("duplicate", "provider_malformed_response")]
@@ -73,6 +126,7 @@ public sealed class OfflineEvaluationTests
         builder.WebHost.ConfigureKestrel(options => options.Listen(IPAddress.Loopback, 0));
         await using var provider = builder.Build();
         var calls = 0;
+        string? sentPrompt = null;
         provider.MapPost(
             "/api/v1/chat/completions",
             async context =>
@@ -80,6 +134,7 @@ public sealed class OfflineEvaluationTests
                 calls++;
                 using var request = await JsonDocument.ParseAsync(context.Request.Body);
                 Assert.Equal("configured/model", request.RootElement.GetProperty("model").GetString());
+                sentPrompt = request.RootElement.GetProperty("messages")[0].GetProperty("content").GetString();
                 const string valid =
                     """{"complete":true,"actions":[{"step":1,"instruction":"Click Save","outcome":"found","action":"click","candidateId":"c1","limitation":"none"}]}""";
                 var content = scenario switch
@@ -127,14 +182,38 @@ public sealed class OfflineEvaluationTests
             }
         );
         await provider.StartAsync();
-        var (exitCode, output) = await RunAsync(
-            """{"instruction":"Click Save","candidates":[{"id":"c1","tag":"button","label":"Save"}]}""",
-            prepareOnly: false,
-            endpoint: provider.Urls.Single() + "/api/v1/"
+        var promptVariant = scenario == "valid_variant" ? "declarative-inspect" : "baseline";
+        const string input =
+            """{"instruction":"Click Save","candidates":[{"id":"c1","tag":"button","label":"Save"}]}""";
+        var (_, preparedOutput) = await RunAsync(
+            input,
+            prepareOnly: true,
+            endpoint: provider.Urls.Single() + "/api/v1/",
+            promptVariant: promptVariant
         );
+        using var prepared = JsonDocument.Parse(preparedOutput);
+        var (exitCode, output) = await RunAsync(
+            input,
+            prepareOnly: false,
+            endpoint: provider.Urls.Single() + "/api/v1/",
+            promptVariant: promptVariant
+        );
+        Assert.Equal(prepared.RootElement.GetProperty("prompt").GetString(), sentPrompt);
         Assert.Equal(expectedCode is null ? 0 : 1, exitCode);
         using var json = JsonDocument.Parse(output);
         var result = json.RootElement;
+        Assert.Equal(
+            prepared.RootElement.GetProperty("configurationId").GetString(),
+            result.GetProperty("configurationId").GetString()
+        );
+        Assert.Equal(
+            prepared.RootElement.GetProperty("promptVersion").GetString(),
+            result.GetProperty("promptVersion").GetString()
+        );
+        Assert.Equal(
+            prepared.RootElement.GetProperty("promptVersion").GetString(),
+            result.GetProperty("diagnostics").GetProperty("promptVersion").GetString()
+        );
         Assert.Equal(expectedCode is null ? "found" : "error", result.GetProperty("outcome").GetString());
         if (expectedCode is null)
         {
@@ -247,7 +326,8 @@ public sealed class OfflineEvaluationTests
         string input,
         bool prepareOnly,
         string? endpoint = null,
-        string? priceLimits = null
+        string? priceLimits = null,
+        string? promptVariant = null
     )
     {
         var path = Path.Combine(Path.GetTempPath(), $"xpathed-offline-{Guid.NewGuid():N}.json");
@@ -270,6 +350,7 @@ public sealed class OfflineEvaluationTests
             {
                 process.StartInfo.ArgumentList.Add("--prepare-only");
             }
+            process.StartInfo.Environment["XPATHED_EVALUATION_PROMPT_VARIANT"] = promptVariant ?? "baseline";
             process.StartInfo.Environment["XPATHED_EVALUATION_PRICE_LIMITS"] = priceLimits ?? "";
             process.StartInfo.Environment["OpenRouter__ApiKey"] = endpoint is null ? "" : "synthetic-api-key";
             process.StartInfo.Environment["OpenRouter__Model"] = "configured/model";

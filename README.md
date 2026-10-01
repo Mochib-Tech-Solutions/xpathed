@@ -116,6 +116,8 @@ Docker definitions have a separate validation job. A dedicated persistence job s
 
 The [independent evaluator](docs/evaluation.md) uses a separate `xpathed-evaluation` project with Browser, Resolver and labelled fixtures. It records every trial and separates intended-target grading from XPath validity. Deterministic runner/fixture/grader tests run in tooling CI; browser evaluations and paid live runs remain explicit. `evaluate:compare` adds an isolated Stagehand adapter. `evaluate:qualify` compares pinned model configurations under a versioned correctness and latency policy, aiming for strictly under one second and requiring 95% correct, complete responses within two seconds (policy 2). Qwen3.8 Flash is available as the explicit `--profile qwen` experiment. Both live comparison paths share the initial experiment's $5 ceiling with dataset runs. Saved reports can be regraded without services. Experimental results never change the production default automatically.
 
+Offline dataset prompt experiments use the explicit, versioned `--prompt-variant` option described in [evaluation](docs/evaluation.md#external-datasets); they do not change production defaults.
+
 ## Roadmap
 
 GitHub Issues hold the live requirements, dependencies and progress. The next capabilities are:
