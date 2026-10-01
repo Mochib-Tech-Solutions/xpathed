@@ -1,0 +1,289 @@
+{
+  "version": 1,
+  "auditedAt": "2026-10-01T18:15:33.033Z",
+  "sourceRevision": "6a7d63f5f10f6c8f37280bdef93ad3ea532493ad",
+  "planSha256": "c8b631eec800d006d9b7b8fd3989f14386fc806ea9945e3ca342a30ae597f5d8",
+  "decisionPolicySha256": "4ba26e897bc4f8bbf4868e14d48cd06f8f35d2dc1f10d745d287f30ef2d658d7",
+  "policyFrozenAt": "2026-10-01T18:01:42.865Z",
+  "executionDesign": "Same seven cases, one attempt per route; OpenAI cohort first, Azure second. Sequential and exposed source-dev cases, not held-out or browser qualification.",
+  "checks": {
+    "replayedAll14Grades": true,
+    "originalSourceLabelsAndReviewedInputsPreserved": true,
+    "preparedRequestsAndAllocationBindingsVerified": true,
+    "uniqueAttemptsAndGenerations": 14,
+    "all14AuthoritativeChargesMatched": true,
+    "sameSourceAndBinaryFingerprints": true,
+    "noPremiumTier": true,
+    "noCacheOrReasoningTokens": true,
+    "reportedChargesMatchBaseEndpointRates": true
+  },
+  "routes": [
+    {
+      "profileId": "luna",
+      "planned": 7,
+      "completed": 7,
+      "correct": 6,
+      "offlineLatencyMs": {
+        "p50": 5464.437042000005,
+        "p95": 7285.214749999999,
+        "observed": 7,
+        "unavailable": 0
+      },
+      "providerLatencyMs": {
+        "p50": 5177.7172,
+        "p95": 7012.5709,
+        "observed": 7,
+        "unavailable": 0
+      },
+      "costUsd": 0.0242059,
+      "inputTokens": 240219,
+      "outputTokens": 368,
+      "cases": [
+        {
+          "caseId": "phrasenode-e4e87fef4039ef7046fa1ce4",
+          "correct": true,
+          "offlineElapsedMs": 5220.307874999999,
+          "providerMs": 4936.528,
+          "reportedUsd": 0.0005281,
+          "inputTokens": 5021,
+          "outputTokens": 52,
+          "remoteAccountingMs": {
+            "reservation": 1672.103083,
+            "reconciliation": 1552.3093750000007
+          }
+        },
+        {
+          "caseId": "phrasenode-ba8d831ae2dc04243fd9cc96",
+          "correct": false,
+          "offlineElapsedMs": 7285.214749999999,
+          "providerMs": 7012.5709,
+          "reportedUsd": 0.0009676,
+          "inputTokens": 9436,
+          "outputTokens": 48,
+          "remoteAccountingMs": {
+            "reservation": 3926.5901670000003,
+            "reconciliation": 1497.0452499999992
+          }
+        },
+        {
+          "caseId": "phrasenode-433220b57236e3f0b2acaf66",
+          "correct": true,
+          "offlineElapsedMs": 6203.220999999998,
+          "providerMs": 5929.7129,
+          "reportedUsd": 0.0052369,
+          "inputTokens": 52064,
+          "outputTokens": 61,
+          "remoteAccountingMs": {
+            "reservation": 2675.6585830000004,
+            "reconciliation": 1398.0409580000014
+          }
+        },
+        {
+          "caseId": "phrasenode-a7a3bdf7addf919530086ddd",
+          "correct": true,
+          "offlineElapsedMs": 5809.863167000003,
+          "providerMs": 5531.0042,
+          "reportedUsd": 0.0052437,
+          "inputTokens": 52187,
+          "outputTokens": 50,
+          "remoteAccountingMs": {
+            "reservation": 2173.9874169999966,
+            "reconciliation": 1545.4758750000037
+          }
+        },
+        {
+          "caseId": "phrasenode-ad868c282a5fd8edb21b9a9c",
+          "correct": true,
+          "offlineElapsedMs": 5049.741624999999,
+          "providerMs": 4765.9072,
+          "reportedUsd": 0.0052472,
+          "inputTokens": 52192,
+          "outputTokens": 56,
+          "remoteAccountingMs": {
+            "reservation": 1684.3482919999988,
+            "reconciliation": 1532.466457999999
+          }
+        },
+        {
+          "caseId": "phrasenode-089e985d921f175d949cda16",
+          "correct": true,
+          "offlineElapsedMs": 5168.866416000004,
+          "providerMs": 4898.8759,
+          "reportedUsd": 0.0017376,
+          "inputTokens": 17131,
+          "outputTokens": 49,
+          "remoteAccountingMs": {
+            "reservation": 1285.1314170000041,
+            "reconciliation": 2226.264332999999
+          }
+        },
+        {
+          "caseId": "phrasenode-3ca25797b7112fd163bb926c",
+          "correct": true,
+          "offlineElapsedMs": 5464.437042000005,
+          "providerMs": 5177.7172,
+          "reportedUsd": 0.0052448,
+          "inputTokens": 52188,
+          "outputTokens": 52,
+          "remoteAccountingMs": {
+            "reservation": 1494.8283750000046,
+            "reconciliation": 1594.1445419999945
+          }
+        }
+      ]
+    },
+    {
+      "profileId": "luna-azure",
+      "planned": 7,
+      "completed": 7,
+      "correct": 6,
+      "offlineLatencyMs": {
+        "p50": 5777.941749999998,
+        "p95": 6687.735708000007,
+        "observed": 7,
+        "unavailable": 0
+      },
+      "providerLatencyMs": {
+        "p50": 5495.2326,
+        "p95": 6401.5931,
+        "observed": 7,
+        "unavailable": 0
+      },
+      "costUsd": 0.0242104,
+      "inputTokens": 240219,
+      "outputTokens": 377,
+      "cases": [
+        {
+          "caseId": "phrasenode-e4e87fef4039ef7046fa1ce4",
+          "correct": true,
+          "offlineElapsedMs": 5587.320917000005,
+          "providerMs": 5293.7539,
+          "reportedUsd": 0.0005271,
+          "inputTokens": 5021,
+          "outputTokens": 50,
+          "remoteAccountingMs": {
+            "reservation": 1838.6807079999999,
+            "reconciliation": 2169.5174170000028
+          }
+        },
+        {
+          "caseId": "phrasenode-ba8d831ae2dc04243fd9cc96",
+          "correct": false,
+          "offlineElapsedMs": 6580.676416000002,
+          "providerMs": 6314.2948,
+          "reportedUsd": 0.0009711,
+          "inputTokens": 9436,
+          "outputTokens": 55,
+          "remoteAccountingMs": {
+            "reservation": 2186.598957999995,
+            "reconciliation": 1739.1247500000027
+          }
+        },
+        {
+          "caseId": "phrasenode-433220b57236e3f0b2acaf66",
+          "correct": true,
+          "offlineElapsedMs": 6687.735708000007,
+          "providerMs": 6401.5931,
+          "reportedUsd": 0.0052369,
+          "inputTokens": 52064,
+          "outputTokens": 61,
+          "remoteAccountingMs": {
+            "reservation": 1443.8662499999919,
+            "reconciliation": 1717.755124999996
+          }
+        },
+        {
+          "caseId": "phrasenode-a7a3bdf7addf919530086ddd",
+          "correct": true,
+          "offlineElapsedMs": 5484.268333,
+          "providerMs": 5200.2428,
+          "reportedUsd": 0.0052442,
+          "inputTokens": 52187,
+          "outputTokens": 51,
+          "remoteAccountingMs": {
+            "reservation": 1641.9901669999963,
+            "reconciliation": 1699.0765419999952
+          }
+        },
+        {
+          "caseId": "phrasenode-ad868c282a5fd8edb21b9a9c",
+          "correct": true,
+          "offlineElapsedMs": 6245.663041000007,
+          "providerMs": 5961.9495,
+          "reportedUsd": 0.0052472,
+          "inputTokens": 52192,
+          "outputTokens": 56,
+          "remoteAccountingMs": {
+            "reservation": 1815.1739579999994,
+            "reconciliation": 1930.5272090000071
+          }
+        },
+        {
+          "caseId": "phrasenode-089e985d921f175d949cda16",
+          "correct": true,
+          "offlineElapsedMs": 5206.414416,
+          "providerMs": 4935.3899,
+          "reportedUsd": 0.0017396,
+          "inputTokens": 17131,
+          "outputTokens": 53,
+          "remoteAccountingMs": {
+            "reservation": 1589.6573749999952,
+            "reconciliation": 1597.6484590000036
+          }
+        },
+        {
+          "caseId": "phrasenode-3ca25797b7112fd163bb926c",
+          "correct": true,
+          "offlineElapsedMs": 5777.941749999998,
+          "providerMs": 5495.2326,
+          "reportedUsd": 0.0052443,
+          "inputTokens": 52188,
+          "outputTokens": 51,
+          "remoteAccountingMs": {
+            "reservation": 1862.3848750000034,
+            "reconciliation": 1447.3404999999912
+          }
+        }
+      ]
+    }
+  ],
+  "decision": {
+    "selectedForNextEvaluation": "luna",
+    "provider": "OpenAI",
+    "status": "provisional",
+    "reason": "Equal 6/7 target correctness; Azure offline median higher, so frozen policy retains OpenAI.",
+    "azureMedianDifferenceMs": 313.5047079999931,
+    "qualification": false,
+    "globalStabilityClaim": false
+  },
+  "pricing": {
+    "observedBaseUsdPerMillion": {
+      "input": 0.1,
+      "output": 0.5
+    },
+    "conservativeForecastUsdPerMillion": {
+      "input": 0.25,
+      "output": 0.75
+    },
+    "explanation": "Forecast covers maximum advertised tier/cache-write rates; all actual pilot calls used default service tier and base token pricing."
+  },
+  "pilotReportedUsd": 0.0484163,
+  "accounting": {
+    "ledgerEntries": 2456,
+    "ceilingUsd": 10,
+    "consumedUsd": 3.7589995437999937,
+    "reportedUsd": 3.729280943799994,
+    "remainingUsd": 6.241000456200006,
+    "pendingCharges": 0,
+    "reviewedUnknownCharges": 4,
+    "reviewedUnknownReservedUsd": 0.029718599999999998,
+    "unknownReportedCostsRemainUnknown": true,
+    "dedicatedEvaluationKeyUsageUsd": 1.715874638
+  },
+  "limits": [
+    "Seven cases do not establish provider stability or a statistically reliable speed difference.",
+    "Offline page-wide source target selection only; no runtime/browser latency qualification.",
+    "Frozen cohort order can confound time/load effects even with no observed cache tokens."
+  ],
+  "privateAuditSha256": "2b8170bfa8f6fc1b1de38643013fb47d923607d19bdbcf2f670fce12eac33ff6"
+}
