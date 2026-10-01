@@ -137,6 +137,8 @@ These links describe planned work, not available features. Hosting and presentat
 
 ## Reference
 
+The [completed source baseline and provider comparison](docs/research/deepinfra-labelled-baseline-report.md) records the expanded labelled measurement and dated standard-route recommendations. It is separate from browser latency measurement and release qualification.
+
 - [Runtime, API contracts and configuration](docs/runtime.md)
 - [Independent evaluation, artifacts and replay](docs/evaluation.md)
 - [Domain vocabulary](CONTEXT.md) and [architecture decisions](docs/adr/)
