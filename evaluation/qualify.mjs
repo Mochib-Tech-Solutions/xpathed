@@ -90,6 +90,27 @@ export function selectQualificationCases(cases, options) {
   return { cases: selected, exclusions };
 }
 
+export function compatibilityCases(allCases) {
+  const compatibility = allCases.filter(
+    (c) => c.contractVersion === "3" && c.split !== "held-out" && !c.mutation,
+  );
+  const chosen = [
+    ...new Set(
+      [
+        compatibility.find((c) => c.expected.actions.some((a) => a.outcome === "found")),
+        compatibility.find((c) => c.expected.actions.some((a) => a.outcome === "not_found")),
+        compatibility.find(
+          (c) => c.expected.actions.filter((a) => a.outcome === "found").length > 1,
+        ),
+        ...compatibility.filter((c) => c.provider?.fault),
+      ].filter(Boolean),
+    ),
+  ];
+  if (chosen.length < 3)
+    throw new Error("Compatibility suite needs positive, absent, and plural cases");
+  return chosen;
+}
+
 export function buildMatrixPlan(cases, selectedProfiles, options) {
   const plan = buildPlan(cases, options);
   return {
@@ -413,23 +434,7 @@ export async function main(args = process.argv.slice(2)) {
     deterministicProxy.listen(8091, "0.0.0.0");
     await once(deterministicProxy, "listening");
     if (options.mode === "live") {
-      const compatibility = allCases.filter(
-        (c) => c.contractVersion === "3" && c.split !== "held-out" && !c.mutation,
-      );
-      const chosen = [
-        ...new Set(
-          [
-            compatibility.find((c) => c.expected.actions.some((a) => a.outcome === "found")),
-            compatibility.find((c) => c.expected.actions.some((a) => a.outcome === "not_found")),
-            compatibility.find(
-              (c) => c.expected.actions.filter((a) => a.outcome === "found").length > 1,
-            ),
-            ...compatibility.filter((c) => c.provider?.fault),
-          ].filter(Boolean),
-        ),
-      ];
-      if (chosen.length < 3)
-        throw new Error("Compatibility suite needs positive, absent, and plural cases");
+      const chosen = compatibilityCases(allCases);
       const gates = [];
       for (const spec of chosen)
         for (const profile of selectedProfiles)
