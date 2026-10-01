@@ -18,7 +18,7 @@ export type SessionState = {
 };
 
 export type ResolutionResult = {
-  contractVersion: "1" | "2" | "3";
+  contractVersion: "1" | "2" | "3" | "4";
   outcome: "found" | "not_found" | "unsupported" | "error" | "partial";
   sessionId: string | null;
   pageId: string;
@@ -82,6 +82,7 @@ export type ResolutionResult = {
     timingsMs?: { total?: number };
     model?: string | null;
     provider?: string | null;
+    providerAccounting?: "pending" | "completed" | "unavailable" | null;
     usage?: {
       inputTokens: number | null;
       outputTokens: number | null;

@@ -55,6 +55,7 @@ internal static class CandidateSelectionStrategy
             new
             {
                 instruction,
+                scope = capture.Scope == "current_view" ? capture.Scope : null,
                 capture.FrameId,
                 candidates = capture.Candidates.Select(candidate => new
                 {
@@ -69,13 +70,30 @@ internal static class CandidateSelectionStrategy
                     scope = candidate.Scope.Length == 0 ? null : candidate.Scope,
                     state = new
                     {
-                        candidate.State.Rendered,
-                        candidate.State.InViewport,
-                        candidate.State.Enabled,
-                        candidate.State.Editable,
-                        candidate.State.Readonly,
+                        rendered = capture.Scope == "current_view" && candidate.State.Rendered
+                            ? (bool?)null
+                            : candidate.State.Rendered,
+                        inViewport = capture.Scope == "current_view" ? (bool?)null : candidate.State.InViewport,
+                        enabled = capture.Scope == "current_view" && candidate.State.Enabled
+                            ? (bool?)null
+                            : candidate.State.Enabled,
+                        editable = capture.Scope == "current_view" && !candidate.State.Editable
+                            ? (bool?)null
+                            : candidate.State.Editable,
+                        @readonly = capture.Scope == "current_view" && candidate.State.Readonly != true
+                            ? null
+                            : candidate.State.Readonly,
                     },
                     candidate.Geometry,
+                    appearance = capture.Scope == "current_view" && candidate.Appearance is { } appearance
+                        ? new
+                        {
+                            appearance.BackgroundColor,
+                            appearance.TextColor,
+                            appearance.BorderColor,
+                            limitations = appearance.Limitations.Length == 0 ? null : appearance.Limitations,
+                        }
+                        : null,
                     frame = candidate.Frame is null
                         ? null
                         : new { candidate.Frame.Id, labels = candidate.Frame.Chain.Select(ancestor => ancestor.Label) },

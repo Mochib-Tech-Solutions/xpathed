@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import assert from "node:assert/strict";
 import { once } from "node:events";
 import { readFileSync } from "node:fs";
@@ -5,6 +6,37 @@ import test from "node:test";
 import { createFixtureServer } from "./server.mjs";
 import { renderFixture } from "./fixtures.mjs";
 import { validateCases } from "./run.mjs";
+
+test("viewport baseline keeps matched target pairs separate from appearance and clipped-scope changes", () => {
+  const suite = JSON.parse(
+    readFileSync(new URL("./viewport-baseline-cases.json", import.meta.url), "utf8"),
+  );
+  const cases = validateCases(suite);
+  assert.equal(
+    new Set(cases.filter((c) => c.baselineStratum === "paired").map((c) => c.pairId)).size,
+    12,
+  );
+  assert.equal(cases.length, 32);
+  for (const spec of cases) {
+    const html = renderFixture(spec.fixture, "private-trial");
+    assert.doesNotMatch(html, /baselineStratum|pairId|expected-target/);
+    assert.equal(spec.labelProvenance.kind, "controlled-authored");
+    assert.notEqual(spec.split, "held-out");
+  }
+  assert.equal(
+    cases.find((c) => c.id === "clipped-frame-v4").expected.actions[0].outcome,
+    "not_found",
+  );
+  assert.equal(
+    cases.find((c) => c.id === "clipped-frame-v3").expected.actions[0].target.selector,
+    "#frame-lower",
+  );
+  assert.match(renderFixture("viewport-clipped", "private-trial"), /overflow:hidden/);
+  assert.match(
+    renderFixture("viewport-clipped", "private-trial", "viewport-clipped-child"),
+    /frame-lower/,
+  );
+});
 
 test("qualification cases preserve family boundaries and render without oracle instructions", () => {
   const suite = JSON.parse(
@@ -247,4 +279,15 @@ test("provider doubles distinguish malformed output, invalid identities and upst
   });
   assert.equal(malformed.status, 400);
   assert.doesNotMatch(await malformed.text(), /not-for-errors/);
+});
+
+test("the default deterministic CI suite exercises reviewed current-view scope and capability cases", async () => {
+  const suite = JSON.parse(await readFile(new URL("./cases.json", import.meta.url), "utf8"));
+  const cases = suite.cases.filter((entry) => entry.contractVersion === "4");
+  for (const fixture of ["viewport-clipped", "viewport-plural", "offscreen", "qualification-color"])
+    assert.ok(
+      cases.some((entry) => entry.fixture === fixture),
+      `Missing current-view ${fixture}`,
+    );
+  for (const entry of cases) assert.equal(entry.review.status, "reviewed");
 });

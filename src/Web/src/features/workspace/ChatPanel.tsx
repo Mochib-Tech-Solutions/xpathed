@@ -170,14 +170,15 @@ export default function ChatPanel({
             <h2 className="text-base font-medium">Find an element</h2>
             <p className="text-muted-foreground">
               {ready
-                ? "Describe the element you want to find on this page."
+                ? "Describe the element you want to find in the current view."
                 : "Open a website, then describe the element you want to find."}
             </p>
           </div>
         )}
         {history.map((resolution) => {
           const result = resolution.result;
-          const sharedAction = result?.contractVersion === "3";
+          const currentView = result?.contractVersion === "4";
+          const sharedAction = result?.contractVersion === "3" || currentView;
           const actions = !result
             ? []
             : result.contractVersion !== "1"
@@ -266,6 +267,7 @@ export default function ChatPanel({
                           : "",
                         result.summary.errors ? `${result.summary.errors} failed` : "",
                         result.summary.blocked ? `${result.summary.blocked} blocked` : "",
+                        currentView ? "current view" : "",
                       ]
                         .filter(Boolean)
                         .join(" · ")}
@@ -343,13 +345,19 @@ export default function ChatPanel({
                             </p>
                           )}
                         {action.outcome === "not_found" && (
-                          <p>I couldn’t find that element on this page.</p>
+                          <p>
+                            {currentView
+                              ? "I couldn’t find that element in the current view."
+                              : "I couldn’t find that element on this page."}
+                          </p>
                         )}
                         {action.outcome === "unsupported" && (
                           <p>
                             {sharedAction && action.code === "unsupported_action"
                               ? (action.message ??
-                                "Use one action per command. You can target several elements on this page.")
+                                (currentView
+                                  ? "Use one action per command. You can target several elements in the current view."
+                                  : "Use one action per command. You can target several elements on this page."))
                               : (instructionLimits[action.code ?? ""] ??
                                 action.message ??
                                 "This instruction is not supported yet.")}
@@ -485,12 +493,19 @@ export default function ChatPanel({
           }
         }}
       >
+        <p id="instruction-scope" className="px-3 pt-2 text-xs text-muted-foreground">
+          Current view only
+        </p>
         <textarea
           ref={composer}
           className="block [field-sizing:content] max-h-40 min-h-[72px] w-full min-w-0 resize-none border-0 bg-transparent px-3 pt-3 pb-2 text-base leading-6 outline-none placeholder:text-muted-foreground focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60"
           aria-label="Describe an element"
           aria-invalid={tooLong}
-          aria-describedby={tooLong ? "instruction-error instruction-hint" : "instruction-hint"}
+          aria-describedby={
+            tooLong
+              ? "instruction-error instruction-scope instruction-hint"
+              : "instruction-scope instruction-hint"
+          }
           placeholder={ready ? "Describe an element…" : "Open a website to begin…"}
           rows={2}
           value={instruction}

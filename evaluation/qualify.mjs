@@ -71,7 +71,7 @@ export function parseQualificationOptions(args) {
     seen = new Set();
   for (let i = 0; i < args.length; i += 2) {
     const name = args[i].slice(2);
-    if (["phase", "split", "profile", "pilot"].includes(name)) {
+    if (["phase", "split", "profile", "pilot", "suite", "forecast-only"].includes(name)) {
       if (seen.has(name) || !args[i + 1] || args[i + 1].startsWith("--"))
         throw new Error("Repeated or missing qualification option");
       seen.add(name);
@@ -79,6 +79,12 @@ export function parseQualificationOptions(args) {
     } else rest.push(args[i], args[i + 1]);
   }
   const options = { ...parseOptions(rest), ...extra };
+  if (options["forecast-only"] !== undefined && options["forecast-only"] !== "true")
+    throw new Error("Use --forecast-only true for explicit preparation");
+  options.forecastOnly = options["forecast-only"] === "true";
+  delete options["forecast-only"];
+  if (options.forecastOnly && options.mode !== "live")
+    throw new Error("Forecast preparation requires live pricing mode");
   if (options.prune) throw new Error("Use the ordinary evaluation prune command");
   if (options.replay && seen.size)
     throw new Error("Replay cannot be combined with qualification options");
@@ -112,7 +118,7 @@ export function selectQualificationCases(cases, options) {
         ? "case filter"
         : !options.splits.includes(item.split)
           ? "split filter"
-          : item.contractVersion !== "3"
+          : !["3", "4"].includes(item.contractVersion)
             ? "legacy contract regression track"
             : item.track === "offline-selection"
               ? "offline dataset track"
@@ -133,28 +139,50 @@ export function selectQualificationCases(cases, options) {
 }
 
 export function compatibilityCases(allCases) {
-  const compatibility = allCases.filter(
-    (c) => c.contractVersion === "3" && c.split !== "held-out" && !c.mutation,
-  );
-  const chosen = [
+  return [
     ...new Set(
-      [
-        compatibility.find((c) => c.expected.actions.some((a) => a.outcome === "found")),
-        compatibility.find((c) => c.expected.actions.some((a) => a.outcome === "not_found")),
-        compatibility.find(
-          (c) => c.expected.actions.filter((a) => a.outcome === "found").length > 1,
-        ),
-        ...compatibility.filter((c) => c.provider?.fault),
-      ].filter(Boolean),
+      allCases.filter((c) => ["3", "4"].includes(c.contractVersion)).map((c) => c.contractVersion),
     ),
-  ];
-  if (chosen.length < 3)
-    throw new Error("Compatibility suite needs positive, absent, and plural cases");
-  return chosen;
+  ].flatMap((version) => {
+    const compatibility = allCases.filter(
+      (c) => c.contractVersion === version && c.split !== "held-out" && !c.mutation,
+    );
+    const required = [
+      compatibility.find((c) => c.expected.actions.some((a) => a.outcome === "found")),
+      compatibility.find((c) => c.expected.actions.some((a) => a.outcome === "not_found")),
+      compatibility.find((c) => c.expected.actions.filter((a) => a.outcome === "found").length > 1),
+    ];
+    if (required.some((c) => !c))
+      throw new Error(
+        `Compatibility suite needs positive, absent, and plural cases for contract ${version}`,
+      );
+    return [...new Set([...required, ...compatibility.filter((c) => c.provider?.fault)])];
+  });
 }
 
 export function buildMatrixPlan(cases, selectedProfiles, options) {
   const plan = buildPlan(cases, options);
+  if (cases.some((c) => c.pairId)) {
+    const specs = new Map(cases.map((c) => [c.id, c]));
+    const seen = new Set();
+    let pairIndex = 0;
+    plan.trials = plan.trials.flatMap((trial) => {
+      const pairId = specs.get(trial.caseId).pairId;
+      if (!pairId) return [trial];
+      const key = `${pairId}:${trial.repetition}`;
+      if (seen.has(key)) return [];
+      seen.add(key);
+      const members = plan.trials.filter(
+        (t) => t.repetition === trial.repetition && specs.get(t.caseId).pairId === pairId,
+      );
+      const first = pairIndex++ % 2 === 0 ? "3" : "4";
+      return members.sort(
+        (a, b) =>
+          Number(specs.get(b.caseId).contractVersion === first) -
+          Number(specs.get(a.caseId).contractVersion === first),
+      );
+    });
+  }
   return {
     ...plan,
     trials: plan.trials.flatMap((t, index) => {
@@ -163,7 +191,9 @@ export function buildMatrixPlan(cases, selectedProfiles, options) {
         (profile) => ({ ...t, profileId: profile.id }),
       );
     }),
-    order: "Seeded case order, rotating model order, sequential repetitions; no retries",
+    order: cases.some((c) => c.pairId)
+      ? "Seeded pair order, adjacent contracts alternating first position; separate edges; no retries"
+      : "Seeded case order, rotating model order, sequential repetitions; no retries",
     warmup:
       "No discarded warmups; new browser session per trial; provider prompt-cache warmth uncontrolled and reported",
   };
@@ -254,7 +284,11 @@ export async function readRun(directory) {
       hash(await readFile(new URL(`../${path}`, import.meta.url), "utf8"))
     )
       throw new Error(`Replay requires the recorded revision: ${path}`);
-  validateCases({ version: "1", cases: manifest.cases });
+  validateCases({
+    version: "1",
+    cases: manifest.cases,
+    ...(manifest.baseline ? { baseline: manifest.baseline } : {}),
+  });
   const trials = [];
   for (const planned of manifest.plan.trials) {
     try {
@@ -386,10 +420,26 @@ export async function main(args = process.argv.slice(2)) {
           options.profileIds,
         );
   const suite = await json(
-    process.env.XPATHED_EVALUATION_SUITE || new URL("./qualification-cases.json", import.meta.url),
+    options.suite ||
+      process.env.XPATHED_EVALUATION_SUITE ||
+      new URL("./qualification-cases.json", import.meta.url),
   );
   const allCases = validateCases(suite);
   const { cases, exclusions } = selectQualificationCases(allCases, options);
+  if (
+    suite.baseline &&
+    (options.phase !== "pilot" ||
+      options.repetitions !== 1 ||
+      options.profileIds.length !== 1 ||
+      options.profileIds[0] !== "deepseek" ||
+      cases.length !== allCases.length ||
+      options.caseId)
+  )
+    throw new Error(
+      "Paired baseline requires the complete suite, one DeepSeek profile, one attempt and pilot phase",
+    );
+  if (options.forecastOnly && !suite.baseline)
+    throw new Error("Forecast-only preparation requires the paired baseline suite");
   if (
     options.mode === "live" &&
     cases.some(
@@ -429,6 +479,7 @@ export async function main(args = process.argv.slice(2)) {
     mode: options.mode,
     phase: options.phase,
     cases,
+    ...(suite.baseline ? { baseline: suite.baseline } : {}),
     exclusions,
     sourceManifestHash: hash(suite),
     profiles: selectedProfiles,
@@ -476,7 +527,12 @@ export async function main(args = process.argv.slice(2)) {
       result: null,
       evidence: null,
     };
-    if (mode === "live") proxy.beginAttempt(trial.id, profile.id);
+    if (mode === "live")
+      proxy.beginAttempt(
+        trial.id,
+        profile.id,
+        manifest.preparedForecast?.reservations.find((r) => r.id === planned.id)?.maximumUsd,
+      );
     await execute(spec, trial, { ...options, mode }, { ...services, resolver: profile.resolver });
     trial.configuration = configurationRecord(trial);
     if (mode === "live") {
@@ -494,7 +550,7 @@ export async function main(args = process.argv.slice(2)) {
     deterministicProxy.listen(8091, "0.0.0.0");
     await once(deterministicProxy, "listening");
     if (options.mode === "live") {
-      const chosen = compatibilityCases(allCases);
+      const chosen = suite.baseline ? cases : compatibilityCases(allCases);
       const gates = [];
       for (const spec of chosen)
         for (const profile of selectedProfiles)
@@ -534,6 +590,34 @@ export async function main(args = process.argv.slice(2)) {
       });
       manifest.pricing = Object.fromEntries(proxy.profiles.map((p) => [p.id, p.pricing]));
       manifest.routeMetadata = proxy.profiles;
+      if (suite.baseline) {
+        manifest.preparedForecast = proxy.forecastRequests(
+          manifest.plan.trials.map((planned) => {
+            const prepared = gates.find(
+              (gate) => gate.caseId === planned.caseId && gate.profileId === planned.profileId,
+            );
+            return {
+              id: planned.id,
+              profileId: planned.profileId,
+              request: prepared?.evidence?.preparedProviderRequest,
+            };
+          }),
+        );
+        await save(join(output, "forecast.json"), manifest.preparedForecast);
+        if (!manifest.preparedForecast.fits)
+          throw new Error(
+            "Combined paired baseline forecast exceeds remaining shared budget; no paid calls made",
+          );
+        if (options.forecastOnly) {
+          manifest.measurement.forecastOnly = true;
+          manifest.contentHash = hash(manifest);
+          await save(join(output, "manifest.json"), manifest);
+          console.log(
+            `Prepared ${manifest.preparedForecast.reservations.length} requests; maximum USD ${manifest.preparedForecast.projectedUsd}; remaining USD ${manifest.preparedForecast.remainingUsd}; no paid calls made.`,
+          );
+          return 0;
+        }
+      }
       if (pilot) {
         manifest.forecast = forecastPilot(
           pilot,

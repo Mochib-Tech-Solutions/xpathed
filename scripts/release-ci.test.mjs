@@ -3,7 +3,24 @@ import test from "node:test";
 import { readFile } from "node:fs/promises";
 import { checkKeyBudget, qualificationCoverage } from "./release-ci.mjs";
 
-test("key preflight accepts only a bounded non-resetting inference key within the remaining campaign", async () => {
+test("key preflight permits a larger key cap while the campaign has its own remaining budget", async () => {
+  assert.deepEqual(
+    await checkKeyBudget("private-key", 2.97226, async () =>
+      Response.json({
+        data: {
+          is_management_key: false,
+          limit: 15,
+          limit_remaining: 15,
+          limit_reset: null,
+          expires_at: null,
+        },
+      }),
+    ),
+    { limitUsd: 15, remainingUsd: 15, reset: null, expiresAt: null },
+  );
+});
+
+test("key preflight requires a bounded non-resetting inference key and a positive campaign balance", async () => {
   const calls = [];
   const data = {
     is_management_key: false,
@@ -27,18 +44,29 @@ test("key preflight accepts only a bounded non-resetting inference key within th
   assert.equal(calls[0].options.headers.Authorization, "Bearer private-key");
   for (const patch of [
     { limit: null },
+    { limit: 0 },
+    { limit: -1 },
     { limit_reset: "monthly" },
     { limit_reset: undefined },
     { is_management_key: true },
     { limit_remaining: 3 },
+    { limit_remaining: null },
+    { limit_remaining: 0 },
     { limit_remaining: -1 },
     { expires_at: "2020-01-01T00:00:00Z" },
+    { expires_at: "invalid" },
   ]) {
     await assert.rejects(
       checkKeyBudget("private-key", 2.97226, async () =>
         Response.json({ data: { ...data, ...patch } }),
       ),
       /key/i,
+    );
+  }
+  for (const remaining of [0, -1, NaN, Infinity]) {
+    await assert.rejects(
+      checkKeyBudget("private-key", remaining, fetchImpl),
+      /campaign.*positive balance/,
     );
   }
   await assert.rejects(

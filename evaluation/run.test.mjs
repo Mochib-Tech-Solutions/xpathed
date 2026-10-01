@@ -31,6 +31,27 @@ const example = {
   },
 };
 
+test("paired viewport suites require complete equivalent pairs and separate changed-scope labels", () => {
+  const cases = ["3", "4"].map((contractVersion) => ({
+    ...structuredClone(example),
+    id: `save-${contractVersion}`,
+    contractVersion,
+    baselineStratum: "paired",
+    pairId: "save",
+    split: "development",
+  }));
+  const suite = { version: "1", baseline: { version: 1, kind: "viewport-paired" }, cases };
+  assert.equal(validateCases(suite).length, 2);
+  assert.throws(() => validateCases({ ...suite, cases: cases.slice(0, 1) }), /pair/);
+  const altered = structuredClone(suite);
+  altered.cases[1].expected.actions[0].target.selector = "#another";
+  assert.throws(() => validateCases(altered), /pair/);
+  assert.throws(
+    () => validateCases({ ...suite, cases: cases.map((c) => ({ ...c, split: "held-out" })) }),
+    /development|regression/,
+  );
+});
+
 test("durable run configuration keeps effective settings but excludes page content and credentials", () => {
   const record = configurationRecord({
     result: {
@@ -91,6 +112,8 @@ async function runWithServices(
   caseId,
   {
     captureFailure = false,
+    contractVersion = "2",
+    captureScope = "page",
     freshFailure = false,
     freshIdentityMismatch = false,
     freshOracleLeak = false,
@@ -115,15 +138,18 @@ async function runWithServices(
     if (path === "/browser/sessions/session" && request.method === "DELETE") return send({});
     if (path === "/browser/pages/page/navigate")
       return send({ pageId: "page", documentId: "document" });
-    if (path === "/browser/pages/page/capture")
+    if (path === "/browser/pages/page/capture") {
+      if (contractVersion === "4") assert.equal(body.scope, "current_view");
       return captureFailure
         ? send({ code: "capture_budget_exceeded" }, 502)
         : send({
             pageId: "page",
             documentId: "document",
             captureId: "capture",
+            scope: captureScope,
             candidates: [{ id: "candidate", label: "Save changes", tag: "button" }],
           });
+    }
     if (path === "/browser/pages/page/selections")
       return send({
         actions: body.actions.map((action) => ({
@@ -154,7 +180,7 @@ async function runWithServices(
       attempts.push(attemptId);
       if (freshFailure && attempts.length === 2) return send({ code: "service_unavailable" }, 503);
       const result = {
-        contractVersion: "2",
+        contractVersion,
         pageId: "page",
         documentId: "document",
         attemptId: freshIdentityMismatch && attempts.length === 2 ? "wrong-attempt" : attemptId,
@@ -348,4 +374,12 @@ test("artifact cleanup erases both model inputs at30 days without discarding out
   } finally {
     await rm(path, { recursive: true, force: true });
   }
+});
+
+test("current-view runs request scoped capture and reject a legacy-scope response", async (t) => {
+  const { trial } = await runWithServices(t, "current-view-control-states-1-v4", {
+    contractVersion: "4",
+  });
+  assert.match(trial.captureObservation.error.message, /wrong scope/);
+  assert.equal(trial.error.code, "capture_scope_unverified");
 });

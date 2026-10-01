@@ -14,6 +14,7 @@ function runWrapper(t, project, service = "web", args = []) {
     join(directory, "docker"),
     `#!/bin/sh
 printf '%s\\n' "$*" >> "$TEST_DOCKER_LOG"
+printf 'suite=%s\\n' "$XPATHED_EVALUATION_SUITE" >> "$TEST_DOCKER_LOG"
 case "$1" in
   compose) case "$*" in *"config --quiet") exit 0;; *) exit 77;; esac ;;
   ps) printf '%s\\n' existing-container ;;
@@ -107,4 +108,18 @@ test("qualification cannot combine strategy comparison or inject an unreviewed s
     assert.equal(result.status, 2);
     assert.match(result.stderr, /qualification|Qualification/);
   }
+});
+
+test("qualification accepts the reviewed viewport baseline and forwards its container suite path", (t) => {
+  const result = runWrapper(t, "xpathed-evaluation-baseline", "resolver", [
+    "--qualification",
+    "--suite",
+    "evaluation/viewport-baseline-cases.json",
+    "--profile",
+    "deepseek",
+    "--split",
+    "regression",
+  ]);
+  assert.equal(result.status, 77);
+  assert.match(result.calls, /suite=\/workspace\/evaluation\/viewport-baseline-cases.json/);
 });

@@ -15,7 +15,7 @@ const oracleScript = `<script>
       const endpoint = '?page=' + encodeURIComponent(location.pathname);
       const response = await fetch('/oracle' + endpoint);
       if (response.status === 204) return;
-      const { xpaths = [], replaceTarget, reload, click, open, focusPopup, close, cookie, scrollToY, slowFrame, mutateXpath, staleInput } = await response.json();
+      const { xpaths = [], replaceTarget, reload, click, open, focusPopup, close, cookie, scrollToY, scrollElement, slowFrame, mutateXpath, staleInput } = await response.json();
       if (staleInput) {
         const binding = Object.keys(window).find(key => key.startsWith('xpathedInput') && typeof window[key] === 'function');
         if (!binding) throw new Error('Missing input notification binding');
@@ -28,6 +28,7 @@ const oracleScript = `<script>
         frame.getBoundingClientRect = () => { const end = performance.now() + 2100; while (performance.now() < end) {} return rect(); };
       }
       if (scrollToY !== undefined) scrollTo(0, scrollToY);
+      if (scrollElement) document.querySelector(scrollElement.selector).scrollTop = scrollElement.y;
       if (cookie) document.cookie = cookie;
       if (click) document.querySelector(click).click();
       if (open) window.fixturePopup = window.open(open.url, open.name ?? '_blank', open.features ?? '');
@@ -458,6 +459,232 @@ test("Browser captures and highlights the independently identified target withou
   });
 });
 
+test("Current-view capture retains partial and blocked targets, safe naming and CSS layout evidence", async () => {
+  await withFixture(
+    `<style>body{margin:0}button{width:100px;height:30px;background:rgb(255,0,0);color:rgb(255,255,255);border:2px solid rgb(0,0,0)}
+    #partial{position:fixed;top:790px;left:10px}#edge{position:fixed;top:800px}#covered{position:absolute;top:100px;left:0}
+    #overlay{position:absolute;top:100px;left:0;width:100px;height:30px;background:white;z-index:2}
+    #reordered{display:flex;flex-direction:column}#above{order:0}#red{order:1}</style>
+    <span id="safe-label" hidden>Named safely<input value="PRIVATE_LABEL_VALUE"></span>
+    <button id="named" aria-labelledby="safe-label" disabled></button><input aria-label="Readonly notes" readonly>
+    <button id="covered">Covered</button><div id="overlay"></div>
+    <button id="partial">Partial</button><button id="edge">Edge only</button>
+    <section aria-label="Approval list"><h2>Approval heading</h2><div id="reordered"><button id="red">Red anchor</button><button id="above" style="background:rgb(0,0,255)">Above anchor</button></div></section>
+    <button hidden>Hidden target</button><button id="offscreen" style="position:absolute;top:2000px">Outside view</button>`,
+    async (session, page) => {
+      const before = await observe();
+      const capture = await request(`/pages/${page.pageId}/capture`, {
+        documentId: page.documentId,
+        scope: "current_view",
+      });
+      assert.equal(capture.scope, "current_view");
+      assert.equal(capture.coverage.complete, true);
+      assert.equal(capture.coverage.excludedOffscreenCount, 2);
+      const named = capture.candidates.find((c) => c.label === "Named safely");
+      const partial = capture.candidates.find((c) => c.label === "Partial");
+      const covered = capture.candidates.find((c) => c.label === "Covered");
+      assert.ok(named && partial && covered);
+      assert.equal(named.state.enabled, false);
+      assert.ok(capture.candidates.some((c) => c.label === "Readonly notes" && c.state.readonly));
+      assert.ok(!JSON.stringify(capture).includes("PRIVATE_LABEL_VALUE"));
+      assert.ok(
+        !capture.candidates.some((c) =>
+          ["Outside view", "Edge only", "Hidden target"].includes(c.label),
+        ),
+      );
+      const red = capture.candidates.find((c) => c.label === "Red anchor");
+      const above = capture.candidates.find((c) => c.label === "Above anchor");
+      assert.deepEqual(red.appearance, {
+        backgroundColor: "rgb(255, 0, 0)",
+        textColor: "rgb(255, 255, 255)",
+        borderColor: "rgb(0, 0, 0)",
+        limitations: [],
+      });
+      assert.equal(above.appearance.backgroundColor, "rgb(0, 0, 255)");
+      assert.ok(above.geometry.y < red.geometry.y);
+      assert.ok(capture.candidates.some((c) => c.text === "Approval heading"));
+      for (const [candidate, reason] of [
+        [named, "disabled"],
+        [covered, "obstructed_at_hit_point"],
+        [partial, null],
+      ]) {
+        const { target } = await request(`/pages/${page.pageId}/selection`, {
+          documentId: page.documentId,
+          captureId: capture.captureId,
+          candidateId: candidate.id,
+          action: "click",
+        });
+        assert.equal(target.state.inViewport, true);
+        if (reason) assert.ok(target.interactability.reasons.includes(reason));
+        const observation = await verify(target.xpaths);
+        assert.deepEqual(observation.matches, [
+          [candidate === named ? "named" : candidate === covered ? "covered" : "partial"],
+        ]);
+        assert.equal(observation.scrollY, before.scrollY);
+        assert.equal(observation.activeElement, before.activeElement);
+      }
+    },
+  );
+});
+
+test("Current-view budgets exclude large offscreen lists but never silently truncate an in-scope set", async () => {
+  await withFixture(
+    `<button id="expected-target">Visible approval</button><div style="position:absolute;top:2000px">${"<button>Outside approval</button>".repeat(2200)}</div>`,
+    async (session, page) => {
+      const capture = await request(`/pages/${page.pageId}/capture`, {
+        documentId: page.documentId,
+        scope: "current_view",
+      });
+      assert.equal(capture.coverage.complete, true);
+      assert.equal(capture.coverage.eligibleCount, 2201);
+      assert.equal(capture.coverage.excludedOffscreenCount, 2200);
+      assert.equal(capture.coverage.capturedCount, 1);
+      assert.equal(capture.candidates[0].label, "Visible approval");
+      const legacy = await request(`/pages/${page.pageId}/capture`, {
+        documentId: page.documentId,
+      });
+      assert.equal(legacy.scope, "page");
+      assert.equal(legacy.coverage.complete, false);
+    },
+  );
+  await withFixture(
+    `<style>button{position:fixed;left:0;top:0}</style>${"<button>Visible approval</button>".repeat(2001)}`,
+    async (session, page) => {
+      const capture = await request(`/pages/${page.pageId}/capture`, {
+        documentId: page.documentId,
+        scope: "current_view",
+      });
+      assert.equal(capture.coverage.complete, false);
+      assert.equal(capture.coverage.errorCode, "capture_budget_exceeded");
+      assert.equal(capture.coverage.capturedCount, 0);
+      assert.deepEqual(capture.candidates, []);
+    },
+  );
+});
+
+test("Legacy incomplete captures preserve scanned shadow-boundary counts", async () => {
+  await withFixture(
+    `<div id="shadow"></div><script>document.querySelector('#shadow').attachShadow({mode:'open'}).innerHTML='<button>Unsupported</button>'</script>${"<button>Entry</button>".repeat(2001)}`,
+    async (session, page) => {
+      const capture = await request(`/pages/${page.pageId}/capture`, {
+        documentId: page.documentId,
+      });
+      assert.equal(capture.coverage.complete, false);
+      assert.equal(capture.unsupportedBoundaryCount, 1);
+    },
+  );
+});
+
+test("Current-view CSS evidence reports uncertainty without image pixels, resource URLs or style text", async () => {
+  await withFixture(
+    `<style>#pseudo::before{content:'decorative';background:red}</style>
+    <button style="background:linear-gradient(red,blue)">Gradient</button>
+    <div style="opacity:.5"><button style="background:red">Translucent</button></div>
+    <button id="pseudo">Pseudo artwork</button><button style="background-image:url('/PRIVATE_STYLE_URL')">Image fill</button>
+    <button><svg width="10" height="10"><rect width="10" height="10" fill="red"/></svg>Icon</button>
+    <button style="background:transparent">Transparent</button>
+    <button style="background:color(display-p3 1 0 0)">Wide gamut</button>`,
+    async (session, page) => {
+      const capture = await request(`/pages/${page.pageId}/capture`, {
+        documentId: page.documentId,
+        scope: "current_view",
+      });
+      assert.equal(capture.coverage.complete, true);
+      assert.ok(!JSON.stringify(capture).includes("PRIVATE_STYLE_URL"));
+      for (const [label, reason] of [
+        ["Gradient", "background_image"],
+        ["Translucent", "complex_effects"],
+        ["Pseudo artwork", "pseudo_element_appearance"],
+        ["Image fill", "background_image"],
+        ["Icon", "replaced_content"],
+        ["Transparent", "background_transparent"],
+        ["Wide gamut", "unsupported_color"],
+      ]) {
+        const candidate = capture.candidates.find((c) => c.label === label);
+        assert.ok(candidate, label);
+        assert.equal(candidate.appearance.backgroundColor, null, label);
+        assert.ok(candidate.appearance.limitations.includes(reason), label);
+      }
+      const legacy = await request(`/pages/${page.pageId}/capture`, {
+        documentId: page.documentId,
+      });
+      assert.ok(legacy.candidates.every((c) => !("appearance" in c)));
+    },
+  );
+});
+
+test("Current-view selection rejects a changed viewport even when a selected fixed target remains visible", async () => {
+  await withFixture(
+    `<style>body{height:2400px}#expected-target{position:fixed;left:10px;top:10px}</style><button id="expected-target">Approval</button><button style="position:absolute;top:850px">Another approval</button>`,
+    async (session, page) => {
+      const capture = await request(`/pages/${page.pageId}/capture`, {
+        documentId: page.documentId,
+        scope: "current_view",
+      });
+      const candidate = capture.candidates.find((c) => c.label === "Approval");
+      await observe({ scrollToY: 150 });
+      await expectError(
+        `/pages/${page.pageId}/selection`,
+        {
+          documentId: page.documentId,
+          captureId: capture.captureId,
+          candidateId: candidate.id,
+          action: "click",
+        },
+        409,
+        "stale_capture",
+      );
+    },
+  );
+});
+
+test("Current-view selection rejects a changed nested scroll container", async () => {
+  await withFixture(
+    `<div id="list" style="height:100px;overflow:auto"><button id="expected-target">Approval</button><div style="height:150px"></div><button>Another approval</button></div>`,
+    async (session, page) => {
+      const capture = await request(`/pages/${page.pageId}/capture`, {
+        documentId: page.documentId,
+        scope: "current_view",
+      });
+      assert.equal(capture.coverage.complete, true);
+      await observe({ scrollElement: { selector: "#list", y: 100 } });
+      await expectError(
+        `/pages/${page.pageId}/selection`,
+        {
+          documentId: page.documentId,
+          captureId: capture.captureId,
+          candidateId: null,
+          action: "unsupported",
+        },
+        409,
+        "stale_capture",
+      );
+    },
+  );
+});
+
+test("Current-view capture skips offscreen frame contents and preserves ancestor appearance uncertainty", async () => {
+  await withFixture(
+    (path) =>
+      path === "/fixture"
+        ? `<div style="opacity:.5"><iframe src="/visible-child"></iframe></div><iframe style="position:absolute;top:2000px" src="/outside-child"></iframe>`
+        : `<button id="expected-target" style="background:red">${path === "/visible-child" ? "Visible child" : "OFFSCREEN_CHILD_CONTENT"}</button>`,
+    async (session, page) => {
+      await observe({}, "/visible-child");
+      const capture = await request(`/pages/${page.pageId}/capture`, {
+        documentId: page.documentId,
+        scope: "current_view",
+      });
+      assert.equal(capture.coverage.complete, true);
+      assert.equal(capture.candidates.length, 1);
+      assert.equal(capture.candidates[0].label, "Visible child");
+      assert.equal(capture.candidates[0].appearance.backgroundColor, null);
+      assert.ok(capture.candidates[0].appearance.limitations.includes("complex_effects"));
+      assert.ok(!JSON.stringify(capture).includes("OFFSCREEN_CHILD_CONTENT"));
+    },
+  );
+});
+
 test("Disabled click and hover keep the same target with different action readiness", async () => {
   await withFixture(
     '<button id="expected-target" disabled>Disabled action</button>',
@@ -617,8 +844,11 @@ const highlightFixture = `<style>body {margin:0;background:white} button {positi
 <button id="expected-target">First approval</button><button id="second-target">Second approval</button>
 <script>window.observedEvents = {}; for (const type of ['pointermove','pointerdown','keydown']) addEventListener(type, event => { if(event.isTrusted) window.observedEvents[type] = (window.observedEvents[type] ?? 0) + 1; });</script>`;
 
-async function selectHighlights(page, plural = false) {
-  const capture = await request(`/pages/${page.pageId}/capture`, { documentId: page.documentId });
+async function selectHighlights(page, plural = false, scope = "page") {
+  const capture = await request(`/pages/${page.pageId}/capture`, {
+    documentId: page.documentId,
+    scope,
+  });
   const buttons = capture.candidates.filter((entry) => entry.tag === "button");
   const batch = {
     documentId: page.documentId,
@@ -648,6 +878,35 @@ test("Viewer highlights every selected target simultaneously", async () => {
       );
     });
   });
+});
+
+test("Current-view completed highlights persist during scrolling while another selection is stale", async () => {
+  await withFixture(
+    `${highlightFixture}<style>body{height:2400px}</style>`,
+    async (session, page) => {
+      const batch = await selectHighlights(page, true, "current_view");
+      await withFramebuffer(session, async (frame) => {
+        await expectHighlights(
+          frame,
+          [
+            [100, 100],
+            [500, 100],
+          ],
+          true,
+        );
+        await observe({ scrollToY: 50 });
+        await expectHighlights(
+          frame,
+          [
+            [100, 50],
+            [500, 50],
+          ],
+          true,
+        );
+        await expectError(`/pages/${page.pageId}/selections`, batch, 409, "stale_capture");
+      });
+    },
+  );
 });
 
 test("Viewer preserves highlights on mouse movement and clears them on click or key input", async () => {
@@ -1588,6 +1847,24 @@ test("Cross-origin frame clipping and ancestor obstruction remain passive and fr
       assert.deepEqual((await observe({ xpaths: target.xpaths }, "/external")).matches, [
         ["expected-target"],
       ]);
+      const current = await request(`/pages/${page.pageId}/capture`, {
+        documentId: page.documentId,
+        scope: "current_view",
+      });
+      assert.equal(current.coverage.complete, true);
+      assert.equal(current.coverage.excludedOffscreenCount, 1);
+      assert.ok(!current.candidates.some((candidate) => candidate.label === "Clipped child"));
+      const visible = current.candidates.find((candidate) => candidate.label === "Covered child");
+      assert.ok(visible);
+      const selected = await request(`/pages/${page.pageId}/selection`, {
+        ...body,
+        captureId: current.captureId,
+        candidateId: visible.id,
+      });
+      assert.ok(selected.target.interactability.reasons.includes("ancestor_frame_obstructed"));
+      assert.deepEqual((await observe({ xpaths: selected.target.xpaths }, "/external")).matches, [
+        ["expected-target"],
+      ]);
       await observe({ reload: true }, "/external");
       await observe({}, "/external");
       await expectError(`/pages/${page.pageId}/selection`, body, 409, "stale_capture");
@@ -1708,6 +1985,16 @@ for (const [name, ancestorStyle, position, modal, visible] of [
         assert.equal(target.interactability.status, visible ? "ready" : "blocked");
         assert.equal(target.interactability.checks.pointerReception, visible ? "pass" : "unknown");
         assert.deepEqual(target.interactability.reasons, visible ? [] : ["off_screen"]);
+        const current = await request(`/pages/${page.pageId}/capture`, {
+          documentId: page.documentId,
+          scope: "current_view",
+        });
+        assert.equal(current.coverage.complete, true);
+        assert.equal(
+          current.candidates.some((entry) => entry.label === "Search"),
+          visible,
+        );
+
         const after = await verify(target.xpaths);
         assert.deepEqual(after.matches, [["expected-target"]]);
         assert.deepEqual(after.events, before.events);

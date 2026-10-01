@@ -15,12 +15,13 @@ timeout=45000
 case_id=
 output=
 suite=
+forecast_only=
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --) shift; continue ;;
     --comparison) comparison=true; shift; continue ;;
     --qualification) qualification=true; shift; continue ;;
-    --mode|--repetitions|--seed|--timeout-ms|--case|--output|--suite|--phase|--split|--profile|--pilot)
+    --mode|--repetitions|--seed|--timeout-ms|--case|--output|--suite|--phase|--split|--profile|--pilot|--forecast-only)
       if [ "$#" -lt 2 ]; then echo "Missing value for $1" >&2; exit 2; fi
       case "$1" in
         --mode) mode=$2 ;;
@@ -34,6 +35,7 @@ while [ "$#" -gt 0 ]; do
         --split) split=$2 ;;
         --profile) profile=$2 ;;
         --pilot) pilot=$2 ;;
+        --forecast-only) forecast_only=$2 ;;
       esac
       shift 2 ;;
     *) echo "Unknown evaluation option: $1" >&2; exit 2 ;;
@@ -45,8 +47,11 @@ fi
 if [ "$comparison" = true ] && [ "$qualification" = true ]; then echo "Choose comparison or qualification" >&2; exit 2; fi
 if [ "$qualification" != true ] && { [ "$phase" != pilot ] || [ "$split" != development ] || [ "$profile" != luna,gemini,deepseek ] || [ -n "$pilot" ]; }; then echo "Qualification options require --qualification" >&2; exit 2; fi
 if [ "$qualification" = true ]; then
-  if [ -n "$suite" ]; then echo "Qualification uses its reviewed versioned suite" >&2; exit 2; fi
-  suite=evaluation/qualification-cases.json
+  case "$suite" in
+    ''|evaluation/qualification-cases.json|evaluation/viewport-baseline-cases.json) ;;
+    *) echo "Qualification requires a reviewed built-in suite" >&2; exit 2 ;;
+  esac
+  suite=${suite:-evaluation/qualification-cases.json}
 fi
 if [ "$comparison" = true ] && [ -n "$suite" ]; then echo "Comparison uses its reviewed fixture subset" >&2; exit 2; fi
 export XPATHED_COMPARISON_MODE=$mode
@@ -67,6 +72,7 @@ if [ -n "$case_id" ]; then set -- "$@" --case "$case_id"; fi
 # Reuse the runner's validation before starting services or creating artifacts.
 if [ "$qualification" = true ]; then
   set -- "$@" --phase "$phase" --split "$split" --profile "$profile"
+  if [ -n "$forecast_only" ]; then set -- "$@" --forecast-only "$forecast_only"; fi
   if [ -n "$pilot" ]; then
     pilot=$(node --input-type=module -e '
       import { realpathSync, statSync } from "node:fs";
@@ -80,6 +86,7 @@ if [ "$qualification" = true ]; then
   fi
   node --input-type=module -e 'import { parseQualificationOptions } from "./evaluation/qualify.mjs"; parseQualificationOptions(process.argv.slice(1));' -- "$@"
 else
+  if [ -n "$forecast_only" ]; then echo "Forecast preparation requires qualification" >&2; exit 2; fi
   node --input-type=module -e 'import { parseOptions } from "./evaluation/run.mjs"; parseOptions(process.argv.slice(1));' -- "$@"
 fi
 

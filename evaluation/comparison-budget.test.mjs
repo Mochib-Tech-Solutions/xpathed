@@ -139,6 +139,35 @@ test("a fresh hosted proxy preserves authoritative historical spend and durably 
   }
 });
 
+test("a complete prepared forecast bounds both arms before any paid request and blocks growth beyond its allocation", async (t) => {
+  const { proxy, post, calls } = await setup(t);
+  const forecast = proxy.forecastRequests([
+    { id: "before", profileId: "default", request: input },
+    { id: "after", profileId: "default", request: input },
+  ]);
+  assert.equal(calls.length, 0);
+  assert.equal(forecast.fits, true);
+  assert.equal(forecast.projectedUsd, forecast.reservations[0].maximumUsd * 2);
+  proxy.beginAttempt("before", "default", forecast.reservations[0].maximumUsd);
+  assert.equal((await post()).status, 200);
+  proxy.beginAttempt("after", "default", forecast.reservations[1].maximumUsd);
+  assert.equal(
+    (await post({ ...input, messages: [{ role: "user", content: "x".repeat(100000) }] })).status,
+    400,
+  );
+  assert.equal(calls.length, 1);
+  assert.equal(
+    proxy.forecastRequests(
+      Array.from({ length: 2000 }, (_, i) => ({
+        id: String(i),
+        profileId: "default",
+        request: input,
+      })),
+    ).fits,
+    false,
+  );
+});
+
 test("missing remote state cannot initialize a new campaign and local spending cannot substitute for it", async (t) => {
   for (const status of [404, 403, 503]) {
     await assert.rejects(

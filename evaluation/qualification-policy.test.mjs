@@ -108,6 +108,102 @@ test("a fully observed frozen live candidate qualifies without activating a defa
   assert.equal(report.defaultActivated, false);
 });
 
+test("paired baseline reports both contracts, keeps missing attempts and excludes scope changes from speed gains", () => {
+  const source = evidence();
+  const v3 = {
+    ...source.manifest.cases[1],
+    id: "before",
+    split: "development",
+    pairId: "same-target",
+    baselineStratum: "paired",
+  };
+  const v4 = { ...v3, id: "after", contractVersion: "4" };
+  const edge = { ...v4, id: "edge", pairId: undefined, baselineStratum: "scope-change" };
+  const specs = [v3, v4, edge];
+  const manifest = {
+    ...source.manifest,
+    baseline: { version: 1, kind: "viewport-paired" },
+    cases: specs,
+    plan: {
+      trials: specs.map((c) => ({
+        id: c.id,
+        caseId: c.id,
+        profileId: "candidate",
+        repetition: 1,
+        attempt: 1,
+      })),
+    },
+  };
+  const original = source.trials[3];
+  const trials = [v3, v4].map((c, index) => ({
+    ...structuredClone(original),
+    id: c.id,
+    caseId: c.id,
+    repetition: 1,
+    elapsedMs: index ? 800 : 1400,
+    result: {
+      ...structuredClone(original.result),
+      contractVersion: c.contractVersion,
+      diagnostics: {
+        usage: { cost: 0.001, inputTokens: index ? 100 : 400 },
+        modelInputComplete: true,
+        modelInputBytes: index ? 200 : 800,
+      },
+    },
+  }));
+  const result = summarizeQualification(manifest, trials);
+  assert.deepEqual(result.qualifiedCandidates, []);
+  const baseline = result.pairedBaseline;
+  assert.equal(baseline.arms["3"].plannedTrials, 1);
+  assert.equal(baseline.arms["4"].plannedTrials, 2);
+  assert.equal(baseline.arms["4"].correctCompleteWithinGoal.passed, 1);
+  assert.equal(baseline.arms["4"].missingTrials, 1);
+  assert.equal(baseline.pairs[0].elapsedMsReduction, 600);
+  assert.equal(baseline.pairs[0].modelInputBytesReduction, 600);
+  assert.equal(baseline.pairs[0].bothCorrect, true);
+  assert.equal(baseline.pairs.length, 1);
+  assert.equal(baseline.arms["4"].costPerCorrectUsd, null);
+  const edgeTrial = structuredClone(trials[1]);
+  edgeTrial.id = "edge";
+  edgeTrial.caseId = "edge";
+  edgeTrial.provider = [{ forwarded: true, reportedUsd: 9 }];
+  edgeTrial.result.diagnostics.modelInputBytes = 999999;
+  edgeTrial.result.diagnostics.usage.inputTokens = 999999;
+  edgeTrial.result.diagnostics.timingsMs = { capture: 99, model: 700 };
+  const stratified = summarizeQualification(manifest, [...trials, edgeTrial]).pairedBaseline;
+  const paired = stratified.arms["4"].strata.paired;
+  assert.equal(paired.modelInputBytes.p50, 200);
+  assert.equal(paired.firstAttempt.usage.inputTokens.total, 100);
+  assert.equal(paired.reportedPaidUsd, 0.001);
+  assert.equal(paired.correctCompleteWithinGoal.passed, 1);
+  assert.equal(
+    stratified.arms["4"].strata["scope-change"].firstAttempt.stageTimingsMs.capture.p50,
+    99,
+  );
+  assert.equal(stratified.pairedGains.elapsedMs.absoluteReduction, 600);
+  assert.ok(
+    Math.abs(stratified.pairedGains.elapsedMs.percentReduction - (600 / 1400) * 100) < 1e-9,
+  );
+  assert.equal(stratified.pairedGains.modelInputBytes.absoluteReduction, 600);
+  const timeout = structuredClone(trials[1]);
+  timeout.elapsedMs = 1;
+  timeout.error = { code: "timeout", message: "timed out" };
+  const failed = summarizeQualification(manifest, [trials[0], timeout, edgeTrial]).pairedBaseline;
+  assert.equal(failed.pairs[0].elapsedMsReduction, null);
+  assert.equal(failed.pairs[0].observedElapsedMsDelta, 1399);
+  assert.equal(failed.pairedGains.elapsedMs.absoluteReduction, null);
+  assert.equal(failed.pairedGains.elapsedMs.measuredPairs, 0);
+  trials[0].result.diagnostics.modelInputComplete = false;
+  trials[0].result.diagnostics.modelInputBytes = 0;
+  trials[0].result.diagnostics.modelCalls = 1;
+  trials[0].provider = [];
+  const incomplete = summarizeQualification(manifest, trials).pairedBaseline;
+  assert.equal(incomplete.arms["3"].modelInputBytes.observed, 0);
+  assert.equal(incomplete.pairs[0].inputTokensReduction, null);
+  assert.equal(incomplete.pairs[0].modelInputBytesReduction, null);
+  assert.equal(incomplete.arms["3"].reportedPaidUsd, null);
+});
+
 test("policy 2 counts only sub-second goals and includes the two-second deadline boundary", () => {
   const { manifest, trials } = evidence();
   for (const trial of trials) trial.elapsedMs = 999;

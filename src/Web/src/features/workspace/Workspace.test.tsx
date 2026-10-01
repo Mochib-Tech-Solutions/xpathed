@@ -184,15 +184,20 @@ describe("Workspace resolution", () => {
     },
   );
 
-  it.each(["found", "not_found"])(
-    "shows one shared action for version-3 targets with a %s second result",
-    async (secondOutcome) => {
+  it.each([
+    ["3", "found"],
+    ["3", "not_found"],
+    ["4", "found"],
+    ["4", "not_found"],
+  ])(
+    "shows one shared action for version-%s targets with a %s second result",
+    async (contractVersion, secondOutcome) => {
       const missing = secondOutcome === "not_found";
       mockApi(() =>
         Promise.resolve(
           Response.json({
             ...found,
-            contractVersion: "3",
+            contractVersion,
             outcome: missing ? "partial" : "found",
             target: null,
             summary: {
@@ -237,9 +242,13 @@ describe("Workspace resolution", () => {
       );
       await user.click(screen.getByRole("button", { name: "Resolve instruction" }));
       expect(
-        await screen.findByText(missing ? "1 target found · 1 missing" : "2 targets found"),
+        await screen.findByText(
+          (missing ? "1 target found · 1 missing" : "2 targets found") +
+            (contractVersion === "4" ? " · current view" : ""),
+        ),
       ).toBeVisible();
       expect(screen.getAllByText("Action: click")).toHaveLength(1);
+      expect(screen.getByText("Current view only")).toBeVisible();
       expect(screen.queryByText(/all targets/i)).not.toBeInTheDocument();
       const targets = screen.getAllByRole("region", { name: /Target [12]/ });
       expect(targets).toHaveLength(2);
@@ -259,7 +268,9 @@ describe("Workspace resolution", () => {
       expect(
         within(targets[1]!).getByText(
           missing
-            ? "I couldn’t find that element on this page."
+            ? contractVersion === "4"
+              ? "I couldn’t find that element in the current view."
+              : "I couldn’t find that element on this page."
             : "//button[@id='confirm-booking']",
         ),
       ).toBeVisible();
@@ -270,7 +281,7 @@ describe("Workspace resolution", () => {
           body: JSON.stringify({
             instruction: "Click all confirmation buttons in the list",
             documentId: "document-1",
-            contractVersion: "3",
+            contractVersion: "4",
           }),
         }),
       );
@@ -480,7 +491,7 @@ describe("Workspace resolution", () => {
         body: JSON.stringify({
           instruction: "Click Pay now",
           documentId: "document-1",
-          contractVersion: "3",
+          contractVersion: "4",
         }),
       }),
     );
@@ -686,6 +697,36 @@ describe("Workspace resolution", () => {
     await user.unhover(cost);
     await user.click(screen.getByRole("button", { name: "Resolve instruction" }));
     expect(await screen.findByRole("button", { name: "Cost unavailable" })).toBeInTheDocument();
+  });
+
+  it("reports pending provider cost on a timed-out current-view request", async () => {
+    mockApi(() =>
+      Promise.resolve(
+        Response.json({
+          ...found,
+          contractVersion: "4",
+          outcome: "error",
+          target: null,
+          actions: [],
+          diagnostics: {
+            code: "resolution_timeout",
+            message: "Resolution exceeded its two-second server processing deadline.",
+            providerAccounting: "pending",
+          },
+        }),
+      ),
+    );
+    const user = await openWorkspace();
+    await submitInstruction(user);
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "two-second server processing deadline",
+    );
+    const cost = screen.getByRole("button", { name: "Cost pending" });
+    await user.hover(cost);
+    expect(screen.getByRole("tooltip")).toHaveTextContent(
+      "The provider may still charge this timed-out request.",
+    );
+    expect(screen.queryByRole("button", { name: "Copy XPath 1" })).not.toBeInTheDocument();
   });
 
   it("reports a clipboard failure only on the history entry being copied", async () => {
@@ -1024,7 +1065,7 @@ describe("Workspace resolution", () => {
         body: JSON.stringify({
           instruction: "Click Fresh target",
           documentId: "document-2",
-          contractVersion: "3",
+          contractVersion: "4",
         }),
       }),
     );
@@ -1244,7 +1285,7 @@ describe("Workspace resolution", () => {
         expect(JSON.parse(typeof options?.body === "string" ? options.body : "null")).toEqual({
           instruction: "Click Pay now",
           documentId: "document-1",
-          contractVersion: "3",
+          contractVersion: "4",
         });
         return Promise.resolve(Response.json(found));
       }

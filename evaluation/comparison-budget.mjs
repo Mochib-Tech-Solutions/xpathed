@@ -263,6 +263,15 @@ function boundedRequest(body, profile) {
   return request;
 }
 
+function maximumCharge(body, pricing) {
+  return (
+    ((Buffer.byteLength(JSON.stringify(body)) + 16384) * pricing.prompt +
+      body.max_tokens * pricing.completion +
+      pricing.request) *
+    1.2
+  );
+}
+
 export function validateBudgetLedger(ledger) {
   if (
     !object(ledger) ||
@@ -447,11 +456,11 @@ export async function createBudgetProxy({
       record.request = safe(body);
       const text = JSON.stringify(body);
       // UTF-8 bytes plus framing bound text tokenization; no image/audio inputs are allowed.
-      const maximum =
-        ((Buffer.byteLength(text) + 16384) * pricing.prompt +
-          body.max_tokens * pricing.completion +
-          pricing.request) *
-        1.2;
+      const maximum = maximumCharge(body, pricing);
+      if (maximum > current.maximumUsd)
+        throw new Error(
+          "Prepared request exceeds its frozen baseline allocation; no paid call made",
+        );
       reserveCharge(ledger, maximum, record.id);
       reservation = ledger.entries.at(-1);
       reservation.attemptId = current.id;
@@ -537,6 +546,36 @@ export async function createBudgetProxy({
     records,
     pricing: configured[0].pricing,
     profiles: configured,
+    forecastRequests(requests) {
+      if (
+        !Array.isArray(requests) ||
+        !requests.length ||
+        new Set(requests.map((r) => r.id)).size !== requests.length
+      )
+        throw new Error("Forecast requires unique planned request identities");
+      const reservations = requests.map(({ id, profileId, request }) => {
+        const profile = configured.find((p) => p.id === profileId);
+        if (!profile || typeof id !== "string" || !id)
+          throw new Error("Invalid forecast profile or identity");
+        const body = boundedRequest(request, profile);
+        return {
+          id,
+          profileId,
+          maximumUsd: maximumCharge(body, profile.pricing) * 1.1,
+          preparedBytes: Buffer.byteLength(JSON.stringify(body)),
+        };
+      });
+      const projectedUsd = reservations.reduce((sum, r) => sum + r.maximumUsd, 0);
+      const remainingUsd = this.budget.remainingUsd;
+      return {
+        basis:
+          "Sum of prepared request byte/token reservation ceilings with 10% allocation headroom; each live request is checked against its frozen allocation",
+        reservations,
+        projectedUsd,
+        remainingUsd,
+        fits: Number.isFinite(projectedUsd) && projectedUsd <= remainingUsd,
+      };
+    },
     get budget() {
       const spentUsd = ledger.entries.reduce(
         (sum, entry) => sum + (entry.reportedUsd ?? entry.reservedUsd),
@@ -554,13 +593,15 @@ export async function createBudgetProxy({
         reviewedReserveUsd: reviewed.reduce((sum, entry) => sum + entry.reservedUsd, 0),
       };
     },
-    beginAttempt(id, profileId = configured[0].id) {
+    beginAttempt(id, profileId = configured[0].id, maximumUsd = Infinity) {
       const profile = configured.find((item) => item.id === profileId);
       if (!profile) throw new Error("Unknown inference profile");
+      if (!(maximumUsd > 0) || (maximumUsd !== Infinity && !Number.isFinite(maximumUsd)))
+        throw new Error("Invalid frozen request allocation");
       if (closed || blocked || busy || typeof id !== "string" || !id || attempts.has(id))
         throw new Error("Cannot begin an overlapping, repeated or blocked inference attempt");
       attempts.add(id);
-      current = { id, profile, used: false };
+      current = { id, profile, used: false, maximumUsd };
     },
     awaitIdle() {
       return idle;

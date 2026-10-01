@@ -103,7 +103,10 @@ public sealed class OpenRouterGateway(IHttpClientFactory clients, IConfiguration
         {
             strategy,
             promptVersion,
-            captureVersion = "4",
+            captureVersion = promptVersion == "8" ? "5" : "4",
+            scope = promptVersion == "8" ? "current_view" : "page",
+            serverDeadlineMs = promptVersion == "8" ? (int?)2000 : null,
+            estimateCost = promptVersion != "8",
             stateVersion = "2",
             interactabilityVersion = "2",
             xpathVersion = "4",
@@ -167,7 +170,9 @@ public sealed class OpenRouterGateway(IHttpClientFactory clients, IConfiguration
         string input,
         JsonElement schema,
         CancellationToken cancellationToken,
-        int outputTokens = 512
+        int outputTokens = 512,
+        Action<ResolutionDiagnostics>? observeUsage = null,
+        bool estimateCost = true
     )
     {
         using var client = clients.CreateClient("openrouter");
@@ -225,6 +230,7 @@ public sealed class OpenRouterGateway(IHttpClientFactory clients, IConfiguration
                     )
                     : null,
         };
+        observeUsage?.Invoke(diagnostics);
         var error = Property(body, "error");
         if (error.ValueKind is JsonValueKind.Undefined or JsonValueKind.Null)
         {
@@ -248,7 +254,7 @@ public sealed class OpenRouterGateway(IHttpClientFactory clients, IConfiguration
             diagnostics with
             {
                 Code = code,
-                CostEstimate = await EstimateCostAsync(diagnostics, cancellationToken),
+                CostEstimate = estimateCost ? await EstimateCostAsync(diagnostics, cancellationToken) : null,
             }
         );
     }

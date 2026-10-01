@@ -60,7 +60,23 @@ The qualification manifest links source/dependency/browser fingerprints, full se
 
 For an offline check that requires an actually qualified profile, use [release evidence sealing and verification](releases.md). It binds the original pilot and confirmation files, regrades both, and requires a clean checkout at the candidate's exact source revision. Ordinary replay success is insufficient for this boundary.
 
-The original legacy contract and saved-locator mutation suite remains separate. Imported PhraseNode and Mind2Web cases retain original split identities and offline-only limitations; these controlled browser results do not claim those corpora were rerun or that reconstructed DOMs reproduce historical readiness. Appearance-only commands expose a known gap: the baseline capture carries geometry but not computed color. That limitation must not disappear into an aggregate score or a full-scope release claim.
+The original legacy contract and saved-locator mutation suite remains separate. Imported PhraseNode and Mind2Web cases retain original split identities and offline-only limitations; these controlled browser results do not claim those corpora were rerun or that reconstructed DOMs reproduce historical readiness. Historical contract-3 appearance-only commands expose a known gap: those captures carry geometry but not computed color. Contract 4 adds bounded CSS evidence in the separately measured current-view baseline. Preserve the historical gap rather than relabelling old results.
+
+## Current-view baseline
+
+[Issue #47](https://github.com/Mochib-Tech-Solutions/xpathed/issues/47) measures contract 3 page-wide input against contract 4 current-view input on the same source revision and fixed standard DeepSeek route. `evaluation/viewport-baseline-cases.json` contains independently reviewed authored browser labels, one attempt per case/arm, with explicit unchanged-target pairs and separate scope-change/appearance strata. It is development/regression evidence and cannot qualify a release. Selected current-view cases also run in the ordinary deterministic CI browser suite.
+
+```sh
+pnpm evaluate:qualify -- --suite evaluation/viewport-baseline-cases.json \
+  --mode deterministic --phase pilot --split regression --profile deepseek \
+  --repetitions 1 --seed 47 --output .artifacts/evaluation/viewport-deterministic
+```
+
+For a live measurement, keep the dedicated evaluation key in an ignored environment file selected by `XPATHED_ENV_FILE`, and configure access to the existing authoritative GitHub ledger as described in [release accounting](releases.md#manual-github-qualification). The app key and its limit are separate. First run the same command with `--mode live --forecast-only true` and a new output directory: it prepares the complete suite using deterministic responses, fetches current pricing and checks the combined conservative reservation against remaining campaign funds, without inference. The paid command omits `--forecast-only true`, uses another new output directory and repeats the guards. Each request must fit its frozen allocation; unknown charges stop subsequent calls. These commands never reset the ledger or enable recurring paid CI.
+
+Retain every original timeout/failure and await late proxy accounting before collecting evidence. Server total time, client request duration, provider time and durable accounting overhead are different measurements. The two-second deadline remains active in contract 4; a quick timeout is a failure, not an improvement. Report paired deltas only where target sets are unchanged, and successful latency gains only where both attempts are correct and complete. Include input bytes/tokens, stage and total p50/p95, coverage, correct responses below one second/within two seconds, unknown/reported/estimated costs and cost per correct complete result. Small one-attempt samples describe the observed run, not a production percentile guarantee.
+
+Contract 4 also skips optional runtime price lookup; the legacy arm retains it, but the evaluation proxy serves pricing from its frozen metadata rather than a production network lookup. The legacy control preserves its prompt/schema/prepared-input semantics; this comparison is not a claim that the historical source binary was rerun. Preserve source/configuration fingerprints and raw evidence. Original imported dataset scores remain separate historical source-quality evidence: their labels do not establish current viewport membership, plural sets or readiness. No new viewport score may be inferred from them. Fresh holdout claims additionally require a family-exposure audit across preparation, reviews and previous runs. This baseline becomes the fixed control for the separately blocked [Jev context-planning comparison #48](https://github.com/Mochib-Tech-Solutions/xpathed/issues/48).
 
 ## Cases and oracles
 
