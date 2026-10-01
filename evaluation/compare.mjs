@@ -392,6 +392,7 @@ export async function main(args = process.argv.slice(2)) {
           arm.elapsedMs ??= performance.now() - start;
         }
         if (mode === "live") {
+          await proxy.awaitIdle();
           const calls = proxy.records.filter((r) => r.attemptId === arm.id);
           arm.evidence = { ...arm.evidence, provider: calls };
           arm.provider = calls.map(({ request, response, ...metadata }) => metadata);

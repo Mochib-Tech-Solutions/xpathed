@@ -246,6 +246,19 @@ export function validProviderCalls(calls, generations) {
   return true;
 }
 
+export async function finishProviderAttempt(trial, proxy, generations) {
+  await proxy.awaitIdle();
+  retainProviderEvidence(trial, proxy.records);
+  const calls = proxy.records.filter((record) => record.attemptId === trial.id);
+  const valid = proxy.budget.pendingCharges === 0 && validProviderCalls(calls, generations);
+  if (!valid)
+    trial.error ??= {
+      code: "provider_evidence_invalid",
+      message: "Provider identity, response reuse or charge evidence failed; further calls stopped",
+    };
+  return valid;
+}
+
 function normalize(result, attemptId) {
   if (result.outcome === "error")
     return {
@@ -423,6 +436,7 @@ export async function main(args = process.argv.slice(2)) {
       };
       const started = performance.now();
       let stop = false;
+      let inferenceStarted = false;
       let inputPath;
       try {
         if (!/^[a-f0-9]{64}$/.test(spec.inputKey))
@@ -466,15 +480,8 @@ export async function main(args = process.argv.slice(2)) {
           trial.result = { configurationId: prepared.configurationId };
           await retainConfigurations(output, manifest, trial);
           proxy.beginAttempt(trial.id, opt.profile);
+          inferenceStarted = true;
           result = await cli(inputPath, env);
-          const calls = proxy.records.filter((record) => record.attemptId === trial.id);
-          stop = proxy.budget.pendingCharges > 0 || !validProviderCalls(calls, generations);
-          if (stop)
-            trial.error = {
-              code: "provider_evidence_invalid",
-              message:
-                "Provider identity, response reuse or charge evidence failed; further calls stopped",
-            };
         } else result = lexicalSelection(input);
         trial.result = normalize(result, trial.id);
         trial.elapsedMs = performance.now() - started;
@@ -483,7 +490,8 @@ export async function main(args = process.argv.slice(2)) {
         trial.elapsedMs = performance.now() - started;
         stop = opt.mode === "live";
       } finally {
-        if (proxy) retainProviderEvidence(trial, proxy.records);
+        if (inferenceStarted)
+          stop = !(await finishProviderAttempt(trial, proxy, generations)) || stop;
         if (inputPath) await rm(inputPath, { force: true });
       }
       if (opt.mode === "live") await retainConfigurations(output, manifest, trial);

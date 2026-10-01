@@ -10,10 +10,52 @@ import {
   profileEnvironment,
   retainProviderEvidence,
   validProviderCalls,
+  finishProviderAttempt,
 } from "./dataset-run.mjs";
 import profiles from "./qualification-profiles.json" with { type: "json" };
 import { gradeTrial } from "./grader.mjs";
 import { prune } from "./run.mjs";
+
+test("late accounting is validated after draining without rewriting the timed-out result", async () => {
+  for (const knownCharge of [true, false]) {
+    const upstream = Promise.withResolvers();
+    const result = { outcome: "error", diagnostics: { code: "provider_timeout" } };
+    const trial = { id: "attempt", result, elapsedMs: 123 };
+    const record = { attemptId: trial.id, forwarded: true, reportedUsd: null };
+    const proxy = {
+      records: [record],
+      budget: { pendingCharges: 1 },
+      awaitIdle: () => upstream.promise,
+    };
+    const completed = finishProviderAttempt(trial, proxy, new Set());
+    Object.assign(record, {
+      identityValid: true,
+      responseCacheHit: false,
+      observedIdentity: { generationId: "late-generation" },
+      reportedUsd: knownCharge ? 0.001 : null,
+    });
+    proxy.budget.pendingCharges = knownCharge ? 0 : 1;
+    upstream.resolve();
+    assert.equal(await completed, knownCharge);
+    assert.equal(trial.result, result);
+    assert.equal(trial.elapsedMs, 123);
+    assert.equal(trial.provider[0].reportedUsd, knownCharge ? 0.001 : null);
+    assert.equal(trial.error?.code, knownCharge ? undefined : "provider_evidence_invalid");
+  }
+  const trial = {
+    id: "attempt",
+    error: { code: "dataset_trial_error", message: "Original error" },
+  };
+  assert.equal(
+    await finishProviderAttempt(
+      trial,
+      { records: [], budget: { pendingCharges: 0 }, awaitIdle: async () => {} },
+      new Set(),
+    ),
+    false,
+  );
+  assert.deepEqual(trial.error, { code: "dataset_trial_error", message: "Original error" });
+});
 
 test("offline success requires exactly one forwarded call with fresh verified identity", () => {
   const call = { forwarded: true, identityValid: true, observedIdentity: { generationId: "g1" } };
