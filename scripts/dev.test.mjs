@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
+import { once } from "node:events";
 import { cp, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
@@ -58,7 +59,34 @@ if (command === 'up') {
 `,
     { mode: 0o755 },
   );
+  // Keep fixture ports below the common Linux ephemeral range without changing production hashing.
+  const reservation = createServer();
+  let project;
+  let digest;
+  let port;
+  for (let attempt = 0; attempt < 1000; attempt++) {
+    project = `dev-command-test-${attempt}`;
+    digest = createHash("sha256").update(`${root}\0${project}`).digest("hex");
+    port = 30000 + (Number.parseInt(digest.slice(0, 8), 16) % 30000);
+    if (port >= 32768) continue;
+    try {
+      const listening = once(reservation, "listening");
+      reservation.listen(port, "127.0.0.1");
+      await listening;
+      break;
+    } catch (error) {
+      if (error.code !== "EADDRINUSE") throw error;
+    }
+  }
+  assert.ok(reservation.listening, "No available fixture control port below 32768.");
+  t.after(() => {
+    if (reservation.listening) reservation.close();
+  });
+  const releasePort = () => {
+    if (reservation.listening) reservation.close();
+  };
   const start = (extraEnv = {}, legacy = false) => {
+    releasePort();
     const child = spawn(
       legacy ? join(root, "docker/compose.sh") : process.execPath,
       legacy ? ["--dev", "up", "--build", "--watch"] : [join(root, "scripts/dev.mjs")],
@@ -67,7 +95,7 @@ if (command === 'up') {
         env: {
           ...process.env,
           PATH: `${join(root, "bin")}:${process.env.PATH}`,
-          COMPOSE_PROJECT_NAME: "dev-command-test",
+          COMPOSE_PROJECT_NAME: project,
           ...extraEnv,
         },
         stdio: "pipe",
@@ -90,7 +118,7 @@ if (command === 'up') {
   const events = () => readFile(join(root, "events"), "utf8").catch(() => "");
   const waitForUps = (count) =>
     waitFor(async () => (await events()).split("up ").length >= count + 1);
-  return { root, start, events, waitFor, waitForUps };
+  return { root, start, events, waitFor, waitForUps, port, digest, releasePort };
 }
 
 test("dev replaces its previous owner and retains configuration and database data", async (t) => {
@@ -184,12 +212,15 @@ test("interrupting project ownership checks cannot authorize cleanup", async (t)
   assert.doesNotMatch(await events(), /down |up /);
 });
 
-for (const method of ["end", "resetAndDestroy"])
+for (const method of ["end", "resetAndDestroy", "wrongIdentity"])
   test(`dev fails safely when a foreign listener uses ${method} without identifying itself`, async (t) => {
-    const { root, start, events, waitFor } = await fixture(t);
-    const digest = createHash("sha256").update(`${root}\0dev-command-test`).digest("hex");
-    const port = 30000 + (Number.parseInt(digest.slice(0, 8), 16) % 30000);
-    const foreign = createServer((socket) => socket[method]());
+    const { start, events, waitFor, port, releasePort } = await fixture(t);
+    releasePort();
+    const foreign = createServer((socket) =>
+      method === "wrongIdentity"
+        ? socket.end("xpathed-dev-v1:another-checkout\n")
+        : socket[method](),
+    );
     await new Promise((resolve) => foreign.listen(port, "127.0.0.1", resolve));
     t.after(() => new Promise((resolve) => foreign.close(resolve)));
     const current = start();
@@ -197,4 +228,41 @@ for (const method of ["end", "resetAndDestroy"])
     assert.equal(current.exitCode, 1);
     assert.match(current.output(), /occupied by another process|ECONNRESET/);
     assert.equal(await events(), "");
+  });
+
+for (const interrupted of [false, true])
+  test(`dev ${interrupted ? "can stop during" : "survives"} repeated control-port collisions without leaking listeners`, async (t) => {
+    const { start, events, waitFor, waitForUps, port, digest, releasePort } = await fixture(t);
+    const identity = `xpathed-dev-v1:${digest}\n`;
+    releasePort();
+    let replacements = 0;
+    const owner = createServer((socket) => {
+      socket.write(identity);
+      let input = "";
+      socket.on("data", (chunk) => {
+        input += chunk;
+        if (input === identity) {
+          replacements++;
+          socket.end();
+          if (!interrupted && replacements === 12) owner.close();
+        }
+      });
+    });
+    await new Promise((resolve) => owner.listen(port, "127.0.0.1", resolve));
+    t.after(async () => {
+      if (owner.listening) await new Promise((resolve) => owner.close(resolve));
+    });
+    const current = start();
+    if (interrupted) {
+      await waitFor(() => replacements >= 12);
+      assert.equal(await events(), "");
+    } else {
+      await waitForUps(1);
+      assert.equal(replacements, 12);
+      assert.doesNotMatch(await events(), /overlap/);
+    }
+    current.kill("SIGTERM");
+    await waitFor(() => exited(current));
+    assert.doesNotMatch(current.output(), /MaxListenersExceededWarning/);
+    assert.equal(current.exitCode, 0);
   });

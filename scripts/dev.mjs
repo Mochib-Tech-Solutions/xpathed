@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
+import { once } from "node:events";
 import { realpath } from "node:fs/promises";
 import { createConnection, createServer } from "node:net";
 import { setTimeout as delay } from "node:timers/promises";
@@ -134,13 +135,9 @@ async function replaceOwner() {
 try {
   while (!stopping) {
     try {
-      await new Promise((resolve, reject) => {
-        server.once("error", reject);
-        server.listen(port, "127.0.0.1", () => {
-          server.removeListener("error", reject);
-          resolve();
-        });
-      });
+      const listening = once(server, "listening");
+      server.listen(port, "127.0.0.1");
+      await listening;
       break;
     } catch (error) {
       if (error.code !== "EADDRINUSE") throw error;
