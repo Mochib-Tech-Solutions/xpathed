@@ -1,0 +1,22 @@
+name: Record verified CI job
+description: Record successful checks for the exact revision and retain their receipt.
+inputs:
+  job:
+    description: Selected CI job identity
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Record the checked revision
+      shell: bash
+      env:
+        CI_JOB_KEY: ${{ inputs.job }}
+      run: node scripts/ci-gate.mjs record "$CI_JOB_KEY"
+    - name: Retain the job receipt
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: ci-receipt-${{ inputs.job }}-${{ github.run_attempt }}
+        path: .artifacts/ci/receipts/${{ inputs.job }}.json
+        if-no-files-found: error
+        include-hidden-files: true
+        retention-days: 90
