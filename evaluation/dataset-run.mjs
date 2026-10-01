@@ -189,7 +189,7 @@ export function options(args) {
     );
   if (!profiles.some((profile) => profile.id === result.profile && profile.variant === "baseline"))
     throw new Error("Offline evaluation requires an approved baseline profile");
-  if (!["baseline", "declarative-inspect"].includes(result.promptVariant))
+  if (!["baseline", "intent-cardinality"].includes(result.promptVariant))
     throw new Error("Unknown offline prompt variant");
   if (result.mode !== "live" && result.promptVariant !== "baseline")
     throw new Error("Experimental prompt variants require live mode");
