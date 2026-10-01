@@ -1,6 +1,6 @@
 {
   "version": "1",
-  "description": "Contract 3 controlled qualification. Original legacy suite remains unchanged. New cases require independent review before live use. Held-out families must not be used for tuning.",
+  "description": "Contract 3 controlled comparison. Families exposed in the 2026-09-30 qualification are now regression, retaining previousSplit provenance. No unexposed held-out families remain; new independent families are required before release qualification. Original legacy suite remains unchanged.",
   "cases": [
     {
       "id": "basic-save",
@@ -2900,7 +2900,7 @@
     {
       "id": "library-borrow",
       "family": "library-catalog",
-      "split": "held-out",
+      "split": "regression",
       "category": "language",
       "fixture": {
         "kind": "derived-static-dom",
@@ -3016,12 +3016,15 @@
         "reviewer": "independent-contract-review",
         "reviewedAt": "2026-09-30T20:59:55.247Z"
       },
-      "setupRevision": "qualification-1"
+      "setupRevision": "qualification-1",
+      "previousSplit": "held-out",
+      "exposedAt": "2026-09-30",
+      "exposureRunId": "312713e2-f4ba-4e35-b28b-6df3e3e78fce"
     },
     {
       "id": "library-missing",
       "family": "library-catalog",
-      "split": "held-out",
+      "split": "regression",
       "category": "absence",
       "fixture": {
         "kind": "derived-static-dom",
@@ -3116,12 +3119,15 @@
         "reviewer": "independent-contract-review",
         "reviewedAt": "2026-09-30T20:59:55.247Z"
       },
-      "setupRevision": "qualification-1"
+      "setupRevision": "qualification-1",
+      "previousSplit": "held-out",
+      "exposedAt": "2026-09-30",
+      "exposureRunId": "312713e2-f4ba-4e35-b28b-6df3e3e78fce"
     },
     {
       "id": "rail-disabled-reservation",
       "family": "rail-timetable",
-      "split": "held-out",
+      "split": "regression",
       "category": "state",
       "fixture": {
         "kind": "derived-static-dom",
@@ -3274,12 +3280,15 @@
         "reviewer": "independent-contract-review",
         "reviewedAt": "2026-09-30T20:59:55.247Z"
       },
-      "setupRevision": "qualification-1"
+      "setupRevision": "qualification-1",
+      "previousSplit": "held-out",
+      "exposedAt": "2026-09-30",
+      "exposureRunId": "312713e2-f4ba-4e35-b28b-6df3e3e78fce"
     },
     {
       "id": "clinic-readonly-clear",
       "family": "clinic-consultation",
-      "split": "held-out",
+      "split": "regression",
       "category": "state",
       "fixture": {
         "kind": "derived-static-dom",
@@ -3385,12 +3394,15 @@
         "reviewer": "independent-contract-review",
         "reviewedAt": "2026-09-30T20:59:55.247Z"
       },
-      "setupRevision": "qualification-1"
+      "setupRevision": "qualification-1",
+      "previousSplit": "held-out",
+      "exposedAt": "2026-09-30",
+      "exposureRunId": "312713e2-f4ba-4e35-b28b-6df3e3e78fce"
     },
     {
       "id": "clinic-fill-question",
       "family": "clinic-consultation",
-      "split": "held-out",
+      "split": "regression",
       "category": "semantics",
       "fixture": {
         "kind": "derived-static-dom",
@@ -3497,12 +3509,15 @@
         "reviewer": "independent-contract-review",
         "reviewedAt": "2026-09-30T20:59:55.247Z"
       },
-      "setupRevision": "qualification-1"
+      "setupRevision": "qualification-1",
+      "previousSplit": "held-out",
+      "exposedAt": "2026-09-30",
+      "exposureRunId": "312713e2-f4ba-4e35-b28b-6df3e3e78fce"
     },
     {
       "id": "museum-about-link",
       "family": "museum-navigation",
-      "split": "held-out",
+      "split": "regression",
       "category": "language",
       "fixture": {
         "kind": "derived-static-dom",
@@ -3628,12 +3643,15 @@
         "reviewer": "independent-contract-review",
         "reviewedAt": "2026-09-30T20:59:55.247Z"
       },
-      "setupRevision": "qualification-1"
+      "setupRevision": "qualification-1",
+      "previousSplit": "held-out",
+      "exposedAt": "2026-09-30",
+      "exposureRunId": "312713e2-f4ba-4e35-b28b-6df3e3e78fce"
     },
     {
       "id": "museum-hover-access",
       "family": "museum-navigation",
-      "split": "held-out",
+      "split": "regression",
       "category": "semantics",
       "fixture": {
         "kind": "derived-static-dom",
@@ -3759,12 +3777,15 @@
         "reviewer": "independent-contract-review",
         "reviewedAt": "2026-09-30T20:59:55.247Z"
       },
-      "setupRevision": "qualification-1"
+      "setupRevision": "qualification-1",
+      "previousSplit": "held-out",
+      "exposedAt": "2026-09-30",
+      "exposureRunId": "312713e2-f4ba-4e35-b28b-6df3e3e78fce"
     },
     {
       "id": "greenhouse-uncheck",
       "family": "greenhouse-controls",
-      "split": "held-out",
+      "split": "regression",
       "category": "state",
       "fixture": {
         "kind": "derived-static-dom",
@@ -3882,12 +3903,15 @@
         "reviewer": "independent-contract-review",
         "reviewedAt": "2026-09-30T20:59:55.247Z"
       },
-      "setupRevision": "qualification-1"
+      "setupRevision": "qualification-1",
+      "previousSplit": "held-out",
+      "exposedAt": "2026-09-30",
+      "exposureRunId": "312713e2-f4ba-4e35-b28b-6df3e3e78fce"
     },
     {
       "id": "studio-select-codec",
       "family": "studio-export",
-      "split": "held-out",
+      "split": "regression",
       "category": "semantics",
       "fixture": {
         "kind": "derived-static-dom",
@@ -4017,12 +4041,15 @@
         "reviewer": "independent-contract-review",
         "reviewedAt": "2026-09-30T20:59:55.247Z"
       },
-      "setupRevision": "qualification-1"
+      "setupRevision": "qualification-1",
+      "previousSplit": "held-out",
+      "exposedAt": "2026-09-30",
+      "exposureRunId": "312713e2-f4ba-4e35-b28b-6df3e3e78fce"
     },
     {
       "id": "warehouse-scoped-plural",
       "family": "warehouse-dispatch",
-      "split": "held-out",
+      "split": "regression",
       "category": "context",
       "fixture": {
         "kind": "derived-static-dom",
@@ -4198,12 +4225,15 @@
         "reviewer": "independent-contract-review",
         "reviewedAt": "2026-09-30T20:59:55.247Z"
       },
-      "setupRevision": "qualification-1"
+      "setupRevision": "qualification-1",
+      "previousSplit": "held-out",
+      "exposedAt": "2026-09-30",
+      "exposureRunId": "312713e2-f4ba-4e35-b28b-6df3e3e78fce"
     },
     {
       "id": "warehouse-mixed",
       "family": "warehouse-dispatch",
-      "split": "held-out",
+      "split": "regression",
       "category": "semantics",
       "fixture": {
         "kind": "derived-static-dom",
@@ -4326,12 +4356,15 @@
         "reviewer": "independent-contract-review",
         "reviewedAt": "2026-09-30T20:59:55.247Z"
       },
-      "setupRevision": "qualification-1"
+      "setupRevision": "qualification-1",
+      "previousSplit": "held-out",
+      "exposedAt": "2026-09-30",
+      "exposureRunId": "312713e2-f4ba-4e35-b28b-6df3e3e78fce"
     },
     {
       "id": "parcel-radio",
       "family": "parcel-packaging",
-      "split": "held-out",
+      "split": "regression",
       "category": "state",
       "fixture": {
         "kind": "derived-static-dom",
@@ -4452,12 +4485,15 @@
         "reviewer": "independent-contract-review",
         "reviewedAt": "2026-09-30T20:59:55.247Z"
       },
-      "setupRevision": "qualification-1"
+      "setupRevision": "qualification-1",
+      "previousSplit": "held-out",
+      "exposedAt": "2026-09-30",
+      "exposureRunId": "312713e2-f4ba-4e35-b28b-6df3e3e78fce"
     },
     {
       "id": "laboratory-upload",
       "family": "laboratory-submission",
-      "split": "held-out",
+      "split": "regression",
       "category": "semantics",
       "fixture": {
         "kind": "derived-static-dom",
@@ -4567,12 +4603,15 @@
         "reviewer": "independent-contract-review",
         "reviewedAt": "2026-09-30T20:59:55.247Z"
       },
-      "setupRevision": "qualification-1"
+      "setupRevision": "qualification-1",
+      "previousSplit": "held-out",
+      "exposedAt": "2026-09-30",
+      "exposureRunId": "312713e2-f4ba-4e35-b28b-6df3e3e78fce"
     },
     {
       "id": "laboratory-future-workflow",
       "family": "laboratory-submission",
-      "split": "held-out",
+      "split": "regression",
       "category": "semantics",
       "fixture": {
         "kind": "derived-static-dom",
@@ -4664,12 +4703,15 @@
         "reviewer": "independent-contract-review",
         "reviewedAt": "2026-09-30T20:59:55.247Z"
       },
-      "setupRevision": "qualification-1"
+      "setupRevision": "qualification-1",
+      "previousSplit": "held-out",
+      "exposedAt": "2026-09-30",
+      "exposureRunId": "312713e2-f4ba-4e35-b28b-6df3e3e78fce"
     },
     {
       "id": "recipe-named-targets",
       "family": "recipe-planning",
-      "split": "held-out",
+      "split": "regression",
       "category": "semantics",
       "fixture": {
         "kind": "derived-static-dom",
@@ -4812,12 +4854,15 @@
         "reviewer": "independent-contract-review",
         "reviewedAt": "2026-09-30T20:59:55.247Z"
       },
-      "setupRevision": "qualification-1"
+      "setupRevision": "qualification-1",
+      "previousSplit": "held-out",
+      "exposedAt": "2026-09-30",
+      "exposureRunId": "312713e2-f4ba-4e35-b28b-6df3e3e78fce"
     },
     {
       "id": "recipe-typo",
       "family": "recipe-planning",
-      "split": "held-out",
+      "split": "regression",
       "category": "language",
       "fixture": {
         "kind": "derived-static-dom",
@@ -4929,7 +4974,10 @@
         "reviewer": "independent-contract-review",
         "reviewedAt": "2026-09-30T20:59:55.247Z"
       },
-      "setupRevision": "qualification-1"
+      "setupRevision": "qualification-1",
+      "previousSplit": "held-out",
+      "exposedAt": "2026-09-30",
+      "exposureRunId": "312713e2-f4ba-4e35-b28b-6df3e3e78fce"
     },
     {
       "id": "provider-malformed",

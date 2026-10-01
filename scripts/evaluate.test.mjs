@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
 
-function runWrapper(t, project, service = "web") {
+function runWrapper(t, project, service = "web", args = []) {
   const directory = mkdtempSync(join(tmpdir(), "xpathed-evaluation-isolation-"));
   t.after(() => rmSync(directory, { recursive: true, force: true }));
   const log = join(directory, "docker-calls");
@@ -29,7 +29,7 @@ esac
   );
   const result = spawnSync(
     "sh",
-    ["scripts/evaluate.sh", "--output", join(directory, "artifacts")],
+    ["scripts/evaluate.sh", "--output", join(directory, "artifacts"), ...args],
     {
       encoding: "utf8",
       cwd: resolve(import.meta.dirname, ".."),
@@ -59,6 +59,20 @@ test("evaluation refuses existing development services before teardown", (t) => 
   assert.equal(result.status, 2);
   assert.match(result.stderr, /non-evaluation service/);
   assert.doesNotMatch(result.calls, /\bdown\b|\bup\b|\brun\b/);
+});
+
+test("Qwen service belongs only to the qualification runner", (t) => {
+  const rejected = runWrapper(t, "xpathed-evaluation-qwen-rejected", "resolver-qwen");
+  assert.equal(rejected.status, 2);
+  assert.match(rejected.stderr, /Qualification service belongs to a different runner/);
+  assert.doesNotMatch(rejected.calls, /\bdown\b|\bup\b|\brun\b/);
+  const accepted = runWrapper(t, "xpathed-evaluation-qwen-accepted", "resolver-qwen", [
+    "--qualification",
+    "--profile",
+    "qwen",
+  ]);
+  assert.equal(accepted.status, 77);
+  assert.match(accepted.calls, /\bdown\b/);
 });
 
 test("custom dataset suites cannot enter live mode or read outside the checkout", (t) => {

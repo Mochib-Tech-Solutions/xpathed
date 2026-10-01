@@ -1,7 +1,7 @@
 {
-  "version": "1",
-  "goalMs": 2000,
-  "deadlineMs": 3000,
+  "version": "2",
+  "goalMs": 1000,
+  "deadlineMs": 2000,
   "minimumCorrectCompleteWithinDeadline": 0.95,
   "minimumCorrectness": 0.95,
   "minimumFamilyCorrectness": 0.8,
@@ -17,6 +17,6 @@
     "unplanned_trial",
     "duplicate_trial"
   ],
-  "basis": "Observed acceptance gates: the maintainer requested a 2-second goal and 3-second maximum. The existing development comparison exposed action misclassification; 95% whole-request correctness and 80% per-family correctness prevent speed alone selecting a candidate. Saved-locator mutation robustness stays a separate regression track. Gates must be frozen with baseline evidence before held-out requests.",
+  "basis": "Accepted 2026-10-01: a strictly sub-1-second goal and 2-second deadline replace policy 1's 2/3-second thresholds. At least 95% of planned requests must be correct and complete within the deadline; whole-request correctness, family floors and invariant gates remain unchanged. Historical rescoring is retrospective, not fresh qualification. Saved-locator mutation robustness stays separate. Freeze policy and baseline evidence before new held-out requests.",
   "uncertainty": "Minimum coverage is a practical experiment floor, not statistical certification. Report the two-sided 95% Wilson interval over held-out families whose every planned request is correct and complete within the deadline; related requests and repetitions do not count as independent families. Authored families are not a random sample of production traffic."
 }

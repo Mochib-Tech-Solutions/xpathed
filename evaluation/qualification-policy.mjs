@@ -215,7 +215,11 @@ function assess(manifest, trials, policy) {
       correctCompleteWithinGoal: ratio(
         entries.filter(
           ({ correct, trial }) =>
-            correct && finite(trial?.elapsedMs) && trial.elapsedMs <= policy.goalMs,
+            correct &&
+            finite(trial?.elapsedMs) &&
+            (policy.version === "1"
+              ? trial.elapsedMs <= policy.goalMs
+              : trial.elapsedMs < policy.goalMs),
         ).length,
         entries.length,
       ),
