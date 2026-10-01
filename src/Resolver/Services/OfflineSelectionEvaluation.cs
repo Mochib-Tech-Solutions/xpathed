@@ -22,11 +22,13 @@ public static class OfflineSelectionEvaluation
     {
         var timer = Stopwatch.StartNew();
         string? configurationId = null;
+        var prompt = ActionSelectionStrategy.SingleInteractionPrompt;
+        var promptVersion = "7";
         var diagnostics = new ResolutionDiagnostics
         {
             Stage = "input",
             Strategy = "candidate-selection-offline-v1",
-            PromptVersion = "7",
+            PromptVersion = promptVersion,
         };
         try
         {
@@ -38,6 +40,20 @@ public static class OfflineSelectionEvaluation
                     "Use --evaluate-offline INPUT [--prepare-only]."
                 );
             }
+            var variant = Environment.GetEnvironmentVariable("XPATHED_EVALUATION_PROMPT_VARIANT");
+            if (variant is not (null or "baseline" or "declarative-inspect"))
+            {
+                throw new ApiException(400, "invalid_offline_prompt_variant", "Unknown offline prompt variant.");
+            }
+            if (variant == "declarative-inspect")
+            {
+                prompt +=
+                    "\nAn element description without an explicit interaction is an inspect request. "
+                    + "Identify its intended candidate using available text and scope; absence of an action verb alone is not unsupported_action. "
+                    + "Keep genuine ambiguity unsupported and preserve all existing plural and workflow rules.";
+                promptVersion = "7-declarative-inspect-1";
+            }
+            diagnostics = diagnostics with { PromptVersion = promptVersion };
             var input = await ReadInputAsync(args[1]);
             using var inputDocument = JsonDocument.Parse(input);
             var candidateIds = inputDocument
@@ -77,11 +93,11 @@ public static class OfflineSelectionEvaluation
             }
             configurationId = gateway.ConfigurationId(
                 diagnostics.Strategy,
-                ActionSelectionStrategy.SingleInteractionPrompt,
+                prompt,
                 ActionSelectionStrategy.Schema,
                 InputBudgetBytes,
                 ActionSelectionStrategy.OutputTokens,
-                "7",
+                promptVersion,
                 ActionSelectionStrategy.MaximumActions
             );
             if (args.Length == 3)
@@ -91,18 +107,18 @@ public static class OfflineSelectionEvaluation
                         new
                         {
                             modelInput = input,
-                            prompt = ActionSelectionStrategy.SingleInteractionPrompt,
+                            prompt,
                             schema = ActionSelectionStrategy.Schema,
                             outputTokens = ActionSelectionStrategy.OutputTokens,
                             configurationId,
-                            promptVersion = "7",
+                            promptVersion,
                             effective = gateway.DescribeConfiguration(
                                 diagnostics.Strategy,
-                                ActionSelectionStrategy.SingleInteractionPrompt,
+                                prompt,
                                 ActionSelectionStrategy.Schema,
                                 InputBudgetBytes,
                                 ActionSelectionStrategy.OutputTokens,
-                                "7",
+                                promptVersion,
                                 ActionSelectionStrategy.MaximumActions
                             ),
                         },
@@ -115,7 +131,7 @@ public static class OfflineSelectionEvaluation
             gateway.EnsureConfigured();
             diagnostics = diagnostics with { Stage = "model", ModelCalls = 1 };
             var completion = await gateway.CompleteAsync(
-                ActionSelectionStrategy.SingleInteractionPrompt,
+                prompt,
                 input,
                 ActionSelectionStrategy.Schema,
                 CancellationToken.None,
@@ -125,7 +141,7 @@ public static class OfflineSelectionEvaluation
             {
                 Stage = "selection",
                 Strategy = diagnostics.Strategy,
-                PromptVersion = "7",
+                PromptVersion = promptVersion,
                 ModelCalls = 1,
                 ModelInputBytes = diagnostics.ModelInputBytes,
                 ModelInputCount = candidateIds.Length,
@@ -177,7 +193,7 @@ public static class OfflineSelectionEvaluation
                     actions = selections,
                     diagnostics,
                     configurationId,
-                    promptVersion = "7",
+                    promptVersion,
                     inputBytes = diagnostics.ModelInputBytes,
                     providerLatencyMs = diagnostics.TimingsMs.TryGetValue("provider", out var elapsed)
                         ? (double?)elapsed
