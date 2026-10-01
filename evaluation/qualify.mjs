@@ -3,6 +3,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { once } from "node:events";
 import { createServer } from "node:http";
+import { isDeepStrictEqual } from "node:util";
 import {
   parseOptions,
   buildPlan,
@@ -22,6 +23,47 @@ const json = async (path) => JSON.parse(await readFile(path, "utf8"));
 const save = (path, value) =>
   writeFile(path, JSON.stringify(value, null, 2) + "\n", { flag: "wx", mode: 0o600 });
 export const profiles = await json(new URL("./qualification-profiles.json", import.meta.url));
+
+export function validateReleaseArtifact(artifact, sourceSha, profileIds) {
+  const keys = (value, expected) =>
+    value &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    isDeepStrictEqual(Object.keys(value).sort(), [...expected].sort());
+  if (
+    !keys(artifact, [
+      "version",
+      "bundleManifestSha256",
+      "sourceSha",
+      "profileId",
+      "images",
+      "platform",
+    ]) ||
+    artifact.version !== 1 ||
+    !/^[a-f\d]{64}$/.test(artifact.bundleManifestSha256 ?? "") ||
+    !/^[a-f\d]{40}$/.test(artifact.sourceSha ?? "") ||
+    artifact.sourceSha !== sourceSha ||
+    !isDeepStrictEqual(profileIds, [artifact.profileId]) ||
+    !profiles.some((profile) => profile.id === artifact.profileId) ||
+    !keys(artifact.platform, ["os", "architecture"]) ||
+    artifact.platform.os !== "linux" ||
+    !["amd64", "arm64"].includes(artifact.platform.architecture) ||
+    !Array.isArray(artifact.images) ||
+    artifact.images.length !== 2 ||
+    new Set(artifact.images.map((image) => image?.id)).size !== 2 ||
+    !artifact.images.every(
+      (image, index) =>
+        keys(image, ["component", "id", "os", "architecture", "sourceSha"]) &&
+        image.component === ["browser", "resolver"][index] &&
+        /^sha256:[a-f\d]{64}$/.test(image.id ?? "") &&
+        image.os === artifact.platform.os &&
+        image.architecture === artifact.platform.architecture &&
+        image.sourceSha === artifact.sourceSha,
+    )
+  )
+    throw new Error("Invalid release artifact identity, source or selected profile");
+  return artifact;
+}
 
 export function parseQualificationOptions(args) {
   const extra = { phase: "pilot", split: "development", profile: "luna,gemini,deepseek" };
@@ -196,6 +238,12 @@ export async function readRun(directory) {
   const { contentHash, ...body } = manifest;
   if (hash(body) !== contentHash || manifest.kind !== "model-qualification")
     throw new Error("Qualification manifest integrity mismatch");
+  if (Object.hasOwn(manifest.qualification ?? {}, "artifact"))
+    validateReleaseArtifact(
+      manifest.qualification.artifact,
+      manifest.code?.revision,
+      manifest.profiles?.map((p) => p.id),
+    );
   for (const path of [
     "evaluation/qualify.mjs",
     "evaluation/grader.mjs",
@@ -284,6 +332,8 @@ export function assertFrozenImplementation(current, previous) {
       throw new Error(`Implementation changed after pilot: ${path}`);
   if (current.browserBinarySha256 !== previous.browserBinarySha256)
     throw new Error("Implementation changed after pilot: Chromium binary");
+  if (!isDeepStrictEqual(current.qualification?.artifact, previous.qualification?.artifact))
+    throw new Error("Implementation changed after pilot: release artifact");
 }
 
 function fixtureProxy(fixture, timeoutMs) {
@@ -326,6 +376,15 @@ export async function main(args = process.argv.slice(2)) {
   )
     throw new Error("Live qualification requires the measured Chromium binary fingerprint");
   const selectedProfiles = options.profileIds.map((id) => profiles.find((p) => p.id === id));
+  const code = await fingerprints();
+  const artifact =
+    process.env.XPATHED_RELEASE_ARTIFACT_JSON === undefined
+      ? undefined
+      : validateReleaseArtifact(
+          JSON.parse(process.env.XPATHED_RELEASE_ARTIFACT_JSON),
+          code.revision,
+          options.profileIds,
+        );
   const suite = await json(
     process.env.XPATHED_EVALUATION_SUITE || new URL("./qualification-cases.json", import.meta.url),
   );
@@ -375,10 +434,11 @@ export async function main(args = process.argv.slice(2)) {
     profiles: selectedProfiles,
     baselineEvidence: pilot ? baselineEvidence(pilot) : null,
     plan: buildMatrixPlan(cases, selectedProfiles, options),
-    code: await fingerprints(),
+    code,
     browserBinarySha256: process.env.XPATHED_BROWSER_BINARY_SHA256 ?? null,
     policy: defaultPolicy,
     qualification: {
+      ...(artifact === undefined ? {} : { artifact }),
       policySha256: hash(defaultPolicy),
       frozenAt: now,
       heldOutStartedAt: null,

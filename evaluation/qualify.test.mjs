@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createHash } from "node:crypto";
+import { spawnSync } from "node:child_process";
 import { mkdtemp, mkdir, readFile, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -15,6 +16,21 @@ import {
   profiles,
 } from "./qualify.mjs";
 import { fingerprints } from "./run.mjs";
+
+const releaseArtifact = (sourceSha) => ({
+  version: 1,
+  bundleManifestSha256: "b".repeat(64),
+  sourceSha,
+  profileId: "deepseek",
+  platform: { os: "linux", architecture: "amd64" },
+  images: ["browser", "resolver"].map((component, index) => ({
+    component,
+    id: `sha256:${String(index + 1).repeat(64)}`,
+    os: "linux",
+    architecture: "amd64",
+    sourceSha,
+  })),
+});
 
 test("qualification interleaves every profile per case and rotates first position", () => {
   const cases = [{ id: "a" }, { id: "b" }];
@@ -149,9 +165,45 @@ test("replay preserves absent planned attempts and rejects swapped trial identit
   await assert.rejects(readRun(directory), /identity mismatch/);
   await writeFile(join(directory, "trials", "test.json"), JSON.stringify(planned));
   assert.equal((await readRun(directory)).trials.length, 1);
+  manifest.code.revision = "a".repeat(40);
+  manifest.profiles = [{ id: "deepseek" }];
+  const artifact = releaseArtifact(manifest.code.revision);
+  manifest.qualification = { artifact };
+  delete manifest.contentHash;
+  manifest.contentHash = digest(manifest);
+  await writeFile(join(directory, "manifest.json"), JSON.stringify(manifest));
+  assert.deepEqual((await readRun(directory)).manifest.qualification.artifact, artifact);
+  manifest.qualification = { artifact: { version: 1 } };
+  delete manifest.contentHash;
+  manifest.contentHash = digest(manifest);
+  await writeFile(join(directory, "manifest.json"), JSON.stringify(manifest));
+  await assert.rejects(readRun(directory), /artifact/i);
+  delete manifest.qualification;
   manifest.cases[0].instruction = "tampered";
   await writeFile(join(directory, "manifest.json"), JSON.stringify(manifest));
   await assert.rejects(readRun(directory), /integrity mismatch/);
+});
+
+test("qualification rejects malformed or mismatched release identity before opening services", async () => {
+  const code = await fingerprints();
+  for (const artifact of [
+    { version: 1 },
+    releaseArtifact("0".repeat(40)),
+    { ...releaseArtifact(code.revision), profileId: "qwen" },
+    { ...releaseArtifact(code.revision), images: releaseArtifact(code.revision).images.reverse() },
+    { ...releaseArtifact(code.revision), platform: { os: "windows", architecture: "amd64" } },
+  ]) {
+    const result = spawnSync(
+      process.execPath,
+      ["evaluation/qualify.mjs", "--profile", "deepseek"],
+      {
+        encoding: "utf8",
+        env: { ...process.env, XPATHED_RELEASE_ARTIFACT_JSON: JSON.stringify(artifact) },
+      },
+    );
+    assert.equal(result.status, 2);
+    assert.match(result.stderr, /artifact/i);
+  }
 });
 
 test("baseline failures are regraded and capability gaps survive a fabricated passing grade", () => {
@@ -241,6 +293,14 @@ test("frozen implementations detect changed, added and removed runtime sources a
         { code: initial, browserBinarySha256: "old" },
       ),
     /Chromium binary/,
+  );
+  assert.throws(
+    () =>
+      assertFrozenImplementation(
+        { code: initial, qualification: { artifact: { bundleManifestSha256: "new" } } },
+        { code: initial, qualification: { artifact: { bundleManifestSha256: "old" } } },
+      ),
+    /artifact/i,
   );
 });
 

@@ -10,7 +10,9 @@ import {
   profiles,
   selectQualificationCases,
   compatibilityCases,
+  validateReleaseArtifact,
 } from "../evaluation/qualify.mjs";
+import { verify as verifyBundle } from "./release-bundle.mjs";
 import { fingerprints, configurationRecord } from "../evaluation/run.mjs";
 import { defaultPolicy, summarizeQualification } from "../evaluation/qualification-policy.mjs";
 import { gradeTrial } from "../evaluation/grader.mjs";
@@ -120,6 +122,26 @@ async function evidence(options) {
   const suite = await json("evaluation/qualification-cases.json");
   const files = {};
   const configurations = {};
+  ensure(
+    Boolean(options.bundle) === Boolean(options.bundleSha256),
+    "Bundle directory and SHA-256 are required together",
+  );
+  let artifact;
+  if (options.bundle) {
+    const { manifest } = await verifyBundle(options.bundle, options.bundleSha256);
+    artifact = validateReleaseArtifact(
+      {
+        version: 1,
+        bundleManifestSha256: options.bundleSha256,
+        sourceSha: manifest.sourceSha,
+        profileId: manifest.profileId,
+        images: manifest.images,
+        platform: manifest.platform,
+      },
+      options.sourceSha,
+      [options.profile],
+    );
+  }
   async function load(directory, phase) {
     directory = resolve(directory);
     ensure(
@@ -162,6 +184,45 @@ async function evidence(options) {
       "manifest.json": hash(headerBytes),
       "compatibility.json": hash(compatibilityBytes),
     };
+    ensure(
+      isDeepStrictEqual(header.qualification?.artifact, artifact),
+      "Qualification artifact differs from supplied bundle",
+    );
+    if (artifact) {
+      const beforeBytes = await regular(join(directory, "artifact-before.json"));
+      const receiptBytes = await regular(join(directory, "artifact-receipt.json"));
+      const before = JSON.parse(beforeBytes),
+        receipt = JSON.parse(receiptBytes);
+      const expectedKeys = (value, keys) =>
+        value && isDeepStrictEqual(Object.keys(value).sort(), keys.sort());
+      const observed = (value) =>
+        Array.isArray(value) &&
+        value.length === 2 &&
+        value.every(
+          (item, index) =>
+            expectedKeys(item, ["component", "imageId", "containerId"]) &&
+            item.component === artifact.images[index].component &&
+            item.imageId === artifact.images[index].id &&
+            /^[a-f\d]{64}$/.test(item.containerId ?? ""),
+        ) &&
+        value[0].containerId !== value[1].containerId;
+      ensure(
+        expectedKeys(before, ["version", "artifact", "observed"]) &&
+          before.version === 1 &&
+          expectedKeys(receipt, ["version", "artifact", "before", "after"]) &&
+          receipt.version === 1 &&
+          isDeepStrictEqual(before.artifact, artifact) &&
+          isDeepStrictEqual(receipt.artifact, artifact) &&
+          observed(before.observed) &&
+          observed(receipt.before) &&
+          observed(receipt.after) &&
+          isDeepStrictEqual(before.observed, receipt.before) &&
+          isDeepStrictEqual(receipt.before, receipt.after),
+        "Artifact container attestation is missing or mismatched",
+      );
+      snapshot["artifact-before.json"] = hash(beforeBytes);
+      snapshot["artifact-receipt.json"] = hash(receiptBytes);
+    }
     for (const id of ids)
       snapshot[`trials/${id}.json`] = hash(await regular(join(directory, "trials", `${id}.json`)));
     const summaryBytes = await optionalFile(join(directory, "summary.json"));
@@ -325,12 +386,15 @@ async function evidence(options) {
     ensure(hash(await regular(path)) === digest, "Evidence changed during verification");
   return {
     version: 1,
-    status: "evidence-only-verified",
+    status: artifact ? "artifact-bound-evidence-verified" : "evidence-only-verified",
     defaultActivated: false,
     sourceSha: options.sourceSha,
     profile: options.profile,
     pilot: resolve(options.pilot),
     confirmation: resolve(options.confirmation),
+    ...(artifact
+      ? { bundle: resolve(options.bundle), bundleSha256: options.bundleSha256, artifact }
+      : {}),
     policySha256: hash(defaultPolicy),
     browserBinarySha256: confirmation.manifest.browserBinarySha256,
     configurations,
@@ -359,11 +423,13 @@ async function main() {
     "--profile": "profile",
     "--source-sha": "sourceSha",
     "--output": "output",
+    "--bundle": "bundle",
+    "--bundle-sha256": "bundleSha256",
   };
   const options = {};
   ensure(
-    command === "seal" && args.length === 10,
-    "Use seal --confirmation RUN --pilot PILOT --profile ID --source-sha SHA --output FILE",
+    command === "seal" && [10, 14].includes(args.length),
+    "Use seal --confirmation RUN --pilot PILOT --profile ID --source-sha SHA --output FILE [--bundle DIRECTORY --bundle-sha256 DIGEST]",
   );
   for (let i = 0; i < args.length; i += 2) {
     ensure(
@@ -372,6 +438,10 @@ async function main() {
     );
     options[names[args[i]]] = args[i + 1];
   }
+  ensure(
+    ["confirmation", "pilot", "profile", "sourceSha", "output"].every((name) => options[name]),
+    "Missing required release option",
+  );
   const candidate = await evidence(options);
   const bytes = JSON.stringify(candidate, null, 2) + "\n";
   await writeFile(options.output, bytes, { flag: "wx", mode: 0o600 });

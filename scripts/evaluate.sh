@@ -39,6 +39,9 @@ while [ "$#" -gt 0 ]; do
     *) echo "Unknown evaluation option: $1" >&2; exit 2 ;;
   esac
 done
+if [ -n "${XPATHED_RELEASE_STATE:-}" ]; then
+  if [ "$qualification" != true ] || [ -z "${XPATHED_RELEASE_OVERLAY:-}" ] || [ -z "${XPATHED_RELEASE_SERVICE:-}" ]; then echo "Artifact qualification requires its verified launcher" >&2; exit 2; fi
+fi
 if [ "$comparison" = true ] && [ "$qualification" = true ]; then echo "Choose comparison or qualification" >&2; exit 2; fi
 if [ "$qualification" != true ] && { [ "$phase" != pilot ] || [ "$split" != development ] || [ "$profile" != luna,gemini,deepseek ] || [ -n "$pilot" ]; }; then echo "Qualification options require --qualification" >&2; exit 2; fi
 if [ "$qualification" = true ]; then
@@ -116,7 +119,9 @@ NODE
 if [ -z "$output" ]; then output=".artifacts/evaluation/$(node -p 'crypto.randomUUID()')"; fi
 export XPATHED_EVALUATION_OUTPUT=$(node -e 'process.stdout.write(require("node:path").resolve(process.argv[1]))' "$output")
 compose() {
-  if [ "$qualification" = true ]; then
+  if [ -n "${XPATHED_RELEASE_STATE:-}" ]; then
+    docker/compose.sh --env-file "$evaluation_env" -f docker/compose.evaluation.yaml -f docker/compose.qualification.yaml -f "$XPATHED_RELEASE_OVERLAY" "$@"
+  elif [ "$qualification" = true ]; then
     docker/compose.sh --env-file "$evaluation_env" -f docker/compose.evaluation.yaml -f docker/compose.qualification.yaml "$@"
   elif [ "$comparison" = true ]; then
     docker/compose.sh --env-file "$evaluation_env" -f docker/compose.evaluation.yaml -f docker/compose.comparison.yaml "$@"
@@ -142,7 +147,17 @@ done
 mkdir -p "$(dirname "$XPATHED_EVALUATION_OUTPUT")"
 mkdir "$XPATHED_EVALUATION_OUTPUT"
 compose down
-trap 'status=$?; compose down || true; rmdir "$evaluation_lock" || true; exit "$status"' EXIT
+release_started=false
+cleanup() {
+  status=$?
+  if [ "$release_started" = true ]; then
+    node scripts/release-evaluate.mjs attest "$XPATHED_RELEASE_STATE" after >/dev/null || status=1
+  fi
+  compose down || status=1
+  rmdir "$evaluation_lock" || status=1
+  exit "$status"
+}
+trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 mount_marker=$(node -p 'crypto.randomUUID()')
@@ -158,7 +173,13 @@ if ! compose run --rm --no-deps --entrypoint node evaluation-fixture -e '
   exit 2
 fi
 rm "$XPATHED_EVALUATION_OUTPUT/.mount-check"
-if [ "$qualification" = true ]; then
+if [ -n "${XPATHED_RELEASE_STATE:-}" ]; then
+  mkdir -p .artifacts/datasets
+  compose up --no-build --pull never --wait browser "$XPATHED_RELEASE_SERVICE" evaluation-fixture
+  XPATHED_RELEASE_ARTIFACT_JSON=$(node scripts/release-evaluate.mjs attest "$XPATHED_RELEASE_STATE" before)
+  export XPATHED_RELEASE_ARTIFACT_JSON
+  release_started=true
+elif [ "$qualification" = true ]; then
   mkdir -p .artifacts/datasets
   compose up --build --wait browser resolver resolver-luna resolver-gemini resolver-deepseek-concise resolver-qwen evaluation-fixture
 elif [ "$comparison" = true ]; then
@@ -167,12 +188,22 @@ elif [ "$comparison" = true ]; then
 else
   compose up --build --wait browser resolver evaluation-fixture
 fi
-compose exec -T evaluation-fixture node /checks/ready.mjs http://browser:8080/health http://resolver:8080/health http://evaluation-fixture:8090/health
+if [ -n "${XPATHED_RELEASE_STATE:-}" ]; then
+  compose exec -T evaluation-fixture node /checks/ready.mjs http://browser:8080/health "http://$XPATHED_RELEASE_SERVICE:8080/health" http://evaluation-fixture:8090/health
+else
+  compose exec -T evaluation-fixture node /checks/ready.mjs http://browser:8080/health http://resolver:8080/health http://evaluation-fixture:8090/health
+fi
 echo "Evaluation artifacts: $XPATHED_EVALUATION_OUTPUT"
 if [ "$qualification" = true ]; then
-  compose exec -T evaluation-fixture node /checks/ready.mjs http://resolver-luna:8080/health http://resolver-gemini:8080/health http://resolver-deepseek-concise:8080/health http://resolver-qwen:8080/health
+  if [ -z "${XPATHED_RELEASE_STATE:-}" ]; then
+    compose exec -T evaluation-fixture node /checks/ready.mjs http://resolver-luna:8080/health http://resolver-gemini:8080/health http://resolver-deepseek-concise:8080/health http://resolver-qwen:8080/health
+  fi
   browser_binary_hash=$(compose exec -T browser sh -c 'sha256sum /ms-playwright/chromium-*/chrome-linux*/chrome' | awk '{print $1}')
-  compose exec -T -e "XPATHED_BROWSER_BINARY_SHA256=$browser_binary_hash" evaluation-fixture node /evaluation/qualify.mjs "$@"
+  if [ -n "${XPATHED_RELEASE_STATE:-}" ]; then
+    compose exec -T -e "XPATHED_BROWSER_BINARY_SHA256=$browser_binary_hash" -e "XPATHED_RELEASE_ARTIFACT_JSON=$XPATHED_RELEASE_ARTIFACT_JSON" evaluation-fixture node /evaluation/qualify.mjs "$@"
+  else
+    compose exec -T -e "XPATHED_BROWSER_BINARY_SHA256=$browser_binary_hash" evaluation-fixture node /evaluation/qualify.mjs "$@"
+  fi
 elif [ "$comparison" = true ]; then
   compose exec -T evaluation-fixture node /checks/ready.mjs http://stagehand:8092/health
   browser_binary_hash=$(compose exec -T browser sh -c 'sha256sum /ms-playwright/chromium-*/chrome-linux*/chrome' | awk '{print $1}')
