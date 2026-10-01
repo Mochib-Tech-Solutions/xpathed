@@ -1,0 +1,61 @@
+name: Release Monitoring
+
+on:
+  schedule:
+    - cron: "17 2 * * *"
+  workflow_dispatch:
+    inputs:
+      notification_test:
+        description: Fail deliberately without provider calls to verify failure-email delivery
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: paid-evaluation
+  cancel-in-progress: false
+
+jobs:
+  monitoring:
+    if: github.ref == 'refs/heads/main' && github.event.repository.private
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24.16.0
+      - uses: docker/setup-compose-action@54042514f505b273907334ae2b9cdbb9a0213c1a # v2.4.0
+        with:
+          version: v5.5.1
+      - name: Check the exact approved release without changing the default
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OPENROUTER_EVAL_API_KEY: ${{ secrets.OPENROUTER_EVAL_API_KEY }}
+          XPATHED_BUDGET_GITHUB_REPOSITORY: ${{ github.repository }}
+          XPATHED_ENV_FILE: /dev/null
+          NOTIFICATION_TEST: ${{ inputs.notification_test || 'false' }}
+        run: |
+          if [ "$NOTIFICATION_TEST" = true ]; then
+            node scripts/release-monitor.mjs --notification-test
+          else
+            node scripts/release-monitor.mjs
+          fi
+      - name: Retain original monitoring evidence and failures
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: monitoring-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            .artifacts/monitoring/**/monitoring.json
+            .artifacts/monitoring/**/source/.artifacts/sentinel-run/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 30

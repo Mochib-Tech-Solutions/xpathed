@@ -1,9 +1,15 @@
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { profiles, selectQualificationCases } from "../evaluation/qualify.mjs";
+import {
+  profiles,
+  selectQualificationCases,
+  readRun,
+  assertPilotReady,
+} from "../evaluation/qualify.mjs";
 import { validateCases } from "../evaluation/run.mjs";
-import policy from "../evaluation/qualification-policy.json" with { type: "json" };
+import { policyForSuite } from "../evaluation/qualification-policy.mjs";
+import { readState } from "./release-state.mjs";
 
 export async function checkEvaluationKey(key, fetchImpl = fetch) {
   if (!key) throw new Error("Missing evaluation key");
@@ -34,16 +40,18 @@ export async function checkEvaluationKey(key, fetchImpl = fetch) {
 }
 
 export function qualificationCoverage(suite) {
+  const policy = policyForSuite(suite);
   const all = validateCases(suite);
   const { cases } = selectQualificationCases(all, {
     mode: "live",
     splits: ["development", ...policy.requiredSplits],
+    requiredContractVersion: policy.requiredContractVersion,
   });
   const held = cases.filter((c) => c.split === "held-out");
   const families = new Set(held.map((c) => c.family));
   const exposed = new Set(all.filter((c) => c.split !== "held-out").map((c) => c.family));
   const blockers = [];
-  if (all.some((c) => c.contractVersion === "4"))
+  if (policy.requiredContractVersion !== "4" && all.some((c) => c.contractVersion === "4"))
     blockers.push("Contract 4 requires a separately frozen current-view qualification policy");
   if (held.length < policy.minimumHeldOutTrials || families.size < policy.minimumHeldOutFamilies)
     blockers.push(
@@ -93,12 +101,24 @@ async function main() {
     throw new Error("Use release-ci.mjs preflight|deterministic|live PROFILE");
   if (
     env.GITHUB_EVENT_NAME !== "workflow_dispatch" ||
-    env.GITHUB_REF !== "refs/heads/main" ||
+    !/^refs\/heads\/(?:main|release\/[a-z0-9][a-z0-9._-]*)$/.test(env.GITHUB_REF ?? "") ||
     !/^[a-f\d]{40}$/.test(env.GITHUB_SHA ?? "") ||
     !/^\d+$/.test(env.GITHUB_RUN_ID ?? "") ||
     !/^\d+$/.test(env.GITHUB_RUN_ATTEMPT ?? "")
   )
-    throw new Error("Release workflow requires a trusted manual main-branch dispatch");
+    throw new Error("Release workflow requires a trusted manual main or release-branch dispatch");
+  const permission = JSON.parse(
+    execFileSync(
+      "gh",
+      [
+        "api",
+        `repos/${env.GITHUB_REPOSITORY}/collaborators/${encodeURIComponent(env.GITHUB_ACTOR ?? "")}/permission`,
+      ],
+      { encoding: "utf8" },
+    ),
+  );
+  if (!["admin", "maintain", "write"].includes(permission.permission))
+    throw new Error("Release dispatch requires a repository maintainer");
   const git = (...args) => execFileSync("git", args, { encoding: "utf8" }).trim();
   if (
     git("rev-parse", "HEAD") !== env.GITHUB_SHA ||
@@ -107,9 +127,20 @@ async function main() {
     throw new Error("Release workflow requires the exact clean dispatched revision");
   const root = ".artifacts/release-ci";
   await mkdir(root, { recursive: true, mode: 0o700 });
-  const coverage = qualificationCoverage(
-    JSON.parse(await readFile("evaluation/qualification-cases.json", "utf8")),
-  );
+  const suitePath = "evaluation/current-view-qualification-cases.json";
+  const suite = JSON.parse(await readFile(suitePath, "utf8"));
+  const policy = policyForSuite(suite);
+  const coverage = qualificationCoverage(suite);
+  const releaseState = readState(env.GITHUB_REPOSITORY);
+  const heldFamilies = [
+    ...new Set(suite.cases.filter((c) => c.split === "held-out").map((c) => c.family)),
+  ];
+  if (releaseState.state.exposures.some((entry) => heldFamilies.includes(entry.family))) {
+    coverage.ready = false;
+    coverage.blockers.push(
+      "Held-out families were reserved for an earlier live qualification; replace exposed families before a new run",
+    );
+  }
   const report = {
     sourceSha: env.GITHUB_SHA,
     mode,
@@ -154,6 +185,22 @@ async function main() {
   if (mode === "preflight") return;
   if (mode === "live" && !coverage.ready)
     throw new Error(`Qualification blocked before inference: ${coverage.blockers.join("; ")}`);
+  const checks = JSON.parse(
+    execFileSync(
+      "gh",
+      ["api", `repos/${env.GITHUB_REPOSITORY}/commits/${env.GITHUB_SHA}/check-runs`],
+      { encoding: "utf8" },
+    ),
+  );
+  if (
+    !checks.check_runs.some(
+      (check) =>
+        check.name === "check" &&
+        check.app?.slug === "github-actions" &&
+        check.conclusion === "success",
+    )
+  )
+    throw new Error("Candidate source requires a successful CI aggregate check at this exact SHA");
   const node = (script, args) =>
     execFileSync(process.execPath, [script, ...args], { stdio: "inherit" });
   const bundle = `${root}/bundle`;
@@ -188,6 +235,8 @@ async function main() {
       "1",
       "--output",
       output,
+      "--suite",
+      suitePath,
       ...extra,
     ]);
   const pilot = `${root}/pilot`,
@@ -197,6 +246,7 @@ async function main() {
     return;
   }
   evaluate("pilot", "development", pilot);
+  assertPilotReady(await readRun(pilot));
   evaluate("confirmation", policy.requiredSplits.join(","), confirmation, ["--pilot", pilot]);
   node("scripts/release.mjs", [
     "seal",
@@ -214,6 +264,19 @@ async function main() {
     digest,
     "--output",
     `${root}/candidate.json`,
+    "--suite",
+    suitePath,
+  ]);
+  const candidateDigest = createHash("sha256")
+    .update(await readFile(`${root}/candidate.json`))
+    .digest("hex");
+  await writeFile(`${root}/candidate-sha256.txt`, candidateDigest + "\n", { mode: 0o600 });
+  node("scripts/release-archive.mjs", [
+    "pack",
+    `${root}/candidate.json`,
+    "--sha256",
+    candidateDigest,
+    `${root}/release-evidence.json.gz`,
   ]);
 }
 
