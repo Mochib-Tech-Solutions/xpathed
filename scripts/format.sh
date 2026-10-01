@@ -21,5 +21,5 @@ if [ "$scope" = all ] || [ "$scope" = web ]; then
   if [ "$action" = --check ]; then pnpm --filter xpathed format:check; else pnpm --filter xpathed format; fi
 fi
 if [ "$scope" = all ] || [ "$scope" = tooling ]; then
-  pnpm exec prettier "$action" package.json .prettierrc.json global.json '.config/*.json' pnpm-workspace.yaml 'docker/*.yaml' 'docker/**/*.json' '.github/workflows/*.yml' 'scripts/*.mjs' 'tests/resolution/*.mjs' 'evaluation/**/*.{mjs,js,json}'
+  pnpm exec prettier "$action" package.json .prettierrc.json global.json '.config/*.json' pnpm-workspace.yaml 'docker/*.yaml' 'docker/**/*.json' '.github/{workflows,actions}/**/*.yml' 'scripts/*.mjs' 'tests/resolution/*.mjs' 'evaluation/**/*.{mjs,js,json}'
 fi

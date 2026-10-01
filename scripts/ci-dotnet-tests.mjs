@@ -10,7 +10,15 @@ export function testProjects(project = "all", cwd = process.cwd()) {
   if (selected.some((name) => !projects.includes(name)))
     throw new Error(`Unknown project: ${project}`);
   return selected
-    .flatMap((name) => globSync(`tests/${name}.*Tests/*.csproj`, { cwd }))
+    .flatMap((name) => {
+      const paths = globSync(`tests/${name}.*Tests/*.csproj`, { cwd });
+      if (
+        ["Browser", "Resolver"].includes(name) &&
+        !paths.includes(`tests/${name}.Tests/${name}.Tests.csproj`)
+      )
+        throw new Error(`The required ${name} unit test project is missing.`);
+      return paths;
+    })
     .filter((path) => !path.includes(".IntegrationTests/"))
     .sort();
 }
