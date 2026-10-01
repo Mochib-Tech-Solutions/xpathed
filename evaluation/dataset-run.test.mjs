@@ -112,6 +112,48 @@ test("offline provider payloads expire with evidence while identity and cost rem
   await assert.rejects(readFile(join(directory, "provider", "record.json")), /ENOENT/);
 });
 
+test("prompt variants require explicit live mode and clear inherited offline settings", () => {
+  const args = [
+    "--import",
+    "source",
+    "--output",
+    "output",
+    "--mode",
+    "live",
+    "--reviewed-inputs",
+    "reviews",
+  ];
+  assert.equal(options(args).promptVariant, "baseline");
+  assert.equal(
+    options([...args, "--prompt-variant", "declarative-inspect"]).promptVariant,
+    "declarative-inspect",
+  );
+  assert.throws(() => options([...args, "--prompt-variant", "concise"]), /prompt variant/);
+  assert.throws(
+    () =>
+      options([
+        "--import",
+        "source",
+        "--output",
+        "output",
+        "--prompt-variant",
+        "declarative-inspect",
+      ]),
+    /live mode/,
+  );
+  const profile = profiles.find((item) => item.id === "qwen");
+  const inherited = { XPATHED_EVALUATION_PROMPT_VARIANT: "declarative-inspect" };
+  assert.equal(
+    profileEnvironment(profile, "http://localhost/", inherited).XPATHED_EVALUATION_PROMPT_VARIANT,
+    "baseline",
+  );
+  assert.equal(
+    profileEnvironment(profile, "http://localhost/", inherited, "declarative-inspect")
+      .XPATHED_EVALUATION_PROMPT_VARIANT,
+    "declarative-inspect",
+  );
+});
+
 test("offline profiles retain the DeepSeek default and accept only approved baseline settings", () => {
   const args = ["--import", "source", "--output", "output"];
   assert.equal(options(args).profile, "deepseek");
