@@ -143,7 +143,8 @@ async function main() {
   await save();
   if (mode !== "deterministic") {
     const { githubBudget } = await import("../evaluation/github-budget.mjs");
-    const { validateBudgetLedger } = await import("../evaluation/comparison-budget.mjs");
+    const { readEvaluationKey, validateBudgetLedger } =
+      await import("../evaluation/comparison-budget.mjs");
     if (
       env.XPATHED_BUDGET_GITHUB_REPOSITORY?.toLowerCase() !== env.GITHUB_REPOSITORY?.toLowerCase()
     )
@@ -159,7 +160,7 @@ async function main() {
       spentUsd: spent,
       remainingUsd: Math.max(0, remote.ledger.ceilingUsd - spent),
     };
-    report.key = await checkKeyBudget(env.OPENROUTER_API_KEY, report.budget.remainingUsd);
+    report.key = await checkKeyBudget(await readEvaluationKey(env), report.budget.remainingUsd);
     await save();
   }
   console.log(JSON.stringify(report, null, 2));

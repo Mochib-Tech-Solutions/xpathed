@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { createServer } from "node:http";
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
+import { parseEnv } from "node:util";
 import { assertReconciledCharges, reserveCharge, unresolvedCharge } from "./dataset-run.mjs";
 import { githubBudget } from "./github-budget.mjs";
 
@@ -100,18 +101,17 @@ function boundedPricing(endpoint) {
 const upstream = "https://openrouter.ai/api/v1";
 const object = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
 
-async function readKey() {
-  if (process.env.OPENROUTER_API_KEY) return process.env.OPENROUTER_API_KEY;
+export async function readEvaluationKey(env = process.env) {
+  if (env.OPENROUTER_EVAL_API_KEY?.trim()) return env.OPENROUTER_EVAL_API_KEY.trim();
   try {
-    return (await readFile(process.env.XPATHED_ENV_FILE ?? ".env", "utf8"))
-      .split(/\r?\n/)
-      .find((line) => /^OPENROUTER_API_KEY=/.test(line))
-      ?.slice("OPENROUTER_API_KEY=".length)
-      .trim()
-      .replace(/^(["'])(.*)\1$/, "$2");
+    const key = parseEnv(
+      await readFile(env.XPATHED_ENV_FILE ?? ".env", "utf8"),
+    ).OPENROUTER_EVAL_API_KEY?.trim();
+    if (key) return key;
   } catch (error) {
     if (error.code !== "ENOENT") throw error;
   }
+  return env.OPENROUTER_API_KEY?.trim();
 }
 
 function boundedRequest(body, profile) {
@@ -310,9 +310,9 @@ export async function createBudgetProxy({
   githubToken = process.env.GH_TOKEN,
 } = {}) {
   const configured = declaredProfiles(profiles);
-  apiKey ??= await readKey();
+  apiKey ??= await readEvaluationKey();
   if (!apiKey)
-    throw new Error("Set OPENROUTER_API_KEY for the explicitly requested live comparison");
+    throw new Error("Set OPENROUTER_EVAL_API_KEY for the explicitly requested live evaluation");
   if (!Number.isFinite(ceilingUsd) || ceilingUsd <= 0 || ceilingUsd > 5)
     throw new Error("Experiment ceiling must be at most $5 total");
   const redact = (text) =>
@@ -401,8 +401,32 @@ export async function createBudgetProxy({
   const retain = async (record) => {
     await onRecord(safe(record));
   };
+  const newRecord = () => {
+    const record = {
+      id: randomUUID(),
+      attemptId: current.id,
+      createdAt: new Date().toISOString(),
+      request: null,
+      response: null,
+      usage: null,
+      reservedUsd: null,
+      reportedUsd: null,
+      remoteAccountingMs: { reservation: 0, reconciliation: 0 },
+    };
+    records.push(record);
+    return record;
+  };
+  const reserve = async (record, maximum) => {
+    reserveCharge(ledger, maximum, record.id);
+    current.reservation = ledger.entries.at(-1);
+    current.reservation.attemptId = current.id;
+    record.reservedUsd = maximum;
+    await persist(record, "reservation");
+    await retain(record);
+  };
   const server = createServer(async (request, response) => {
     const send = (status, value) => {
+      if (response.headersSent || response.destroyed) return;
       response.writeHead(status, {
         "Content-Type": "application/json",
         "Cache-Control": "no-store",
@@ -426,19 +450,8 @@ export async function createBudgetProxy({
     const finished = Promise.withResolvers();
     idle = finished.promise;
     const started = performance.now();
-    const record = {
-      id: randomUUID(),
-      attemptId: current.id,
-      createdAt: new Date().toISOString(),
-      request: null,
-      response: null,
-      usage: null,
-      reservedUsd: null,
-      reportedUsd: null,
-      remoteAccountingMs: { reservation: 0, reconciliation: 0 },
-    };
-    records.push(record);
-    let reservation;
+    const record = current.preparedRecord ?? newRecord();
+    let reservation = current.reservation;
     try {
       const chunks = [];
       let size = 0;
@@ -461,12 +474,8 @@ export async function createBudgetProxy({
         throw new Error(
           "Prepared request exceeds its frozen baseline allocation; no paid call made",
         );
-      reserveCharge(ledger, maximum, record.id);
-      reservation = ledger.entries.at(-1);
-      reservation.attemptId = current.id;
-      record.reservedUsd = maximum;
-      await persist(record, "reservation");
-      await retain(record);
+      if (!reservation) await reserve(record, maximum);
+      reservation = current.reservation;
       record.forwarded = true;
       const result = await fetchImpl(`${upstream}/chat/completions`, {
         method: "POST",
@@ -522,12 +531,16 @@ export async function createBudgetProxy({
         record.error =
           "Provider identity mismatch or response cache hit; further qualification calls are blocked";
       }
+      if (current.preparedRecord && !blocked) {
+        record.responseElapsedMs = performance.now() - started;
+        send(result.status, payload);
+      }
       await persist(record, "reconciliation");
       record.elapsedMs = performance.now() - started;
       await retain(record);
       send(result.status, payload);
     } catch (error) {
-      blocked ||= reservation != null;
+      blocked ||= current.reservation != null;
       record.error = safe(String(error.message));
       record.elapsedMs = performance.now() - started;
       try {
@@ -535,7 +548,7 @@ export async function createBudgetProxy({
       } catch {
         blocked = true;
       }
-      send(reservation ? 502 : 400, { error: { message: record.error } });
+      send(current.reservation ? 502 : 400, { error: { message: record.error } });
     } finally {
       busy = false;
       finished.resolve();
@@ -598,10 +611,46 @@ export async function createBudgetProxy({
       if (!profile) throw new Error("Unknown inference profile");
       if (!(maximumUsd > 0) || (maximumUsd !== Infinity && !Number.isFinite(maximumUsd)))
         throw new Error("Invalid frozen request allocation");
-      if (closed || blocked || busy || typeof id !== "string" || !id || attempts.has(id))
+      if (
+        closed ||
+        blocked ||
+        busy ||
+        current?.preparedRecord ||
+        typeof id !== "string" ||
+        !id ||
+        attempts.has(id)
+      )
         throw new Error("Cannot begin an overlapping, repeated or blocked inference attempt");
       attempts.add(id);
       current = { id, profile, used: false, maximumUsd };
+    },
+    async reserveAttempt(id, profileId, maximumUsd) {
+      if (!Number.isFinite(maximumUsd) || maximumUsd <= 0)
+        throw new Error("Prepared attempt requires a finite frozen allocation");
+      this.beginAttempt(id, profileId, maximumUsd);
+      busy = true;
+      const finished = Promise.withResolvers();
+      idle = finished.promise;
+      current.preparedRecord = newRecord();
+      try {
+        await reserve(current.preparedRecord, maximumUsd);
+      } catch (error) {
+        blocked = true;
+        throw new Error(redact(String(error.message)));
+      } finally {
+        busy = false;
+        finished.resolve();
+      }
+    },
+    async finishAttempt() {
+      await idle;
+      if (!current?.preparedRecord) throw new Error("No prepared attempt to finish");
+      if (!current.used) blocked = true;
+      if (blocked)
+        throw new Error(
+          "Prepared attempt accounting is incomplete or invalid; further calls blocked",
+        );
+      current.preparedRecord = null;
     },
     awaitIdle() {
       return idle;

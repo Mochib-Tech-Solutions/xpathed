@@ -28,6 +28,8 @@ Open [localhost:8080](http://localhost:8080), enter a website address and press 
 
 Setup creates an ignored `.env` with a random database password. Add `OPENROUTER_API_KEY` to that file for instruction resolution; manual browsing works without a model key. Set `XPATHED_PORT` in your shell to choose another loopback port. Running `pnpm dev` again replaces the existing development runner for this checkout and Compose project, including an older attached Compose watcher. It prepares configuration, stops the previous project containers, then starts source watching. Ctrl+C stops the development services; configuration and PostgreSQL data are preserved. `pnpm docker:down` removes their containers while preserving PostgreSQL data.
 
+For explicitly requested live evaluations, add the separate `OPENROUTER_EVAL_API_KEY` to `.env`; evaluation does not fall back to the application key stored in that file. See [evaluation setup](docs/evaluation.md) for key precedence and the shared spending ceiling.
+
 The Compose project defaults to `xpathed`. Use a different `COMPOSE_PROJECT_NAME` and `XPATHED_PORT` for a separate checkout; development startup refuses containers labelled as belonging to another checkout. Unrelated Compose projects are left running.
 
 ### Production images locally

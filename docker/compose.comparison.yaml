@@ -7,7 +7,7 @@ services:
       OpenRouter__Provider: wafer
   evaluation-fixture:
     environment:
-      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPENROUTER_EVAL_API_KEY: ${OPENROUTER_EVAL_API_KEY:-}
       XPATHED_COMPARISON_MODE: ${XPATHED_COMPARISON_MODE:-deterministic}
       XPATHED_BUDGET_PATH: /budget/experiment-budget.json
     volumes:

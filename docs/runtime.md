@@ -83,6 +83,7 @@ Operation errors use `{code, message, traceId}`. Controller validation returns t
 | `BrowserUrl`                               | Internal browser base URL, `http://browser:8080`                                                                          |
 | `ResolverUrl`                              | Client API resolver URL, `http://resolver:8080`                                                                           |
 | `OPENROUTER_API_KEY`                       | Ignored local `.env` key used only by Resolver; manual browsing requires no key                                           |
+| `OPENROUTER_EVAL_API_KEY`                  | Dedicated key for explicitly requested live evaluation; never replaces the application key                                |
 | `OPENROUTER_MODEL` / `OPENROUTER_PROVIDER` | Initial route `deepseek/deepseek-v4.1-flash` / `wafer`; see [resolution configuration](resolution.md#model-configuration) |
 | `ViewerOrigins`                            | Comma-separated exact allowed viewer origins; Compose includes localhost and 127.0.0.1                                    |
 | `MaxSessions`                              | Browser capacity, default 4; allowed 1–16                                                                                 |

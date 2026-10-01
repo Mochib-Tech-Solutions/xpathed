@@ -184,6 +184,94 @@ test("provider errors, leaked evidence and incomplete coverage remain distinct f
   assert.equal(gradeTrial(caseSpec, trial()).metrics.modelInputCoverage, null);
 });
 
+test("late provider accounting reports charged timeout usage without changing the failed result", () => {
+  const actual = trial();
+  actual.elapsedMs = 2004;
+  actual.result = {
+    contractVersion: "4",
+    outcome: "error",
+    actions: [],
+    diagnostics: { code: "resolution_timeout", providerAccounting: "pending", modelCalls: 1 },
+  };
+  actual.provider = [
+    {
+      forwarded: true,
+      reportedUsd: 0.002,
+      usage: {
+        prompt_tokens: 100,
+        completion_tokens: 20,
+        total_tokens: 120,
+        completion_tokens_details: { reasoning_tokens: 0 },
+        prompt_tokens_details: { cached_tokens: 50 },
+      },
+    },
+  ];
+  const original = structuredClone(actual);
+  const grade = gradeTrial(caseSpec, actual);
+  assert.equal(grade.passed, false);
+  assert.equal(grade.metrics.operationalError, true);
+  assert.equal(grade.metrics.latencyMs, 2004);
+  assert.equal(grade.metrics.accountingSource, "provider_records");
+  assert.equal(grade.metrics.reportedCostUsd, 0.002);
+  assert.deepEqual(grade.metrics.usage, {
+    inputTokens: 100,
+    outputTokens: 20,
+    totalTokens: 120,
+    reasoningTokens: 0,
+    cachedTokens: 50,
+  });
+  const report = summarize({ cases: [caseSpec], plan: { repetitions: 1, caseOrder: ["save"] } }, [
+    actual,
+  ]);
+  assert.equal(report.firstAttempt.cost.reportedUsd.total, 0.002);
+  assert.equal(report.firstAttempt.usage.inputTokens.total, 100);
+  assert.equal(report.firstAttempt.accountingSources.provider_records, 1);
+  assert.deepEqual(actual, original);
+});
+
+test("unsettled evaluation accounting fails the contract without rewriting a successful runtime result", () => {
+  const actual = trial();
+  actual.accountingError = "Prepared attempt accounting is incomplete or invalid";
+  const original = structuredClone(actual);
+  const grade = gradeTrial(caseSpec, actual);
+  assert.equal(grade.passed, false);
+  assert.ok(grade.failures.some(({ category }) => category === "contract"));
+  assert.equal(grade.metrics.operationalError, false);
+  assert.equal(grade.metrics.latencyMs, 20);
+  assert.deepEqual(actual, original);
+});
+
+test("provider accounting sums each forwarded call and preserves unknown charges and usage", () => {
+  const actual = trial();
+  actual.result.diagnostics = {
+    modelCalls: 1,
+    usage: { cost: 9, inputTokens: 999 },
+  };
+  actual.provider = [
+    { forwarded: true, reportedUsd: 0.002, usage: { prompt_tokens: 100 } },
+    { forwarded: true, reportedUsd: 0.003, usage: { prompt_tokens: 200 } },
+    { forwarded: false, reportedUsd: 7, usage: { prompt_tokens: 999 } },
+  ];
+  let metrics = gradeTrial(caseSpec, actual).metrics;
+  assert.equal(metrics.reportedCostUsd, 0.005);
+  assert.equal(metrics.usage.inputTokens, 300);
+  assert.equal(metrics.usage.reasoningTokens, null);
+  actual.provider[1].usage = null;
+  metrics = gradeTrial(caseSpec, actual).metrics;
+  assert.equal(metrics.reportedCostUsd, 0.005);
+  assert.equal(metrics.usage.inputTokens, null);
+  actual.provider[1].reportedUsd = null;
+  assert.equal(gradeTrial(caseSpec, actual).metrics.reportedCostUsd, null);
+  actual.provider = [];
+  metrics = gradeTrial(caseSpec, actual).metrics;
+  assert.equal(metrics.reportedCostUsd, null);
+  assert.equal(metrics.usage.inputTokens, null);
+  actual.result.diagnostics.modelCalls = 0;
+  metrics = gradeTrial(caseSpec, actual).metrics;
+  assert.equal(metrics.reportedCostUsd, 0);
+  assert.equal(metrics.usage.inputTokens, 0);
+});
+
 test("saved locator reuse is graded separately from fresh resolution after a mutation", () => {
   const expected = {
     ...caseSpec,

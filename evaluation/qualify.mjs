@@ -402,7 +402,10 @@ export async function main(args = process.argv.slice(2)) {
     const run = await readRun(resolve(options.replay));
     const summary = summarizeQualification(run.manifest, run.trials, run.manifest.policy);
     printSummary(summary);
-    return run.trials.length === run.manifest.plan.trials.length ? 0 : 1;
+    return run.trials.length === run.manifest.plan.trials.length &&
+      !run.trials.some((trial) => trial.accountingError)
+      ? 0
+      : 1;
   }
   if (
     options.mode === "live" &&
@@ -496,8 +499,14 @@ export async function main(args = process.argv.slice(2)) {
       baselineRunIds: pilot ? [pilot.manifest.id] : [],
     },
     measurement: {
+      latencyProtocol: suite.baseline
+        ? "resolver-http-pre-reserved-v2"
+        : "resolver-http-inline-accounting-v1",
       latency:
-        "Resolver HTTP end-to-end, including capture/model/verification; independent fixture setup and grading excluded",
+        "Resolver HTTP end-to-end, including capture/model/verification; independent fixture setup and grading excluded" +
+        (suite.baseline
+          ? "; durable budget reservation before execution, reconciliation after provider response and before next trial"
+          : "; durable budget reservation and reconciliation inside request timing"),
       serving: "standard",
       responseReuse: false,
       healing: false,
@@ -527,16 +536,26 @@ export async function main(args = process.argv.slice(2)) {
       result: null,
       evidence: null,
     };
-    if (mode === "live")
-      proxy.beginAttempt(
-        trial.id,
-        profile.id,
-        manifest.preparedForecast?.reservations.find((r) => r.id === planned.id)?.maximumUsd,
-      );
+    if (mode === "live") {
+      if (suite.baseline)
+        await proxy.reserveAttempt(
+          trial.id,
+          profile.id,
+          manifest.preparedForecast.reservations.find((r) => r.id === planned.id).maximumUsd,
+        );
+      else proxy.beginAttempt(trial.id, profile.id);
+    }
     await execute(spec, trial, { ...options, mode }, { ...services, resolver: profile.resolver });
     trial.configuration = configurationRecord(trial);
     if (mode === "live") {
       await proxy.awaitIdle();
+      if (suite.baseline) {
+        try {
+          await proxy.finishAttempt();
+        } catch (error) {
+          trial.accountingError = error.message;
+        }
+      }
       const calls = proxy.records.filter((r) => r.attemptId === trial.id);
       trial.provider = calls.map(({ request, response, ...metadata }) => metadata);
       trial.evidence = { ...trial.evidence, provider: calls };
@@ -645,6 +664,7 @@ export async function main(args = process.argv.slice(2)) {
       console.log(
         `${trial.grade.passed ? "PASS" : "FAIL"} ${trial.profileId} ${trial.caseId} #${trial.repetition} ${Math.round(trial.elapsedMs ?? 0)}ms`,
       );
+      if (trial.accountingError) throw new Error(trial.accountingError);
       if (
         options.mode === "live" &&
         (proxy.budget.pendingCharges ||

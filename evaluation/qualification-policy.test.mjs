@@ -141,6 +141,10 @@ test("paired baseline reports both contracts, keeps missing attempts and exclude
     caseId: c.id,
     repetition: 1,
     elapsedMs: index ? 800 : 1400,
+    provider: original.provider.map((record) => ({
+      ...record,
+      usage: { prompt_tokens: index ? 100 : 400 },
+    })),
     result: {
       ...structuredClone(original.result),
       contractVersion: c.contractVersion,

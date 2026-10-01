@@ -15,6 +15,7 @@ import {
   assertFrozenImplementation,
   profiles,
   compatibilityCases,
+  main,
 } from "./qualify.mjs";
 import { fingerprints } from "./run.mjs";
 
@@ -199,6 +200,7 @@ test("replay preserves absent planned attempts and rejects swapped trial identit
   const planned = { id: "test", caseId: spec.id, profileId: "deepseek", repetition: 1, attempt: 1 };
   const manifest = {
     kind: "model-qualification",
+    profiles: [{ id: "deepseek" }],
     cases: [spec],
     plan: { trials: [planned] },
     code: { files },
@@ -213,6 +215,13 @@ test("replay preserves absent planned attempts and rejects swapped trial identit
   await assert.rejects(readRun(directory), /identity mismatch/);
   await writeFile(join(directory, "trials", "test.json"), JSON.stringify(planned));
   assert.equal((await readRun(directory)).trials.length, 1);
+  assert.equal(await main(["--replay", directory]), 0);
+  await writeFile(
+    join(directory, "trials", "test.json"),
+    JSON.stringify({ ...planned, accountingError: "Final reconciliation failed" }),
+  );
+  assert.equal(await main(["--replay", directory]), 1);
+  await writeFile(join(directory, "trials", "test.json"), JSON.stringify(planned));
   manifest.code.revision = "a".repeat(40);
   manifest.profiles = [{ id: "deepseek" }];
   const artifact = releaseArtifact(manifest.code.revision);

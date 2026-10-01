@@ -107,6 +107,17 @@ trap 'rmdir "$evaluation_lock"' EXIT
 export POSTGRES_PASSWORD=evaluation-unused
 evaluation_env=${XPATHED_ENV_FILE:-/dev/null}
 if [ "$mode" = live ] && [ -z "${XPATHED_ENV_FILE:-}" ] && [ -f .env ]; then evaluation_env=.env; fi
+if [ "$mode" = live ]; then
+  OPENROUTER_EVAL_API_KEY=$(node --input-type=module -e '
+    import { readEvaluationKey } from "./evaluation/comparison-budget.mjs";
+    const key = await readEvaluationKey();
+    if (!key) throw new Error("Set OPENROUTER_EVAL_API_KEY for live evaluation");
+    process.stdout.write(key);
+  ')
+else
+  OPENROUTER_EVAL_API_KEY=
+fi
+export OPENROUTER_EVAL_API_KEY
 export XPATHED_CODE_REVISION=$(git rev-parse HEAD)
 export XPATHED_TREE_HASH=$(node --input-type=module <<'NODE'
 import { execFileSync } from "node:child_process";
