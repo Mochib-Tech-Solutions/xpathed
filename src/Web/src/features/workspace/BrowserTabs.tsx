@@ -38,6 +38,19 @@ export default function BrowserTabs({
         aria-label="Browser tabs"
         className="flex min-w-0 gap-1 overflow-x-auto"
       >
+        {pages.length === 0 && (
+          <button
+            type="button"
+            role="tab"
+            id="tab-start"
+            aria-controls="browser-panel"
+            aria-selected="true"
+            disabled={busy}
+            className="min-w-24 shrink-0 rounded-t-md border border-b-0 border-border bg-background px-3 py-2 text-left text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            New tab
+          </button>
+        )}
         {pages.map((page, index) => {
           const title = page.title || (page.url === "about:blank" ? "New tab" : page.url);
           return (
@@ -108,7 +121,7 @@ export default function BrowserTabs({
         variant="ghost"
         size="icon"
         className="size-7"
-        disabled={busy}
+        disabled={busy || pages.length === 0}
         aria-label="New tab"
         title="New tab"
         onClick={onNew}
@@ -116,7 +129,7 @@ export default function BrowserTabs({
         <Plus aria-hidden="true" />
       </Button>
       <div className="ml-auto shrink-0">
-        <CloseAllTabsButton disabled={busy} onConfirm={onCloseAll} />
+        <CloseAllTabsButton disabled={busy || pages.length === 0} onConfirm={onCloseAll} />
       </div>
     </div>
   );

@@ -14,7 +14,9 @@ ClientApi automatically persists sanitized backend diagnostics and supports inte
 
 Each browser session owns a Chromium process, an isolated browser context, up to eight managed pages, one Xvfb display and one loopback-only x11vnc listener. ASP.NET bridges binary WebSocket traffic directly to VNC and acknowledges normal viewer disconnects before releasing the connection; no debugging or raw VNC port is published. CDP is used internally to keep each Chromium window fullscreen and bring the active page to the front. No browser objects cross an HTTP boundary.
 
-The resolver receives the same `pageId` as the client. It asks the browser service for an inspection without opening or navigating a page. The initial workspace creates no session. Submitting the address bar creates a session at `about:blank` and immediately navigates to the supplied website. Later submissions reuse that session; a failed navigation keeps it available for retry.
+The resolver receives the same `pageId` as the client. It asks the browser service for an inspection without opening or navigating a page. The initial workspace shows a selected **New tab** and creates no session; tab creation and close-all controls stay disabled until a managed page exists. The tab strip and address bar retain their positions when navigation starts. Submitting the address bar creates a session at `about:blank` and immediately navigates to the supplied website. Later submissions reuse that session; a failed navigation keeps it available for retry.
+
+The workspace defaults to dark before first paint and uses one header button to switch between light and dark. Explicit choices persist in `xpathed.theme`; an absent, legacy `system`, invalid or unreadable preference uses dark. OS theme changes do not alter the workspace. The chat reset uses an eraser beside its heading, separate from browser reload.
 
 ## Client API
 
