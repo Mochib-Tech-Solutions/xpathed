@@ -1,10 +1,10 @@
 # Labelled dataset model comparison
 
-2026-10-01. **Comparison paused after 524 of 764 planned attempts:** a DeepSeek timeout left one provider charge unknown. The shared budget guard stopped further paid work. This partial report preserves the original failures and distinguishes paired results from unequal remaining coverage; no optimization candidate or production default is selected yet.
+2026-10-01. **Completed all 764 planned attempts: 191 original labelled cases for each of four models.** DeepSeek is the next tuning candidate under the previously frozen correctness-within-two-seconds rule. Gemini has the highest exact source-target accuracy. Qwen is slower and less accurate than Gemini on this sample. No model qualifies for production promotion, and defaults remain unchanged.
 
 ## Comparison contract
 
-The declared sample is **191 original PhraseNode development cases from 40 page families**, once per model: Qwen3.8 Flash/Alibaba, Gemini 3.8 Flash/Google AI Studio, GPT-6 Luna/OpenAI and DeepSeek V4.1 Flash/Wafer. All receive the same baseline version-7 system prompt, output schema and per-case instruction/candidate payload. No prompt variants, repeated trials, retries or model-based case selection are included. Nine pilot cases count toward the total; the remaining 182 are disjoint. Full completion would mean 764 paid attempts, not 764 independent source cases.
+The declared sample is **191 original PhraseNode development cases from 40 page families**, once per model: Qwen3.8 Flash/Alibaba, Gemini 3.8 Flash/Google AI Studio, GPT-6 Luna/OpenAI and DeepSeek V4.1 Flash/Wafer. All receive the same baseline version-7 system prompt, output schema and per-case instruction/candidate payload. No prompt variants, repeated trials, retries or model-based case selection are included. Nine pilot cases count toward the total; the remaining 182 are disjoint. The 764 attempts represent 191 shared source cases, not 764 independent cases.
 
 Standard routes and their explicit supported reasoning/cache settings remain in the recorded profiles: Qwen and DeepSeek disable reasoning, Luna requests `none`, and Gemini requests `low`. Provider infrastructure and required settings differ, so results compare those served model configurations rather than isolating architecture from all serving effects. Each retains the 4,096-token completion ceiling, schema validation, disabled fallback and response-cache checks. [Route research](model-qualification-availability.md), [Qwen route research](qwen-flash-qualification-availability.md)
 
@@ -22,15 +22,17 @@ Mind2Web contributes **zero cases to this comparison** under the original-label-
 
 ## Execution and budget
 
-Source revision: `69c3e21`. The private orchestration file `.artifacts/datasets/run-labelled-waves.mjs` freezes the 191-case queue and uses the existing dataset runner and `forecastPilot`. The pilot includes the largest reviewed payload and candidate page. Each subsequent wave takes a contiguous prefix of the remaining queue that fits the reconciled shared **$5 ledger for all four models**, using current bounded route prices and twice the observed per-model input/output maxima from every retained call. Maxima and failures are retained; the formula is not relaxed after a budget rejection. Actual per-call reservations remain authoritative.
+The first 524 attempts used source revision `69c3e21`; the 240 resumed attempts used `6c0be5e`. Between them, the shared proxy and runners gained timeout-accounting synchronization and explicit full-reservation review; the offline entrypoint gained evaluation-only prompt-variant support. Rebuilt Resolver/Common binaries therefore have different hashes. The resumed baseline sent the same prompt, schema and per-case inputs: actual provider message and schema bytes were checked across all models and runs. No baseline prompt or model setting was tuned from results during this comparison. The private orchestration file `.artifacts/datasets/run-labelled-waves.mjs` freezes the 191-case queue and uses the existing dataset runner and `forecastPilot`. The pilot includes the largest reviewed payload and candidate page. Each subsequent wave takes a contiguous prefix of the remaining queue that fits the reconciled shared **$5 ledger for all four models**, using current bounded route prices and twice the observed per-model input/output maxima from every retained call. Maxima and failures are retained; the formula is not relaxed after a budget rejection. Actual per-call reservations remain authoritative.
 
 Model order rotates between waves; requests run sequentially without retries. The same selected case set reaches every model in a completed wave. If another whole wave cannot fit, execution stops and reports the incomplete frozen plan. Scores never determine which cases run next. Provider identity, response-cache, unique-generation and known-charge checks gate continuation; an invalid or unreconciled call stops further paid work. No paid CI is enabled and the ledger is never reset.
+
+Resumption used a separate frozen queue containing only unattempted pairs. Affordable per-model batches were bounded by the exact prepared request size in UTF-8 bytes plus framing, the full 4,096-token output allowance, the highest current route/cache-write tiers and the shared proxy's safety factor. Each complete next batch had to fit the remaining ledger before launch; actual charges then released unused reservation capacity. This request-size bound includes failed attempts without inventing missing token usage. The original four-model wave history and both interrupted manifests remain unchanged.
 
 ## Evidence and reproduction
 
 Private preparation files live under `.artifacts/datasets/phrasenode-dev-expanded-preparation/`. `labelled-partition-selection.json` records the 9/182 partition, exclusions and parent hashes; its SHA-256 is `858d92742997db25c8bad38375f83cdda5ee15d439b843cc1937ed5a360d71f9`. Exact approved payload hashes live in `labelled-pilot-reviewed-inputs.json` and `labelled-remainder-reviewed-inputs.json`. Wave plans, forecasts and execution records preserve the order and budget decisions. Provider/page payloads stay private.
 
-All four pilot manifests recorded system-prompt SHA-256 `ea2ee6e48dea7838e102281891afe2548f5f9fb2861ed83576f9619168509a32` and schema SHA-256 `04474859d8a35c892a84c81a18a27d68edbfa1d09d04c8f02f8a5f83214ddfe1`. The retained attempted evidence uses those same prompt and schema hashes. Run configuration IDs include the ephemeral loopback proxy address and therefore differ across runs; compare semantic settings after verifying and normalizing only that local address, and verify actual provider request messages and schemas byte for byte.
+All 764 retained attempts use system-prompt SHA-256 `ea2ee6e48dea7838e102281891afe2548f5f9fb2861ed83576f9619168509a32` and schema SHA-256 `04474859d8a35c892a84c81a18a27d68edbfa1d09d04c8f02f8a5f83214ddfe1`. Run configuration IDs include the ephemeral loopback proxy address and therefore differ across runs; compare semantic settings after verifying and normalizing only that local address, and verify actual provider request messages and schemas byte for byte.
 
 At the recorded source revision, each retained run can be regraded without services or paid calls:
 
@@ -38,49 +40,53 @@ At the recorded source revision, each retained run can be regraded without servi
 rtk pnpm evaluate:dataset --replay .artifacts/datasets/qwen-labelled-pilot
 ```
 
-Repeat replay for the other model pilot directories and every recorded wave directory. Reissuing a live command would be a new paid experiment, not replay; preserve existing artifacts and budget accounting.
+Repeat replay for the other model pilot directories and every recorded wave/resume directory, using the source revision recorded in each manifest. The private `stage1-final-audit.json` reproduces every per-run summary, and `labelled-comparison-aggregates.json` combines original and resumed attempts without rewriting interrupted runs. `stage2-selected-model.json` freezes the tuning-candidate decision; `stage2-development-baseline.json` references the original 40 development attempts for reuse. Reissuing a live command would be a new paid experiment, not replay; preserve existing artifacts and budget accounting.
 
 ## Results and interpretation
 
-### Paired evidence available before interruption
-
-These 90 cases reached every model once (the 9-case pilot plus the first 81-case wave). Correct means exactly the original labelled singleton target set, with valid complete output; including the gold node among extra targets is insufficient. Provider latency includes all available attempts, not only successes. These are descriptive results on the completed shared subset, not the intended 191-case comparison.
+Every row covers the same 191 cases from 40 page families, once per model. **Exact responses** require precisely the original labelled singleton target set and valid complete output; returning the gold node among extra targets fails. PhraseNode has no independent action labels, so these scores do not establish correct interaction detection.
 
 | Model    | Exact responses | Correct below 1 s, provider | Correct within 2 s, provider | Provider p50 / p95, ms | Offline CLI p50 / p95, ms |
 | -------- | --------------: | --------------------------: | ---------------------------: | ---------------------: | ------------------------: |
-| Qwen     |           64/90 |                        0/90 |                         3/90 |            2809 / 5372 |               3130 / 5698 |
-| Gemini   |           74/90 |                        0/90 |                        53/90 |            1628 / 4074 |               1949 / 4392 |
-| Luna     |           65/90 |                        0/90 |                        55/90 |            1752 / 2522 |               2072 / 2837 |
-| DeepSeek |           67/90 |                       50/90 |                        66/90 |             682 / 1465 |               1005 / 1830 |
+| Qwen     |         127/191 |                       0/191 |                        3/191 |            2897 / 4994 |               3224 / 5350 |
+| Gemini   |         149/191 |                       0/191 |                      103/191 |            1776 / 4389 |               2088 / 4701 |
+| Luna     |         128/191 |                       0/191 |                      107/191 |            1743 / 2513 |               2049 / 2834 |
+| DeepSeek |         133/191 |                      65/191 |                      120/191 |            1024 / 2833 |               1328 / 3194 |
 
-Gemini has the highest observed source-target accuracy on this subset; DeepSeek has the most correct results within the provider-time deadline. Neither result establishes a release-quality winner. In particular, the subsequent DeepSeek timeout remains part of the broader evidence, rather than disappearing behind the paired table.
+Latency percentiles include all available attempts, including failures. DeepSeek has 190 observed provider timings: its original timeout lacks provider elapsed time and remains a failure in every 191-case denominator. All 191 offline elapsed times are available for every model. Correct offline CLI responses within two seconds are Qwen 0, Gemini 57, Luna 50 and DeepSeek 112; below one second they are 0, 0, 0 and 34 respectively.
 
-### All attempted work and charges
+Raw gold-node matches are 131 / 149 / 133 / 136 for Qwen / Gemini / Luna / DeepSeek. Those are not the exact-response scores above: an extra or otherwise invalid target set cannot become correct because it contains the gold node. Failures include wrong targets, incorrect unsupported/not-found outcomes, extra target sets and malformed or incomplete model output. Model-output contract errors are distinct from provider outages. Original labels and every unsuccessful attempt remain unchanged.
 
-| Model    | Attempted / planned cases | Exact responses among attempted | Known charges, USD | Charges observed |
-| -------- | ------------------------: | ------------------------------: | -----------------: | ---------------: |
-| Qwen     |                    90/191 |                           64/90 |       $0.049145998 |            90/90 |
-| Gemini   |                   150/191 |                         115/150 |       $0.753512250 |          150/150 |
-| Luna     |                   150/191 |                         105/150 |       $0.085750500 |          150/150 |
-| DeepSeek |                   134/191 |                          92/134 |       $0.037751850 |          133/134 |
+The selection rule was frozen before completion: maximize exact source-target responses within 2,000 ms provider time, then overall correctness, provider p95 and reported cost. **DeepSeek wins that tuning-candidate rule with 120/191**, while Gemini leads overall correctness with 149/191. Neither approaches the 95% correctness/deadline gate, and offline evidence cannot qualify browser behavior. The existing family-diverse 40-case development subset reuses DeepSeek's original attempts (28 exact responses, 25 within two seconds), without rerunning its baseline. No second-stage improvement is claimed here.
 
-Do not compare these unequal-coverage accuracy fractions as if they used the same cases. There are 240 unattempted model/case pairs. All 524 attempted records remain retained, including the 30-second DeepSeek timeout; no case/model pair was retried. Of them, 523 have unique generation IDs and known provider charges. Requests, source labels and matching-case prompt/schema bytes remain identical across models.
+### Costs and serving evidence
 
-Known new spend is **$0.926160598**, plus one **$0.00651132 reserved amount with unknown actual cost**. The ledger also retains $0.2521110378 from previous experiments: $1.1782716358 known charges and $1.1847829558 including the outstanding reservation, below the unchanged $5 ceiling. The reservation is not reported as an actual charge or silently changed to zero.
+| Model    | Known provider charges, USD | Charges observed | Reasoning tokens | Cached input tokens |
+| -------- | --------------------------: | ---------------: | ---------------: | ------------------: |
+| Qwen     |                $0.229897918 |          191/191 |                0 |              98,048 |
+| Gemini   |                $1.270649250 |          191/191 |           16,811 |                   0 |
+| Luna     |                $0.147707900 |          191/191 |                0 |                   0 |
+| DeepSeek |                $0.076895550 |          189/191 |                0 |              78,592 |
 
-The first 81-case-per-model wave passed a conservative $4.65062958 forecast against $4.6624524662 remaining. After reconciliation, the next 60-case wave passed a $4.3361 forecast against $4.3412 remaining. It stopped after Gemini and Luna completed and DeepSeek reached case 44; Qwen's second wave never started. The original interrupted manifest and its 44/60 summary remain unchanged. Resume requires charge recovery and must schedule only never-attempted pairs, retaining the failed case in the denominator.
+Known charges for this comparison total **$1.725150618**. Two DeepSeek timeouts have unknown actual charges and separately consume their complete reviewed reservations: **$0.00651132 + $0.00782268 = $0.014334**. They remain unknown in `reportedUsd`; these amounts are conservative budget accounting, not fabricated provider charges.
 
-### Timeout accounting and verification
+At completion of this stage, including **$0.2521110378** from prior experiments, the shared ledger records **$1.9772616558 known charges**, **$0.014334 reviewed reservations**, and **$1.9915956558 total consumed** against the unchanged hard $5 ceiling. There are no unreviewed pending charges; **$3.0084043442** remains. All 762 responses with charges have distinct verified generation identities. The two response-less timeouts do not acquire invented identities, costs or success results. No response reuse was observed; provider prompt-cache warmth is uncontrolled and differs between configurations.
 
-The offline process timed out before receiving a generation ID. A local deterministic reproduction exposed a shared harness race: a disconnected client's HTTP socket could close while upstream accounting was still pending, allowing shutdown to release the ledger lock too early. The fix waits for active accounting before releasing that lock or saving provider evidence in all three live runners. It validates late evidence after draining while preserving the original result and measured elapsed time. The fix was added after the interruption and has only deterministic regression evidence so far; it cannot reconstruct a response already lost by the original process.
+### Interrupted runs and resumption
 
-Focused cancellation tests reproduce the original failure and verify late-charge retention, repeated close calls, unchanged timeout outcomes and continued blocking for unresolved charges. The current tooling gate passes 195 tests; Docker configuration and the earlier 66 deterministic browser cases also passed. These engineering checks make no paid inference calls.
+The first interruption occurred after 524 attempts. Its original DeepSeek wave manifest and **44/60** summary remain unchanged. The user then authorized autonomous resumption under the same hard ceiling, with the unknown charge consuming its full reservation under an explicit review. Only the 240 never-attempted model/case pairs were scheduled.
 
-The configured inference key cannot access management-only analytics (observed HTTP 403). The supported recovery is to retrieve the matching generation ID from [OpenRouter Logs](https://openrouter.ai/logs), then fetch its exact account charge through the [generation metadata API](https://openrouter.ai/docs/api/api-reference/generations/get-generation). Aggregate balances or activity totals are insufficient to assign a charge to this individual request. Paid work remains stopped while that evidence is missing.
+A second DeepSeek timeout stopped a resumed batch at **42/57**. That original failure and summary also remain unchanged. Its full reservation was reviewed under the same authorization; the last **15 never-attempted cases** ran in a separate directory. No timed-out or completed case/model pair was retried. Independent aggregation confirms exactly 191 unique pairs per model and 764 total attempts, with both timeouts retained as failures.
 
-These are **offline single-target selection** measurements. PhraseNode supplies no independent action labels; this run does not evaluate action detection, multiple-target completeness, XPath validity, readiness or historical browser state. Timing includes offline preparation and Resolver child-process startup plus model selection, but no live browser capture or UI round trip. It cannot establish the application's sub-second goal or two-second maximum. Provider prompt-cache warmth remains uncontrolled and must be reported from usage separately from response-cache reuse.
+The first timeout exposed a shared harness race: a disconnected client's HTTP socket could close while upstream accounting was pending, allowing shutdown to release the ledger lock too early. The fix waits for active accounting before releasing the lock or retaining final provider evidence in all live runners; it preserves the original response outcome and elapsed time. This improves accounting, not model correctness, and cannot recover a response already lost by the provider/client timeout. Both unknown costs would require generation-specific provider evidence to replace conservative reservations.
 
-Repeated instructions share page families, development data is already exposed and public-dataset training contamination is unknown. Report family coverage and uncertainty alongside aggregate scores. A wrong match to an uncertain source annotation is not automatically a definite model error; remaining annotation ambiguity requires separate adjudication without rewriting original scores. The controlled browser qualification and its known color-reference gap remain separate evidence.
+Focused cancellation, reservation and runner checks, the tooling gate, Docker validation and deterministic browser checks passed. These engineering checks remain separate from paid model measurements; no paid CI was introduced.
+
+### Limits
+
+These are **offline single-target selection** measurements. PhraseNode supplies no independent action/readiness/plural labels; this run does not establish action detection, multiple-target completeness, XPath validity or historical browser state. Offline timing includes preparation and Resolver child-process startup plus model selection, but no live browser capture or UI round trip. Provider timing is a narrower measurement. Neither proves the application's sub-second goal or two-second maximum.
+
+Repeated instructions share page families, development data is exposed, serving conditions were uncontrolled across the interrupted run, and public-dataset training contamination is unknown. The sample is not a random production sample; descriptive timing/accuracy differences are not statistical certification. A disagreement with an uncertain source annotation is not automatically a definite model error. Any later adjudication must preserve these original scores. The controlled browser qualification and its known color-reference gap remain separate evidence.
 
 ## Historical threshold reassessment
 
@@ -97,4 +103,4 @@ None reaches the new 95% deadline requirement (76/80). The concise row is retain
 
 ## Ordered follow-up
 
-[Issue #34](https://github.com/Mochib-Tech-Solutions/xpathed/issues/34) records the accepted second stage: choose one optimization candidate from the completed model comparison, test only failure-supported changes on a frozen development subset, then confirm the selected configuration against the baseline on separate original test families. Existing development baseline attempts are reused rather than repeated. All stages retain the same shared $5 ceiling; no configuration becomes a production default from this offline evidence.
+[Issue #34](https://github.com/Mochib-Tech-Solutions/xpathed/issues/34) records the accepted second stage and its forthcoming paired report: test only failure-supported changes on the selected DeepSeek configuration using the frozen development subset, then confirm any selected configuration against the baseline on separate original test families. Existing development baseline attempts are reused rather than repeated. All stages retain the same shared $5 ceiling; no configuration becomes a production default from this offline evidence.

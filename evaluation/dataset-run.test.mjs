@@ -125,10 +125,11 @@ test("prompt variants require explicit live mode and clear inherited offline set
   ];
   assert.equal(options(args).promptVariant, "baseline");
   assert.equal(
-    options([...args, "--prompt-variant", "declarative-inspect"]).promptVariant,
-    "declarative-inspect",
+    options([...args, "--prompt-variant", "intent-cardinality"]).promptVariant,
+    "intent-cardinality",
   );
-  assert.throws(() => options([...args, "--prompt-variant", "concise"]), /prompt variant/);
+  for (const variant of ["concise", "declarative-inspect"])
+    assert.throws(() => options([...args, "--prompt-variant", variant]), /prompt variant/);
   assert.throws(
     () =>
       options([
@@ -137,20 +138,20 @@ test("prompt variants require explicit live mode and clear inherited offline set
         "--output",
         "output",
         "--prompt-variant",
-        "declarative-inspect",
+        "intent-cardinality",
       ]),
     /live mode/,
   );
   const profile = profiles.find((item) => item.id === "qwen");
-  const inherited = { XPATHED_EVALUATION_PROMPT_VARIANT: "declarative-inspect" };
+  const inherited = { XPATHED_EVALUATION_PROMPT_VARIANT: "intent-cardinality" };
   assert.equal(
     profileEnvironment(profile, "http://localhost/", inherited).XPATHED_EVALUATION_PROMPT_VARIANT,
     "baseline",
   );
   assert.equal(
-    profileEnvironment(profile, "http://localhost/", inherited, "declarative-inspect")
+    profileEnvironment(profile, "http://localhost/", inherited, "intent-cardinality")
       .XPATHED_EVALUATION_PROMPT_VARIANT,
-    "declarative-inspect",
+    "intent-cardinality",
   );
 });
 
