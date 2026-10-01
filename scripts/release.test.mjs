@@ -13,7 +13,9 @@ import {
   symlinkSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
+import { gzipSync } from "node:zlib";
+import { pathToFileURL } from "node:url";
 import test from "node:test";
 import { gradeTrial } from "../evaluation/grader.mjs";
 
@@ -21,13 +23,17 @@ const hash = (value) =>
   createHash("sha256")
     .update(typeof value === "string" || Buffer.isBuffer(value) ? value : JSON.stringify(value))
     .digest("hex");
-async function workspace(t, { contractVersion = "3", promptVersion = "7" } = {}) {
+async function workspace(
+  t,
+  { contractVersion = "3", promptVersion = "7", qualificationPolicy } = {},
+) {
   const cwd = realpathSync(mkdtempSync(join(tmpdir(), "xpathed-release-")));
   t.after(() => rmSync(cwd, { recursive: true, force: true }));
   cpSync("evaluation", join(cwd, "evaluation"), { recursive: true });
   mkdirSync(join(cwd, "scripts"));
   cpSync("scripts/release.mjs", join(cwd, "scripts/release.mjs"));
   cpSync("scripts/release-bundle.mjs", join(cwd, "scripts/release-bundle.mjs"));
+  cpSync("scripts/release-archive.mjs", join(cwd, "scripts/release-archive.mjs"));
   writeFileSync(join(cwd, ".gitignore"), ".artifacts/\n");
   const write = (path, value) =>
     writeFileSync(join(cwd, path), JSON.stringify(value, null, 2) + "\n");
@@ -55,8 +61,12 @@ async function workspace(t, { contractVersion = "3", promptVersion = "7" } = {})
       summary: { processingComplete: true },
     },
   }));
-  const suite = { version: "1", cases };
-  write("evaluation/qualification-cases.json", suite);
+  const suite = { version: "1", ...(qualificationPolicy ? { qualificationPolicy } : {}), cases };
+  if (qualificationPolicy) suite.sentinels = ["case-31", "case-0"];
+  const suitePath = qualificationPolicy
+    ? "evaluation/current-view-qualification-cases.json"
+    : "evaluation/qualification-cases.json";
+  write(suitePath, suite);
   const git = (...args) => execFileSync("git", args, { cwd, encoding: "utf8" }).trim();
   git("init", "--quiet");
   git("add", ".");
@@ -75,9 +85,10 @@ async function workspace(t, { contractVersion = "3", promptVersion = "7" } = {})
   const { profiles, baselineEvidence, selectQualificationCases, compatibilityCases } = await import(
     `file://${cwd}/evaluation/qualify.mjs`
   );
-  const { defaultPolicy, summarizeQualification } = await import(
+  const { policyForSuite, summarizeQualification } = await import(
     `file://${cwd}/evaluation/qualification-policy.mjs`
   );
+  const defaultPolicy = policyForSuite(suite);
   const profile = profiles.find((item) => item.id === "deepseek");
   const code = await fingerprints(cwd);
   const build = (phase, pilot) => {
@@ -112,11 +123,29 @@ async function workspace(t, { contractVersion = "3", promptVersion = "7" } = {})
       code,
       browserBinarySha256: "b".repeat(64),
       policy: defaultPolicy,
+      ...(defaultPolicy.latencyProtocol
+        ? { measurement: { latencyProtocol: defaultPolicy.latencyProtocol } }
+        : {}),
       qualification: {
         policySha256: hash(defaultPolicy),
         frozenAt: time(-3000),
         heldOutStartedAt: phase === "pilot" ? null : time(-2000),
         baselineRunIds: pilot ? [pilot.manifest.id] : [],
+        ...(defaultPolicy.version === "3" && phase === "confirmation"
+          ? {
+              exposure: {
+                repository: "example/private",
+                runId: `${phase}-run`,
+                sourceSha: code.revision,
+                reservedAt: time(-2500),
+                families: [
+                  ...new Set(
+                    selected.cases.filter((c) => c.split === "held-out").map((c) => c.family),
+                  ),
+                ].sort(),
+              },
+            }
+          : {}),
       },
     };
     const makeTrial = (planned, mode = "live") => {
@@ -173,6 +202,7 @@ async function workspace(t, { contractVersion = "3", promptVersion = "7" } = {})
             Strategy: "candidate-selection-v1",
             PromptVersion: promptVersion,
             effective: {
+              ...(contractVersion === "4" ? { scope: "current_view", captureVersion: "5" } : {}),
               responseCache: false,
               request: {
                 model: profile.model,
@@ -196,35 +226,37 @@ async function workspace(t, { contractVersion = "3", promptVersion = "7" } = {})
       return trial;
     };
     const trials = manifest.plan.trials.map((p) => makeTrial(p));
-    const compatibility = compatibilityCases(cases).map((spec, i) => {
-      const trial = makeTrial(
-        {
-          id: hash(`${phase}-compat-${i}`).slice(0, 32),
-          caseId: spec.id,
-          profileId: profile.id,
-          repetition: 1,
-          attempt: 1,
-        },
-        "deterministic",
-      );
-      return {
-        id: trial.id,
-        caseId: trial.caseId,
-        profileId: trial.profileId,
-        grade: gradeTrial(spec, trial),
-      };
-    });
+    const compatibility = compatibilityCases(cases, qualificationPolicy ? selected.cases : []).map(
+      (spec, i) => {
+        const trial = makeTrial(
+          {
+            id: hash(`${phase}-compat-${i}`).slice(0, 32),
+            caseId: spec.id,
+            profileId: profile.id,
+            repetition: 1,
+            attempt: 1,
+          },
+          "deterministic",
+        );
+        return {
+          id: trial.id,
+          caseId: trial.caseId,
+          profileId: trial.profileId,
+          grade: gradeTrial(spec, trial),
+        };
+      },
+    );
     write(`${path}/compatibility.json`, compatibility);
     manifest.contentHash = hash(manifest);
     write(`${path}/manifest.json`, manifest);
-    write(`${path}/summary.json`, summarizeQualification(manifest, trials));
+    write(`${path}/summary.json`, summarizeQualification(manifest, trials, defaultPolicy));
     return { manifest, trials, path };
   };
   const pilot = build("pilot");
   const confirmation = build("confirmation", pilot);
   assert.equal(
-    summarizeQualification(confirmation.manifest, confirmation.trials).profiles.deepseek
-      .qualification.status,
+    summarizeQualification(confirmation.manifest, confirmation.trials, defaultPolicy).profiles
+      .deepseek.qualification.status,
     "qualified",
   );
   const run = (...args) =>
@@ -251,6 +283,7 @@ async function workspace(t, { contractVersion = "3", promptVersion = "7" } = {})
       sha,
       "--output",
       ".artifacts/candidate.json",
+      ...(qualificationPolicy ? ["--suite", suitePath] : []),
       ...extra,
     );
   const bindArtifact = () => {
@@ -350,6 +383,111 @@ test("artifact-bound sealing verifies both original container attestations and t
   );
   const verified = work.run("verify", file, "--sha256", hash(bytes));
   assert.equal(verified.status, 0, verified.stderr);
+});
+
+test("portable evidence archives verify in a relocated exact-source checkout and reject alteration", async (t) => {
+  const work = await workspace(t);
+  assert.equal(work.bindArtifact().seal().status, 0);
+  const candidate = ".artifacts/candidate.json";
+  const digest = hash(readFileSync(join(work.cwd, candidate)));
+  const archive = ".artifacts/evidence.json.gz";
+  const run = (cwd, ...args) =>
+    spawnSync(process.execPath, ["scripts/release-archive.mjs", ...args], {
+      cwd,
+      encoding: "utf8",
+    });
+  const packed = run(work.cwd, "pack", candidate, "--sha256", digest, archive);
+  assert.equal(packed.status, 0, packed.stderr);
+  const bytes = readFileSync(join(work.cwd, archive));
+  const destination = realpathSync(mkdtempSync(join(tmpdir(), "xpathed-relocated-")));
+  t.after(() => rmSync(destination, { recursive: true, force: true }));
+  cpSync(work.cwd, destination, { recursive: true });
+  rmSync(join(destination, work.pilot.path), { recursive: true });
+  rmSync(join(destination, work.confirmation.path), { recursive: true });
+  rmSync(join(destination, candidate));
+  assert.match(
+    run(destination, "restore", archive, "--sha256", "0".repeat(64)).stderr,
+    /digest mismatch/,
+  );
+  const restored = run(destination, "restore", archive, "--sha256", hash(bytes));
+  assert.equal(restored.status, 0, restored.stderr);
+  assert.equal(hash(readFileSync(join(destination, candidate))), digest);
+  assert.notEqual(
+    run(destination, "restore", archive, "--sha256", hash(bytes)).status,
+    0,
+    "existing evidence is never overwritten",
+  );
+});
+
+test("published candidates require a pinned digest and restore the exact source, images and measured sentinels", async (t) => {
+  const work = await workspace(t, {
+    contractVersion: "4",
+    promptVersion: "8",
+    qualificationPolicy: "3",
+  });
+  const bound = work.bindArtifact();
+  assert.equal(bound.seal().status, 0);
+  const candidate = ".artifacts/candidate.json";
+  const digest = hash(readFileSync(join(work.cwd, candidate)));
+  const published = join(work.cwd, ".artifacts/published");
+  mkdirSync(published);
+  const packed = spawnSync(
+    process.execPath,
+    [
+      "scripts/release-archive.mjs",
+      "pack",
+      candidate,
+      "--sha256",
+      digest,
+      join(published, "release-evidence.json.gz"),
+    ],
+    { cwd: work.cwd, encoding: "utf8" },
+  );
+  assert.equal(packed.status, 0, packed.stderr);
+  for (const file of ["manifest.json", "configuration.json", "source.tar"])
+    cpSync(join(work.cwd, bound.bundle, file), join(published, file));
+  writeFileSync(
+    join(published, "images.tar.gz.part-0000"),
+    gzipSync(readFileSync(join(work.cwd, bound.bundle, "images.tar"))),
+  );
+  execFileSync("git", ["remote", "add", "origin", work.cwd], { cwd: work.cwd });
+  const bin = join(work.cwd, ".artifacts/bin");
+  mkdirSync(bin);
+  writeFileSync(
+    join(bin, "gh"),
+    `#!/usr/bin/env node\nconst fs=require('node:fs'),p=require('node:path');const dest=process.argv[process.argv.indexOf('--dir')+1];for(const name of fs.readdirSync(process.env.PUBLISHED_FIXTURE))fs.copyFileSync(p.join(process.env.PUBLISHED_FIXTURE,name),p.join(dest,name));\n`,
+    { mode: 0o700 },
+  );
+  const module = pathToFileURL(resolve("scripts/release-fetch.mjs")).href;
+  const fetch = (sha, directory) =>
+    spawnSync(
+      process.execPath,
+      [
+        "--input-type=module",
+        "--eval",
+        `import {fetchRelease} from ${JSON.stringify(module)}; const result=await fetchRelease('example/private','candidate-1-1',process.argv[1],process.argv[2]); console.log(JSON.stringify(result.release));`,
+        sha,
+        directory,
+      ],
+      {
+        cwd: work.cwd,
+        encoding: "utf8",
+        env: { ...process.env, PATH: `${bin}:${process.env.PATH}`, PUBLISHED_FIXTURE: published },
+      },
+    );
+  const wrong = fetch("f".repeat(64), ".artifacts/wrong");
+  assert.notEqual(wrong.status, 0);
+  assert.match(wrong.stderr, /pinned candidate/);
+  const restored = fetch(digest, ".artifacts/restored");
+  assert.equal(restored.status, 0, restored.stderr);
+  assert.match(restored.stdout, /"status":"qualified"/);
+  assert.equal(
+    execFileSync("git", ["rev-parse", "HEAD"], {
+      cwd: join(work.cwd, ".artifacts/restored/source"),
+      encoding: "utf8",
+    }).trim(),
+    work.sha,
+  );
 });
 
 test("artifact-bound sealing fails closed for missing, swapped or downgraded identities and receipts", async (t) => {
@@ -496,6 +634,27 @@ test("legacy release policy cannot seal current-view evidence with either curren
       assert.match(sealed.stderr, /current-view qualification policy/i);
     });
   }
+});
+
+test("current-view evidence seals only under its frozen policy and actual scope", async (t) => {
+  const work = await workspace(t, {
+    contractVersion: "4",
+    promptVersion: "8",
+    qualificationPolicy: "3",
+  });
+  const sealed = work.seal();
+  assert.equal(sealed.status, 0, sealed.stderr);
+  const file = join(work.cwd, ".artifacts/candidate.json");
+  assert.equal(work.run("verify", file, "--sha256", hash(readFileSync(file))).status, 0);
+  rmSync(file);
+  const trial = work.confirmation.trials[0];
+  const config = JSON.parse(trial.evidence.configurationJson);
+  config.effective.scope = "page";
+  trial.evidence.configurationJson = JSON.stringify(config);
+  const { configurationRecord } = await import(`file://${work.cwd}/evaluation/run.mjs`);
+  trial.configuration = configurationRecord(trial);
+  work.write(`${work.confirmation.path}/trials/${trial.id}.json`, trial);
+  assert.match(work.seal().stderr, /Current-view configuration mismatch/);
 });
 
 test("live runner compatibility evidence is regraded and included without becoming qualification attempts", async (t) => {

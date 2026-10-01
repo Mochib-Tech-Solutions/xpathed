@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import test from "node:test";
 import policy from "./qualification-policy.json" with { type: "json" };
 import { summarizeQualification } from "./qualification-policy.mjs";
+import currentViewPolicy from "./current-view-qualification-policy.json" with { type: "json" };
 
 function evidence() {
   const cases = Array.from({ length: 11 }, (_, index) => ({
@@ -106,6 +107,37 @@ test("a fully observed frozen live candidate qualifies without activating a defa
     Math.abs(report.profiles.candidate.firstAttempt.cost.reportedUsd.total - 0.033) < 1e-12,
   );
   assert.equal(report.defaultActivated, false);
+});
+
+test("current-view release qualification requires its own coverage and measured protocol", () => {
+  const { manifest, trials } = evidence();
+  manifest.qualification.policySha256 = createHash("sha256")
+    .update(JSON.stringify(currentViewPolicy))
+    .digest("hex");
+  const status = () =>
+    summarizeQualification(manifest, trials, currentViewPolicy).profiles.candidate.qualification;
+  assert.equal(status().status, "insufficient-evidence");
+  assert.ok(status().reasons.includes("current_view_coverage_insufficient"));
+  manifest.cases = trials.map((trial) => ({
+    ...manifest.cases.find((c) => c.id === trial.caseId),
+    id: trial.id,
+    contractVersion: "4",
+  }));
+  for (const trial of trials) {
+    trial.caseId = trial.id;
+    trial.repetition = 1;
+    trial.result.contractVersion = "4";
+  }
+  manifest.plan.trials = trials.map(({ id, caseId, profileId, repetition, attempt }) => ({
+    id,
+    caseId,
+    profileId,
+    repetition,
+    attempt,
+  }));
+  assert.ok(status().reasons.includes("latency_protocol_mismatch"));
+  manifest.measurement = { latencyProtocol: currentViewPolicy.latencyProtocol };
+  assert.equal(status().status, "qualified");
 });
 
 test("paired baseline reports both contracts, keeps missing attempts and excludes scope changes from speed gains", () => {

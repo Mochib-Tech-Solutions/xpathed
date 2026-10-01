@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { readFile, writeFile, lstat, realpath, readdir } from "node:fs/promises";
 import { execFileSync } from "node:child_process";
-import { resolve, join } from "node:path";
+import { resolve, join, relative, isAbsolute } from "node:path";
 import { isDeepStrictEqual } from "node:util";
 import {
   readRun,
@@ -14,7 +14,7 @@ import {
 } from "../evaluation/qualify.mjs";
 import { verify as verifyBundle } from "./release-bundle.mjs";
 import { fingerprints, configurationRecord } from "../evaluation/run.mjs";
-import { defaultPolicy, summarizeQualification } from "../evaluation/qualification-policy.mjs";
+import { policyForSuite, summarizeQualification } from "../evaluation/qualification-policy.mjs";
 import { gradeTrial } from "../evaluation/grader.mjs";
 
 const hash = (value) =>
@@ -56,7 +56,7 @@ function fresh(value) {
     "Evidence timestamp is invalid or expired",
   );
 }
-function configuration(trial, profile) {
+function configuration(trial, profile, policy) {
   fresh(trial.createdAt);
   const recorded = configurationRecord(trial);
   ensure(
@@ -73,15 +73,23 @@ function configuration(trial, profile) {
   JSON.parse(trial.evidence.outputSchema);
   const request = recorded.effective?.request;
   ensure(
-    trial.result?.contractVersion !== "4",
+    trial.result?.contractVersion !== "4" || policy.requiredContractVersion === "4",
     "Contract 4 requires a separately frozen current-view qualification policy",
   );
   const promptVersion = {
     1: "5",
     2: "6",
     3: profile.variant === "concise" ? "7-concise-1" : "7",
+    4: "8",
   }[trial.result?.contractVersion];
   ensure(typeof promptVersion === "string", "Unsupported release qualification contract");
+  if (trial.result?.contractVersion === "4")
+    ensure(
+      profile.variant === "baseline" &&
+        recorded.effective?.scope === "current_view" &&
+        recorded.effective?.captureVersion === "5",
+      "Current-view configuration mismatch",
+    );
   ensure(
     /^[a-f\d]{64}$/.test(recorded.configurationId ?? "") &&
       recorded.model === profile.model &&
@@ -121,7 +129,16 @@ async function evidence(options) {
     "Source identity environment overrides are not accepted",
   );
   const current = await fingerprints(process.cwd());
-  const suite = await json("evaluation/qualification-cases.json");
+  const suitePath = options.suite ?? "evaluation/qualification-cases.json";
+  ensure(
+    [
+      "evaluation/qualification-cases.json",
+      "evaluation/current-view-qualification-cases.json",
+    ].includes(suitePath),
+    "Unsupported release suite",
+  );
+  const suite = await json(suitePath);
+  const defaultPolicy = policyForSuite(suite);
   const files = {};
   const configurations = {};
   ensure(
@@ -154,7 +171,10 @@ async function evidence(options) {
     const header = JSON.parse(headerBytes);
     const compatibilityBytes = await regular(join(directory, "compatibility.json"));
     const compatibility = JSON.parse(compatibilityBytes);
-    const expectedCompatibility = compatibilityCases(suite.cases)
+    const expectedCompatibility = compatibilityCases(
+      suite.cases,
+      defaultPolicy.requiredContractVersion ? header.cases : [],
+    )
       .flatMap((s) => header.profiles.map((p) => `${s.id}:${p.id}`))
       .sort();
     ensure(
@@ -239,7 +259,7 @@ async function evidence(options) {
       const trial = await json(join(directory, "trials", `${record.id}.json`));
       ensure(
         spec &&
-          spec.split !== "held-out" &&
+          (spec.split !== "held-out" || defaultPolicy.requiredContractVersion === "4") &&
           trial.mode === "deterministic" &&
           record.id === trial.id &&
           record.caseId === trial.caseId &&
@@ -276,6 +296,7 @@ async function evidence(options) {
     const selection = selectQualificationCases(suite.cases, {
       mode: "live",
       splits: phase === "pilot" ? ["development"] : defaultPolicy.requiredSplits,
+      requiredContractVersion: defaultPolicy.requiredContractVersion,
     });
     ensure(
       isDeepStrictEqual(m.cases, selection.cases) &&
@@ -328,7 +349,7 @@ async function evidence(options) {
       const trial = await json(join(directory, "trials", `${id}.json`));
       const profile = m.profiles.find((p) => p.id === trial.profileId);
       ensure(profile, "Trial references an unknown profile");
-      const record = configuration(trial, profile);
+      const record = configuration(trial, profile, defaultPolicy);
       const key = `${profile.id}:${trial.result.contractVersion}`;
       ensure(
         !configurations[key] || isDeepStrictEqual(configurations[key], record),
@@ -363,6 +384,27 @@ async function evidence(options) {
   }
   const pilot = await load(options.pilot, "pilot");
   const confirmation = await load(options.confirmation, "confirmation");
+  const exposure = confirmation.manifest.qualification.exposure;
+  if (defaultPolicy.version === "3")
+    ensure(
+      exposure?.runId === confirmation.manifest.id &&
+        exposure.sourceSha === options.sourceSha &&
+        /^[\w.-]+\/[\w.-]+$/.test(exposure.repository ?? "") &&
+        Number.isFinite(Date.parse(exposure.reservedAt)) &&
+        Date.parse(exposure.reservedAt) <=
+          Date.parse(confirmation.manifest.qualification.heldOutStartedAt) &&
+        isDeepStrictEqual(
+          exposure.families,
+          [
+            ...new Set(
+              confirmation.manifest.cases
+                .filter((c) => c.split === "held-out")
+                .map((c) => c.family),
+            ),
+          ].sort(),
+        ),
+      "Confirmation lacks its exact held-out exposure reservation",
+    );
   assertFrozenImplementation(relevant(confirmation.manifest), relevant(pilot.manifest));
   ensure(
     isDeepStrictEqual(confirmation.manifest.baselineEvidence, baselineEvidence(pilot)),
@@ -386,21 +428,35 @@ async function evidence(options) {
   assertFrozenImplementation(relevant(finalSource), relevant(current));
   for (const [path, digest] of Object.entries(files))
     ensure(hash(await regular(path)) === digest, "Evidence changed during verification");
+  const portable = options.version !== 1;
+  const evidencePath = (path) => {
+    if (!portable) return resolve(path);
+    const value = relative(process.cwd(), resolve(path));
+    ensure(
+      value.startsWith(".artifacts/") && !isAbsolute(value) && !value.split("/").includes(".."),
+      "Portable evidence must remain under this checkout's .artifacts directory",
+    );
+    return value;
+  };
   return {
-    version: 1,
+    version: portable ? 2 : 1,
     status: artifact ? "artifact-bound-evidence-verified" : "evidence-only-verified",
     defaultActivated: false,
     sourceSha: options.sourceSha,
+    ...(options.suite ? { suite: options.suite } : {}),
     profile: options.profile,
-    pilot: resolve(options.pilot),
-    confirmation: resolve(options.confirmation),
+    pilot: evidencePath(options.pilot),
+    confirmation: evidencePath(options.confirmation),
     ...(artifact
-      ? { bundle: resolve(options.bundle), bundleSha256: options.bundleSha256, artifact }
+      ? { bundle: evidencePath(options.bundle), bundleSha256: options.bundleSha256, artifact }
       : {}),
     policySha256: hash(defaultPolicy),
     browserBinarySha256: confirmation.manifest.browserBinarySha256,
+    ...(exposure ? { exposure } : {}),
     configurations,
-    files,
+    files: Object.fromEntries(
+      Object.entries(files).map(([path, digest]) => [evidencePath(path), digest]),
+    ),
   };
 }
 
@@ -427,10 +483,11 @@ async function main() {
     "--output": "output",
     "--bundle": "bundle",
     "--bundle-sha256": "bundleSha256",
+    "--suite": "suite",
   };
   const options = {};
   ensure(
-    command === "seal" && [10, 14].includes(args.length),
+    command === "seal" && [10, 12, 14, 16].includes(args.length),
     "Use seal --confirmation RUN --pilot PILOT --profile ID --source-sha SHA --output FILE [--bundle DIRECTORY --bundle-sha256 DIGEST]",
   );
   for (let i = 0; i < args.length; i += 2) {

@@ -1,0 +1,61 @@
+name: Release Promotion
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Explicitly select a qualified release or the retained previous approval
+        type: choice
+        options: [promote, rollback]
+        required: true
+      candidate_tag:
+        description: Exact candidate tag for promotion (ignored for rollback)
+        type: string
+      candidate_sha256:
+        description: Independently retained candidate digest for promotion
+        type: string
+      expected_current:
+        description: Current approved candidate digest, or none for the first approval
+        type: string
+        required: true
+      reason:
+        description: Reason retained in the approval audit
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: paid-evaluation
+  cancel-in-progress: false
+
+jobs:
+  promotion:
+    if: github.ref == 'refs/heads/main' && github.event.repository.private
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 20
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24.16.0
+      - name: Verify and select the explicit release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OPERATION: ${{ inputs.operation }}
+          CANDIDATE_TAG: ${{ inputs.candidate_tag }}
+          CANDIDATE_SHA256: ${{ inputs.candidate_sha256 }}
+          EXPECTED_CURRENT: ${{ inputs.expected_current }}
+          REASON: ${{ inputs.reason }}
+        run: |
+          if [ "$OPERATION" = promote ]; then
+            node scripts/release-control.mjs promote --tag "$CANDIDATE_TAG" --sha256 "$CANDIDATE_SHA256" --expected-current "$EXPECTED_CURRENT" --reason "$REASON"
+          else
+            node scripts/release-control.mjs rollback --expected-current "$EXPECTED_CURRENT" --reason "$REASON"
+          fi

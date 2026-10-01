@@ -130,13 +130,13 @@ The dataset `--profile deepseek-deepinfra` evaluates standard DeepInfra FP8 as a
 
 The offline [release verifier](docs/releases.md) seals qualified pilot/confirmation evidence against an exact source revision and checks it again using an independently retained digest. Missing, changed, expired or unqualified evidence fails verification. This does not promote a configuration or change the running application.
 
-Private [artifact bundles](docs/releases.md#private-docker-artifact-bundles) preserve exact Browser/Resolver runtime images, tracked source and nonsecret profile settings. Bundle verification is offline; restoration loads images without starting the app. Packaging does not qualify a model or create an approved release. The explicitly dispatched **Release Qualification** workflow checks the dedicated key and durable shared accounting, evaluates exact saved images, and preserves private candidate bundles using compressed image transport. Its live mode requires fresh held-out labels before inference; no schedule or automatic promotion is enabled. See the [manual release runbook](docs/releases.md#manual-github-qualification).
+Private [artifact bundles](docs/releases.md#private-docker-artifact-bundles) preserve exact Browser/Resolver runtime images, tracked source and nonsecret profile settings. Bundle verification is offline; restoration loads images without starting the app. Packaging does not qualify a model or create an approved release. The explicitly dispatched **Release Qualification** workflow checks the dedicated key and durable shared accounting, evaluates exact saved images, and preserves private candidate bundles using compressed image transport. Its live mode requires fresh held-out labels before inference. **Release Promotion** explicitly selects a verified candidate; **Release Monitoring** checks the frozen approved release nightly using the evaluation key. Local activation and rollback are explicit; drift never switches models or stops the app. See the [manual release runbook](docs/releases.md#manual-github-qualification).
 
 ## Roadmap
 
 GitHub Issues hold the live requirements, dependencies and progress. The next capabilities are:
 
-- [Add release promotion, rollback and drift monitoring (#11)](https://github.com/Mochib-Tech-Solutions/xpathed/issues/11).
+- [Complete release qualification and operational verification (#11)](https://github.com/Mochib-Tech-Solutions/xpathed/issues/11).
 - [Enable eligible branch protection and verify actual Copilot review (#41)](https://github.com/Mochib-Tech-Solutions/xpathed/issues/41).
 
 These links describe planned work, not available features. Hosting and presentation work are deferred. Consult the live tickets before starting a slice; research notes may describe alternatives that were not adopted.

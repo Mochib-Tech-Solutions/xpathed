@@ -961,7 +961,13 @@ export async function createBudgetProxy({
     async reserveAttempt(id, profileId, maximumUsd, context) {
       if (!(tracking && maximumUsd === null) && (!Number.isFinite(maximumUsd) || maximumUsd <= 0))
         throw new Error("Prepared attempt requires a finite frozen allocation");
-      let preparedRequests, decisionRequest;
+      let preparedRequests, decisionRequest, preparedRequest;
+      if (object(context) && Object.hasOwn(context, "preparedRequest")) {
+        if (Object.keys(context).length !== 1 || !object(context.preparedRequest))
+          throw new Error("Ordinary preparation requires exactly one frozen request");
+        preparedRequest = context.preparedRequest;
+        context = null;
+      }
       if (context != null) {
         if (
           !contextPlanning ||
@@ -996,7 +1002,7 @@ export async function createBudgetProxy({
             throw new Error("Jev state must equal the original prepared LLM instruction");
         }
       }
-      this.beginAttempt(id, profileId, maximumUsd);
+      this.beginAttempt(id, profileId, maximumUsd, preparedRequest);
       busy = true;
       const finished = Promise.withResolvers();
       idle = finished.promise;

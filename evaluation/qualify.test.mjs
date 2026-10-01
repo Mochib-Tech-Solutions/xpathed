@@ -5,6 +5,8 @@ import { spawnSync } from "node:child_process";
 import { mkdtemp, mkdir, readFile, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { createServer } from "node:http";
+import { once } from "node:events";
 import {
   buildMatrixPlan,
   parseQualificationOptions,
@@ -16,6 +18,9 @@ import {
   profiles,
   compatibilityCases,
   main,
+  fixtureProxy,
+  summarizeMonitoring,
+  assertPilotReady,
 } from "./qualify.mjs";
 import { fingerprints } from "./run.mjs";
 
@@ -32,6 +37,98 @@ const releaseArtifact = (sourceSha) => ({
     architecture: "amd64",
     sourceSha,
   })),
+});
+
+test("qualification preparation does not supply synthetic prices to the Resolver cache", async (t) => {
+  let calls = 0;
+  const upstream = createServer((req, res) => {
+    calls++;
+    res.end("{}");
+  });
+  upstream.listen(0, "127.0.0.1");
+  await once(upstream, "listening");
+  const proxy = fixtureProxy(`http://127.0.0.1:${upstream.address().port}`, 1000);
+  proxy.listen(0, "127.0.0.1");
+  await once(proxy, "listening");
+  t.after(() => {
+    proxy.closeAllConnections();
+    proxy.close();
+    upstream.closeAllConnections();
+    upstream.close();
+  });
+  const base = `http://127.0.0.1:${proxy.address().port}`;
+  assert.equal((await fetch(`${base}/api/v1/models/example/model/endpoints`)).status, 404);
+  assert.equal(calls, 0);
+  assert.equal(
+    (await fetch(`${base}/api/v1/chat/completions`, { method: "POST", body: "{}" })).status,
+    200,
+  );
+  assert.equal(calls, 1);
+});
+
+test("frozen sentinel monitoring separates semantic drift, latency and infrastructure failures", () => {
+  assert.throws(
+    () =>
+      selectQualificationCases([{ id: "fresh", split: "held-out" }], {
+        sentinelIds: ["fresh"],
+        splits: ["held-out"],
+        mode: "live",
+      }),
+    /never fresh held-out/,
+  );
+  const spec = {
+    id: "absent",
+    contractVersion: "4",
+    expected: {
+      outcome: "not_found",
+      actions: [{ step: 1, action: "click", outcome: "not_found" }],
+      summary: { processingComplete: true },
+    },
+  };
+  const trial = {
+    id: "trial",
+    caseId: "absent",
+    profileId: "deepseek",
+    attempt: 1,
+    elapsedMs: 300,
+    provider: [
+      { forwarded: true, identityValid: true, responseCacheHit: false, reportedUsd: 0.001 },
+    ],
+    result: {
+      contractVersion: "4",
+      action: "click",
+      outcome: "not_found",
+      actions: [{ actionId: "a1", order: 1, step: 1, action: "click", outcome: "not_found" }],
+      summary: { processingComplete: true },
+    },
+  };
+  const manifest = {
+    monitoring: true,
+    mode: "live",
+    policy: { version: "3", deadlineMs: 2000, minimumCorrectCompleteWithinDeadline: 0.95 },
+    cases: [spec],
+    plan: { trials: [{ id: "trial", caseId: "absent", profileId: "deepseek" }] },
+  };
+  assert.equal(summarizeMonitoring(manifest, [trial]).status, "passed");
+  assert.equal(
+    summarizeMonitoring(manifest, [{ ...trial, elapsedMs: 2500 }]).status,
+    "latency_regression",
+  );
+  assert.equal(summarizeMonitoring(manifest, []).status, "infrastructure_failure");
+  assert.equal(summarizeMonitoring(manifest, []).reportedUsd, null);
+  assert.equal(
+    summarizeMonitoring(manifest, [{ ...trial, provider: [] }]).status,
+    "infrastructure_failure",
+  );
+  const wrong = structuredClone(trial);
+  wrong.result.actions[0].action = "hover";
+  assert.equal(summarizeMonitoring(manifest, [wrong]).status, "semantic_drift");
+  assert.equal(summarizeMonitoring(manifest, [trial]).defaultActivated, false);
+  const pilot = { ...manifest, phase: "pilot", monitoring: false };
+  assert.equal(assertPilotReady({ manifest: pilot, trials: [trial] }).status, "passed");
+  for (const trials of [[], [wrong], [{ ...trial, elapsedMs: 2500 }]])
+    assert.throws(() => assertPilotReady({ manifest: pilot, trials }), /Pilot failed/);
+  assert.throws(() => assertPilotReady({ manifest, trials: [trial] }), /development pilot/);
 });
 
 test("qualification interleaves every profile per case and rotates first position", () => {
