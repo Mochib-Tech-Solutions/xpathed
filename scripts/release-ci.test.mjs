@@ -49,6 +49,15 @@ test("key preflight accepts only a bounded non-resetting inference key within th
     ),
     /key metadata unavailable/,
   );
+  await assert.rejects(
+    checkKeyBudget("private-key", 2.97226, async () =>
+      Response.json({
+        data: { ...data, limit: null, label: "private-key", is_management_key: "private-key" },
+      }),
+    ),
+    (error) =>
+      error.message.includes('"limitUsd":"unavailable"') && !error.message.includes("private-key"),
+  );
 });
 
 test("live release coverage blocks reused or absent holdout before any inference", async () => {
