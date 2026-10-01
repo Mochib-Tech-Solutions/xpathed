@@ -160,6 +160,7 @@ export function options(args) {
     "--reviewed-inputs": "reviewedInputs",
     "--profile": "profile",
     "--prompt-variant": "promptVariant",
+    "--prepared-plan": "preparedPlan",
   };
   const seen = new Set();
   for (let i = 0; i < args.length; i += 2) {
@@ -195,6 +196,8 @@ export function options(args) {
     throw new Error("Unknown offline prompt variant");
   if (result.mode !== "live" && result.promptVariant !== "baseline")
     throw new Error("Experimental prompt variants require live mode");
+  if (result.preparedPlan && result.mode !== "live")
+    throw new Error("Prepared plans require live mode");
   result.budgetUsd = Number(result.budgetUsd);
   if (!(result.budgetUsd > 0 && result.budgetUsd <= campaignCeilingUsd))
     throw new Error(`Campaign ceiling must be at most $${campaignCeilingUsd} total`);
@@ -386,6 +389,31 @@ export async function main(args = process.argv.slice(2)) {
   if (!selectable.length) throw new Error("No reviewed cases in the selected split");
   const ids = buildPlan(selectable, planOptions).caseOrder.slice(0, opt.limit);
   const cases = ids.map((id) => eligible.find((item) => item.id === id));
+  const preparedPlan = opt.preparedPlan ? await json(resolve(opt.preparedPlan)) : null;
+  if (
+    opt.preparedPlan &&
+    (!preparedPlan ||
+      preparedPlan.version !== 1 ||
+      preparedPlan.profileId !== opt.profile ||
+      preparedPlan.promptVariant !== opt.promptVariant ||
+      !Array.isArray(preparedPlan.entries) ||
+      preparedPlan.entries.length !== cases.length ||
+      new Set(preparedPlan.entries.map((entry) => entry?.caseId)).size !== cases.length ||
+      preparedPlan.entries.some(
+        (entry) =>
+          !entry ||
+          !ids.includes(entry.caseId) ||
+          !/^[a-f0-9]{64}$/.test(entry.inputHash) ||
+          !/^[a-f0-9]{64}$/.test(entry.requestSha256) ||
+          !Number.isFinite(entry.maximumUsd) ||
+          entry.maximumUsd <= 0 ||
+          entry.inputHash !==
+            reviews.entries.find((review) => review.caseId === entry.caseId)?.inputHash,
+      ))
+  )
+    throw new Error(
+      "Prepared plan must match the exact selected cases, reviewed inputs, profile, prompt and finite positive caps",
+    );
   const plan = buildPlan(cases, planOptions);
   plan.trials = plan.trials.map((item) => ({ ...item, id: randomUUID().replaceAll("-", "") }));
   const manifest = {
@@ -396,6 +424,7 @@ export async function main(args = process.argv.slice(2)) {
     track: "offline-selection",
     profile: opt.mode === "live" ? profiles.find((profile) => profile.id === opt.profile) : null,
     promptVariant: opt.mode === "live" ? opt.promptVariant : null,
+    preparedPlan,
     timingScope:
       "Offline preparation and resolver child-process startup plus model selection; no browser or UI latency",
     measurement:
@@ -517,7 +546,20 @@ export async function main(args = process.argv.slice(2)) {
           };
           trial.result = { configurationId: prepared.configurationId };
           await retainConfigurations(output, manifest, trial);
-          proxy.beginAttempt(trial.id, opt.profile);
+          const allocation = preparedPlan?.entries.find((entry) => entry.caseId === spec.id);
+          let preparedRequest;
+          if (allocation) {
+            preparedRequest = structuredClone(prepared.effective.request);
+            preparedRequest.messages[1].content = prepared.modelInput;
+            preparedRequest.stream = false;
+            if (
+              preparedRequest.model !== manifest.profile.model ||
+              hash(JSON.stringify(input)) !== allocation.inputHash ||
+              hash(JSON.stringify(preparedRequest)) !== allocation.requestSha256
+            )
+              throw new Error("Prepared provider request differs from its approved plan");
+          }
+          proxy.beginAttempt(trial.id, opt.profile, allocation?.maximumUsd, preparedRequest);
           inferenceStarted = true;
           result = await cli(inputPath, env);
         } else result = lexicalSelection(input);

@@ -400,3 +400,218 @@ test("dataset CLI preserves train-only selection, exact input integrity and repl
     await rm(root, { recursive: true, force: true });
   }
 });
+
+test("live dataset plans bind the selected inputs and prepared requests before forwarding", async (t) => {
+  const { mkdtemp, mkdir, writeFile, readFile, rm } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const { join, resolve } = await import("node:path");
+  const { createHash } = await import("node:crypto");
+  const { spawnSync } = await import("node:child_process");
+  const root = await mkdtemp(join(tmpdir(), "xpathed-prepared-dataset-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const sha = (value) => createHash("sha256").update(value).digest("hex");
+  const input = { instruction: "Save", candidates: [{ id: "n1", tag: "button", text: "Save" }] };
+  const inputText = JSON.stringify({ candidates: input.candidates });
+  const inputKey = sha(inputText);
+  const model = "deepseek/deepseek-v4.1-flash";
+  const request = {
+    model,
+    messages: [
+      { role: "system", content: "Select the target" },
+      { role: "user", content: "Save: n1" },
+    ],
+    stream: false,
+    max_tokens: 4096,
+    reasoning: { enabled: false },
+    response_format: {
+      type: "json_schema",
+      json_schema: { name: "result", strict: true, schema: {} },
+    },
+    provider: {
+      only: ["wafer"],
+      order: ["wafer"],
+      allow_fallbacks: false,
+      require_parameters: true,
+    },
+  };
+  const prepared = {
+    modelInput: "Save: n1",
+    prompt: "Select the target",
+    schema: {},
+    promptVersion: "7",
+    configurationId: "fixture",
+    effective: {
+      strategy: "fixture",
+      request: {
+        ...request,
+        messages: [request.messages[0], { role: "user", content: "placeholder" }],
+      },
+    },
+  };
+  const item = {
+    id: "save",
+    status: "offline-eligible",
+    dataset: "phrasenode",
+    split: "train",
+    family: "page",
+    instruction: "Save",
+    inputKey,
+    oracle: { candidateId: "n1" },
+    provenance: { revision: "fixture" },
+  };
+  const imported = join(root, "import");
+  await mkdir(join(imported, "inputs"), { recursive: true });
+  await writeFile(join(imported, "inputs", `${inputKey}.json`), inputText);
+  const cases = JSON.stringify([item]);
+  await writeFile(join(imported, "cases.json"), cases);
+  await writeFile(join(imported, "inventory.json"), "{}");
+  await writeFile(
+    join(imported, "manifest.json"),
+    JSON.stringify({ casesSha256: sha(cases), inventorySha256: sha("{}") }),
+  );
+  const review = {
+    version: 1,
+    entries: [
+      {
+        caseId: "save",
+        inputHash: sha(JSON.stringify(input)),
+        reviewer: "fixture",
+        reviewedAt: "2026-10-01T00:00:00Z",
+        providerSubmission: true,
+      },
+    ],
+  };
+  await writeFile(join(root, "reviews.json"), JSON.stringify(review));
+  await writeFile(join(root, "prepared.json"), JSON.stringify(prepared));
+  await writeFile(join(root, "request.json"), JSON.stringify(request));
+  await writeFile(
+    join(root, "dotnet"),
+    `#!${process.execPath}
+const fs = require('node:fs');
+if (process.argv.includes('build')) process.exit(0);
+if (process.argv.includes('--prepare-only')) console.log(fs.readFileSync('prepared.json', 'utf8'));
+else fetch(process.env.OpenRouter__BaseUrl + 'chat/completions', { method: 'POST', headers: { 'content-type': 'application/json' }, body: fs.readFileSync('request.json', 'utf8') }).then(() => console.log(JSON.stringify({outcome:'error', diagnostics:{code:'fixture_response'}})));
+`,
+    { mode: 0o755 },
+  );
+  await writeFile(
+    join(root, "network.mjs"),
+    String.raw`
+import { appendFile } from 'node:fs/promises';
+const original = globalThis.fetch;
+globalThis.fetch = async (url, options) => {
+ if (String(url).startsWith('http://127.0.0.1:')) return original(url, options);
+ if (String(url).endsWith('/endpoints')) return Response.json({data:{endpoints:[{tag:'wafer',provider_name:'Wafer',pricing:{prompt:'0.0000001',completion:'0.0000005'},supported_parameters:['response_format','structured_outputs','reasoning','max_tokens']}]}});
+ if (String(url).endsWith('/chat/completions')) { await appendFile('forwarded.jsonl', options.body+'\n'); return Response.json({id:'generation-fixture',model:'${model}',provider:'Wafer',usage:{cost:0.001},choices:[]}); }
+ throw new Error('Unexpected network request');
+};
+`,
+  );
+  const entry = {
+    caseId: "save",
+    inputHash: sha(JSON.stringify(input)),
+    requestSha256: sha(JSON.stringify(request)),
+    maximumUsd: 0.1,
+  };
+  const plan = { version: 1, profileId: "deepseek", promptVariant: "baseline", entries: [entry] };
+  const run = async (name, changed, preparedValue = prepared, requestValue = request) => {
+    await rm(join(root, "forwarded.jsonl"), { force: true });
+    await writeFile(join(root, "plan.json"), JSON.stringify(changed));
+    await writeFile(join(root, "prepared.json"), JSON.stringify(preparedValue));
+    await writeFile(join(root, "request.json"), JSON.stringify(requestValue));
+    const result = spawnSync(
+      process.execPath,
+      [
+        "--import",
+        join(root, "network.mjs"),
+        resolve("evaluation/dataset-run.mjs"),
+        "--import",
+        imported,
+        "--output",
+        join(root, name),
+        "--mode",
+        "live",
+        "--reviewed-inputs",
+        join(root, "reviews.json"),
+        "--prepared-plan",
+        join(root, "plan.json"),
+      ],
+      {
+        cwd: root,
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          PATH: `${root}:${process.env.PATH}`,
+          OPENROUTER_EVAL_API_KEY: "fixture-only",
+          XPATHED_BUDGET_GITHUB_REPOSITORY: "",
+          GH_TOKEN: "",
+          XPATHED_WORKSPACE: root,
+        },
+      },
+    );
+    const forwarded = await readFile(join(root, "forwarded.jsonl"), "utf8").catch(() => "");
+    return { result, forwarded };
+  };
+  const valid = await run("valid", plan);
+  assert.ok(valid.forwarded.includes(model), valid.result.stderr + valid.result.stdout);
+  const failures = [
+    null,
+    { ...plan, version: 2 },
+    { ...plan, profileId: "qwen" },
+    { ...plan, promptVariant: "intent-cardinality" },
+    { ...plan, entries: [] },
+    { ...plan, entries: [entry, entry] },
+    ...[
+      { caseId: "other" },
+      { inputHash: "a".repeat(64) },
+      { requestSha256: "b".repeat(64) },
+      { maximumUsd: 0 },
+      { maximumUsd: "0.1" },
+      { maximumUsd: null },
+      { requestSha256: "bad" },
+      { maximumUsd: 0.00000001 },
+    ].map((change) => ({ ...plan, entries: [{ ...entry, ...change }] })),
+  ];
+  for (const [i, invalid] of failures.entries()) {
+    const { result, forwarded } = await run(`invalid-${i}`, invalid);
+    assert.notEqual(result.status, 0, `Invalid plan ${i} accepted`);
+    assert.equal(forwarded, "", `Invalid plan ${i} forwarded`);
+  }
+  for (const [name, changed] of [
+    ["changed-input", { ...prepared, modelInput: "Stop: n1" }],
+    [
+      "changed-model",
+      {
+        ...prepared,
+        effective: {
+          ...prepared.effective,
+          request: { ...prepared.effective.request, model: "another/model" },
+        },
+      },
+    ],
+    [
+      "changed-prompt",
+      {
+        ...prepared,
+        effective: {
+          ...prepared.effective,
+          request: {
+            ...prepared.effective.request,
+            messages: [
+              { role: "system", content: "Different prompt" },
+              prepared.effective.request.messages[1],
+            ],
+          },
+        },
+      },
+    ],
+  ]) {
+    const { forwarded } = await run(name, plan, changed);
+    assert.equal(forwarded, "", `${name} forwarded`);
+  }
+  const actualMutation = await run("actual-request-change", plan, prepared, {
+    ...request,
+    messages: [request.messages[0], { role: "user", content: "Stop: n1" }],
+  });
+  assert.equal(actualMutation.forwarded, "", "Actual request must match its prepared request");
+});
