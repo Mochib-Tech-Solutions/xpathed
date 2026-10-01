@@ -126,6 +126,7 @@ export function options(args) {
     budgetUsd: 5,
     split: "train",
     profile: "deepseek",
+    promptVariant: "baseline",
   };
   const keys = {
     "--import": "import",
@@ -138,6 +139,7 @@ export function options(args) {
     "--split": "split",
     "--reviewed-inputs": "reviewedInputs",
     "--profile": "profile",
+    "--prompt-variant": "promptVariant",
   };
   const seen = new Set();
   for (let i = 0; i < args.length; i += 2) {
@@ -169,6 +171,10 @@ export function options(args) {
     );
   if (!profiles.some((profile) => profile.id === result.profile && profile.variant === "baseline"))
     throw new Error("Offline evaluation requires an approved baseline profile");
+  if (!["baseline", "declarative-inspect"].includes(result.promptVariant))
+    throw new Error("Unknown offline prompt variant");
+  if (result.mode !== "live" && result.promptVariant !== "baseline")
+    throw new Error("Experimental prompt variants require live mode");
   result.budgetUsd = Number(result.budgetUsd);
   if (!(result.budgetUsd > 0 && result.budgetUsd <= 5))
     throw new Error("Initial experiment ceiling must be at most $5 total");
@@ -207,7 +213,12 @@ export async function cli(path, env, prepareOnly = false) {
   }
 }
 
-export function profileEnvironment(profile, baseUrl, inherited = process.env) {
+export function profileEnvironment(
+  profile,
+  baseUrl,
+  inherited = process.env,
+  promptVariant = "baseline",
+) {
   const env = {
     ...inherited,
     OpenRouter__ApiKey: "dataset-proxy-only",
@@ -215,6 +226,7 @@ export function profileEnvironment(profile, baseUrl, inherited = process.env) {
     OpenRouter__Model: profile.model,
     OpenRouter__Provider: profile.provider,
     OpenRouter__TimeoutSeconds: "30",
+    XPATHED_EVALUATION_PROMPT_VARIANT: promptVariant,
   };
   delete env.OpenRouter__ReasoningEffort;
   delete env.OpenRouter__PromptCacheMode;
@@ -363,6 +375,7 @@ export async function main(args = process.argv.slice(2)) {
     mode: opt.mode,
     track: "offline-selection",
     profile: opt.mode === "live" ? profiles.find((profile) => profile.id === opt.profile) : null,
+    promptVariant: opt.mode === "live" ? opt.promptVariant : null,
     timingScope:
       "Offline preparation and resolver child-process startup plus model selection; no browser or UI latency",
     measurement:
@@ -419,7 +432,12 @@ export async function main(args = process.argv.slice(2)) {
       manifest.pricing = proxy.pricing;
       manifest.routeMetadata = proxy.profiles;
       manifest.budgetBefore = proxy.budget;
-      env = profileEnvironment(profile, `http://127.0.0.1:${proxy.server.address().port}/api/v1/`);
+      env = profileEnvironment(
+        profile,
+        `http://127.0.0.1:${proxy.server.address().port}/api/v1/`,
+        process.env,
+        opt.promptVariant,
+      );
       manifest.policy.experimentCeilingUsd = proxy.budget.ceilingUsd;
     }
     manifest.contentHash = hash(JSON.stringify(manifest));
