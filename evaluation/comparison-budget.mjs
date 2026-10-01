@@ -3,6 +3,7 @@ import { createServer } from "node:http";
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { assertReconciledCharges, reserveCharge, unresolvedCharge } from "./dataset-run.mjs";
+import { githubBudget } from "./github-budget.mjs";
 
 const model = "deepseek/deepseek-v4.1-flash";
 const approved = {
@@ -262,6 +263,32 @@ function boundedRequest(body, profile) {
   return request;
 }
 
+export function validateBudgetLedger(ledger) {
+  if (
+    !object(ledger) ||
+    ledger.version !== 1 ||
+    !Number.isFinite(ledger.ceilingUsd) ||
+    ledger.ceilingUsd <= 0 ||
+    ledger.ceilingUsd > 5 ||
+    (Object.hasOwn(ledger, "remoteAuthority") &&
+      (typeof ledger.remoteAuthority !== "string" ||
+        !/^github:[a-z\d][a-z\d-]*\/[a-z\d._-]+:evaluation-budget:experiment-budget\.json$/.test(
+          ledger.remoteAuthority,
+        ))) ||
+    !Array.isArray(ledger.entries) ||
+    ledger.entries.some(
+      (entry) =>
+        !object(entry) ||
+        !Number.isFinite(entry.reservedUsd) ||
+        entry.reservedUsd <= 0 ||
+        (entry.reportedUsd != null &&
+          (!Number.isFinite(entry.reportedUsd) || entry.reportedUsd < 0)),
+    )
+  )
+    throw new Error("Invalid experiment budget ledger");
+  assertReconciledCharges(ledger);
+}
+
 // The caller owns listening; only this process receives the real provider key.
 export async function createBudgetProxy({
   apiKey,
@@ -270,6 +297,8 @@ export async function createBudgetProxy({
   ceilingUsd = 5,
   fetchImpl = fetch,
   onRecord = async () => {},
+  githubRepository = process.env.XPATHED_BUDGET_GITHUB_REPOSITORY,
+  githubToken = process.env.GH_TOKEN,
 } = {}) {
   const configured = declaredProfiles(profiles);
   apiKey ??= await readKey();
@@ -277,15 +306,27 @@ export async function createBudgetProxy({
     throw new Error("Set OPENROUTER_API_KEY for the explicitly requested live comparison");
   if (!Number.isFinite(ceilingUsd) || ceilingUsd <= 0 || ceilingUsd > 5)
     throw new Error("Experiment ceiling must be at most $5 total");
+  const redact = (text) =>
+    [apiKey, githubToken]
+      .filter(Boolean)
+      .reduce((value, secret) => value.replaceAll(secret, "[redacted]"), text);
   await mkdir(dirname(ledgerPath), { recursive: true });
   const lock = `${ledgerPath}.lock`;
   await mkdir(lock);
-  let ledger;
-  const persist = async () => {
+  let ledger, remote;
+  const persist = async (record, stage) => {
     await writeFile(`${ledgerPath}.pending`, JSON.stringify(ledger, null, 2) + "\n", {
       mode: 0o600,
     });
     await rename(`${ledgerPath}.pending`, ledgerPath);
+    if (remote) {
+      const started = performance.now();
+      try {
+        await remote.persist(ledger);
+      } finally {
+        if (record) record.remoteAccountingMs[stage] = performance.now() - started;
+      }
+    }
   };
   try {
     try {
@@ -295,22 +336,18 @@ export async function createBudgetProxy({
       ledger = { version: 1, ceilingUsd, entries: [] };
     }
     if (
-      ledger.version !== 1 ||
-      !Number.isFinite(ledger.ceilingUsd) ||
-      ledger.ceilingUsd <= 0 ||
-      ledger.ceilingUsd > 5 ||
-      !Array.isArray(ledger.entries) ||
-      ledger.entries.some(
-        (entry) =>
-          !object(entry) ||
-          !Number.isFinite(entry.reservedUsd) ||
-          entry.reservedUsd <= 0 ||
-          (entry.reportedUsd != null &&
-            (!Number.isFinite(entry.reportedUsd) || entry.reportedUsd < 0)),
-      )
+      object(ledger) &&
+      Object.hasOwn(ledger, "remoteAuthority") &&
+      (typeof githubRepository !== "string" ||
+        ledger.remoteAuthority !==
+          `github:${githubRepository.toLowerCase()}:evaluation-budget:experiment-budget.json`)
     )
-      throw new Error("Invalid experiment budget ledger");
-    assertReconciledCharges(ledger);
+      throw new Error("Local budget requires its matching GitHub authority");
+    if (githubRepository) {
+      remote = await githubBudget(githubRepository, githubToken, fetchImpl);
+      ledger = remote.ledger;
+    }
+    validateBudgetLedger(ledger);
     ledger.ceilingUsd = Math.min(ledger.ceilingUsd, ceilingUsd);
     for (const profile of configured) {
       const response = await fetchImpl(`${upstream}${profile.endpointPath}`, {
@@ -341,7 +378,7 @@ export async function createBudgetProxy({
     await persist();
   } catch (error) {
     await rm(lock, { recursive: true });
-    throw error;
+    throw new Error(redact(String(error.message)));
   }
   const records = [],
     attempts = new Set();
@@ -351,7 +388,7 @@ export async function createBudgetProxy({
     closed = false,
     idle = Promise.resolve(),
     closing;
-  const safe = (value) => JSON.parse(JSON.stringify(value).replaceAll(apiKey, "[redacted]"));
+  const safe = (value) => JSON.parse(redact(JSON.stringify(value)));
   const retain = async (record) => {
     await onRecord(safe(record));
   };
@@ -389,6 +426,7 @@ export async function createBudgetProxy({
       usage: null,
       reservedUsd: null,
       reportedUsd: null,
+      remoteAccountingMs: { reservation: 0, reconciliation: 0 },
     };
     records.push(record);
     let reservation;
@@ -418,7 +456,7 @@ export async function createBudgetProxy({
       reservation = ledger.entries.at(-1);
       reservation.attemptId = current.id;
       record.reservedUsd = maximum;
-      await persist();
+      await persist(record, "reservation");
       await retain(record);
       record.forwarded = true;
       const result = await fetchImpl(`${upstream}/chat/completions`, {
@@ -475,7 +513,7 @@ export async function createBudgetProxy({
         record.error =
           "Provider identity mismatch or response cache hit; further qualification calls are blocked";
       }
-      await persist();
+      await persist(record, "reconciliation");
       record.elapsedMs = performance.now() - started;
       await retain(record);
       send(result.status, payload);
