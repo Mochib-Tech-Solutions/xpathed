@@ -28,7 +28,7 @@ export async function checkKeyBudget(key, remainingUsd, fetchImpl = fetch) {
     (data.expires_at != null && !(Date.parse(data.expires_at) > Date.now()))
   )
     throw new Error(
-      "Evaluation key needs a positive non-resetting cap and balance, and must not be expired or a management key. The authoritative shared $5 campaign must also have a positive balance. " +
+      "Evaluation key needs a positive non-resetting cap and balance, and must not be expired or a management key. The authoritative shared campaign must also have a positive balance. " +
         JSON.stringify({
           managementKey:
             typeof data?.is_management_key === "boolean" ? data.is_management_key : "unavailable",
