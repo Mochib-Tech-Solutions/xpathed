@@ -21,6 +21,45 @@ const pricing = {
 };
 const input = { model, messages: [{ role: "user", content: "Find Save" }], max_tokens: 4096 };
 
+test("frozen request rejects changed content before reserving or forwarding", async (t) => {
+  const { proxy, post, calls } = await setup(t);
+  const maximum = proxy.forecastRequests([{ id: "frozen", profileId: "default", request: input }])
+    .reservations[0].maximumUsd;
+  proxy.beginAttempt("frozen", "default", maximum, input);
+  const response = await post({ ...input, messages: [{ role: "user", content: "Find Edit" }] });
+  assert.equal(response.status, 400);
+  assert.match((await response.json()).error.message, /frozen prepared request/);
+  assert.equal(calls.length, 0);
+  assert.equal(proxy.budget.spentUsd, 0);
+  assert.equal(proxy.budget.pendingCharges, 0);
+});
+
+test("frozen request accepts equivalent key order and cannot be changed by its caller", async (t) => {
+  const { proxy, post, calls } = await setup(t);
+  const prepared = structuredClone(input);
+  proxy.beginAttempt("frozen", "default", 0.01, prepared);
+  prepared.messages[0].content = "Find Edit";
+  const response = await post({
+    max_tokens: input.max_tokens,
+    messages: [{ content: "Find Save", role: "user" }],
+    model,
+  });
+  assert.equal(response.status, 200);
+  assert.equal(calls.length, 1);
+  assert.equal(JSON.parse(calls[0].options.body).messages[0].content, "Find Save");
+});
+
+test("matching frozen request cannot exceed its allocation before reservation", async (t) => {
+  const { proxy, post, calls } = await setup(t);
+  proxy.beginAttempt("frozen", "default", 0.000001, input);
+  const response = await post();
+  assert.equal(response.status, 400);
+  assert.match((await response.json()).error.message, /frozen baseline allocation/);
+  assert.equal(calls.length, 0);
+  assert.equal(proxy.budget.spentUsd, 0);
+  assert.equal(proxy.budget.pendingCharges, 0);
+});
+
 async function setup(
   t,
   {

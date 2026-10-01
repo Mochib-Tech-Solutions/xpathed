@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { createServer } from "node:http";
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
-import { parseEnv } from "node:util";
+import { isDeepStrictEqual, parseEnv } from "node:util";
 import {
   assertReconciledCharges,
   campaignCeilingUsd,
@@ -471,6 +471,8 @@ export async function createBudgetProxy({
       record.pricing = pricing;
       record.requestedIdentity = { model: profile.model, provider: profile.provider };
       const body = boundedRequest(JSON.parse(Buffer.concat(chunks).toString("utf8")), profile);
+      if (current.preparedRequest && !isDeepStrictEqual(body, current.preparedRequest))
+        throw new Error("Inference differs from its frozen prepared request; no paid call made");
       record.request = safe(body);
       const text = JSON.stringify(body);
       // UTF-8 bytes plus framing bound text tokenization; no image/audio inputs are allowed.
@@ -611,7 +613,7 @@ export async function createBudgetProxy({
         reviewedReserveUsd: reviewed.reduce((sum, entry) => sum + entry.reservedUsd, 0),
       };
     },
-    beginAttempt(id, profileId = configured[0].id, maximumUsd = Infinity) {
+    beginAttempt(id, profileId = configured[0].id, maximumUsd = Infinity, preparedRequest) {
       const profile = configured.find((item) => item.id === profileId);
       if (!profile) throw new Error("Unknown inference profile");
       if (!(maximumUsd > 0) || (maximumUsd !== Infinity && !Number.isFinite(maximumUsd)))
@@ -626,8 +628,10 @@ export async function createBudgetProxy({
         attempts.has(id)
       )
         throw new Error("Cannot begin an overlapping, repeated or blocked inference attempt");
+      const frozenRequest =
+        preparedRequest == null ? null : structuredClone(boundedRequest(preparedRequest, profile));
       attempts.add(id);
-      current = { id, profile, used: false, maximumUsd };
+      current = { id, profile, used: false, maximumUsd, preparedRequest: frozenRequest };
     },
     async reserveAttempt(id, profileId, maximumUsd) {
       if (!Number.isFinite(maximumUsd) || maximumUsd <= 0)
