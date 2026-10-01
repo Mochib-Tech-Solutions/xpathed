@@ -42,7 +42,7 @@ test("missing attempts stay in stratum denominators and partial errors and unkno
       cardinality: "singleton",
       result: { outcome: "partial" },
       grade: { passed: false, metrics: { unsupported: true, operationalError: true } },
-      provider: [{ forwarded: true, reservedUsd: 0.1, reportedUsd: null, usage: null }],
+      provider: [{ forwarded: true, reservedUsd: null, reportedUsd: null, usage: null }],
     },
   ]);
   assert.equal(report.strategies.custom.singleton.total, 2);

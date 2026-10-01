@@ -5,52 +5,30 @@ import { profiles, selectQualificationCases } from "../evaluation/qualify.mjs";
 import { validateCases } from "../evaluation/run.mjs";
 import policy from "../evaluation/qualification-policy.json" with { type: "json" };
 
-export async function checkKeyBudget(key, remainingUsd, fetchImpl = fetch) {
+export async function checkEvaluationKey(key, fetchImpl = fetch) {
   if (!key) throw new Error("Missing evaluation key");
-  const response = await fetchImpl("https://openrouter.ai/api/v1/key", {
-    headers: { Authorization: `Bearer ${key}` },
-    signal: AbortSignal.timeout(10000),
-    redirect: "error",
-  });
-  if (!response.ok) throw new Error(`Evaluation key metadata unavailable (${response.status})`);
-  const { data } = await response.json();
+  let data;
+  try {
+    const response = await fetchImpl("https://openrouter.ai/api/v1/key", {
+      headers: { Authorization: `Bearer ${key}` },
+      signal: AbortSignal.timeout(10000),
+      redirect: "error",
+    });
+    if (!response.ok) throw new Error("Unusable key metadata response");
+    ({ data } = await response.json());
+  } catch {
+    throw new Error("Evaluation key metadata unavailable");
+  }
   if (
     !data ||
     data.is_management_key !== false ||
-    data.limit_reset !== null ||
-    !Number.isFinite(data.limit) ||
-    data.limit <= 0 ||
-    !Number.isFinite(data.limit_remaining) ||
-    data.limit_remaining <= 0 ||
-    data.limit_remaining > data.limit ||
-    !Number.isFinite(remainingUsd) ||
-    remainingUsd <= 0 ||
     (data.expires_at != null && !(Date.parse(data.expires_at) > Date.now()))
   )
-    throw new Error(
-      "Evaluation key needs a positive non-resetting cap and balance, and must not be expired or a management key. The authoritative shared campaign must also have a positive balance. " +
-        JSON.stringify({
-          managementKey:
-            typeof data?.is_management_key === "boolean" ? data.is_management_key : "unavailable",
-          legacyProvisioningKey:
-            typeof data?.is_provisioning_key === "boolean"
-              ? data.is_provisioning_key
-              : "unavailable",
-          limitUsd: Number.isFinite(data?.limit) ? data.limit : "unavailable",
-          remainingUsd: Number.isFinite(data?.limit_remaining)
-            ? data.limit_remaining
-            : "unavailable",
-          reset: [null, "daily", "weekly", "monthly"].includes(data?.limit_reset)
-            ? data.limit_reset
-            : "unavailable",
-          campaignRemainingUsd: remainingUsd,
-          expiryValid: data?.expires_at == null || Date.parse(data.expires_at) > Date.now(),
-        }),
-    );
+    throw new Error("Evaluation key must be a valid unexpired inference key, not a management key");
   return {
-    limitUsd: data.limit,
-    remainingUsd: data.limit_remaining,
-    reset: null,
+    limitUsd: Number.isFinite(data.limit) ? data.limit : null,
+    remainingUsd: Number.isFinite(data.limit_remaining) ? data.limit_remaining : null,
+    reset: ["daily", "weekly", "monthly"].includes(data.limit_reset) ? data.limit_reset : null,
     expiresAt: data.expires_at ?? null,
   };
 }
@@ -150,17 +128,24 @@ async function main() {
     )
       throw new Error("Budget authority must be this private repository");
     const remote = await githubBudget(env.XPATHED_BUDGET_GITHUB_REPOSITORY, env.GH_TOKEN);
+    if (remote.ledger.budgetPolicy !== "provider-limit")
+      throw new Error("Evaluation ledger requires an explicit provider-limit policy migration");
     validateBudgetLedger(remote.ledger);
-    const spent = remote.ledger.entries.reduce(
-      (sum, e) => sum + (e.reportedUsd ?? e.reservedUsd),
-      0,
-    );
+    const unknown = remote.ledger.entries.filter((entry) => entry.reportedUsd == null);
     report.budget = {
-      ceilingUsd: remote.ledger.ceilingUsd,
-      spentUsd: spent,
-      remainingUsd: Math.max(0, remote.ledger.ceilingUsd - spent),
+      budgetPolicy: "provider-limit",
+      historicalCeilingUsd: remote.ledger.ceilingUsd ?? null,
+      ceilingUsd: null,
+      remainingUsd: null,
+      knownReportedUsd: remote.ledger.entries.reduce(
+        (sum, entry) => sum + (entry.reportedUsd ?? 0),
+        0,
+      ),
+      unknownChargeRecords: unknown.length,
+      unknownReservedUsd: unknown.reduce((sum, entry) => sum + (entry.reservedUsd ?? 0), 0),
+      unknownEstimateRecords: unknown.filter((entry) => entry.reservedUsd == null).length,
     };
-    report.key = await checkKeyBudget(await readEvaluationKey(env), report.budget.remainingUsd);
+    report.key = await checkEvaluationKey(await readEvaluationKey(env));
     await save();
   }
   console.log(JSON.stringify(report, null, 2));

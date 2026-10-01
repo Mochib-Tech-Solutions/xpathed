@@ -10,6 +10,10 @@ internal sealed class DeterministicServicesHandler : HttpMessageHandler
     private static readonly string[] SaveXpaths = ["//*[@data-testid='save-profile']"];
     public Func<string, CancellationToken, Task>? BeforeRespondAsync { get; init; }
     public string? ProviderBody { get; init; }
+    public string DecisionBody { get; init; } =
+        """{"model":"typesafe/jev-1.13-20260917","provider":"TypeSafe","answers":{"appearance":{"type":"noul","noul":0.01},"layout":{"type":"noul","noul":0.02}}}""";
+    public JsonElement DecisionRequest { get; private set; }
+    public int DecisionRequestCount { get; private set; }
     public HttpStatusCode ProviderStatus { get; init; } = HttpStatusCode.OK;
     public string PricingBody { get; init; } =
         """
@@ -45,6 +49,12 @@ internal sealed class DeterministicServicesHandler : HttpMessageHandler
         {
             CaptureRequest = await request.Content!.ReadFromJsonAsync<JsonElement>(cancellationToken);
             return Json(CaptureBody);
+        }
+        if (path == "/api/alpha/decisions")
+        {
+            DecisionRequestCount++;
+            DecisionRequest = await request.Content!.ReadFromJsonAsync<JsonElement>(cancellationToken);
+            return Json(DecisionBody);
         }
         if (path == "/api/v1/chat/completions")
         {

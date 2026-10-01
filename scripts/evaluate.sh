@@ -5,6 +5,7 @@ cd "$(dirname "$0")/.."
 mode=deterministic
 comparison=false
 qualification=false
+context=false
 phase=pilot
 split=development
 profile=luna,gemini,deepseek
@@ -21,6 +22,7 @@ while [ "$#" -gt 0 ]; do
     --) shift; continue ;;
     --comparison) comparison=true; shift; continue ;;
     --qualification) qualification=true; shift; continue ;;
+    --context) context=true; shift; continue ;;
     --mode|--repetitions|--seed|--timeout-ms|--case|--output|--suite|--phase|--split|--profile|--pilot|--forecast-only)
       if [ "$#" -lt 2 ]; then echo "Missing value for $1" >&2; exit 2; fi
       case "$1" in
@@ -44,7 +46,11 @@ done
 if [ -n "${XPATHED_RELEASE_STATE:-}" ]; then
   if [ "$qualification" != true ] || [ -z "${XPATHED_RELEASE_OVERLAY:-}" ] || [ -z "${XPATHED_RELEASE_SERVICE:-}" ]; then echo "Artifact qualification requires its verified launcher" >&2; exit 2; fi
 fi
-if [ "$comparison" = true ] && [ "$qualification" = true ]; then echo "Choose comparison or qualification" >&2; exit 2; fi
+if { [ "$comparison" = true ] && [ "$qualification" = true ]; } || { [ "$context" = true ] && { [ "$comparison" = true ] || [ "$qualification" = true ]; }; }; then echo "Choose one evaluation mode" >&2; exit 2; fi
+if [ "$context" = true ]; then
+  if [ -n "$suite" ] || [ -n "$forecast_only" ] || [ -n "$case_id" ] || [ "$repetitions" != 1 ] || [ "$seed" != 1 ]; then echo "Context comparison uses one attempt and its reviewed current-view suite" >&2; exit 2; fi
+  suite=evaluation/viewport-baseline-cases.json
+fi
 if [ "$qualification" != true ] && { [ "$phase" != pilot ] || [ "$split" != development ] || [ "$profile" != luna,gemini,deepseek ] || [ -n "$pilot" ]; }; then echo "Qualification options require --qualification" >&2; exit 2; fi
 if [ "$qualification" = true ]; then
   case "$suite" in
@@ -57,7 +63,7 @@ if [ "$comparison" = true ] && [ -n "$suite" ]; then echo "Comparison uses its r
 export XPATHED_COMPARISON_MODE=$mode
 export XPATHED_EVALUATION_SUITE=
 if [ -n "$suite" ]; then
-  if [ "$mode" != deterministic ] && [ "$qualification" != true ]; then echo "Custom suites support deterministic evaluation only" >&2; exit 2; fi
+  if [ "$mode" != deterministic ] && [ "$qualification" != true ] && [ "$context" != true ]; then echo "Custom suites support deterministic evaluation only" >&2; exit 2; fi
   XPATHED_EVALUATION_SUITE=$(node --input-type=module -e '
     import { realpathSync, statSync } from "node:fs";
     import { relative, isAbsolute } from "node:path";
@@ -68,6 +74,7 @@ if [ -n "$suite" ]; then
   ' "$suite")
 fi
 set -- --mode "$mode" --repetitions "$repetitions" --seed "$seed" --timeout-ms "$timeout" --output /artifacts
+if [ "$context" = true ]; then set -- --mode "$mode" --timeout-ms "$timeout" --output /artifacts; fi
 if [ -n "$case_id" ]; then set -- "$@" --case "$case_id"; fi
 # Reuse the runner's validation before starting services or creating artifacts.
 if [ "$qualification" = true ]; then
@@ -85,12 +92,16 @@ if [ "$qualification" = true ]; then
     set -- "$@" --pilot "$pilot"
   fi
   node --input-type=module -e 'import { parseQualificationOptions } from "./evaluation/qualify.mjs"; parseQualificationOptions(process.argv.slice(1));' -- "$@"
+elif [ "$context" = true ]; then
+  node --input-type=module -e 'import { parseContextOptions } from "./evaluation/context-experiment.mjs"; parseContextOptions(process.argv.slice(1));' -- "$@"
 else
   if [ -n "$forecast_only" ]; then echo "Forecast preparation requires qualification" >&2; exit 2; fi
   node --input-type=module -e 'import { parseOptions } from "./evaluation/run.mjs"; parseOptions(process.argv.slice(1));' -- "$@"
 fi
 
-export COMPOSE_PROJECT_NAME=${XPATHED_EVALUATION_PROJECT:-xpathed-evaluation}
+evaluation_default_project=xpathed-evaluation
+if [ "$context" = true ]; then evaluation_default_project=xpathed-evaluation-context; fi
+export COMPOSE_PROJECT_NAME=${XPATHED_EVALUATION_PROJECT:-$evaluation_default_project}
 case "$COMPOSE_PROJECT_NAME" in ''|*[!a-z0-9_-]*) echo "Invalid evaluation project name" >&2; exit 2 ;; esac
 case "$COMPOSE_PROJECT_NAME" in
   xpathed-evaluation|xpathed-evaluation-?*) ;;
@@ -141,6 +152,8 @@ export XPATHED_EVALUATION_GID=$(id -g)
 compose() {
   if [ -n "${XPATHED_RELEASE_STATE:-}" ]; then
     docker/compose.sh --env-file "$evaluation_env" -f docker/compose.evaluation.yaml -f docker/compose.qualification.yaml -f "$XPATHED_RELEASE_OVERLAY" "$@"
+  elif [ "$context" = true ]; then
+    docker/compose.sh --env-file "$evaluation_env" -f docker/compose.evaluation.yaml -f docker/compose.context.yaml "$@"
   elif [ "$qualification" = true ]; then
     docker/compose.sh --env-file "$evaluation_env" -f docker/compose.evaluation.yaml -f docker/compose.qualification.yaml "$@"
   elif [ "$comparison" = true ]; then
@@ -159,6 +172,7 @@ for container in $(docker ps -aq --filter "label=com.docker.compose.project=$COM
   service=$(docker inspect --format '{{ index .Config.Labels "com.docker.compose.service" }}' "$container")
   case "$service" in
     browser|resolver|evaluation-fixture) ;;
+    resolver-context) if [ "$context" != true ]; then echo "Context service belongs to a different runner" >&2; exit 2; fi ;;
     stagehand) if [ "$comparison" != true ]; then echo "Comparison service belongs to a different runner" >&2; exit 2; fi ;;
     resolver-luna|resolver-gemini|resolver-deepseek-concise|resolver-qwen) if [ "$qualification" != true ]; then echo "Qualification service belongs to a different runner" >&2; exit 2; fi ;;
     *) echo "Evaluation project contains a non-evaluation service: $service" >&2; exit 2 ;;
@@ -166,7 +180,7 @@ for container in $(docker ps -aq --filter "label=com.docker.compose.project=$COM
 done
 mkdir -p "$(dirname "$XPATHED_EVALUATION_OUTPUT")"
 mkdir "$XPATHED_EVALUATION_OUTPUT"
-if [ "$qualification" = true ] || [ "$comparison" = true ]; then
+if [ "$qualification" = true ] || [ "$comparison" = true ] || [ "$context" = true ]; then
   mkdir -p .artifacts/datasets
 fi
 compose down
@@ -201,6 +215,8 @@ if [ -n "${XPATHED_RELEASE_STATE:-}" ]; then
   XPATHED_RELEASE_ARTIFACT_JSON=$(node scripts/release-evaluate.mjs attest "$XPATHED_RELEASE_STATE" before)
   export XPATHED_RELEASE_ARTIFACT_JSON
   release_started=true
+elif [ "$context" = true ]; then
+  compose up --build --wait browser resolver resolver-context evaluation-fixture
 elif [ "$qualification" = true ]; then
   compose up --build --wait browser resolver resolver-luna resolver-gemini resolver-deepseek-concise resolver-qwen evaluation-fixture
 elif [ "$comparison" = true ]; then
@@ -214,7 +230,11 @@ else
   compose exec -T evaluation-fixture node /checks/ready.mjs http://browser:8080/health http://resolver:8080/health http://evaluation-fixture:8090/health
 fi
 echo "Evaluation artifacts: $XPATHED_EVALUATION_OUTPUT"
-if [ "$qualification" = true ]; then
+if [ "$context" = true ]; then
+  compose exec -T evaluation-fixture node /checks/ready.mjs http://resolver-context:8080/health
+  browser_binary_hash=$(compose exec -T browser sh -c 'sha256sum /ms-playwright/chromium-*/chrome-linux*/chrome' | awk '{print $1}')
+  compose exec -T -e "XPATHED_BROWSER_BINARY_SHA256=$browser_binary_hash" evaluation-fixture node /evaluation/context-experiment.mjs "$@"
+elif [ "$qualification" = true ]; then
   if [ -z "${XPATHED_RELEASE_STATE:-}" ]; then
     compose exec -T evaluation-fixture node /checks/ready.mjs http://resolver-luna:8080/health http://resolver-gemini:8080/health http://resolver-deepseek-concise:8080/health http://resolver-qwen:8080/health
   fi

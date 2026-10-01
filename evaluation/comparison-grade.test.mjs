@@ -193,3 +193,21 @@ test("live charge gaps and excess charges fail accounting without hiding operati
   );
   assert.equal(gradeComparison(spec(), { ...trial(), mode: "deterministic" }).passed, true);
 });
+
+test("provider-limit comparisons keep cost gaps and overruns out of target correctness", () => {
+  for (const [reservedUsd, reportedUsd] of [
+    [null, null],
+    [0.01, 0.02],
+  ]) {
+    const trial = liveTrial();
+    trial.provider[0] = { ...trial.provider[0], reservedUsd, reportedUsd };
+    assert.equal(gradeComparison(spec(), trial, "provider-limit").passed, true);
+  }
+  const invalid = liveTrial();
+  invalid.provider[0].reportedUsd = -1;
+  assert.ok(
+    gradeComparison(spec(), invalid, "provider-limit").failures.some(
+      (f) => f.category === "accounting",
+    ),
+  );
+});

@@ -65,7 +65,12 @@ esac
 }
 
 test("live evaluation wrappers pass the dedicated file key and reject an app-only file before Docker", async (t) => {
-  for (const args of [[], ["--comparison"], ["--qualification", "--profile", "deepseek"]]) {
+  for (const args of [
+    [],
+    ["--comparison"],
+    ["--context"],
+    ["--qualification", "--profile", "deepseek"],
+  ]) {
     await t.test(args[0] ?? "direct", (t) => {
       const selected = runWrapper(t, "xpathed-evaluation-key", "web", ["--mode", "live", ...args], {
         envText: "OPENROUTER_API_KEY=fixture-app\nOPENROUTER_EVAL_API_KEY=fixture-eval\n",
@@ -152,8 +157,31 @@ test("qualification cannot combine strategy comparison or inject an unreviewed s
       cwd: resolve(import.meta.dirname, ".."),
     });
     assert.equal(result.status, 2);
-    assert.match(result.stderr, /qualification|Qualification/);
+    assert.match(result.stderr, /qualification|Qualification|Choose one evaluation mode/);
   }
+});
+
+test("context comparison isolates its service and rejects extra attempts or modes before Docker", (t) => {
+  for (const args of [
+    ["--context", "--qualification"],
+    ["--context", "--comparison"],
+    ["--context", "--repetitions", "2"],
+    ["--context", "--case", "basic-save"],
+    ["--context", "--seed", "2"],
+    ["--context", "--suite", "evaluation/cases.json"],
+  ]) {
+    const result = runWrapper(t, "xpathed-evaluation-context-options", "resolver-context", args);
+    assert.equal(result.status, 2);
+    assert.equal(result.calls, "");
+  }
+  const rejected = runWrapper(t, "xpathed-evaluation-context-reject", "resolver-context");
+  assert.equal(rejected.status, 2);
+  assert.match(rejected.stderr, /Context service belongs to a different runner/);
+  const accepted = runWrapper(t, "xpathed-evaluation-context-accept", "resolver-context", [
+    "--context",
+  ]);
+  assert.equal(accepted.status, 77);
+  assert.match(accepted.calls, /compose.context.yaml/);
 });
 
 test("qualification accepts the reviewed viewport baseline and forwards its container suite path", (t) => {

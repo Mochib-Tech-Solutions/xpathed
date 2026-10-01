@@ -103,20 +103,24 @@ export function lexicalSelection(input) {
 }
 
 export function reserveCharge(ledger, maximumUsd, id) {
-  if (!Number.isFinite(maximumUsd) || maximumUsd <= 0) throw new Error("Invalid maximum charge");
+  const tracking = ledger.budgetPolicy === "provider-limit";
+  if (!(tracking && maximumUsd === null) && (!Number.isFinite(maximumUsd) || maximumUsd <= 0))
+    throw new Error("Invalid maximum charge");
   if (
-    !Number.isFinite(ledger.ceilingUsd) ||
-    ledger.ceilingUsd <= 0 ||
-    ledger.ceilingUsd > campaignCeilingUsd ||
+    (!tracking &&
+      (!Number.isFinite(ledger.ceilingUsd) ||
+        ledger.ceilingUsd <= 0 ||
+        ledger.ceilingUsd > campaignCeilingUsd)) ||
     !Array.isArray(ledger.entries)
   )
     throw new Error("Invalid budget ledger");
   const spent = ledger.entries.reduce((sum, entry) => {
     const charge = entry.reportedUsd ?? entry.reservedUsd;
+    if (tracking && charge == null) return sum;
     if (!Number.isFinite(charge) || charge < 0) throw new Error("Invalid retained charge");
     return sum + charge;
   }, 0);
-  if (spent + maximumUsd > ledger.ceilingUsd)
+  if (!tracking && spent + maximumUsd > ledger.ceilingUsd)
     throw new Error("Total experiment budget would be exceeded");
   if (ledger.entries.some((entry) => entry.id === id))
     throw new Error("Repeated attempt reservation");
@@ -125,6 +129,12 @@ export function reserveCharge(ledger, maximumUsd, id) {
 }
 
 export function unresolvedCharge(entry) {
+  if (
+    entry.accountingStatus === "not_forwarded" &&
+    entry.forwarded === false &&
+    entry.reportedUsd == null
+  )
+    return false;
   const review = entry.reservationReview;
   if (!Number.isFinite(entry.reservedUsd) || entry.reservedUsd <= 0) return true;
   if (
@@ -147,6 +157,7 @@ export function unresolvedCharge(entry) {
 }
 
 export function assertReconciledCharges(ledger) {
+  if (ledger.budgetPolicy === "provider-limit") return;
   if (ledger.entries.some(unresolvedCharge))
     throw new Error("Unreconciled prior attempt blocks further paid calls");
 }
@@ -157,6 +168,7 @@ export function options(args) {
     limit: 30,
     seed: 1,
     budgetUsd: campaignCeilingUsd,
+    budgetPolicy: "provider-limit",
     split: "train",
     profile: "deepseek",
     promptVariant: "baseline",
@@ -169,6 +181,7 @@ export function options(args) {
     "--seed": "seed",
     "--replay": "replay",
     "--budget-usd": "budgetUsd",
+    "--budget-policy": "budgetPolicy",
     "--split": "split",
     "--reviewed-inputs": "reviewedInputs",
     "--profile": "profile",
@@ -215,8 +228,15 @@ export function options(args) {
     throw new Error("Experimental prompt variants require live mode");
   if (result.preparedPlan && result.mode !== "live")
     throw new Error("Prepared plans require live mode");
-  result.budgetUsd = Number(result.budgetUsd);
-  if (!(result.budgetUsd > 0 && result.budgetUsd <= campaignCeilingUsd))
+  if (!["provider-limit", "local-ceiling"].includes(result.budgetPolicy))
+    throw new Error("Unknown budget policy");
+  if (result.budgetPolicy === "provider-limit" && seen.has("budgetUsd"))
+    throw new Error("--budget-usd requires explicit --budget-policy local-ceiling");
+  result.budgetUsd = result.budgetPolicy === "provider-limit" ? null : Number(result.budgetUsd);
+  if (
+    result.budgetPolicy === "local-ceiling" &&
+    !(result.budgetUsd > 0 && result.budgetUsd <= campaignCeilingUsd)
+  )
     throw new Error(`Campaign ceiling must be at most $${campaignCeilingUsd} total`);
   return result;
 }
@@ -302,7 +322,9 @@ export async function finishProviderAttempt(trial, proxy, generations) {
   await proxy.awaitIdle();
   retainProviderEvidence(trial, proxy.records);
   const calls = proxy.records.filter((record) => record.attemptId === trial.id);
-  const valid = proxy.budget.pendingCharges === 0 && validProviderCalls(calls, generations);
+  const valid =
+    (proxy.budget.budgetPolicy === "provider-limit" || proxy.budget.pendingCharges === 0) &&
+    validProviderCalls(calls, generations);
   if (!valid)
     trial.error ??= {
       code: "provider_evidence_invalid",
@@ -422,8 +444,8 @@ export async function main(args = process.argv.slice(2)) {
           !ids.includes(entry.caseId) ||
           !/^[a-f0-9]{64}$/.test(entry.inputHash) ||
           !/^[a-f0-9]{64}$/.test(entry.requestSha256) ||
-          !Number.isFinite(entry.maximumUsd) ||
-          entry.maximumUsd <= 0 ||
+          (!(opt.budgetPolicy === "provider-limit" && entry.maximumUsd === null) &&
+            (!Number.isFinite(entry.maximumUsd) || entry.maximumUsd <= 0)) ||
           entry.inputHash !==
             reviews.entries.find((review) => review.caseId === entry.caseId)?.inputHash,
       ))
@@ -485,6 +507,7 @@ export async function main(args = process.argv.slice(2)) {
       proxy = await createBudgetProxy({
         profiles: [profile],
         ceilingUsd: opt.budgetUsd,
+        budgetPolicy: opt.budgetPolicy,
         onRecord: (record) =>
           writeFile(
             join(output, "provider", `${record.id}.json`),
@@ -506,6 +529,7 @@ export async function main(args = process.argv.slice(2)) {
         opt.promptVariant,
       );
       manifest.policy.experimentCeilingUsd = proxy.budget.ceilingUsd;
+      manifest.policy.budgetPolicy = opt.budgetPolicy;
     }
     manifest.contentHash = hash(JSON.stringify(manifest));
     await save(join(output, "manifest.json"), manifest);

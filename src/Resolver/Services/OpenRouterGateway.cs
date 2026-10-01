@@ -70,7 +70,8 @@ public sealed class OpenRouterGateway(IHttpClientFactory clients, IConfiguration
         int modelInputBudgetBytes,
         int outputTokens,
         string promptVersion,
-        int maximumActions
+        int maximumActions,
+        object? contextPlanning = null
     ) =>
         Convert.ToHexStringLower(
             SHA256.HashData(
@@ -83,7 +84,8 @@ public sealed class OpenRouterGateway(IHttpClientFactory clients, IConfiguration
                             modelInputBudgetBytes,
                             outputTokens,
                             promptVersion,
-                            maximumActions
+                            maximumActions,
+                            contextPlanning
                         )
                     )
                 )
@@ -97,9 +99,11 @@ public sealed class OpenRouterGateway(IHttpClientFactory clients, IConfiguration
         int modelInputBudgetBytes,
         int outputTokens,
         string promptVersion,
-        int maximumActions
-    ) =>
-        new
+        int maximumActions,
+        object? contextPlanning = null
+    )
+    {
+        var description = new
         {
             strategy,
             promptVersion,
@@ -117,6 +121,14 @@ public sealed class OpenRouterGateway(IHttpClientFactory clients, IConfiguration
             maximumActions,
             request = CreateRequest(prompt, string.Empty, schema, outputTokens),
         };
+        if (contextPlanning is null)
+        {
+            return description;
+        }
+        var result = JsonSerializer.SerializeToNode(description)!;
+        result["contextPlanning"] = JsonSerializer.SerializeToNode(contextPlanning);
+        return result;
+    }
 
     private Dictionary<string, object> CreateRequest(string prompt, string input, JsonElement schema, int outputTokens)
     {

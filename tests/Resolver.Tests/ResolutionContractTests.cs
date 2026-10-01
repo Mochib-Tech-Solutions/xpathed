@@ -12,6 +12,484 @@ namespace Xpathed.Resolver.Tests;
 
 public sealed class ResolutionContractTests
 {
+    [Fact]
+    public async Task EvaluationContextPlanningOmitsOnlyConfidentlyUnneededEvidence()
+    {
+        var handler = new DeterministicServicesHandler
+        {
+            CaptureBody = CurrentViewCapture(),
+            ProviderBody = BilledSelection(),
+        };
+        await using var application = CreateApplication(
+            handler,
+            new Dictionary<string, string?> { ["Evaluation:ContextPlanning"] = "jev-v1" }
+        );
+        using var client = application.CreateClient();
+        client.DefaultRequestHeaders.Add("X-Xpathed-Attempt-Id", Guid.NewGuid().ToString("N"));
+        using var response = await client.PostAsJsonAsync(
+            "/internal/pages/page-1/resolve",
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                contractVersion = "4",
+            }
+        );
+        var envelope = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("found", envelope.GetProperty("result").GetProperty("outcome").GetString());
+        Assert.Equal(1, handler.DecisionRequestCount);
+        Assert.Equal("Click Save", handler.DecisionRequest.GetProperty("state").GetString());
+        using var input = JsonDocument.Parse(
+            handler.ModelRequest.GetProperty("messages")[1].GetProperty("content").GetString()!
+        );
+        var candidate = input.RootElement.GetProperty("candidates")[0];
+        Assert.Equal("button-save", candidate.GetProperty("id").GetString());
+        Assert.Equal("Save", candidate.GetProperty("label").GetString());
+        Assert.False(candidate.TryGetProperty("geometry", out _));
+        Assert.False(candidate.TryGetProperty("appearance", out _));
+        Assert.Equal(
+            "not_requested",
+            input.RootElement.GetProperty("evidenceAvailability").GetProperty("appearance").GetString()
+        );
+    }
+
+    [Theory]
+    [InlineData(0.99, 0.99, true, true, "classified")]
+    [InlineData(0.99, 0.01, true, false, "classified")]
+    [InlineData(0.01, 0.99, false, true, "classified")]
+    [InlineData(0.05, 0.05, false, false, "classified")]
+    [InlineData(0.01, 0.5, true, true, "fallback_uncertain")]
+    [InlineData(0.5, 0.01, true, true, "fallback_uncertain")]
+    [InlineData(-0.1, 0.01, true, true, "fallback_error")]
+    [InlineData(0.01, 1.1, true, true, "fallback_error")]
+    public async Task EvaluationContextPlanningPreservesCoreContextAndRecordsDecisions(
+        double appearance,
+        double layout,
+        bool keepsAppearance,
+        bool keepsGeometry,
+        string status
+    )
+    {
+        var capture = JsonNode.Parse(CurrentViewCapture())!;
+        var second = capture["candidates"]![0]!.DeepClone();
+        second["id"] = "second";
+        second["state"]!["enabled"] = false;
+        capture["candidates"]!.AsArray().Add(second);
+        capture["coverage"]!["capturedCount"] = 2;
+        capture["coverage"]!["eligibleCount"] = 2;
+        var body = JsonSerializer.Serialize(
+            new
+            {
+                model = "typesafe/jev-1.13-20260917",
+                provider = "TypeSafe",
+                answers = new
+                {
+                    appearance = new { type = "noul", noul = appearance },
+                    layout = new { type = "noul", noul = layout },
+                },
+            }
+        );
+        var originalInstruction = "Click Save above the red link 東京";
+        var control = new DeterministicServicesHandler
+        {
+            CaptureBody = capture.ToJsonString(),
+            ProviderBody = BilledSelection(),
+        };
+        var assisted = new DeterministicServicesHandler
+        {
+            CaptureBody = capture.ToJsonString(),
+            ProviderBody = BilledSelection(),
+            DecisionBody = body,
+        };
+        var baseline = await ResolveContextAsync(control, null, originalInstruction);
+        var result = await ResolveContextAsync(assisted, "jev-v1", originalInstruction);
+        Assert.Equal("found", result.GetProperty("result").GetProperty("outcome").GetString());
+        Assert.Equal(1, assisted.DecisionRequestCount);
+        Assert.Equal(1, assisted.ProviderRequestCount);
+        Assert.Equal("typesafe/jev-1.13", assisted.DecisionRequest.GetProperty("model").GetString());
+        Assert.Equal(originalInstruction, assisted.DecisionRequest.GetProperty("state").GetString());
+        Assert.Equal(2, assisted.DecisionRequest.GetProperty("questions").EnumerateObject().Count());
+        var before = JsonNode.Parse(
+            control.ModelRequest.GetProperty("messages")[1].GetProperty("content").GetString()!
+        )!;
+        var after = JsonNode.Parse(
+            assisted.ModelRequest.GetProperty("messages")[1].GetProperty("content").GetString()!
+        )!;
+        Assert.Equal(originalInstruction, after["instruction"]!.GetValue<string>());
+        Assert.Equal(2, after["candidates"]!.AsArray().Count);
+        foreach (var candidate in after["candidates"]!.AsArray())
+        {
+            Assert.Equal(keepsAppearance, candidate!.AsObject().ContainsKey("appearance"));
+            Assert.Equal(keepsGeometry, candidate.AsObject().ContainsKey("geometry"));
+        }
+        foreach (var input in new[] { before, after })
+        {
+            input.AsObject().Remove("evidenceAvailability");
+            foreach (var candidate in input["candidates"]!.AsArray())
+            {
+                candidate!.AsObject().Remove("appearance");
+                candidate.AsObject().Remove("geometry");
+            }
+        }
+        Assert.Equal(before.ToJsonString(), after.ToJsonString());
+        using var config = JsonDocument.Parse(
+            result.GetProperty("evidence").GetProperty("configurationJson").GetString()!
+        );
+        Assert.Equal(status, config.RootElement.GetProperty("contextPlanning").GetProperty("status").GetString());
+        Assert.Equal(
+            "jev-v1",
+            config
+                .RootElement.GetProperty("effective")
+                .GetProperty("contextPlanning")
+                .GetProperty("version")
+                .GetString()
+        );
+        Assert.NotEqual(
+            baseline.GetProperty("result").GetProperty("configurationId").GetString(),
+            result.GetProperty("result").GetProperty("configurationId").GetString()
+        );
+        Assert.Equal(
+            result.GetProperty("result").GetProperty("configurationId").GetString(),
+            Convert.ToHexStringLower(
+                System.Security.Cryptography.SHA256.HashData(
+                    System.Text.Encoding.UTF8.GetBytes(config.RootElement.GetProperty("effective").GetRawText())
+                )
+            )
+        );
+        Assert.DoesNotContain(originalInstruction, config.RootElement.GetRawText(), StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("{")]
+    [InlineData("null")]
+    [InlineData("{\"answers\":{}}")]
+    [InlineData(
+        "{\"answers\":{\"appearance\":{\"type\":\"noul\",\"score\":0},\"layout\":{\"type\":\"noul\",\"noul\":0}}}"
+    )]
+    public async Task EvaluationContextPlanningMalformedAnswersKeepFullEvidence(string body)
+    {
+        var handler = new DeterministicServicesHandler
+        {
+            CaptureBody = CurrentViewCapture(),
+            ProviderBody = BilledSelection(),
+            DecisionBody = body,
+        };
+        var result = await ResolveContextAsync(handler, "jev-v1", "Click Save");
+        Assert.Equal("found", result.GetProperty("result").GetProperty("outcome").GetString());
+        using var input = JsonDocument.Parse(
+            handler.ModelRequest.GetProperty("messages")[1].GetProperty("content").GetString()!
+        );
+        Assert.True(input.RootElement.GetProperty("candidates")[0].TryGetProperty("geometry", out _));
+        Assert.True(input.RootElement.GetProperty("candidates")[0].TryGetProperty("appearance", out _));
+    }
+
+    [Theory]
+    [InlineData("model")]
+    [InlineData("provider")]
+    [InlineData("extra_answer")]
+    [InlineData("extra_root")]
+    [InlineData("extra_probability")]
+    public async Task EvaluationContextPlanningUntrustedAnswersNeverRemoveEvidence(string problem)
+    {
+        var body = JsonNode.Parse(new DeterministicServicesHandler().DecisionBody)!;
+        switch (problem)
+        {
+            case "model":
+                body["model"] = "unexpected-model";
+                break;
+            case "provider":
+                body["provider"] = "unexpected-provider";
+                break;
+            case "extra_answer":
+                body["answers"]!["target"] = "button-save";
+                break;
+            case "extra_root":
+                body["prompt"] = "untrusted-provider-instruction";
+                break;
+            case "extra_probability":
+                body["answers"]!["appearance"]!["score"] = 0;
+                break;
+        }
+        var handler = new DeterministicServicesHandler
+        {
+            CaptureBody = CurrentViewCapture(),
+            ProviderBody = BilledSelection(),
+            DecisionBody = body.ToJsonString(),
+        };
+        var result = await ResolveContextAsync(handler, "jev-v1", "Click Save");
+        Assert.Equal("found", result.GetProperty("result").GetProperty("outcome").GetString());
+        using var input = JsonDocument.Parse(
+            handler.ModelRequest.GetProperty("messages")[1].GetProperty("content").GetString()!
+        );
+        Assert.True(input.RootElement.GetProperty("candidates")[0].TryGetProperty("geometry", out _));
+        Assert.True(input.RootElement.GetProperty("candidates")[0].TryGetProperty("appearance", out _));
+        Assert.DoesNotContain(
+            "untrusted-provider-instruction",
+            handler.ModelRequest.GetRawText(),
+            StringComparison.Ordinal
+        );
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task EvaluationContextPlanningIsDisabledForPublicRequests(bool enabled)
+    {
+        var handler = new DeterministicServicesHandler
+        {
+            CaptureBody = CurrentViewCapture(),
+            ProviderBody = BilledSelection(),
+        };
+        var result = await ResolveContextAsync(handler, enabled ? "jev-v1" : null, "Click Save", false);
+        Assert.Equal("found", result.GetProperty("outcome").GetString());
+        Assert.Equal(0, handler.DecisionRequestCount);
+        using var input = JsonDocument.Parse(
+            handler.ModelRequest.GetProperty("messages")[1].GetProperty("content").GetString()!
+        );
+        Assert.False(input.RootElement.TryGetProperty("evidenceAvailability", out _));
+        Assert.True(input.RootElement.GetProperty("candidates")[0].TryGetProperty("appearance", out _));
+        Assert.DoesNotContain("jev-v1", handler.ModelRequest.GetRawText(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task EvaluationContextPlanningFailureDoesNotRetryOrChangeTheLlmModel()
+    {
+        var calls = 0;
+        var handler = new DeterministicServicesHandler
+        {
+            CaptureBody = CurrentViewCapture(),
+            ProviderBody = BilledSelection(),
+            BeforeRespondAsync = (path, _) =>
+            {
+                if (path == "/api/alpha/decisions")
+                {
+                    calls++;
+                    throw new HttpRequestException();
+                }
+                return Task.CompletedTask;
+            },
+        };
+        var result = await ResolveContextAsync(handler, "jev-v1", "Click Save");
+        Assert.Equal("found", result.GetProperty("result").GetProperty("outcome").GetString());
+        Assert.Equal(1, calls);
+        Assert.Equal(1, handler.ProviderRequestCount);
+        Assert.Equal("deepseek/deepseek-v4.1-flash", handler.ModelRequest.GetProperty("model").GetString());
+        using var input = JsonDocument.Parse(
+            handler.ModelRequest.GetProperty("messages")[1].GetProperty("content").GetString()!
+        );
+        Assert.True(input.RootElement.GetProperty("candidates")[0].TryGetProperty("geometry", out _));
+        Assert.True(input.RootElement.GetProperty("candidates")[0].TryGetProperty("appearance", out _));
+    }
+
+    [Fact]
+    public async Task EvaluationContextPlanningKeepsTheSamePolicyIdentityAcrossChoices()
+    {
+        var first = await ResolveContextAsync(
+            new DeterministicServicesHandler { CaptureBody = CurrentViewCapture(), ProviderBody = BilledSelection() },
+            "jev-v1",
+            "Click Save"
+        );
+        var second = await ResolveContextAsync(
+            new DeterministicServicesHandler
+            {
+                CaptureBody = CurrentViewCapture(),
+                ProviderBody = BilledSelection(),
+                DecisionBody = new DeterministicServicesHandler()
+                    .DecisionBody.Replace("0.01", "0.99", StringComparison.Ordinal)
+                    .Replace("0.02", "0.99", StringComparison.Ordinal),
+            },
+            "jev-v1",
+            "Click Save"
+        );
+        Assert.Equal(
+            first.GetProperty("result").GetProperty("configurationId").GetString(),
+            second.GetProperty("result").GetProperty("configurationId").GetString()
+        );
+    }
+
+    [Fact]
+    public async Task EvaluationContextPlanningDoesNotApplyToLegacyDiagnosticContracts()
+    {
+        var handler = new DeterministicServicesHandler { ProviderBody = BilledSelection() };
+        await using var application = CreateApplication(
+            handler,
+            new Dictionary<string, string?> { ["Evaluation:ContextPlanning"] = "jev-v1" }
+        );
+        using var client = application.CreateClient();
+        client.DefaultRequestHeaders.Add("X-Xpathed-Attempt-Id", Guid.NewGuid().ToString("N"));
+        using var response = await client.PostAsJsonAsync(
+            "/internal/pages/page-1/resolve",
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                contractVersion = "3",
+            }
+        );
+        var result = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("found", result.GetProperty("result").GetProperty("outcome").GetString());
+        Assert.Equal(0, handler.DecisionRequestCount);
+        Assert.DoesNotContain(
+            "contextPlanning",
+            result.GetProperty("evidence").GetProperty("configurationJson").GetString(),
+            StringComparison.Ordinal
+        );
+    }
+
+    [Fact]
+    public async Task EvaluationContextPlanningTimingIsSeparateFromTheFinalModelAndValidation()
+    {
+        var handler = new DeterministicServicesHandler
+        {
+            CaptureBody = CurrentViewCapture(),
+            ProviderBody = BilledSelection(),
+            BeforeRespondAsync = async (path, token) =>
+            {
+                if (path == "/api/alpha/decisions")
+                {
+                    await Task.Delay(TimeSpan.FromMilliseconds(200), token);
+                }
+            },
+        };
+        var envelope = await ResolveContextAsync(handler, "jev-v1", "Click Save");
+        var timings = envelope.GetProperty("result").GetProperty("diagnostics").GetProperty("timingsMs");
+        using var config = JsonDocument.Parse(
+            envelope.GetProperty("evidence").GetProperty("configurationJson").GetString()!
+        );
+        var classification = config.RootElement.GetProperty("contextPlanning").GetProperty("elapsedMs").GetDouble();
+        var planning = timings.GetProperty("planning").GetDouble();
+        Assert.True(planning >= classification);
+        Assert.True(timings.GetProperty("model").GetDouble() < planning);
+        var stages =
+            timings.GetProperty("capture").GetDouble()
+            + planning
+            + timings.GetProperty("model").GetDouble()
+            + timings.GetProperty("validation").GetDouble();
+        Assert.True(stages <= timings.GetProperty("total").GetDouble());
+        var baseline = await ResolveContextAsync(
+            new DeterministicServicesHandler { CaptureBody = CurrentViewCapture(), ProviderBody = BilledSelection() },
+            null,
+            "Click Save"
+        );
+        Assert.False(
+            baseline
+                .GetProperty("result")
+                .GetProperty("diagnostics")
+                .GetProperty("timingsMs")
+                .TryGetProperty("planning", out _)
+        );
+    }
+
+    [Fact]
+    public async Task EvaluationContextPlanningDeadlinePreservesTheCompletedCaptureTiming()
+    {
+        var handler = new DeterministicServicesHandler
+        {
+            CaptureBody = CurrentViewCapture(),
+            ProviderBody = BilledSelection(),
+            BeforeRespondAsync = async (path, token) =>
+            {
+                if (path == "/pages/page-1/capture")
+                {
+                    await Task.Delay(TimeSpan.FromMilliseconds(1700), token);
+                }
+                if (path == "/api/alpha/decisions")
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(10), token);
+                }
+            },
+        };
+        var envelope = await ResolveContextAsync(handler, "jev-v1", "Click Save");
+        var diagnostics = envelope.GetProperty("result").GetProperty("diagnostics");
+        Assert.Equal("resolution_timeout", diagnostics.GetProperty("code").GetString());
+        Assert.Equal("planning", diagnostics.GetProperty("stage").GetString());
+        Assert.Equal(0, handler.ProviderRequestCount);
+        var timings = diagnostics.GetProperty("timingsMs");
+        Assert.True(timings.GetProperty("planning").GetDouble() > 0);
+        Assert.False(timings.TryGetProperty("model", out _));
+        var stages = timings.GetProperty("capture").GetDouble() + timings.GetProperty("planning").GetDouble();
+        Assert.True(stages <= timings.GetProperty("total").GetDouble());
+    }
+
+    [Fact]
+    public async Task EvaluationContextPlanningTimeoutFallsBackWithinTheOriginalDeadline()
+    {
+        var handler = new DeterministicServicesHandler
+        {
+            CaptureBody = CurrentViewCapture(),
+            ProviderBody = BilledSelection(),
+            BeforeRespondAsync = async (path, token) =>
+            {
+                if (path == "/api/alpha/decisions")
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(10), token);
+                }
+                if (path == "/pages/page-1/selections")
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(2), token);
+                }
+            },
+        };
+        var result = await ResolveContextAsync(handler, "jev-v1", "Click Save");
+        Assert.Equal(
+            "resolution_timeout",
+            result.GetProperty("result").GetProperty("diagnostics").GetProperty("code").GetString()
+        );
+        Assert.InRange(
+            result
+                .GetProperty("result")
+                .GetProperty("diagnostics")
+                .GetProperty("timingsMs")
+                .GetProperty("total")
+                .GetDouble(),
+            1800,
+            2500
+        );
+        using var config = JsonDocument.Parse(
+            result.GetProperty("evidence").GetProperty("configurationJson").GetString()!
+        );
+        Assert.Equal(
+            "fallback_timeout",
+            config.RootElement.GetProperty("contextPlanning").GetProperty("status").GetString()
+        );
+        Assert.Equal(1, handler.ProviderRequestCount);
+    }
+
+    [Fact]
+    public async Task EvaluationContextPlanningRejectsUnknownStartupMode()
+    {
+        await using var application = CreateApplication(
+            new DeterministicServicesHandler(),
+            new Dictionary<string, string?> { ["Evaluation:ContextPlanning"] = "unknown" }
+        );
+        Assert.Throws<InvalidOperationException>(() => application.CreateClient());
+    }
+
+    private static async Task<JsonElement> ResolveContextAsync(
+        DeterministicServicesHandler handler,
+        string? mode,
+        string instruction,
+        bool diagnostic = true
+    )
+    {
+        await using var application = CreateApplication(
+            handler,
+            new Dictionary<string, string?> { ["Evaluation:ContextPlanning"] = mode }
+        );
+        using var client = application.CreateClient();
+        client.DefaultRequestHeaders.Add("X-Xpathed-Attempt-Id", Guid.NewGuid().ToString("N"));
+        using var response = await client.PostAsJsonAsync(
+            (diagnostic ? "/internal" : "") + "/pages/page-1/resolve",
+            new
+            {
+                instruction,
+                documentId = "document-1",
+                contractVersion = "4",
+            }
+        );
+        return await response.Content.ReadFromJsonAsync<JsonElement>();
+    }
+
     [Theory]
     [InlineData(1, 1, 2, 2, true)]
     [InlineData(0, 1, 1, 1, true)]

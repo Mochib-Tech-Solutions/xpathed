@@ -53,19 +53,50 @@ public sealed partial class ResolutionService(
     )
     {
         string? input = null;
+        object? planningEvidence = null;
+        var assisted = request.ContractVersion == "4" && configuration["Evaluation:ContextPlanning"] == "jev-v1";
+        var effectivePrompt =
+            PromptFor(request.ContractVersion) + (assisted ? ContextPlanner.PromptSuffix : string.Empty);
         var result = await ResolveCoreAsync(
             pageId,
             request,
             traceId,
             cancellationToken,
             attemptId,
-            value => input = value
+            value => input = value,
+            assisted ? value => planningEvidence = value : null
         );
         var multiple = request.ContractVersion is "2" or "3" or "4";
         var sensitive =
             DiagnosticSanitizer.IsSensitiveInstruction(request.Instruction)
             || DiagnosticSanitizer.IsSensitiveAction(result.Action)
             || result.Actions?.Any(action => DiagnosticSanitizer.IsSensitiveAction(action.Action)) == true;
+        var evidenceConfiguration = JsonSerializer.SerializeToNode(
+            new
+            {
+                gateway.Model,
+                gateway.Provider,
+                result.ConfigurationId,
+                result.Diagnostics.Strategy,
+                result.Diagnostics.PromptVersion,
+                result.Diagnostics.ModelInputBudgetBytes,
+                outputTokens = multiple ? ActionSelectionStrategy.OutputTokens : 512,
+                effective = gateway.DescribeConfiguration(
+                    result.Diagnostics.Strategy,
+                    effectivePrompt,
+                    SchemaFor(request.ContractVersion),
+                    result.Diagnostics.ModelInputBudgetBytes,
+                    multiple ? ActionSelectionStrategy.OutputTokens : 512,
+                    result.Diagnostics.PromptVersion,
+                    multiple ? ActionSelectionStrategy.MaximumActions : 1,
+                    assisted ? ContextPlanner.Policy : null
+                ),
+            }
+        )!;
+        if (assisted)
+        {
+            evidenceConfiguration["contextPlanning"] = JsonSerializer.SerializeToNode(planningEvidence);
+        }
         var evidence = new ResolutionEvidence(
             "1",
             sensitive ? "withheld_sensitive_instruction"
@@ -73,31 +104,9 @@ public sealed partial class ResolutionService(
                 : "sanitized",
             sensitive ? DiagnosticSanitizer.Redacted : DiagnosticSanitizer.RedactInstruction(request.Instruction),
             sensitive || input is null ? null : DiagnosticSanitizer.SanitizeJson(input),
-            PromptFor(request.ContractVersion),
+            effectivePrompt,
             SchemaFor(request.ContractVersion).GetRawText(),
-            DiagnosticSanitizer.SanitizeJson(
-                JsonSerializer.Serialize(
-                    new
-                    {
-                        gateway.Model,
-                        gateway.Provider,
-                        result.ConfigurationId,
-                        result.Diagnostics.Strategy,
-                        result.Diagnostics.PromptVersion,
-                        result.Diagnostics.ModelInputBudgetBytes,
-                        outputTokens = multiple ? ActionSelectionStrategy.OutputTokens : 512,
-                        effective = gateway.DescribeConfiguration(
-                            result.Diagnostics.Strategy,
-                            PromptFor(request.ContractVersion),
-                            SchemaFor(request.ContractVersion),
-                            result.Diagnostics.ModelInputBudgetBytes,
-                            multiple ? ActionSelectionStrategy.OutputTokens : 512,
-                            result.Diagnostics.PromptVersion,
-                            multiple ? ActionSelectionStrategy.MaximumActions : 1
-                        ),
-                    }
-                )
-            )
+            DiagnosticSanitizer.SanitizeJson(evidenceConfiguration.ToJsonString())
         );
         return new DiagnosticResolution(result, evidence);
     }
@@ -108,7 +117,8 @@ public sealed partial class ResolutionService(
         string traceId,
         CancellationToken cancellationToken,
         string? suppliedAttemptId = null,
-        Action<string>? observeInput = null
+        Action<string>? observeInput = null,
+        Action<object>? observePlanning = null
     )
     {
         var timer = Stopwatch.StartNew();
@@ -125,7 +135,8 @@ public sealed partial class ResolutionService(
         var providerCompleted = false;
         var multiple = request.ContractVersion is "2" or "3" or "4";
         var singleInteraction = request.ContractVersion is "3" or "4";
-        var prompt = PromptFor(request.ContractVersion);
+        var assisted = observePlanning is not null;
+        var prompt = PromptFor(request.ContractVersion) + (assisted ? ContextPlanner.PromptSuffix : string.Empty);
         var schema = SchemaFor(request.ContractVersion);
         var outputTokens = multiple ? ActionSelectionStrategy.OutputTokens : 512;
         var strategy = configuration["Resolution:Strategy"] ?? "candidate-selection-v1";
@@ -146,7 +157,8 @@ public sealed partial class ResolutionService(
             diagnostics.ModelInputBudgetBytes,
             outputTokens,
             diagnostics.PromptVersion,
-            multiple ? ActionSelectionStrategy.MaximumActions : 1
+            multiple ? ActionSelectionStrategy.MaximumActions : 1,
+            assisted ? ContextPlanner.Policy : null
         );
         try
         {
@@ -240,7 +252,27 @@ public sealed partial class ResolutionService(
                     "The browser returned inconsistent candidates or coverage."
                 );
             }
-            var input = CandidateSelectionStrategy.PrepareInput(request.Instruction, capture);
+            ContextEvidenceSelection? evidenceSelection = null;
+            if (assisted)
+            {
+                diagnostics = diagnostics with { Stage = "planning" };
+                var planningStarted = timer.Elapsed.TotalMilliseconds;
+                try
+                {
+                    var planning = await new ContextPlanner(clients, configuration).PlanAsync(
+                        request.Instruction,
+                        cancellationToken
+                    );
+                    evidenceSelection = planning.Selection;
+                    observePlanning!(planning.Evidence);
+                    cancellationToken.ThrowIfCancellationRequested();
+                }
+                finally
+                {
+                    diagnostics.TimingsMs["planning"] = timer.Elapsed.TotalMilliseconds - planningStarted;
+                }
+            }
+            var input = CandidateSelectionStrategy.PrepareInput(request.Instruction, capture, evidenceSelection);
             diagnostics = diagnostics with
             {
                 Stage = "model",
@@ -331,7 +363,10 @@ public sealed partial class ResolutionService(
                             : "unavailable"
                         : null,
             };
-            diagnostics.TimingsMs["model"] = timer.Elapsed.TotalMilliseconds - diagnostics.TimingsMs["capture"];
+            diagnostics.TimingsMs["model"] =
+                timer.Elapsed.TotalMilliseconds
+                - diagnostics.TimingsMs["capture"]
+                - diagnostics.TimingsMs.GetValueOrDefault("planning");
             if (completion.Diagnostics.Code is { } code)
             {
                 throw new ApiException(502, code, "OpenRouter could not return a valid selection.");
@@ -439,7 +474,10 @@ public sealed partial class ResolutionService(
                     throw new ApiException(502, "invalid_browser_selection", "The browser inspected another action.");
                 }
                 diagnostics.TimingsMs["validation"] =
-                    timer.Elapsed.TotalMilliseconds - diagnostics.TimingsMs["capture"] - diagnostics.TimingsMs["model"];
+                    timer.Elapsed.TotalMilliseconds
+                    - diagnostics.TimingsMs["capture"]
+                    - diagnostics.TimingsMs["model"]
+                    - diagnostics.TimingsMs.GetValueOrDefault("planning");
                 diagnostics = diagnostics with { Stage = "complete" };
                 var outcomes = results.Select(item => item.Outcome).Distinct().ToArray();
                 var outcome = outcomes.Length == 1 ? outcomes[0] : "partial";
@@ -497,7 +535,10 @@ public sealed partial class ResolutionService(
                 );
             }
             diagnostics.TimingsMs["validation"] =
-                timer.Elapsed.TotalMilliseconds - diagnostics.TimingsMs["capture"] - diagnostics.TimingsMs["model"];
+                timer.Elapsed.TotalMilliseconds
+                - diagnostics.TimingsMs["capture"]
+                - diagnostics.TimingsMs["model"]
+                - diagnostics.TimingsMs.GetValueOrDefault("planning");
             diagnostics = diagnostics with { Stage = "complete" };
             if (selection.Outcome == "not_found" && capture.UnsupportedBoundaryCount > 0)
             {
@@ -563,7 +604,8 @@ public sealed partial class ResolutionService(
                 diagnostics.TimingsMs[stage] =
                     timer.Elapsed.TotalMilliseconds
                     - (stage == "capture" ? 0 : diagnostics.TimingsMs.GetValueOrDefault("capture"))
-                    - (stage == "validation" ? diagnostics.TimingsMs.GetValueOrDefault("model") : 0);
+                    - (stage == "validation" ? diagnostics.TimingsMs.GetValueOrDefault("model") : 0)
+                    - (stage == "capture" ? 0 : diagnostics.TimingsMs.GetValueOrDefault("planning"));
             }
             diagnostics = diagnostics with { Code = code, Message = message };
             LogFailure(logger, diagnostics.Stage, code, "error", traceId, attemptId, configurationId, attemptId);
