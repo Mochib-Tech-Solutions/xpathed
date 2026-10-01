@@ -33,9 +33,14 @@ function declaredProfiles(profiles) {
     const allowed =
       profile?.id === "deepseek-deepinfra" && profile.model === model
         ? { provider: "deepinfra/fp8", reasoning: { enabled: false } }
-        : approved[profile?.model];
+        : profile?.id === "luna-azure" && profile.model === "openai/gpt-6-luna"
+          ? { provider: "azure", reasoning: { effort: "none" } }
+          : approved[profile?.model];
     if (
       !allowed ||
+      (profile.id === "luna-azure" &&
+        (profile.model !== "openai/gpt-6-luna" ||
+          !equal(profile.promptCacheOptions, { mode: "explicit" }))) ||
       typeof profile.id !== "string" ||
       !profile.id ||
       ids.has(profile.id) ||
@@ -51,7 +56,12 @@ function declaredProfiles(profiles) {
     )
       throw new Error("Unapproved model, route, reasoning or output profile");
     ids.add(profile.id);
-    return { ...profile, strict, endpointPath: `/models/${profile.model}/endpoints` };
+    return {
+      ...profile,
+      strict,
+      outputLimitParameter: profile.id === "luna-azure" ? "max_completion_tokens" : "max_tokens",
+      endpointPath: `/models/${profile.model}/endpoints`,
+    };
   });
 }
 
@@ -191,6 +201,12 @@ function boundedRequest(body, profile) {
   )
     throw new Error("Prompt caching must match the approved profile");
   if (
+    body.max_tokens != null &&
+    body.max_completion_tokens != null &&
+    body.max_tokens !== body.max_completion_tokens
+  )
+    throw new Error("Output limit aliases must agree");
+  if (
     profile.maxTokens != null &&
     (body.max_tokens ?? body.max_completion_tokens) !== profile.maxTokens
   )
@@ -268,13 +284,17 @@ function boundedRequest(body, profile) {
     plugins: [{ id: "context-compression", enabled: false }],
   };
   delete request.max_completion_tokens;
+  if (profile.outputLimitParameter === "max_completion_tokens") {
+    request.max_completion_tokens = request.max_tokens;
+    delete request.max_tokens;
+  }
   return request;
 }
 
 function maximumCharge(body, pricing) {
   return (
     ((Buffer.byteLength(JSON.stringify(body)) + 16384) * pricing.prompt +
-      body.max_tokens * pricing.completion +
+      (body.max_tokens ?? body.max_completion_tokens) * pricing.completion +
       pricing.request) *
     1.2
   );
@@ -386,8 +406,8 @@ export async function createBudgetProxy({
       ];
       if (
         profile.strict &&
-        !["response_format", "structured_outputs", "reasoning", "max_tokens"].every((parameter) =>
-          profile.endpoint.supported_parameters?.includes(parameter),
+        !["response_format", "structured_outputs", "reasoning", profile.outputLimitParameter].every(
+          (parameter) => profile.endpoint.supported_parameters?.includes(parameter),
         )
       )
         throw new Error("Approved route does not advertise the required parameters");
