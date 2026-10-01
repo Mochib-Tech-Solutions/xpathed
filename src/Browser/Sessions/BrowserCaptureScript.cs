@@ -6,6 +6,12 @@ internal static class BrowserCaptureScript
         async identity => {
           let environment = JSON.parse(identity.environment);
           const frame = JSON.parse(identity.frame);
+          const currentView = identity.scope === 'current_view';
+          const viewport = () => [innerWidth, innerHeight, scrollX, scrollY, visualViewport?.offsetLeft ?? 0, visualViewport?.offsetTop ?? 0, visualViewport?.scale ?? 1];
+          const initialViewport = currentView ? viewport() : [];
+          const scrollContainers = [];
+          const viewUnchanged = () => !currentView || viewport().every((value, index) => value === initialViewport[index]) &&
+            scrollContainers.every(([element, x, y, width, height]) => element.isConnected && element.scrollLeft === x && element.scrollTop === y && element.clientWidth === width && element.clientHeight === height);
           const capturedDocument = document;
           const capturedRoot = document.documentElement;
           const budgetExceeded = {};
@@ -167,6 +173,7 @@ internal static class BrowserCaptureScript
               right: environment.x + (rect.x + rect.width) * environment.scaleX, bottom: environment.y + (rect.y + rect.height) * environment.scaleY });
           };
           const pointFor = element => { const clip = visibleRect(element); return { x: (clip.left + clip.right) / 2, y: (clip.top + clip.bottom) / 2 }; };
+          const inView = element => { const rect = visibleRect(element); return rect.right > rect.left && rect.bottom > rect.top; };
           const receivesPoint = (element, point) => {
             const hit = document.elementFromPoint((point.x - environment.x) / environment.scaleX, (point.y - environment.y) / environment.scaleY);
             return !!hit && (hit === element || element.contains(hit));
@@ -235,15 +242,54 @@ internal static class BrowserCaptureScript
             return element.matches('a[href],button,input,select,textarea,summary,img[alt],[aria-label],[aria-labelledby],[role],[tabindex],[contenteditable]:not([contenteditable="false"])') ||
               (!element.closest('button,a,textarea,select,[contenteditable]:not([contenteditable="false"])') && [...element.childNodes].some(node => node.nodeType === Node.TEXT_NODE && normalize(node.textContent)));
           };
+          const complexEffects = element => {
+            if (environment.complexEffects) return true;
+            for (let ancestor = element; ancestor; ancestor = ancestor.parentElement) {
+              checkBudget();
+              const style = cssFor(ancestor);
+              if (Number(style.opacity) !== 1 || style.filter !== 'none' || style.mixBlendMode !== 'normal' ||
+                style.backdropFilter && style.backdropFilter !== 'none' || style.maskImage && style.maskImage !== 'none') {
+                return true;
+              }
+            }
+            return false;
+          };
+          const appearance = element => {
+            const css = cssFor(element);
+            const limitations = complexEffects(element) ? ['complex_effects'] : [];
+            if (css.backgroundImage !== 'none') limitations.push('background_image');
+            if (element.matches('img,svg,canvas,video,object,embed') || element.querySelector('img,svg,canvas,video,object,embed')) limitations.push('replaced_content');
+            if (['::before','::after'].some(pseudo => {
+              const style = getComputedStyle(element, pseudo);
+              return !['none','normal'].includes(style.content) && style.display !== 'none';
+            })) limitations.push('pseudo_element_appearance');
+            if (limitations.length) return { backgroundColor:null, textColor:null, borderColor:null, limitations };
+            const opaqueColor = value => {
+              if (/^rgb\(\d{1,3}, \d{1,3}, \d{1,3}\)$/u.test(value)) return value;
+              if (value === 'rgba(0, 0, 0, 0)') return null;
+              if (!limitations.includes('unsupported_color')) limitations.push('unsupported_color');
+              return null;
+            };
+            const backgroundColor = opaqueColor(css.backgroundColor);
+            if (css.backgroundColor === 'rgba(0, 0, 0, 0)') limitations.push('background_transparent');
+            const textColor = opaqueColor(css.color);
+            const sides = ['Top','Right','Bottom','Left'].filter(side => Number.parseFloat(css[`border${side}Width`]) > 0 && !['none','hidden'].includes(css[`border${side}Style`]));
+            const borders = [...new Set(sides.map(side => css[`border${side}Color`]))];
+            const borderColor = borders.length === 1 ? opaqueColor(borders[0]) : null;
+            if (borders.length > 1) limitations.push('mixed_border_colors');
+            return { backgroundColor, textColor, borderColor, limitations };
+          };
           const describe = (element, index) => ({
             id: `${frame.id}:c${index + 1}`, frame, tag: element.localName, role: role(element), text: text(element),
             label: label(element), placeholder: normalize(element.getAttribute('placeholder')), scope: [...new Set([...scope(element), ...(environment.scope ?? [])])],
-            state: { ...state(element), checked: null, selected: null, selectedOptionCount: null }, geometry: geometry(element)
+            state: { ...state(element), checked: null, selected: null, selectedOptionCount: null }, geometry: geometry(element),
+            ...(currentView ? { appearance: appearance(element) } : {})
           });
           const nodes = [];
           const frameElements = [];
+          const shadowHosts = [];
           const candidates = [];
-          let scannedCount = 0, eligibleCount = 0, unsupportedBoundaryCount = 0, bytes = 2, complete = !modalityUnknown;
+          let scannedCount = 0, eligibleCount = 0, excludedOffscreenCount = 0, unsupportedBoundaryCount = 0, bytes = 2, complete = !modalityUnknown, viewChanged = false;
           const walker = document.createTreeWalker(document, NodeFilter.SHOW_ELEMENT);
           try {
             while (walker.nextNode()) {
@@ -251,16 +297,40 @@ internal static class BrowserCaptureScript
               if (scannedCount === 20000) throw budgetExceeded;
               scannedCount++;
               const element = walker.currentNode;
-              if (element.shadowRoot && accessibilityExposed(element)) unsupportedBoundaryCount++;
+              if (currentView && (element.scrollWidth > element.clientWidth || element.scrollHeight > element.clientHeight))
+                scrollContainers.push([element, element.scrollLeft, element.scrollTop, element.clientWidth, element.clientHeight]);
+              if (element.shadowRoot && accessibilityExposed(element)) {
+                if (currentView) shadowHosts.push(element); else unsupportedBoundaryCount++;
+              }
               if (element.matches('iframe,frame') && accessibilityExposed(element)) frameElements.push(element);
               if (!eligible(element)) continue;
               eligibleCount++;
-              if (eligibleCount > 2000) complete = false;
+              if (!currentView && eligibleCount > 2000) complete = false;
               if (!complete) continue;
               nodes.push(element);
             }
             if (complete) {
-              await observeIntersections([...nodes, ...frameElements]);
+              await observeIntersections([...nodes, ...frameElements, ...shadowHosts, ...scrollContainers.map(([element]) => element)]);
+              if (!viewUnchanged()) { viewChanged = true; throw budgetExceeded; }
+              if (currentView) unsupportedBoundaryCount = shadowHosts.filter(inView).length;
+              if (currentView) {
+                const retained = nodes.filter(inView);
+                excludedOffscreenCount = nodes.length - retained.length;
+                nodes.length = 0; nodes.push(...retained);
+                const retainedFrames = frameElements.filter(inView);
+                frameElements.length = 0; frameElements.push(...retainedFrames);
+                const relevantAncestors = new Set();
+                for (const node of [...nodes, ...frameElements]) {
+                  for (let ancestor = node.parentElement; ancestor && !relevantAncestors.has(ancestor); ancestor = ancestor.parentElement) {
+                    checkBudget(); relevantAncestors.add(ancestor);
+                  }
+                }
+                for (let index = scrollContainers.length - 1; index >= 0; index--) {
+                  const [element] = scrollContainers[index];
+                  if (!inView(element) && !relevantAncestors.has(element)) scrollContainers.splice(index, 1);
+                }
+                if (nodes.length > 2000) throw budgetExceeded;
+              }
               for (const element of nodes) {
                 checkBudget();
                 const candidate = describe(element, candidates.length);
@@ -365,7 +435,9 @@ internal static class BrowserCaptureScript
               try {
                 environment = value ? JSON.parse(value) : { x:0, y:0, scaleX:1, scaleY:1, exposed:true, rendered:true, clip:{left:0,top:0,right:innerWidth,bottom:innerHeight} };
                 reset(budgetMs);
+                if (!viewUnchanged()) return { errorCode: 'stale_capture' };
                 await observeIntersections([...nodes, ...frameElements]);
+                if (!viewUnchanged()) return { errorCode: 'stale_capture' };
                 return {};
               } catch (error) { if (error === budgetExceeded) return { errorCode: 'validation_budget_exceeded' }; throw error; }
             },
@@ -393,11 +465,12 @@ internal static class BrowserCaptureScript
                 environment: { scope: [...new Set([...scope(element), ...(environment.scope ?? [])])], x: rect.x + element.clientLeft * scaleX, y: rect.y + element.clientTop * scaleY, scaleX: scaleX || 1, scaleY: scaleY || 1,
                   clip: intersection(visibleRect(element), { left: rect.x + element.clientLeft * scaleX, top: rect.y + element.clientTop * scaleY,
                     right: rect.x + (element.clientLeft + element.clientWidth) * scaleX, bottom: rect.y + (element.clientTop + element.clientHeight) * scaleY }),
-                  exposed: accessibilityExposed(element), rendered: rendered(element), enabled: state(element).enabled, geometrySupported } };
+                  exposed: accessibilityExposed(element), rendered: rendered(element), enabled: state(element).enabled, geometrySupported,
+                  ...(currentView ? { complexEffects: complexEffects(element) } : {}) } };
               } catch (error) { if (error === budgetExceeded) return { errorCode: 'capture_budget_exceeded' }; throw error; }
             },
-            data: { sessionId: identity.sessionId, pageId: identity.pageId, documentId: identity.documentId, captureId: identity.captureId, frameId: frame.id, capturedAt: new Date().toISOString(), candidates,
-              coverage: { scannedCount, eligibleCount, capturedCount: candidates.length, complete, errorCode: complete ? null : modalityUnknown ? 'capture_exposure_unknown' : 'capture_budget_exceeded' }, unsupportedBoundaryCount },
+            data: { sessionId: identity.sessionId, pageId: identity.pageId, documentId: identity.documentId, captureId: identity.captureId, frameId: frame.id, capturedAt: new Date().toISOString(), candidates, scope: identity.scope,
+              coverage: { scannedCount, eligibleCount, excludedOffscreenCount, capturedCount: candidates.length, complete, errorCode: complete ? null : viewChanged ? 'capture_view_changed' : modalityUnknown ? 'capture_exposure_unknown' : 'capture_budget_exceeded' }, unsupportedBoundaryCount },
             select(candidateId, action, budgetMs = 2000) {
               try {
               deadline = performance.now() + budgetMs;
@@ -406,12 +479,14 @@ internal static class BrowserCaptureScript
               if (modalityUnknown) return { errorCode: 'capture_exposure_unknown' };
               if (capturedDocument !== document) return { errorCode: 'stale_document' };
               if (!complete) return { errorCode: 'capture_budget_exceeded' };
+              if (!viewUnchanged()) return { errorCode: 'stale_capture' };
               if (document.documentElement !== capturedRoot || nodes.some(node => !node.isConnected || node.ownerDocument !== document)) return { errorCode: 'stale_capture' };
               if (candidateId === null) return { target: null };
               const index = candidates.findIndex(candidate => candidate.id === candidateId);
               if (index < 0) return { errorCode: 'unknown_candidate' };
               const element = nodes[index];
               if (!element.isConnected || !accessibilityExposed(element)) return { errorCode: 'stale_capture' };
+              if (currentView && !inView(element)) return { errorCode: 'stale_capture' };
               const xpaths = xpathsFor(element);
               if (!xpaths.length) return { errorCode: 'xpath_validation_failed' };
               return { target: { candidateId, frame, tag: element.localName, role: role(element), accessibleName: label(element), label: candidates[index].label || candidates[index].text,

@@ -6,7 +6,7 @@ using Xpathed.Common.Http;
 
 namespace Xpathed.Browser.Sessions;
 
-internal sealed class BrowserPageCapture(BrowserPageRuntime page) : IAsyncDisposable
+internal sealed class BrowserPageCapture(BrowserPageRuntime page, string scope) : IAsyncDisposable
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly List<BrowserFrameCapture> frames = [];
@@ -18,6 +18,7 @@ internal sealed class BrowserPageCapture(BrowserPageRuntime page) : IAsyncDispos
         var candidates = new List<CandidateElement>();
         var scanned = 0;
         var eligible = 0;
+        var excludedOffscreen = 0;
         var unsupported = 0;
         string? error = null;
         var environment = await page.Page.EvaluateAsync<JsonElement>(
@@ -37,8 +38,9 @@ internal sealed class BrowserPageCapture(BrowserPageRuntime page) : IAsyncDispos
             "main",
             DateTimeOffset.UtcNow,
             complete ? [.. candidates] : [],
-            new CaptureCoverage(scanned, eligible, complete ? candidates.Count : 0, complete, error),
-            unsupported
+            new CaptureCoverage(scanned, eligible, complete ? candidates.Count : 0, complete, error, excludedOffscreen),
+            unsupported,
+            scope
         );
 
         async Task VisitAsync(
@@ -66,6 +68,7 @@ internal sealed class BrowserPageCapture(BrowserPageRuntime page) : IAsyncDispos
                     pageId = page.Id,
                     documentId,
                     captureId,
+                    scope,
                     frame = JsonSerializer.Serialize(identity, JsonOptions),
                     environment = environment.GetRawText(),
                     budgetMs = 2000 - timer.ElapsedMilliseconds,
@@ -77,13 +80,14 @@ internal sealed class BrowserPageCapture(BrowserPageRuntime page) : IAsyncDispos
             var result = JsonSerializer.Deserialize<CandidateCapture>(data, JsonOptions)!;
             scanned += result.Coverage.ScannedCount;
             eligible += result.Coverage.EligibleCount;
+            excludedOffscreen += result.Coverage.ExcludedOffscreenCount;
             unsupported += result.UnsupportedBoundaryCount;
             candidates.AddRange(result.Candidates);
             captured.CandidateIds.UnionWith(result.Candidates.Select(candidate => candidate.Id));
             if (
                 !result.Coverage.Complete
                 || scanned > 20000
-                || eligible > 2000
+                || (scope == "current_view" ? candidates.Count : eligible) > 2000
                 || JsonSerializer.SerializeToUtf8Bytes(candidates, JsonOptions).Length > 512000
                 || timer.ElapsedMilliseconds >= 2000
             )

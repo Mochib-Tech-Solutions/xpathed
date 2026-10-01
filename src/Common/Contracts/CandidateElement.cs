@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace Xpathed.Common.Contracts;
 
 public sealed record CandidateElement(
@@ -10,5 +12,6 @@ public sealed record CandidateElement(
     string[] Scope,
     TargetState State,
     ElementGeometry Geometry,
-    TargetFrame? Frame = null
+    TargetFrame? Frame = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] CandidateAppearance? Appearance = null
 );

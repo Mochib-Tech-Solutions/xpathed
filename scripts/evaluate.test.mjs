@@ -5,15 +5,28 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
 
-function runWrapper(t, project, service = "web", args = []) {
+function runWrapper(
+  t,
+  project,
+  service = "web",
+  args = [],
+  { envText = "", environment = {} } = {},
+) {
   const directory = mkdtempSync(join(tmpdir(), "xpathed-evaluation-isolation-"));
   t.after(() => rmSync(directory, { recursive: true, force: true }));
   const log = join(directory, "docker-calls");
   writeFileSync(log, "");
+  const envFile = join(directory, ".env");
+  writeFileSync(envFile, envText);
   writeFileSync(
     join(directory, "docker"),
     `#!/bin/sh
 printf '%s\\n' "$*" >> "$TEST_DOCKER_LOG"
+printf 'suite=%s\\n' "$XPATHED_EVALUATION_SUITE" >> "$TEST_DOCKER_LOG"
+if [ -z "$OPENROUTER_EVAL_API_KEY" ]; then key_state=empty
+elif [ "$OPENROUTER_EVAL_API_KEY" = fixture-eval ]; then key_state=selected
+else key_state=unexpected; fi
+printf 'evaluation-key=%s\\n' "$key_state" >> "$TEST_DOCKER_LOG"
 case "$1" in
   compose) case "$*" in *"config --quiet") exit 0;; *) exit 77;; esac ;;
   ps) printf '%s\\n' existing-container ;;
@@ -41,11 +54,45 @@ esac
         TEST_DOCKER_LOG: log,
         TEST_PROJECT_DIRECTORY: resolve(import.meta.dirname, ".."),
         TEST_EXISTING_SERVICE: service,
+        OPENROUTER_API_KEY: "",
+        OPENROUTER_EVAL_API_KEY: "",
+        XPATHED_ENV_FILE: envFile,
+        ...environment,
       },
     },
   );
   return { ...result, calls: readFileSync(log, "utf8") };
 }
+
+test("live evaluation wrappers pass the dedicated file key and reject an app-only file before Docker", async (t) => {
+  for (const args of [[], ["--comparison"], ["--qualification", "--profile", "deepseek"]]) {
+    await t.test(args[0] ?? "direct", (t) => {
+      const selected = runWrapper(t, "xpathed-evaluation-key", "web", ["--mode", "live", ...args], {
+        envText: "OPENROUTER_API_KEY=fixture-app\nOPENROUTER_EVAL_API_KEY=fixture-eval\n",
+      });
+      assert.equal(selected.status, 2);
+      assert.match(selected.stderr, /non-evaluation service/);
+      assert.match(selected.calls, /evaluation-key=selected/);
+      const missing = runWrapper(t, "xpathed-evaluation-key", "web", ["--mode", "live", ...args], {
+        envText: "OPENROUTER_API_KEY=fixture-app\n",
+      });
+      assert.notEqual(missing.status, 0);
+      assert.match(missing.stderr, /Set OPENROUTER_EVAL_API_KEY/);
+      assert.equal(missing.calls, "");
+      assert.doesNotMatch(missing.stdout + missing.stderr, /fixture-app/);
+    });
+  }
+});
+
+test("deterministic evaluation removes the dedicated key before invoking Docker", (t) => {
+  const result = runWrapper(t, "xpathed-evaluation-key", "web", ["--qualification"], {
+    envText: "OPENROUTER_EVAL_API_KEY=fixture-eval\n",
+    environment: { OPENROUTER_EVAL_API_KEY: "fixture-eval" },
+  });
+  assert.equal(result.status, 2);
+  assert.match(result.calls, /evaluation-key=empty/);
+  assert.doesNotMatch(result.calls, /evaluation-key=selected/);
+});
 
 test("evaluation rejects the development project name before invoking Docker", (t) => {
   const result = runWrapper(t, "xpathed");
@@ -107,4 +154,18 @@ test("qualification cannot combine strategy comparison or inject an unreviewed s
     assert.equal(result.status, 2);
     assert.match(result.stderr, /qualification|Qualification/);
   }
+});
+
+test("qualification accepts the reviewed viewport baseline and forwards its container suite path", (t) => {
+  const result = runWrapper(t, "xpathed-evaluation-baseline", "resolver", [
+    "--qualification",
+    "--suite",
+    "evaluation/viewport-baseline-cases.json",
+    "--profile",
+    "deepseek",
+    "--split",
+    "regression",
+  ]);
+  assert.equal(result.status, 77);
+  assert.match(result.calls, /suite=\/workspace\/evaluation\/viewport-baseline-cases.json/);
 });

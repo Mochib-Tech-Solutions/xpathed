@@ -19,5 +19,6 @@ public sealed record ResolutionDiagnostics
     public string? FinishReason { get; init; }
     public ModelUsage? Usage { get; init; }
     public ModelCostEstimate? CostEstimate { get; init; }
+    public string? ProviderAccounting { get; init; }
     public Dictionary<string, double> TimingsMs { get; init; } = [];
 }

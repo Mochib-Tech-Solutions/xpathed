@@ -23,7 +23,16 @@ const input = { model, messages: [{ role: "user", content: "Find Save" }], max_t
 
 async function setup(
   t,
-  { completion, ceilingUsd, initial, onRecord, profiles, metadata = pricing, github } = {},
+  {
+    completion,
+    ceilingUsd,
+    initial,
+    onRecord,
+    profiles,
+    metadata = pricing,
+    github,
+    apiKey = "test-provider-secret",
+  } = {},
 ) {
   const directory = await mkdtemp(join(tmpdir(), "xpathed-comparison-budget-"));
   let proxy;
@@ -55,7 +64,7 @@ async function setup(
         });
   };
   proxy = await createBudgetProxy({
-    apiKey: "test-provider-secret",
+    apiKey,
     ledgerPath,
     fetchImpl,
     ceilingUsd,
@@ -76,6 +85,62 @@ async function setup(
     });
   return { proxy, post, base, calls, ledgerPath, fetchImpl };
 }
+
+test("live evaluation selects its dedicated key and never falls back to the app key in a file", async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), "xpathed-evaluation-key-"));
+  const names = ["OPENROUTER_EVAL_API_KEY", "OPENROUTER_API_KEY", "XPATHED_ENV_FILE"];
+  const previous = Object.fromEntries(names.map((name) => [name, process.env[name]]));
+  t.after(async () => {
+    for (const name of names) {
+      if (previous[name] === undefined) delete process.env[name];
+      else process.env[name] = previous[name];
+    }
+    await rm(directory, { recursive: true, force: true });
+  });
+  process.env.XPATHED_ENV_FILE = join(directory, ".env");
+  for (const [name, environment, file, expected] of [
+    [
+      "dedicated environment wins",
+      { OPENROUTER_EVAL_API_KEY: "eval-env", OPENROUTER_API_KEY: "app-env" },
+      "OPENROUTER_EVAL_API_KEY=eval-file\nOPENROUTER_API_KEY=app-file\n",
+      "eval-env",
+    ],
+    [
+      "dedicated file wins over legacy environment",
+      { OPENROUTER_API_KEY: "legacy-env" },
+      "OPENROUTER_EVAL_API_KEY = 'eval-file' # dedicated\nOPENROUTER_API_KEY=app-file\n",
+      "eval-file",
+    ],
+    [
+      "explicit legacy environment remains supported",
+      { OPENROUTER_API_KEY: "legacy-env" },
+      "OPENROUTER_API_KEY=app-file\n",
+      "legacy-env",
+    ],
+    ["app-only file is refused", {}, "OPENROUTER_API_KEY=app-file\n", null],
+    [
+      "blank dedicated key does not select the app file key",
+      {},
+      "OPENROUTER_EVAL_API_KEY=\nOPENROUTER_API_KEY=app-file\n",
+      null,
+    ],
+  ]) {
+    await t.test(name, async (t) => {
+      delete process.env.OPENROUTER_EVAL_API_KEY;
+      delete process.env.OPENROUTER_API_KEY;
+      Object.assign(process.env, environment);
+      await writeFile(process.env.XPATHED_ENV_FILE, file);
+      if (expected === null) {
+        await assert.rejects(setup(t, { apiKey: null }), /Set OPENROUTER_EVAL_API_KEY/);
+        return;
+      }
+      const { proxy, post, calls } = await setup(t, { apiKey: null });
+      proxy.beginAttempt("configured-key");
+      assert.equal((await post()).status, 200);
+      assert.equal(calls[0].options.headers.Authorization, `Bearer ${expected}`);
+    });
+  }
+});
 
 function githubBudget(initial) {
   let ledger = structuredClone(initial);
@@ -111,6 +176,103 @@ function githubBudget(initial) {
   };
 }
 
+test("prepared baseline reserves before the timed request and returns before remote reconciliation", async (t) => {
+  const github = githubBudget({
+    version: 1,
+    ceilingUsd: 5,
+    remoteAuthority: "github:example/private:evaluation-budget:experiment-budget.json",
+    entries: [],
+  });
+  const { proxy, post, calls } = await setup(t, { github });
+  const maximum = proxy.forecastRequests([{ id: "prepared", profileId: "default", request: input }])
+    .reservations[0].maximumUsd;
+  await proxy.reserveAttempt("prepared", "default", maximum);
+  assert.equal(calls.length, 0);
+  assert.equal(github.ledger.entries[0].reservedUsd, maximum);
+  const reconcile = Promise.withResolvers();
+  const originalFetch = github.fetch;
+  github.fetch = async (url, options) => {
+    if (options.method === "PUT") await reconcile.promise;
+    return originalFetch(url, options);
+  };
+  try {
+    const response = await post(input, AbortSignal.timeout(1000));
+    assert.equal(response.status, 200);
+    assert.equal((await response.json()).usage.cost, 0.001);
+    assert.equal(github.ledger.entries[0].reportedUsd, null);
+    assert.throws(() => proxy.beginAttempt("overlap"), /overlapping/);
+  } finally {
+    reconcile.resolve();
+    await proxy.finishAttempt();
+  }
+  assert.equal(github.ledger.entries[0].reportedUsd, 0.001);
+  assert.equal(calls.length, 1);
+  assert.ok(proxy.records[0].elapsedMs >= proxy.records[0].responseElapsedMs);
+});
+
+test("prepared allocation cannot forward an oversized request or retry after an unused attempt", async (t) => {
+  const { proxy, post, calls } = await setup(t);
+  const maximum = proxy.forecastRequests([{ id: "prepared", profileId: "default", request: input }])
+    .reservations[0].maximumUsd;
+  await proxy.reserveAttempt("prepared", "default", maximum);
+  assert.equal(
+    (await post({ ...input, messages: [{ role: "user", content: "x".repeat(100000) }] })).status,
+    502,
+  );
+  await assert.rejects(proxy.finishAttempt(), /accounting/);
+  assert.equal(calls.length, 0);
+  assert.equal(proxy.budget.pendingCharges, 1);
+  await assert.rejects(proxy.reserveAttempt("next", "default", maximum), /blocked/);
+
+  const unused = await setup(t);
+  await unused.proxy.reserveAttempt("unused", "default", maximum);
+  await assert.rejects(unused.proxy.finishAttempt(), /accounting/);
+  assert.equal(
+    (await unused.post()).status,
+    409,
+    "late dispatch cannot spend or bind to a new trial",
+  );
+  assert.equal(unused.calls.length, 0);
+});
+
+test("prepared response survives reconciliation failure but settlement fails even for the final attempt", async (t) => {
+  const github = githubBudget({
+    version: 1,
+    ceilingUsd: 5,
+    remoteAuthority: "github:example/private:evaluation-budget:experiment-budget.json",
+    entries: [],
+  });
+  const { proxy, post, calls } = await setup(t, { github });
+  await proxy.reserveAttempt("last", "default", 0.01);
+  const originalFetch = github.fetch;
+  github.fetch = (url, options) =>
+    options.method === "PUT"
+      ? Promise.reject(new Error("Lost receipt with test-github-secret"))
+      : originalFetch(url, options);
+  const response = await post();
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).usage.cost, 0.001);
+  await assert.rejects(proxy.finishAttempt(), /accounting/);
+  assert.equal(calls.length, 1);
+  assert.equal(github.ledger.entries[0].reportedUsd, null);
+  assert.ok(!JSON.stringify(proxy.records).includes("test-github-secret"));
+  await assert.rejects(proxy.reserveAttempt("next", "default", 0.01), /blocked/);
+});
+
+test("failed prepared reservation blocks inference before the timed resolver is invoked", async (t) => {
+  const github = githubBudget({
+    version: 1,
+    ceilingUsd: 5,
+    remoteAuthority: "github:example/private:evaluation-budget:experiment-budget.json",
+    entries: [],
+  });
+  const { proxy, post, calls } = await setup(t, { github });
+  github.fetch = async () => Response.json({}, { status: 409 });
+  await assert.rejects(proxy.reserveAttempt("conflict", "default", 0.01), /conditional write/);
+  assert.equal((await post()).status, 409);
+  assert.equal(calls.length, 0);
+});
+
 test("a fresh hosted proxy preserves authoritative historical spend and durably reserves before inference", async (t) => {
   const previous = { id: "historical", reservedUsd: 2, reportedUsd: 1.5 };
   const github = githubBudget({
@@ -137,6 +299,35 @@ test("a fresh hosted proxy preserves authoritative historical spend and durably 
     const duration = proxy.records[0].remoteAccountingMs[stage];
     assert.ok(Number.isFinite(duration) && duration >= 0);
   }
+});
+
+test("a complete prepared forecast bounds both arms before any paid request and blocks growth beyond its allocation", async (t) => {
+  const { proxy, post, calls } = await setup(t);
+  const forecast = proxy.forecastRequests([
+    { id: "before", profileId: "default", request: input },
+    { id: "after", profileId: "default", request: input },
+  ]);
+  assert.equal(calls.length, 0);
+  assert.equal(forecast.fits, true);
+  assert.equal(forecast.projectedUsd, forecast.reservations[0].maximumUsd * 2);
+  proxy.beginAttempt("before", "default", forecast.reservations[0].maximumUsd);
+  assert.equal((await post()).status, 200);
+  proxy.beginAttempt("after", "default", forecast.reservations[1].maximumUsd);
+  assert.equal(
+    (await post({ ...input, messages: [{ role: "user", content: "x".repeat(100000) }] })).status,
+    400,
+  );
+  assert.equal(calls.length, 1);
+  assert.equal(
+    proxy.forecastRequests(
+      Array.from({ length: 2000 }, (_, i) => ({
+        id: String(i),
+        profileId: "default",
+        request: input,
+      })),
+    ).fits,
+    false,
+  );
 });
 
 test("missing remote state cannot initialize a new campaign and local spending cannot substitute for it", async (t) => {

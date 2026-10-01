@@ -9,5 +9,6 @@ public sealed record CandidateCapture(
     DateTimeOffset CapturedAt,
     CandidateElement[] Candidates,
     CaptureCoverage Coverage,
-    int UnsupportedBoundaryCount
+    int UnsupportedBoundaryCount,
+    string Scope = "page"
 );

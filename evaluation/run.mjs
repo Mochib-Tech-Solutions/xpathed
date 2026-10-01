@@ -3,6 +3,7 @@ import { mkdir, readFile, writeFile, readdir, rm, rename, lstat, readlink } from
 import { resolve, join } from "node:path";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { isDeepStrictEqual } from "node:util";
 import { setTimeout as delay } from "node:timers/promises";
 
 const directory = fileURLToPath(new URL(".", import.meta.url));
@@ -105,6 +106,39 @@ export function validateCases(manifest) {
         !(offline ? action.target?.candidateId : action.target?.selector)
       )
         throw new Error("Found actions require an independent target mapping");
+    }
+  }
+  if (manifest.baseline) {
+    if (manifest.baseline.version !== 1 || manifest.baseline.kind !== "viewport-paired")
+      throw new Error("Unsupported paired baseline version");
+    for (const item of manifest.cases) {
+      if (!["development", "regression"].includes(item.split))
+        throw new Error("Paired baseline permits only development/regression evidence");
+      if (
+        !["3", "4"].includes(item.contractVersion) ||
+        !["paired", "scope-change", "capability"].includes(item.baselineStratum)
+      )
+        throw new Error("Invalid paired baseline contract or stratum");
+      if (item.baselineStratum === "paired") {
+        if (!/^[a-z0-9_-]+$/.test(item.pairId ?? ""))
+          throw new Error("Missing baseline pair identity");
+        const pair = manifest.cases.filter((c) => c.pairId === item.pairId);
+        if (
+          pair.length !== 2 ||
+          new Set(pair.map((c) => c.contractVersion)).size !== 2 ||
+          pair.some(
+            (c) =>
+              c.baselineStratum !== "paired" ||
+              ["instruction", "fixture", "setup", "viewport", "family", "split", "expected"].some(
+                (key) => !isDeepStrictEqual(c[key], item[key]),
+              ),
+          )
+        )
+          throw new Error(
+            "Baseline pair must retain identical fixture, instruction, setup and expected target/action labels",
+          );
+      } else if (item.pairId != null)
+        throw new Error("Changed scope/capability cases cannot be paired speed evidence");
     }
   }
   return manifest.cases;
@@ -362,6 +396,7 @@ async function resolveTrial(spec, trial, session, page, options, services, chann
           options.timeoutMs,
         );
         const text = JSON.stringify(providerRequest);
+        trial.evidence = { ...trial.evidence, preparedProviderRequest: providerRequest };
         trial.observation.privacyLeak ||= (spec.privacySentinels ?? []).some((s) =>
           text.includes(s),
         );
@@ -396,9 +431,14 @@ export async function execute(spec, trial, options, services) {
     try {
       const capture = await request(
         `${services.browser}/pages/${session.pageId}/capture`,
-        { documentId: page.documentId },
+        {
+          documentId: page.documentId,
+          ...(spec.contractVersion === "4" ? { scope: "current_view" } : {}),
+        },
         options.timeoutMs,
       );
+      if (spec.contractVersion === "4" && capture.scope !== "current_view")
+        throw new Error("Current-view capture returned the wrong scope");
       const coverageTargets = await mapCandidates(
         capture.candidates,
         capture,
@@ -417,6 +457,8 @@ export async function execute(spec, trial, options, services) {
         options.timeoutMs,
       );
       const capturedText = JSON.stringify(capture);
+      trial.captureObservation.captureBytes = Buffer.byteLength(capturedText);
+      trial.captureObservation.scope = capture.scope ?? "page";
       trial.captureObservation.privacyLeak = (spec.privacySentinels ?? []).some((s) =>
         capturedText.includes(s),
       );
@@ -426,6 +468,11 @@ export async function execute(spec, trial, options, services) {
       };
     }
     await resolveTrial(spec, trial, session, page, options, services);
+    if (spec.contractVersion === "4" && trial.captureObservation?.error)
+      trial.error ??= {
+        code: "capture_scope_unverified",
+        message: "Independent current-view capture could not be verified",
+      };
     if (spec.mutation && trial.result?.actions?.some((a) => a.target)) {
       const changed = await command(
         services.fixture,

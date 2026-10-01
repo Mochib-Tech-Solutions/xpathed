@@ -47,6 +47,11 @@ export function renderDerivedBody(fixture) {
 
 export function renderFixture(key, trial, frame) {
   const pages = {
+    "viewport-clipped": `<main><h1>Clipped panel</h1><div style="height:100px;overflow:hidden"><iframe id="clipped-panel" title="Clipped panel" src="/frame?trial=${encodeURIComponent(trial)}&name=viewport-clipped-child" style="display:block"></iframe></div></main>`,
+    "viewport-clipped-child":
+      '<button id="frame-upper">Upper action</button><div style="margin-top:220px"><button id="frame-lower">Lower action</button></div>',
+    "viewport-plural":
+      '<section aria-label="Approvals"><button id="approve-visible">Approve</button><div style="margin-top:1500px"><button id="approve-below">Approve</button></div></section>',
     "qualification-color":
       '<main><button id="choose-cool" style="background:#1649cc;color:white">Choose</button><button id="choose-warm" style="background:#bb1818;color:white">Choose</button></main>',
     form: '<main><section aria-label="Profile"><h1>Profile</h1><button id="save-profile">Save changes</button><button id="cancel-profile">Cancel</button></section></main>',

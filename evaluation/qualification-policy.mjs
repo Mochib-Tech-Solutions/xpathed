@@ -84,6 +84,7 @@ function assess(manifest, trials, policy) {
   );
   const reasons = [];
   const insufficient = [];
+  if (manifest.baseline) insufficient.push("development_baseline_not_release_qualification");
   const baseline = manifest.baselineEvidence?.profiles?.[manifest.profile.id];
   if (baseline?.criticalFailures?.length) reasons.push("baseline_critical_failure");
   if (baseline?.hardFailures?.length) reasons.push("baseline_hard_invariant_failure");
@@ -170,7 +171,7 @@ function assess(manifest, trials, policy) {
   if (
     !heldOut.some(
       ({ spec }) =>
-        spec.contractVersion === "3" &&
+        ["3", "4"].includes(spec.contractVersion) &&
         spec.expected.actions.filter(({ outcome }) => outcome === "found").length > 1,
     )
   )
@@ -287,5 +288,170 @@ export function summarizeQualification(manifest, trials, policy = defaultPolicy)
       .filter(([, report]) => report.qualification.status === "qualified")
       .map(([id]) => id),
     defaultActivated: false,
+    ...(manifest.baseline
+      ? { pairedBaseline: summarizePairedBaseline(manifest, trials, policy) }
+      : {}),
+  };
+}
+
+function summarizePairedBaseline(manifest, trials, policy) {
+  const input = (trial, key) =>
+    trial?.result?.diagnostics?.modelInputComplete === true
+      ? key === "modelInputBytes"
+        ? trial.result.diagnostics[key]
+        : trial.result.diagnostics.usage?.[key]
+      : null;
+  const records = manifest.cases.map((spec) => {
+    const trial = trials.find((t) => t.caseId === spec.id && t.attempt === 1);
+    const grade = gradeTrial(spec, trial);
+    return {
+      spec,
+      trial,
+      correct:
+        grade.passed &&
+        !grade.metrics.operationalError &&
+        grade.metrics.processingComplete === true,
+    };
+  });
+  const reportedCost = (trial) => {
+    if (!trial) return null;
+    const calls = trial.provider?.filter((p) => p.forwarded);
+    if (!calls) return trial.result?.diagnostics?.usage?.cost ?? null;
+    if (!calls.length && trial.result?.diagnostics?.modelCalls !== 0) return null;
+    return calls.every((c) => finite(c.reportedUsd))
+      ? calls.reduce((sum, c) => sum + c.reportedUsd, 0)
+      : null;
+  };
+  const summarizeCohort = (entries) => {
+    const cases = entries.map(({ spec }) => spec);
+    const observed = entries.flatMap(({ trial }) => (trial ? [trial] : []));
+    const report = summarize(
+      { ...manifest, cases, plan: { caseOrder: cases.map((c) => c.id), repetitions: 1 } },
+      observed,
+    );
+    const correct = entries.filter((e) => e.correct).length;
+    const costs = entries.map(({ trial }) => reportedCost(trial));
+    const cost = costs.every(finite) ? costs.reduce((sum, value) => sum + value, 0) : null;
+    return {
+      ...report,
+      correct: ratio(correct, entries.length),
+      correctCompleteWithinGoal: ratio(
+        entries.filter(
+          (e) => e.correct && finite(e.trial?.elapsedMs) && e.trial.elapsedMs < policy.goalMs,
+        ).length,
+        entries.length,
+      ),
+      correctCompleteWithinDeadline: ratio(
+        entries.filter(
+          (e) => e.correct && finite(e.trial?.elapsedMs) && e.trial.elapsedMs <= policy.deadlineMs,
+        ).length,
+        entries.length,
+      ),
+      reportedPaidUsd: cost,
+      costPerCorrectUsd: cost !== null && correct ? cost / correct : null,
+      modelInputBytes: latency(
+        entries.map(({ trial }) => ({ trial: { elapsedMs: input(trial, "modelInputBytes") } })),
+      ),
+      captureBytes: latency(
+        entries.map(({ trial }) => ({
+          trial: { elapsedMs: trial?.captureObservation?.captureBytes },
+        })),
+      ),
+    };
+  };
+  const arms = Object.fromEntries(
+    ["3", "4"].map((contract) => {
+      const entries = records.filter(({ spec }) => spec.contractVersion === contract);
+      return [
+        contract,
+        {
+          ...summarizeCohort(entries),
+          strata: Object.fromEntries(
+            [...new Set(entries.map(({ spec }) => spec.baselineStratum))].map((stratum) => [
+              stratum,
+              summarizeCohort(entries.filter(({ spec }) => spec.baselineStratum === stratum)),
+            ]),
+          ),
+        },
+      ];
+    }),
+  );
+  const reduction = (before, after) => (finite(before) && finite(after) ? before - after : null);
+  const pairs = [
+    ...new Set(
+      records
+        .filter(({ spec }) => spec.baselineStratum === "paired")
+        .map(({ spec }) => spec.pairId),
+    ),
+  ].map((pairId) => {
+    const before = records.find(
+      ({ spec }) => spec.pairId === pairId && spec.contractVersion === "3",
+    );
+    const after = records.find(
+      ({ spec }) => spec.pairId === pairId && spec.contractVersion === "4",
+    );
+    return {
+      pairId,
+      beforeCaseId: before.spec.id,
+      afterCaseId: after.spec.id,
+      beforeCorrect: before.correct,
+      afterCorrect: after.correct,
+      bothCorrect: before.correct && after.correct,
+      elapsedMsReduction:
+        before.correct && after.correct
+          ? reduction(before.trial?.elapsedMs, after.trial?.elapsedMs)
+          : null,
+      observedElapsedMsDelta: reduction(before.trial?.elapsedMs, after.trial?.elapsedMs),
+      modelInputBytesReduction: reduction(
+        input(before.trial, "modelInputBytes"),
+        input(after.trial, "modelInputBytes"),
+      ),
+      inputTokensReduction: reduction(
+        input(before.trial, "inputTokens"),
+        input(after.trial, "inputTokens"),
+      ),
+    };
+  });
+  const pairedGains = Object.fromEntries(
+    Object.entries({
+      elapsedMs: (trial) => trial?.elapsedMs,
+      modelInputBytes: (trial) => input(trial, "modelInputBytes"),
+      inputTokens: (trial) => input(trial, "inputTokens"),
+      captureBytes: (trial) => trial?.captureObservation?.captureBytes,
+      reportedPaidUsd: reportedCost,
+    }).map(([metric, value]) => {
+      const measured = pairs
+        .filter((pair) => pair.bothCorrect)
+        .map((pair) => ({
+          before: value(records.find(({ spec }) => spec.id === pair.beforeCaseId).trial),
+          after: value(records.find(({ spec }) => spec.id === pair.afterCaseId).trial),
+        }))
+        .filter(({ before, after }) => finite(before) && finite(after));
+      const before = measured.reduce((sum, row) => sum + row.before, 0);
+      const after = measured.reduce((sum, row) => sum + row.after, 0);
+      return [
+        metric,
+        {
+          measuredPairs: measured.length,
+          beforeTotal: measured.length ? before : null,
+          afterTotal: measured.length ? after : null,
+          absoluteReduction: measured.length ? before - after : null,
+          percentReduction:
+            measured.length && before > 0 ? ((before - after) / before) * 100 : null,
+        },
+      ];
+    }),
+  );
+  return {
+    comparison:
+      "Legacy contract 3 versus current-view contract 4 on one source revision; not a historical-source speedup",
+    arms,
+    pairs,
+    pairedGains,
+    pairedGainsBasis:
+      "Totals over unchanged-target pairs correct in both arms with both metric observations; negative reductions indicate increases",
+    bothCorrectPairCount: pairs.filter((p) => p.bothCorrect).length,
+    limitation:
+      "Small controlled development sample; scope/capability changes are reported separately, not paired speed gains. Missing and failed attempts remain in denominators.",
   };
 }

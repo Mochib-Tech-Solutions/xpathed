@@ -5,12 +5,603 @@ using System.Text.Json.Nodes;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Xpathed.Resolver.Controllers;
 
 namespace Xpathed.Resolver.Tests;
 
 public sealed class ResolutionContractTests
 {
+    [Theory]
+    [InlineData(1, 1, 2, 2, true)]
+    [InlineData(0, 1, 1, 1, true)]
+    [InlineData(1, -1, 0, 1, false)]
+    [InlineData(1, 1, 1, 2, false)]
+    [InlineData(1, int.MaxValue, int.MinValue, int.MaxValue, false)]
+    [InlineData(1, 1, 2, 1, false)]
+    [InlineData(1, 0, 1, -1, false)]
+    public async Task CurrentViewCoverageAccountsForExcludedCandidates(
+        int captured,
+        int excluded,
+        int eligible,
+        int scanned,
+        bool valid
+    )
+    {
+        var capture = JsonNode.Parse(CurrentViewCapture())!;
+        if (captured == 0)
+        {
+            capture["candidates"] = new JsonArray();
+        }
+        capture["coverage"]!["capturedCount"] = captured;
+        capture["coverage"]!["excludedOffscreenCount"] = excluded;
+        capture["coverage"]!["eligibleCount"] = eligible;
+        capture["coverage"]!["scannedCount"] = scanned;
+        var handler = new DeterministicServicesHandler
+        {
+            CaptureBody = capture.ToJsonString(),
+            ProviderBody =
+                captured == 0
+                    ? ProviderSelection(
+                        """{"complete":true,"actions":[{"step":1,"instruction":"Click Help","action":"click","outcome":"not_found","candidateId":null,"limitation":"none"}]}"""
+                    )
+                    : BilledSelection(),
+        };
+        await using var application = CreateApplication(handler);
+        using var client = application.CreateClient();
+        using var response = await client.PostAsJsonAsync(
+            "/pages/page-1/resolve",
+            new
+            {
+                instruction = "Click Help",
+                documentId = "document-1",
+                contractVersion = "4",
+            }
+        );
+        var result = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(
+            valid
+                ? captured == 0
+                    ? "not_found"
+                    : "found"
+                : "error",
+            result.GetProperty("outcome").GetString()
+        );
+        Assert.Equal(valid ? 1 : 0, handler.ProviderRequestCount);
+        if (!valid)
+        {
+            Assert.Equal("invalid_browser_capture", result.GetProperty("diagnostics").GetProperty("code").GetString());
+        }
+    }
+
+    [Fact]
+    public async Task CurrentViewDoesNotAwaitOptionalPricingMetadata()
+    {
+        var pricingCalls = 0;
+        var handler = new DeterministicServicesHandler
+        {
+            CaptureBody = CurrentViewCapture(),
+            ProviderBody = BilledSelection(),
+            BeforeRespondAsync = async (path, token) =>
+            {
+                if (path.EndsWith("/endpoints", StringComparison.Ordinal))
+                {
+                    Interlocked.Increment(ref pricingCalls);
+                    await Task.Delay(TimeSpan.FromSeconds(10), token);
+                }
+            },
+        };
+        await using var application = CreateApplication(handler);
+        using var client = application.CreateClient();
+        using var response = await client.PostAsJsonAsync(
+            "/pages/page-1/resolve",
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                contractVersion = "4",
+            }
+        );
+        var result = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("found", result.GetProperty("outcome").GetString());
+        Assert.Equal(0, pricingCalls);
+        Assert.Equal(
+            0.0000215m,
+            result.GetProperty("diagnostics").GetProperty("usage").GetProperty("cost").GetDecimal()
+        );
+        Assert.Equal(JsonValueKind.Null, result.GetProperty("diagnostics").GetProperty("costEstimate").ValueKind);
+    }
+
+    [Theory]
+    [InlineData("3", false)]
+    [InlineData("4", true)]
+    public async Task AppearanceLimitationIsVersionedInSentAndRetainedSchema(string version, bool supported)
+    {
+        var handler = new DeterministicServicesHandler
+        {
+            CaptureBody = supported ? CurrentViewCapture() : new DeterministicServicesHandler().CaptureBody,
+            ProviderBody = ProviderSelection(
+                """{"complete":true,"actions":[{"step":1,"instruction":"Click the red image","action":"unsupported","outcome":"unsupported","candidateId":null,"limitation":"appearance_unavailable"}]}"""
+            ),
+        };
+        await using var application = CreateApplication(handler);
+        using var client = application.CreateClient();
+        client.DefaultRequestHeaders.Add("X-Xpathed-Attempt-Id", Guid.NewGuid().ToString("N"));
+        using var response = await client.PostAsJsonAsync(
+            "/internal/pages/page-1/resolve",
+            new
+            {
+                instruction = "Click the red image",
+                documentId = "document-1",
+                contractVersion = version,
+            }
+        );
+        var envelope = await response.Content.ReadFromJsonAsync<JsonElement>();
+        var result = envelope.GetProperty("result");
+        Assert.Equal(supported ? "unsupported" : "error", result.GetProperty("outcome").GetString());
+        if (supported)
+        {
+            Assert.Equal("appearance_unavailable", result.GetProperty("actions")[0].GetProperty("code").GetString());
+            Assert.Equal(
+                "The requested appearance cannot be established from the captured CSS evidence.",
+                result.GetProperty("actions")[0].GetProperty("message").GetString()
+            );
+        }
+        else
+        {
+            Assert.Equal(
+                "provider_malformed_response",
+                result.GetProperty("diagnostics").GetProperty("code").GetString()
+            );
+        }
+        var sent = handler.ModelRequest.GetProperty("response_format").GetProperty("json_schema").GetProperty("schema");
+        using var retained = JsonDocument.Parse(
+            envelope.GetProperty("evidence").GetProperty("outputSchema").GetString()!
+        );
+        Assert.True(JsonElement.DeepEquals(sent, retained.RootElement));
+        using var configuration = JsonDocument.Parse(
+            envelope.GetProperty("evidence").GetProperty("configurationJson").GetString()!
+        );
+        Assert.True(
+            JsonElement.DeepEquals(
+                sent,
+                configuration
+                    .RootElement.GetProperty("effective")
+                    .GetProperty("request")
+                    .GetProperty("response_format")
+                    .GetProperty("json_schema")
+                    .GetProperty("schema")
+            )
+        );
+        Assert.Equal(
+            supported,
+            sent.GetProperty("properties")
+                .GetProperty("actions")
+                .GetProperty("items")
+                .GetProperty("properties")
+                .GetProperty("limitation")
+                .GetProperty("enum")
+                .EnumerateArray()
+                .Any(item => item.GetString() == "appearance_unavailable")
+        );
+    }
+
+    [Theory]
+    [InlineData("1")]
+    [InlineData("2")]
+    [InlineData("3")]
+    public async Task LegacyPreparedInputPreservesBaselineBytes(string version)
+    {
+        var handler = new DeterministicServicesHandler { ProviderBody = version == "1" ? null : BilledSelection() };
+        await using var application = CreateApplication(handler);
+        using var client = application.CreateClient();
+        using var response = await client.PostAsJsonAsync(
+            "/pages/page-1/resolve",
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                contractVersion = version,
+            }
+        );
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(
+            """{"instruction":"Click Save","frameId":"main","candidates":[{"id":"button-save","tag":"button","role":"button","label":"Save","scope":["Profile"],"state":{"rendered":true,"inViewport":true,"enabled":true,"editable":false},"geometry":{"x":20,"y":40,"width":90,"height":30}}]}""",
+            handler.ModelRequest.GetProperty("messages")[1].GetProperty("content").GetString()
+        );
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task CurrentViewCompactStatePreservesMeaningfulFlags(bool constrained)
+    {
+        var capture = JsonNode.Parse(CurrentViewCapture())!;
+        var state = capture["candidates"]![0]!["state"]!;
+        state["rendered"] = !constrained;
+        state["enabled"] = !constrained;
+        state["editable"] = constrained;
+        state["readonly"] = constrained;
+        var handler = new DeterministicServicesHandler
+        {
+            CaptureBody = capture.ToJsonString(),
+            ProviderBody = BilledSelection(),
+        };
+        await using var application = CreateApplication(handler);
+        using var client = application.CreateClient();
+        using var response = await client.PostAsJsonAsync(
+            "/pages/page-1/resolve",
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                contractVersion = "4",
+            }
+        );
+        using var input = JsonDocument.Parse(
+            handler.ModelRequest.GetProperty("messages")[1].GetProperty("content").GetString()!
+        );
+        var candidate = input.RootElement.GetProperty("candidates")[0];
+        var actual = candidate.GetProperty("state");
+        Assert.False(actual.TryGetProperty("inViewport", out _));
+        if (constrained)
+        {
+            Assert.False(actual.GetProperty("rendered").GetBoolean());
+            Assert.False(actual.GetProperty("enabled").GetBoolean());
+            Assert.True(actual.GetProperty("editable").GetBoolean());
+            Assert.True(actual.GetProperty("readonly").GetBoolean());
+        }
+        else
+        {
+            Assert.Empty(actual.EnumerateObject());
+        }
+        Assert.False(candidate.GetProperty("appearance").TryGetProperty("limitations", out _));
+        Assert.Equal("rgb(255, 0, 0)", candidate.GetProperty("appearance").GetProperty("backgroundColor").GetString());
+        Assert.Equal(20, candidate.GetProperty("geometry").GetProperty("x").GetInt32());
+    }
+
+    [Theory]
+    [InlineData("1", "page")]
+    [InlineData("2", "page")]
+    [InlineData("3", "page")]
+    [InlineData("4", "current_view")]
+    public async Task RequestedVersionPreservesScopeAndOnlyCurrentViewCarriesAppearance(string version, string scope)
+    {
+        var capture = JsonNode.Parse(new DeterministicServicesHandler().CaptureBody)!;
+        capture["scope"] = scope;
+        capture["candidates"]![0]!["appearance"] = JsonNode.Parse(
+            """{"backgroundColor":"rgb(255, 0, 0)","textColor":"rgb(255, 255, 255)","borderColor":null,"limitations":["background_transparent"]}"""
+        );
+        var handler = new DeterministicServicesHandler
+        {
+            CaptureBody = capture.ToJsonString(),
+            ProviderBody =
+                version == "1"
+                    ? null
+                    : ProviderSelection(
+                        """{"complete":true,"actions":[{"step":1,"instruction":"Click Save","action":"click","outcome":"found","candidateId":"button-save","limitation":"none"}]}"""
+                    ),
+        };
+        await using var application = CreateApplication(handler);
+        using var client = application.CreateClient();
+        const string instruction = "Click the red Save control at the left of Profile";
+        using var response = await client.PostAsJsonAsync(
+            "/pages/page-1/resolve",
+            new
+            {
+                instruction,
+                documentId = "document-1",
+                contractVersion = version,
+            }
+        );
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var result = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("found", result.GetProperty("outcome").GetString());
+        Assert.Equal(scope, handler.CaptureRequest.GetProperty("scope").GetString());
+        using var input = JsonDocument.Parse(
+            handler.ModelRequest.GetProperty("messages")[1].GetProperty("content").GetString()!
+        );
+        Assert.Equal(instruction, input.RootElement.GetProperty("instruction").GetString());
+        var candidate = input.RootElement.GetProperty("candidates")[0];
+        Assert.Equal("button-save", candidate.GetProperty("id").GetString());
+        Assert.Equal("Profile", candidate.GetProperty("scope")[0].GetString());
+        Assert.Equal(20, candidate.GetProperty("geometry").GetProperty("x").GetInt32());
+        if (version == "4")
+        {
+            Assert.Equal("8", result.GetProperty("diagnostics").GetProperty("promptVersion").GetString());
+            Assert.Equal("current_view", input.RootElement.GetProperty("scope").GetString());
+            Assert.Equal(
+                "rgb(255, 0, 0)",
+                candidate.GetProperty("appearance").GetProperty("backgroundColor").GetString()
+            );
+            Assert.Equal(
+                "background_transparent",
+                candidate.GetProperty("appearance").GetProperty("limitations")[0].GetString()
+            );
+        }
+        else
+        {
+            Assert.False(candidate.TryGetProperty("appearance", out _));
+        }
+        Assert.Equal(1, handler.ProviderRequestCount);
+        Assert.Equal(1, handler.SelectionRequestCount);
+    }
+
+    [Fact]
+    public async Task CurrentViewDeadlineCancelsCaptureBeforeAnyProviderCall()
+    {
+        var cancelled = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var handler = new DeterministicServicesHandler
+        {
+            BeforeRespondAsync = async (path, token) =>
+            {
+                if (!path.EndsWith("/capture", StringComparison.Ordinal))
+                {
+                    return;
+                }
+                try
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(10), token);
+                }
+                catch (OperationCanceledException)
+                {
+                    cancelled.TrySetResult();
+                    throw;
+                }
+            },
+        };
+        await using var application = CreateApplication(handler);
+        using var client = application.CreateClient();
+        using var response = await client.PostAsJsonAsync(
+            "/pages/page-1/resolve",
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                contractVersion = "4",
+            }
+        );
+        var result = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("error", result.GetProperty("outcome").GetString());
+        Assert.Equal("resolution_timeout", result.GetProperty("diagnostics").GetProperty("code").GetString());
+        Assert.InRange(
+            result.GetProperty("diagnostics").GetProperty("timingsMs").GetProperty("total").GetDouble(),
+            1800,
+            3000
+        );
+        await cancelled.Task.WaitAsync(TimeSpan.FromSeconds(1));
+        Assert.Equal(0, handler.ProviderRequestCount);
+        Assert.Equal(0, handler.SelectionRequestCount);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    [InlineData(true, true)]
+    public async Task LateProviderChargesAreLoggedOnceWithoutLateSelection(
+        bool disconnect,
+        bool duringValidation = false
+    )
+    {
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var logs = new AccountingLogProvider();
+        var handler = new DeterministicServicesHandler
+        {
+            CaptureBody = CurrentViewCapture(),
+            ProviderBody = BilledSelection(),
+            BeforeRespondAsync = async (path, token) =>
+            {
+                if (path.EndsWith(duringValidation ? "/selections" : "/chat/completions", StringComparison.Ordinal))
+                {
+                    started.TrySetResult();
+                    await release.Task.WaitAsync(token);
+                }
+            },
+        };
+        await using var application = CreateApplication(handler, logs: logs);
+        using var client = application.CreateClient();
+        using var cancellation = new CancellationTokenSource();
+        var request = client.PostAsJsonAsync(
+            "/pages/page-1/resolve",
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                contractVersion = "4",
+            },
+            cancellation.Token
+        );
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        string? attempt = null;
+        if (disconnect)
+        {
+            cancellation.Cancel();
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(async () => await request);
+        }
+        else
+        {
+            using var response = await request;
+            var result = await response.Content.ReadFromJsonAsync<JsonElement>();
+            Assert.Equal("error", result.GetProperty("outcome").GetString());
+            var diagnostics = result.GetProperty("diagnostics");
+            Assert.Equal("resolution_timeout", diagnostics.GetProperty("code").GetString());
+            Assert.Equal("pending", diagnostics.GetProperty("providerAccounting").GetString());
+            Assert.Equal(JsonValueKind.Null, diagnostics.GetProperty("usage").ValueKind);
+            attempt = result.GetProperty("attemptId").GetString();
+        }
+        Assert.Equal(0, handler.SelectionRequestCount);
+        release.SetResult();
+        await logs.Recorded.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        var entry = Assert.Single(logs.Entries).ToDictionary(pair => pair.Key, pair => pair.Value);
+        Assert.Equal(0.0000215m, entry["ReportedUsd"]);
+        Assert.Equal("generation-1", entry["GenerationId"]);
+        Assert.Equal("completed", entry["AccountingStatus"]);
+        if (attempt is not null)
+        {
+            Assert.Equal(attempt, entry["AttemptId"]);
+        }
+        Assert.Equal(1, handler.ProviderRequestCount);
+        Assert.Equal(0, handler.SelectionRequestCount);
+    }
+
+    [Theory]
+    [InlineData("/pages/page-1/selections")]
+    public async Task CurrentViewTimeoutRetainsChargesAlreadyReported(string slowPath)
+    {
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var handler = new DeterministicServicesHandler
+        {
+            CaptureBody = CurrentViewCapture(),
+            ProviderBody = BilledSelection(),
+            BeforeRespondAsync = async (path, token) =>
+            {
+                if (path == slowPath)
+                {
+                    await release.Task.WaitAsync(token);
+                }
+            },
+        };
+        await using var application = CreateApplication(handler);
+        using var client = application.CreateClient();
+        using var response = await client.PostAsJsonAsync(
+            "/pages/page-1/resolve",
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                contractVersion = "4",
+            }
+        );
+        var result = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("resolution_timeout", result.GetProperty("diagnostics").GetProperty("code").GetString());
+        Assert.Equal(
+            0.0000215m,
+            result.GetProperty("diagnostics").GetProperty("usage").GetProperty("cost").GetDecimal()
+        );
+        Assert.Equal("completed", result.GetProperty("diagnostics").GetProperty("providerAccounting").GetString());
+        Assert.InRange(
+            result.GetProperty("diagnostics").GetProperty("timingsMs").GetProperty("total").GetDouble(),
+            1800,
+            3000
+        );
+        Assert.Empty(result.GetProperty("actions").EnumerateArray());
+        release.TrySetResult();
+    }
+
+    [Theory]
+    [InlineData("page")]
+    [InlineData("offscreen")]
+    [InlineData("appearance")]
+    public async Task InvalidCurrentViewEvidenceNeverReachesTheModel(string problem)
+    {
+        var capture = JsonNode.Parse(CurrentViewCapture())!;
+        if (problem == "page")
+        {
+            capture["scope"] = "page";
+        }
+        if (problem == "offscreen")
+        {
+            capture["candidates"]![0]!["state"]!["inViewport"] = false;
+        }
+        if (problem == "appearance")
+        {
+            capture["candidates"]![0]!["appearance"]!["backgroundColor"] = "url(https://private.invalid?token=secret)";
+        }
+        var handler = new DeterministicServicesHandler { CaptureBody = capture.ToJsonString() };
+        await using var application = CreateApplication(handler);
+        using var client = application.CreateClient();
+        using var response = await client.PostAsJsonAsync(
+            "/pages/page-1/resolve",
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                contractVersion = "4",
+            }
+        );
+        var result = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("invalid_browser_capture", result.GetProperty("diagnostics").GetProperty("code").GetString());
+        Assert.Equal(0, handler.ProviderRequestCount);
+    }
+
+    [Theory]
+    [InlineData("not_found", "click", "none", "No matching element found in the current view.")]
+    [InlineData(
+        "unsupported",
+        "click",
+        "current_state_dependency",
+        "This step depends on a future page state. No earlier action was executed."
+    )]
+    public async Task CurrentViewMissingAndFutureStateOutcomesRemainDistinct(
+        string outcome,
+        string action,
+        string limitation,
+        string message
+    )
+    {
+        var handler = new DeterministicServicesHandler
+        {
+            CaptureBody = CurrentViewCapture(),
+            ProviderBody = ProviderSelection(
+                JsonSerializer.Serialize(
+                    new
+                    {
+                        complete = true,
+                        actions = new[]
+                        {
+                            new
+                            {
+                                step = 1,
+                                instruction = "Click Help",
+                                action,
+                                outcome,
+                                candidateId = (string?)null,
+                                limitation,
+                            },
+                        },
+                    }
+                )
+            ),
+        };
+        await using var application = CreateApplication(handler);
+        using var client = application.CreateClient();
+        using var response = await client.PostAsJsonAsync(
+            "/pages/page-1/resolve",
+            new
+            {
+                instruction = limitation == "none" ? "Click Help" : "Scroll down and click Help",
+                documentId = "document-1",
+                contractVersion = "4",
+            }
+        );
+        var result = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(outcome, result.GetProperty("outcome").GetString());
+        Assert.Equal(message, result.GetProperty("actions")[0].GetProperty("message").GetString());
+        Assert.Equal(1, handler.ProviderRequestCount);
+        Assert.Equal(1, handler.SelectionRequestCount);
+    }
+
+    private static string CurrentViewCapture()
+    {
+        var capture = JsonNode.Parse(new DeterministicServicesHandler().CaptureBody)!;
+        capture["scope"] = "current_view";
+        capture["candidates"]![0]!["appearance"] = JsonNode.Parse(
+            """{"backgroundColor":"rgb(255, 0, 0)","textColor":"rgb(0, 0, 0)","borderColor":null,"limitations":[]}"""
+        );
+        return capture.ToJsonString();
+    }
+
+    private static string BilledSelection()
+    {
+        var response = JsonNode.Parse(
+            """{"id":"generation-1","model":"deepseek/deepseek-v4.1-flash","provider":"Wafer","choices":[{"finish_reason":"stop","message":{}}],"usage":{"prompt_tokens":140,"completion_tokens":15,"total_tokens":155,"cost":0.0000215}}"""
+        );
+        response!["choices"]![0]!["message"]!["content"] =
+            """{"complete":true,"actions":[{"step":1,"instruction":"Click Save","action":"click","outcome":"found","candidateId":"button-save","limitation":"none"}]}""";
+        return response.ToJsonString();
+    }
+
     [Theory]
     [InlineData("none")]
     [InlineData("low")]
@@ -1723,7 +2314,8 @@ public sealed class ResolutionContractTests
 
     private static WebApplicationFactory<HealthController> CreateApplication(
         DeterministicServicesHandler handler,
-        Dictionary<string, string?>? settings = null
+        Dictionary<string, string?>? settings = null,
+        ILoggerProvider? logs = null
     ) =>
         new WebApplicationFactory<HealthController>().WithWebHostBuilder(builder =>
         {
@@ -1735,6 +2327,10 @@ public sealed class ResolutionContractTests
             );
             builder.ConfigureServices(services =>
             {
+                if (logs is not null)
+                {
+                    services.AddLogging(logging => logging.AddProvider(logs));
+                }
                 services.AddHttpClient("browser").ConfigurePrimaryHttpMessageHandler(() => handler);
                 services.AddHttpClient("openrouter").ConfigurePrimaryHttpMessageHandler(() => handler);
             });

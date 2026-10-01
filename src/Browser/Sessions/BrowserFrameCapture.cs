@@ -53,12 +53,15 @@ internal sealed class BrowserFrameCapture(
             "(capture, args) => capture.updateEnvironment(args.environment, args.budgetMs)",
             new { environment, budgetMs = Math.Max(0, budgetMs - timer.ElapsedMilliseconds) }
         );
-        if (updated.TryGetProperty("errorCode", out _))
+        if (updated.TryGetProperty("errorCode", out var error))
         {
+            var stale = error.GetString() == "stale_capture";
             throw new ApiException(
                 409,
-                "validation_budget_exceeded",
-                "Viewport observation exceeded its processing budget."
+                stale ? "stale_capture" : "validation_budget_exceeded",
+                stale
+                    ? "The current view changed after capture."
+                    : "Viewport observation exceeded its processing budget."
             );
         }
     }
