@@ -43,6 +43,8 @@ export function qualificationCoverage(suite) {
   const families = new Set(held.map((c) => c.family));
   const exposed = new Set(all.filter((c) => c.split !== "held-out").map((c) => c.family));
   const blockers = [];
+  if (all.some((c) => c.contractVersion === "4"))
+    blockers.push("Contract 4 requires a separately frozen current-view qualification policy");
   if (held.length < policy.minimumHeldOutTrials || families.size < policy.minimumHeldOutFamilies)
     blockers.push(
       `Fresh held-out coverage requires at least ${policy.minimumHeldOutTrials} cases across ${policy.minimumHeldOutFamilies} families (one attempt each)`,
