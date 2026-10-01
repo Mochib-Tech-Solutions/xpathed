@@ -376,6 +376,51 @@ test("artifact cleanup erases both model inputs at30 days without discarding out
   }
 });
 
+test("context retention expires prepared requests and preflight evidence, then removes records", async () => {
+  const path = await mkdtemp(join(tmpdir(), "context-retention-"));
+  try {
+    for (const sub of ["trials", "preflight", "provider"]) await mkdir(join(path, sub));
+    const manifest = {
+      version: 1,
+      kind: "context-experiment",
+      id: "context-run",
+      createdAt: "2026-08-01T00:00:00Z",
+      plan: [],
+      code: { revision: "test" },
+      preparedRequests: { a: [{ messages: [{ content: "private input" }] }] },
+      contentHash: "original-frozen-hash",
+    };
+    await writeFile(join(path, "manifest.json"), JSON.stringify(manifest));
+    for (const sub of ["trials", "preflight"])
+      await writeFile(
+        join(path, sub, "a.json"),
+        JSON.stringify({
+          result: { outcome: "found" },
+          evidence: { modelInput: "private input" },
+        }),
+      );
+    await writeFile(join(path, "provider", "a.json"), JSON.stringify({ request: "private input" }));
+    assert.equal(await prune(path, new Date("2026-08-30T00:00:00Z")), "retained");
+    assert.deepEqual(JSON.parse(await readFile(join(path, "manifest.json"), "utf8")), manifest);
+    assert.equal(await prune(path, new Date("2026-08-31T00:00:00Z")), "evidence_deleted");
+    const expired = JSON.parse(await readFile(join(path, "manifest.json"), "utf8"));
+    assert.equal(expired.preparedRequests, undefined);
+    assert.equal(expired.evidenceAvailability, "expired");
+    assert.equal(expired.contentHash, manifest.contentHash);
+    for (const sub of ["trials", "preflight"]) {
+      const trial = JSON.parse(await readFile(join(path, sub, "a.json"), "utf8"));
+      assert.equal(trial.evidence, null);
+      assert.equal(trial.evidenceAvailability, "expired");
+      assert.equal(trial.result.outcome, "found");
+    }
+    await assert.rejects(readFile(join(path, "provider", "a.json")), { code: "ENOENT" });
+    assert.equal(await prune(path, new Date("2026-10-30T00:00:00Z")), "records_deleted");
+    await assert.rejects(readFile(join(path, "manifest.json")), { code: "ENOENT" });
+  } finally {
+    await rm(path, { recursive: true, force: true });
+  }
+});
+
 test("current-view runs request scoped capture and reject a legacy-scope response", async (t) => {
   const { trial } = await runWithServices(t, "current-view-control-states-1-v4", {
     contractVersion: "4",

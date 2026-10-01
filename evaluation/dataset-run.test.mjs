@@ -265,11 +265,19 @@ test("the shared spending ceiling includes reservations and refuses the next una
   assert.throws(() => reserveCharge(ledger, NaN, "invalid"), /charge/i);
 });
 
-test("dataset runs default to the authorized campaign ceiling and permit only lower overrides", () => {
+test("dataset runs default to provider limits and retain explicit historical ceiling mode", () => {
   const args = ["--import", "imported", "--output", "results"];
-  assert.equal(options(args).budgetUsd, 10);
-  assert.equal(options([...args, "--budget-usd", "5"]).budgetUsd, 5);
-  assert.throws(() => options([...args, "--budget-usd", "10.01"]), /at most \$10/);
+  assert.equal(options(args).budgetUsd, null);
+  assert.equal(options(args).budgetPolicy, "provider-limit");
+  assert.throws(() => options([...args, "--budget-usd", "5"]), /explicit/);
+  assert.equal(
+    options([...args, "--budget-policy", "local-ceiling", "--budget-usd", "5"]).budgetUsd,
+    5,
+  );
+  assert.throws(
+    () => options([...args, "--budget-policy", "local-ceiling", "--budget-usd", "10.01"]),
+    /at most \$10/,
+  );
   const ledger = {
     ceilingUsd: 10,
     entries: [{ id: "retained", reservedUsd: 3, reportedUsd: 2 }],
@@ -277,6 +285,40 @@ test("dataset runs default to the authorized campaign ceiling and permit only lo
   reserveCharge(ledger, 8, "remaining");
   assert.throws(() => reserveCharge(ledger, 0.01, "too-much"), /budget/);
   assert.equal(ledger.entries.length, 2);
+});
+
+test("provider-limit accounting retains unknown estimates without stopping valid source results", async () => {
+  const ledger = {
+    budgetPolicy: "provider-limit",
+    ceilingUsd: 10,
+    entries: [{ id: "historical", reservedUsd: 50, reportedUsd: null }],
+  };
+  reserveCharge(ledger, null, "new");
+  assert.equal(ledger.entries[1].reportedUsd, null);
+  assert.equal(ledger.entries[1].reservedUsd, null);
+  assert.doesNotThrow(() => assertReconciledCharges(ledger));
+  assert.throws(() => reserveCharge(ledger, null, "new"), /Repeated/);
+  const trial = { id: "attempt", result: { outcome: "found" } };
+  const valid = await finishProviderAttempt(
+    trial,
+    {
+      budget: { budgetPolicy: "provider-limit", pendingCharges: 2 },
+      records: [
+        {
+          attemptId: "attempt",
+          forwarded: true,
+          identityValid: true,
+          observedIdentity: { generationId: "unique" },
+          reportedUsd: null,
+        },
+      ],
+      awaitIdle: async () => {},
+    },
+    new Set(),
+  );
+  assert.equal(valid, true);
+  assert.equal(trial.error, undefined);
+  assert.equal(trial.provider[0].reportedUsd, null);
 });
 
 test("reservation reviews must consume the full maximum with an explicit reason and ISO timestamp", () => {
@@ -606,15 +648,23 @@ globalThis.fetch = async (url, options) => {
       { requestSha256: "b".repeat(64) },
       { maximumUsd: 0 },
       { maximumUsd: "0.1" },
-      { maximumUsd: null },
       { requestSha256: "bad" },
-      { maximumUsd: 0.00000001 },
     ].map((change) => ({ ...plan, entries: [{ ...entry, ...change }] })),
   ];
   for (const [i, invalid] of failures.entries()) {
     const { result, forwarded } = await run(`invalid-${i}`, invalid);
     assert.notEqual(result.status, 0, `Invalid plan ${i} accepted`);
     assert.equal(forwarded, "", `Invalid plan ${i} forwarded`);
+  }
+  for (const maximumUsd of [null, 0.00000001]) {
+    const allowed = await run(`estimate-${maximumUsd}`, {
+      ...plan,
+      entries: [{ ...entry, maximumUsd }],
+    });
+    assert.ok(
+      allowed.forwarded.includes(model),
+      "Tracking estimates must not gate a valid frozen request",
+    );
   }
   for (const [name, changed] of [
     ["changed-input", { ...prepared, modelInput: "Stop: n1" }],
