@@ -108,6 +108,8 @@ Root commands are defined in `package.json`. Host C# build and formatting comman
 
 `clean` preserves source, `.env`, installed dependencies and database volumes. Each service has its own Dockerfile under `docker/<service>/`; `docker/compose.sh` resolves paths from the repository root.
 
+Preferred XPaths use explicit test contracts and meaningful target semantics before ordinary IDs, with live singleton same-node verification. See the [selection policy](docs/resolution.md#preferred-xpath) and [research](docs/research/2026-10-01-semantic-xpath-reuse.md) for scope and reuse limits.
+
 ## CI
 
 GitHub Actions selects affected .NET projects, Web and repository tooling from changed paths. Shared code selects its consumers; documentation-only changes skip application builds. Solution changes also build `Xpathed.slnx`. Formatting, lint, build and validation failures feed one final `check` result.
