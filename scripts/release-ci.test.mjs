@@ -28,6 +28,7 @@ test("key preflight accepts only a bounded non-resetting inference key within th
   for (const patch of [
     { limit: null },
     { limit_reset: "monthly" },
+    { limit_reset: undefined },
     { is_management_key: true },
     { limit_remaining: 3 },
     { limit_remaining: -1 },

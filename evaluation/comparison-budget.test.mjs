@@ -133,6 +133,10 @@ test("a fresh hosted proxy preserves authoritative historical spend and durably 
   assert.equal((await post()).status, 200);
   assert.equal(github.ledger.entries[1].reportedUsd, 0.001);
   assert.deepEqual(JSON.parse(await readFile(ledgerPath, "utf8")), github.ledger);
+  for (const stage of ["reservation", "reconciliation"]) {
+    const duration = proxy.records[0].remoteAccountingMs[stage];
+    assert.ok(Number.isFinite(duration) && duration >= 0);
+  }
 });
 
 test("missing remote state cannot initialize a new campaign and local spending cannot substitute for it", async (t) => {
@@ -742,6 +746,7 @@ test("qualification pins each approved profile and reserves the highest tier and
     assert.equal(request.provider.max_price.prompt, 0.25);
     assert.equal(request.provider.max_price.completion, 0.75);
     const record = proxy.records[index];
+    assert.deepEqual(record.remoteAccountingMs, { reservation: 0, reconciliation: 0 });
     assert.equal(record.profileId, profile.id);
     assert.equal(record.observedIdentity.model, profile.model);
     assert.equal(record.identityValid, true);

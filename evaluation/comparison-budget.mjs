@@ -314,12 +314,19 @@ export async function createBudgetProxy({
   const lock = `${ledgerPath}.lock`;
   await mkdir(lock);
   let ledger, remote;
-  const persist = async () => {
+  const persist = async (record, stage) => {
     await writeFile(`${ledgerPath}.pending`, JSON.stringify(ledger, null, 2) + "\n", {
       mode: 0o600,
     });
     await rename(`${ledgerPath}.pending`, ledgerPath);
-    await remote?.persist(ledger);
+    if (remote) {
+      const started = performance.now();
+      try {
+        await remote.persist(ledger);
+      } finally {
+        if (record) record.remoteAccountingMs[stage] = performance.now() - started;
+      }
+    }
   };
   try {
     try {
@@ -419,6 +426,7 @@ export async function createBudgetProxy({
       usage: null,
       reservedUsd: null,
       reportedUsd: null,
+      remoteAccountingMs: { reservation: 0, reconciliation: 0 },
     };
     records.push(record);
     let reservation;
@@ -448,7 +456,7 @@ export async function createBudgetProxy({
       reservation = ledger.entries.at(-1);
       reservation.attemptId = current.id;
       record.reservedUsd = maximum;
-      await persist();
+      await persist(record, "reservation");
       await retain(record);
       record.forwarded = true;
       const result = await fetchImpl(`${upstream}/chat/completions`, {
@@ -505,7 +513,7 @@ export async function createBudgetProxy({
         record.error =
           "Provider identity mismatch or response cache hit; further qualification calls are blocked";
       }
-      await persist();
+      await persist(record, "reconciliation");
       record.elapsedMs = performance.now() - started;
       await retain(record);
       send(result.status, payload);

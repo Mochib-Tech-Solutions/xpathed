@@ -17,7 +17,7 @@ export async function checkKeyBudget(key, remainingUsd, fetchImpl = fetch) {
   if (
     !data ||
     data.is_management_key !== false ||
-    data.limit_reset != null ||
+    data.limit_reset !== null ||
     !Number.isFinite(data.limit) ||
     data.limit <= 0 ||
     data.limit > 5 ||
