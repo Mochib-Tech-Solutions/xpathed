@@ -1,14 +1,11 @@
 // Apply the saved preference before the app paints.
 (() => {
-  let theme = "system";
+  let dark = true;
   try {
-    theme = localStorage.getItem("xpathed.theme") ?? "system";
+    dark = localStorage.getItem("xpathed.theme") !== "light";
   } catch {
-    // Use the system preference if storage is blocked.
+    // Keep the dark default if storage is blocked.
   }
-  const dark =
-    theme === "dark" ||
-    (theme !== "light" && window.matchMedia("(prefers-color-scheme: dark)").matches);
   document.documentElement.classList.toggle("dark", dark);
   document.documentElement.style.colorScheme = dark ? "dark" : "light";
 })();

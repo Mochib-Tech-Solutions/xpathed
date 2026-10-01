@@ -100,17 +100,15 @@ export default function Workspace() {
           className="order-first flex min-h-0 min-w-0 flex-1 flex-col bg-background sm:order-none"
           aria-label="Browser workspace"
         >
-          {session && (
-            <BrowserTabs
-              pages={pages}
-              activePageId={page?.pageId}
-              busy={!!busy}
-              onNew={newTab}
-              onSelect={selectTab}
-              onClose={closeTab}
-              onCloseAll={closeAllTabs}
-            />
-          )}
+          <BrowserTabs
+            pages={pages}
+            activePageId={page?.pageId}
+            busy={!!busy}
+            onNew={newTab}
+            onSelect={selectTab}
+            onClose={closeTab}
+            onCloseAll={closeAllTabs}
+          />
           <BrowserToolbar
             sessionId={session?.sessionId}
             pageUrl={page?.url}
@@ -122,8 +120,8 @@ export default function Workspace() {
           />
           <div
             id="browser-panel"
-            role={page ? "tabpanel" : undefined}
-            aria-labelledby={page ? `tab-${page.pageId}` : undefined}
+            role="tabpanel"
+            aria-labelledby={page ? `tab-${page.pageId}` : "tab-start"}
             className="relative min-h-0 flex-1 overflow-hidden bg-muted/50"
           >
             {session ? (

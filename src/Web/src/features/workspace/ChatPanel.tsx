@@ -1,4 +1,4 @@
-import { ArrowUp, Check, Copy, LoaderCircle, RotateCcw } from "lucide-react";
+import { ArrowUp, Check, Copy, Eraser, LoaderCircle } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import type { Resolution, ResolutionResult } from "./api";
@@ -132,7 +132,7 @@ export default function ChatPanel({
       className="flex h-[42%] min-h-56 min-w-0 flex-col border-t border-border bg-muted/40 sm:h-auto sm:min-h-0 sm:border-t-0 sm:border-r"
       aria-label="Chat"
     >
-      <div className="flex min-h-14 shrink-0 items-center justify-between border-b border-border px-4">
+      <div className="flex min-h-10 shrink-0 items-center gap-2 border-b border-border px-4">
         <h1 className="font-medium">Chat</h1>
         <Button
           type="button"
@@ -150,7 +150,7 @@ export default function ChatPanel({
             composer.current?.focus();
           }}
         >
-          <RotateCcw aria-hidden="true" />
+          <Eraser aria-hidden="true" />
         </Button>
       </div>
       <div
