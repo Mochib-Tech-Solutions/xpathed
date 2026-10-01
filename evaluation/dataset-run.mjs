@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
-import { readFile, writeFile, mkdir, rename, rm } from "node:fs/promises";
+import { readFile, writeFile, mkdir, rm } from "node:fs/promises";
 import { join, resolve } from "node:path";
-import { spawnSync } from "node:child_process";
+import { execFile, spawnSync } from "node:child_process";
 import {
   buildPlan,
   fingerprints,
@@ -11,6 +11,10 @@ import {
   retainConfigurations,
 } from "./run.mjs";
 import { gradeTrial, summarize } from "./grader.mjs";
+
+const profiles = JSON.parse(
+  await readFile(new URL("./qualification-profiles.json", import.meta.url), "utf8"),
+);
 
 const hash = (text) => createHash("sha256").update(text).digest("hex");
 const json = async (path) => JSON.parse(await readFile(path, "utf8"));
@@ -114,8 +118,15 @@ export function assertReconciledCharges(ledger) {
     throw new Error("Unreconciled prior attempt blocks further paid calls");
 }
 
-function options(args) {
-  const result = { mode: "deterministic", limit: 30, seed: 1, budgetUsd: 5, split: "train" };
+export function options(args) {
+  const result = {
+    mode: "deterministic",
+    limit: 30,
+    seed: 1,
+    budgetUsd: 5,
+    split: "train",
+    profile: "deepseek",
+  };
   const keys = {
     "--import": "import",
     "--output": "output",
@@ -126,6 +137,7 @@ function options(args) {
     "--budget-usd": "budgetUsd",
     "--split": "split",
     "--reviewed-inputs": "reviewedInputs",
+    "--profile": "profile",
   };
   const seen = new Set();
   for (let i = 0; i < args.length; i += 2) {
@@ -155,49 +167,83 @@ function options(args) {
     throw new Error(
       "Live dataset calls require --reviewed-inputs with exact input hashes and privacy review",
     );
+  if (!profiles.some((profile) => profile.id === result.profile && profile.variant === "baseline"))
+    throw new Error("Offline evaluation requires an approved baseline profile");
   result.budgetUsd = Number(result.budgetUsd);
   if (!(result.budgetUsd > 0 && result.budgetUsd <= 5))
     throw new Error("Initial experiment ceiling must be at most $5 total");
   return result;
 }
 
-async function apiKey() {
-  if (process.env.OPENROUTER_API_KEY) return process.env.OPENROUTER_API_KEY;
-  try {
-    const line = (await readFile(process.env.XPATHED_ENV_FILE ?? ".env", "utf8"))
-      .split(/\r?\n/)
-      .find((value) => /^OPENROUTER_API_KEY=/.test(value));
-    return line
-      ?.slice("OPENROUTER_API_KEY=".length)
-      .trim()
-      .replace(/^(["'])(.*)\1$/, "$2");
-  } catch (error) {
-    if (error.code !== "ENOENT") throw error;
-  }
-}
-
-function cli(path, env, prepareOnly = false) {
-  const command = spawnSync(
-    "dotnet",
-    [
-      "src/Resolver/bin/Release/net10.0/Resolver.dll",
-      "--evaluate-offline",
-      path,
-      ...(prepareOnly ? ["--prepare-only"] : []),
-    ],
-    { env, encoding: "utf8", timeout: 65000, maxBuffer: 2_000_000 },
-  );
-  if (command.error || !command.stdout?.trim())
-    throw new Error(
-      "Offline resolver process did not return evidence; its reserved cost remains charged",
+export async function cli(path, env, prepareOnly = false) {
+  // Keep the event loop available for the shared budget proxy while .NET runs.
+  const stdout = await new Promise((resolve, reject) => {
+    execFile(
+      "dotnet",
+      [
+        "src/Resolver/bin/Release/net10.0/Resolver.dll",
+        "--evaluate-offline",
+        path,
+        ...(prepareOnly ? ["--prepare-only"] : []),
+      ],
+      { env, encoding: "utf8", timeout: 65000, maxBuffer: 2_000_000 },
+      (error, stdout) => {
+        if (!stdout?.trim() || error?.killed || error?.code === "ENOENT")
+          reject(
+            new Error(
+              "Offline resolver process did not return evidence; its reserved cost remains charged",
+            ),
+          );
+        else resolve(stdout);
+      },
     );
+  });
   try {
-    return JSON.parse(command.stdout);
+    return JSON.parse(stdout);
   } catch {
     throw new Error(
       "Offline resolver returned malformed evidence; its reserved cost remains charged",
     );
   }
+}
+
+export function profileEnvironment(profile, baseUrl, inherited = process.env) {
+  const env = {
+    ...inherited,
+    OpenRouter__ApiKey: "dataset-proxy-only",
+    OpenRouter__BaseUrl: baseUrl,
+    OpenRouter__Model: profile.model,
+    OpenRouter__Provider: profile.provider,
+    OpenRouter__TimeoutSeconds: "30",
+  };
+  delete env.OpenRouter__ReasoningEffort;
+  delete env.OpenRouter__PromptCacheMode;
+  delete env.XPATHED_EVALUATION_PRICE_LIMITS;
+  if (profile.reasoning.effort) env.OpenRouter__ReasoningEffort = profile.reasoning.effort;
+  if (profile.promptCacheOptions) env.OpenRouter__PromptCacheMode = profile.promptCacheOptions.mode;
+  return env;
+}
+
+export function retainProviderEvidence(trial, records) {
+  const calls = records.filter((record) => record.attemptId === trial.id);
+  trial.provider = calls.map(({ request, response, ...metadata }) => metadata);
+  trial.evidence = { ...trial.evidence, provider: calls };
+}
+
+export function validProviderCalls(calls, generations) {
+  if (calls.length !== 1 || calls[0].forwarded !== true) return false;
+  const record = calls[0];
+  const generation = record.observedIdentity?.generationId;
+  if (
+    record.identityValid !== true ||
+    record.responseCacheHit ||
+    record.error ||
+    !generation ||
+    generations.has(generation)
+  )
+    return false;
+  generations.add(generation);
+  return true;
 }
 
 function normalize(result, attemptId) {
@@ -303,6 +349,9 @@ export async function main(args = process.argv.slice(2)) {
     createdAt: new Date().toISOString(),
     mode: opt.mode,
     track: "offline-selection",
+    profile: opt.mode === "live" ? profiles.find((profile) => profile.id === opt.profile) : null,
+    timingScope:
+      "Offline preparation and resolver child-process startup plus model selection; no browser or UI latency",
     measurement:
       opt.mode === "live"
         ? "offline model target selection"
@@ -333,67 +382,37 @@ export async function main(args = process.argv.slice(2)) {
   await mkdir(output, { mode: 0o700 });
   await mkdir(join(output, "trials"));
   await mkdir(join(output, "imports"));
-  let ledger, lock, ledgerPath, env;
-  const persistLedger = async () => {
-    await writeFile(`${ledgerPath}.pending`, JSON.stringify(ledger, null, 2) + "\n", {
-      mode: 0o600,
-    });
-    await rename(`${ledgerPath}.pending`, ledgerPath);
-  };
+  let proxy, env;
   try {
     if (opt.mode === "live") {
-      const key = await apiKey();
-      if (!key) throw new Error("Set OPENROUTER_API_KEY for an explicitly requested live pilot");
-      ledgerPath = resolve(".artifacts/datasets/experiment-budget.json");
-      await mkdir(resolve(".artifacts/datasets"), { recursive: true });
-      await mkdir(`${ledgerPath}.lock`);
-      lock = `${ledgerPath}.lock`;
-      try {
-        ledger = await json(ledgerPath);
-      } catch (error) {
-        if (error.code !== "ENOENT") throw error;
-        ledger = { version: 1, ceilingUsd: opt.budgetUsd, entries: [] };
-      }
-      ledger.ceilingUsd = Math.min(ledger.ceilingUsd, opt.budgetUsd);
-      assertReconciledCharges(ledger);
-      const response = await fetch(
-        "https://openrouter.ai/api/v1/models/deepseek/deepseek-v4.1-flash/endpoints",
-        { signal: AbortSignal.timeout(10000) },
-      );
-      if (!response.ok) throw new Error("Current route pricing is unavailable");
-      const endpoint = (await response.json()).data.endpoints.find((item) => item.tag === "wafer");
-      const rate = endpoint?.pricing;
-      if (
-        !rate ||
-        rate.overrides ||
-        !Number.isFinite(Number(rate.prompt)) ||
-        Number(rate.prompt) <= 0 ||
-        !Number.isFinite(Number(rate.completion)) ||
-        Number(rate.completion) <= 0 ||
-        !Number.isFinite(Number(rate.request ?? 0)) ||
-        Number(rate.request ?? 0) < 0
-      )
-        throw new Error("Unbounded or missing route prices");
-      manifest.pricing = { ...rate, fetchedAt: new Date().toISOString() };
-      env = {
-        ...process.env,
-        OpenRouter__ApiKey: key,
-        OpenRouter__BaseUrl: "https://openrouter.ai/api/v1/",
-        OpenRouter__Model: "deepseek/deepseek-v4.1-flash",
-        OpenRouter__Provider: "wafer",
-        OpenRouter__TimeoutSeconds: "30",
-        XPATHED_EVALUATION_PRICE_LIMITS: JSON.stringify({
-          prompt: Number(rate.prompt) * 1_000_000,
-          completion: Number(rate.completion) * 1_000_000,
-          request: Number(rate.request ?? 0),
-        }),
-      };
-      manifest.policy.experimentCeilingUsd = ledger.ceilingUsd;
-      await persistLedger();
+      // Import lazily: the shared proxy uses this module's reservation helpers.
+      const { createBudgetProxy } = await import("./comparison-budget.mjs");
+      const profile = manifest.profile;
+      await mkdir(join(output, "provider"));
+      proxy = await createBudgetProxy({
+        profiles: [profile],
+        ceilingUsd: opt.budgetUsd,
+        onRecord: (record) =>
+          writeFile(
+            join(output, "provider", `${record.id}.json`),
+            JSON.stringify(record, null, 2) + "\n",
+            { mode: 0o600 },
+          ),
+      });
+      await new Promise((resolve, reject) => {
+        proxy.server.once("error", reject);
+        proxy.server.listen(0, "127.0.0.1", resolve);
+      });
+      manifest.pricing = proxy.pricing;
+      manifest.routeMetadata = proxy.profiles;
+      manifest.budgetBefore = proxy.budget;
+      env = profileEnvironment(profile, `http://127.0.0.1:${proxy.server.address().port}/api/v1/`);
+      manifest.policy.experimentCeilingUsd = proxy.budget.ceilingUsd;
     }
     manifest.contentHash = hash(JSON.stringify(manifest));
     await save(join(output, "manifest.json"), manifest);
     const trials = [];
+    const generations = new Set();
     for (const planned of plan.trials) {
       const spec = cases.find((item) => item.id === planned.caseId);
       const trial = {
@@ -428,7 +447,7 @@ export async function main(args = process.argv.slice(2)) {
         if (opt.mode === "live") {
           inputPath = join(output, "trials", `${trial.id}.input.json`);
           await save(inputPath, input);
-          const prepared = cli(inputPath, env, true);
+          const prepared = await cli(inputPath, env, true);
           if (prepared.outcome === "error")
             throw new Error("Offline resolver rejected the prepared input");
           trial.evidence = {
@@ -446,21 +465,16 @@ export async function main(args = process.argv.slice(2)) {
           };
           trial.result = { configurationId: prepared.configurationId };
           await retainConfigurations(output, manifest, trial);
-          // UTF-8 bytes plus conservative framing allowance bound byte-level tokenization; output includes reasoning.
-          const maximumInput = Buffer.byteLength(JSON.stringify(prepared)) + 16384;
-          const maximum =
-            maximumInput * Number(manifest.pricing.prompt) +
-            4096 * Number(manifest.pricing.completion) +
-            Number(manifest.pricing.request ?? 0);
-          reserveCharge(ledger, maximum * 1.2, trial.id);
-          await persistLedger();
-          result = cli(inputPath, env);
-          const charge = result.diagnostics?.usage?.cost;
-          const reservation = ledger.entries.find((entry) => entry.id === trial.id);
-          if (typeof charge === "number" && Number.isFinite(charge) && charge >= 0)
-            reservation.reportedUsd = charge;
-          stop = reservation.reportedUsd == null || charge > reservation.reservedUsd;
-          await persistLedger();
+          proxy.beginAttempt(trial.id, opt.profile);
+          result = await cli(inputPath, env);
+          const calls = proxy.records.filter((record) => record.attemptId === trial.id);
+          stop = proxy.budget.pendingCharges > 0 || !validProviderCalls(calls, generations);
+          if (stop)
+            trial.error = {
+              code: "provider_evidence_invalid",
+              message:
+                "Provider identity, response reuse or charge evidence failed; further calls stopped",
+            };
         } else result = lexicalSelection(input);
         trial.result = normalize(result, trial.id);
         trial.elapsedMs = performance.now() - started;
@@ -469,6 +483,7 @@ export async function main(args = process.argv.slice(2)) {
         trial.elapsedMs = performance.now() - started;
         stop = opt.mode === "live";
       } finally {
+        if (proxy) retainProviderEvidence(trial, proxy.records);
         if (inputPath) await rm(inputPath, { force: true });
       }
       if (opt.mode === "live") await retainConfigurations(output, manifest, trial);
@@ -476,8 +491,13 @@ export async function main(args = process.argv.slice(2)) {
       await save(join(output, "trials", `${trial.id}.json`), trial);
       await save(join(output, "imports", `${trial.id}.json`), toArtifact(manifest, trial, grade));
       trials.push(trial);
+      if (opt.mode === "live")
+        console.log(
+          `${grade.passed ? "PASS" : "FAIL"} ${opt.profile} ${spec.id} ${Math.round(trial.elapsedMs)}ms (${trials.length}/${plan.trials.length})`,
+        );
       if (stop) break;
     }
+    if (proxy) await save(join(output, "budget.json"), proxy.budget);
     const summary = summarize(manifest, trials);
     await save(join(output, "summary.json"), summary);
     await writeFile(
@@ -501,7 +521,7 @@ export async function main(args = process.argv.slice(2)) {
     );
     return summary.passed ? 0 : 1;
   } finally {
-    if (lock) await rm(lock, { recursive: true });
+    await proxy?.close();
   }
 }
 

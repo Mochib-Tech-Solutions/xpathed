@@ -9,6 +9,7 @@ const approved = {
   "deepseek/deepseek-v4.1-flash": { provider: "wafer", reasoning: { enabled: false } },
   "openai/gpt-6-luna": { provider: "openai", reasoning: { effort: "none" } },
   "google/gemini-3.8-flash": { provider: "google-ai-studio", reasoning: { effort: "low" } },
+  "qwen/qwen3.8-flash": { provider: "alibaba", reasoning: { enabled: false } },
 };
 const equal = (left, right) =>
   object(left) &&
