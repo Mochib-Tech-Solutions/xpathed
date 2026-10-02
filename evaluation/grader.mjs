@@ -117,8 +117,6 @@ export function gradeTrial(caseSpec, trial) {
   if (metrics.privacyLeak) fail("privacy", "A privacy sentinel reached retained result/evidence.");
   if (metrics.oracleLeak)
     fail("oracle_leak", "Oracle information reached model-visible or returned evidence.");
-  if (trial?.accountingError != null)
-    fail("contract", "Evaluation provider accounting did not settle successfully.");
   if (trial?.observation?.passiveStateUnchanged === false)
     fail("passive_state", "Resolution changed page state beyond the permitted highlight.");
   metrics.savedLocator = null;

@@ -149,7 +149,7 @@ test("custom dataset suites cannot enter live mode or read outside the checkout"
 test("qualification cannot combine strategy comparison or inject an unreviewed suite", () => {
   for (const args of [
     ["--qualification", "--comparison"],
-    ["--qualification", "--suite", "evaluation/cases.json"],
+    ["--qualification", "--suite", "evaluation/research/viewport-cases.json"],
     ["--profile", "gemini"],
   ]) {
     const result = spawnSync("sh", ["scripts/evaluate.sh", ...args], {
@@ -168,7 +168,7 @@ test("context comparison isolates its service and rejects extra attempts or mode
     ["--context", "--repetitions", "2"],
     ["--context", "--case", "basic-save"],
     ["--context", "--seed", "2"],
-    ["--context", "--suite", "evaluation/cases.json"],
+    ["--context", "--suite", "evaluation/cases/index.json"],
   ]) {
     const result = runWrapper(t, "xpathed-evaluation-context-options", "resolver-context", args);
     assert.equal(result.status, 2);
@@ -184,16 +184,14 @@ test("context comparison isolates its service and rejects extra attempts or mode
   assert.match(accepted.calls, /compose.context.yaml/);
 });
 
-test("qualification accepts the reviewed viewport baseline and forwards its container suite path", (t) => {
+test("release comparison accepts the unified collection and forwards its container path", (t) => {
   const result = runWrapper(t, "xpathed-evaluation-baseline", "resolver", [
     "--qualification",
     "--suite",
-    "evaluation/viewport-baseline-cases.json",
+    "evaluation/cases/index.json",
     "--profile",
     "deepseek",
-    "--split",
-    "regression",
   ]);
   assert.equal(result.status, 77);
-  assert.match(result.calls, /suite=\/workspace\/evaluation\/viewport-baseline-cases.json/);
+  assert.match(result.calls, /suite=\/workspace\/evaluation\/cases\/index.json/);
 });

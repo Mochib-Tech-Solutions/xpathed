@@ -343,11 +343,21 @@ test("importable artifacts keep model input only inside expiring evidence", () =
   );
 });
 
-test("artifact cleanup erases both model inputs at30 days without discarding outcomes", async () => {
+test("artifact cleanup erases browser and offline inputs at 30 days without discarding outcomes", async () => {
   const path = await mkdtemp(join(tmpdir(), "evaluation-retention-"));
   try {
     await mkdir(join(path, "trials"));
     await mkdir(join(path, "imports"));
+    await mkdir(join(path, "offline"));
+    await writeFile(
+      join(path, "offline", "a.request.json"),
+      JSON.stringify({ input: "raw input" }),
+    );
+    await writeFile(
+      join(path, "offline", "a.response.json"),
+      JSON.stringify({ prepared: "raw prompt", result: "raw output" }),
+    );
+    const expected = { actions: [{ target: { candidateId: "c1" } }] };
     await writeFile(
       join(path, "manifest.json"),
       JSON.stringify({
@@ -356,19 +366,38 @@ test("artifact cleanup erases both model inputs at30 days without discarding out
         createdAt: "2026-08-01T00:00:00Z",
         plan: { trials: [] },
         code: { revision: "test" },
+        contentHash: "original-frozen-hash",
+        cases: [
+          {
+            id: "offline",
+            expected,
+            input: { instruction: "Click Save", candidates: [{ id: "c1", text: "raw input" }] },
+          },
+        ],
       }),
     );
     await writeFile(
       join(path, "trials", "a.json"),
       JSON.stringify({
         result: { outcome: "found" },
+        provider: [{ forwarded: true, reportedUsd: 0.001 }],
         evidence: { modelInput: "secret" },
         baseline: { result: { outcome: "not_found" }, evidence: { modelInput: "baseline secret" } },
         mutation: { fresh: { evidence: { modelInput: "secret" } } },
       }),
     );
     await writeFile(join(path, "trials", "a.json.partial"), '{"evidence":"interrupted raw input"');
-    await prune(path, new Date("2026-09-01T00:00:00Z"));
+    assert.equal(await prune(path, new Date("2026-08-30T00:00:00Z")), "retained");
+    const retained = JSON.parse(await readFile(join(path, "manifest.json"), "utf8"));
+    assert.ok(retained.cases[0].input);
+    assert.equal(await prune(path, new Date("2026-08-31T00:00:00Z")), "evidence_deleted");
+    const expired = JSON.parse(await readFile(join(path, "manifest.json"), "utf8"));
+    assert.equal(expired.cases[0].input, undefined);
+    assert.deepEqual(expired.cases[0].expected, expected);
+    assert.equal(expired.evidenceAvailability, "expired");
+    assert.equal(expired.contentHash, "original-frozen-hash");
+    await assert.rejects(readFile(join(path, "offline", "a.request.json")), { code: "ENOENT" });
+    await assert.rejects(readFile(join(path, "offline", "a.response.json")), { code: "ENOENT" });
     await assert.rejects(() => readFile(join(path, "trials", "a.json.partial")), {
       code: "ENOENT",
     });
@@ -378,6 +407,7 @@ test("artifact cleanup erases both model inputs at30 days without discarding out
     assert.equal(trial.baseline.evidence, null);
     assert.equal(trial.baseline.result.outcome, "not_found");
     assert.equal(trial.result.outcome, "found");
+    assert.deepEqual(trial.provider, [{ forwarded: true, reportedUsd: 0.001 }]);
   } finally {
     await rm(path, { recursive: true, force: true });
   }
@@ -429,7 +459,7 @@ test("context retention expires prepared requests and preflight evidence, then r
 });
 
 test("current-view runs request scoped capture and reject a legacy-scope response", async (t) => {
-  const { trial } = await runWithServices(t, "current-view-control-states-1-v4", {
+  const { trial } = await runWithServices(t, "control-states-1-v4", {
     contractVersion: "4",
   });
   assert.match(trial.captureObservation.error.message, /wrong scope/);

@@ -1,136 +1,235 @@
+import { loadCases } from "./cases/load.mjs";
 import assert from "node:assert/strict";
-import { test } from "node:test";
-import { assertParity, selectCases, normalizeStagehand, summarizePairs, main } from "./compare.mjs";
-import { prune } from "./run.mjs";
-import { mkdtemp, writeFile, readFile, mkdir, rm, access } from "node:fs/promises";
+import test from "node:test";
+import { createHash } from "node:crypto";
+import { spawnSync } from "node:child_process";
+import { mkdtemp, mkdir, readFile, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createHash } from "node:crypto";
+import { createServer } from "node:http";
+import { once } from "node:events";
+import {
+  buildMatrixPlan,
+  parseQualificationOptions,
+  selectQualificationCases,
+  readRun,
+  profiles,
+  fixtureProxy,
+  summarizeMonitoring,
+  savePairedTrial,
+  validateReleaseArtifact,
+} from "./compare.mjs";
+import currentPolicy from "./policy.json" with { type: "json" };
+import { fingerprints } from "./run.mjs";
 
-test("comparison uses current single-action cases and preserves explicit plural cardinality", () => {
-  const cases = selectCases();
-  assert.ok(cases.length > 5);
-  for (const item of cases) {
-    assert.equal(item.contractVersion, "3");
-    assert.equal(new Set(item.expected.actions.map((a) => a.action)).size, 1);
-    assert.equal(item.mutation, undefined);
-  }
-  assert.equal(selectCases("single-action-plural-confirmations")[0].cardinality, "all");
-  assert.throws(() => selectCases("plural-partial"), /comparison case/);
+const releaseArtifact = (sourceSha) => ({
+  version: 1,
+  bundleManifestSha256: "b".repeat(64),
+  sourceSha,
+  profileId: "deepseek",
+  platform: { os: "linux", architecture: "amd64" },
+  images: ["browser", "resolver"].map((component, index) => ({
+    component,
+    id: `sha256:${String(index + 1).repeat(64)}`,
+    os: "linux",
+    architecture: "amd64",
+    sourceSha,
+  })),
 });
 
-test("missing attempts stay in stratum denominators and partial errors and unknown charges remain visible", () => {
-  const manifest = {
-    mode: "live",
-    cases: [
-      { id: "a", cardinality: "singleton" },
-      { id: "b", cardinality: "all" },
-    ],
-    plan: {
-      trials: [
-        { caseId: "a", repetition: 1 },
-        { caseId: "a", repetition: 2 },
-        { caseId: "b", repetition: 1 },
-      ],
-    },
-  };
-  const report = summarizePairs(manifest, [
-    {
-      caseId: "a",
-      repetition: 1,
-      strategy: "custom",
-      cardinality: "singleton",
-      result: { outcome: "partial" },
-      grade: { passed: false, metrics: { unsupported: true, operationalError: true } },
-      provider: [{ forwarded: true, reservedUsd: null, reportedUsd: null, usage: null }],
-    },
-  ]);
-  assert.equal(report.strategies.custom.singleton.total, 2);
-  assert.equal(report.strategies.stagehand.plural.total, 1);
-  assert.equal(report.strategies.custom.errors, 1);
-  assert.equal(report.strategies.custom.unsupported, 1);
-  assert.equal(report.strategies.custom.reportedUsd, null);
-  assert.equal(report.strategies.custom.knownReportedUsd, 0);
-  assert.equal(report.strategies.custom.usage.prompt_tokens, null);
-  assert.equal(report.commonCoverage, 0);
-  assert.equal(report.passed, false);
-});
-
-test("replay retains missing trials and rejects a changed runner; pruning removes raw provider snapshots", async (t) => {
-  t.mock.method(console, "log", () => {});
-  const directory = await mkdtemp(join(tmpdir(), "xpathed-comparison-"));
-  const sha = (value) => createHash("sha256").update(value).digest("hex");
-  const manifest = {
-    version: "1",
-    id: "test",
-    mode: "deterministic",
-    createdAt: "2026-08-01T00:00:00Z",
-    code: { revision: "test" },
-    cases: selectCases("basic-save"),
-    plan: { trials: [{ id: "attempt", caseId: "basic-save", repetition: 1 }] },
-    graderHash: sha(await readFile(new URL("./comparison-grade.mjs", import.meta.url))),
-    runnerHash: sha(await readFile(new URL("./compare.mjs", import.meta.url))),
-  };
-  const persist = () =>
-    writeFile(
-      join(directory, "manifest.json"),
-      JSON.stringify({ ...manifest, contentHash: sha(JSON.stringify(manifest)) }),
-    );
-  try {
-    await persist();
-    assert.equal(await main(["--replay", directory]), 1);
-    manifest.runnerHash = "changed";
-    await persist();
-    await assert.rejects(main(["--replay", directory]), /integrity mismatch/);
-    await mkdir(join(directory, "trials"));
-    await writeFile(
-      join(directory, "trials", "attempt.json"),
-      JSON.stringify({ evidence: { input: "private" }, result: { outcome: "found" } }),
-    );
-    await mkdir(join(directory, "provider"));
-    await writeFile(join(directory, "provider", "request.json"), "private provider input");
-    assert.equal(await prune(directory, new Date("2026-09-01T00:00:00Z")), "evidence_deleted");
-    await assert.rejects(access(join(directory, "provider")));
-    assert.equal(
-      JSON.parse(await readFile(join(directory, "trials", "attempt.json"), "utf8")).evidence,
-      null,
-    );
-  } finally {
-    await rm(directory, { recursive: true, force: true });
-  }
-});
-
-test("environment mismatches stop comparison before inference", () => {
-  const baseline = {
-    viewport: { width: 1280, height: 800 },
-    userAgent: "Chrome/123",
-    language: "en-US",
-    languages: ["en-US"],
-    timeZone: "UTC",
-    initialState: [{ scroll: [0, 0] }],
-    documentChecksum: ["fnv1a32-utf16:abcdabcd"],
-  };
-  assert.doesNotThrow(() => assertParity(baseline, structuredClone(baseline)));
-  for (const key of Object.keys(baseline)) {
-    assert.throws(() => assertParity(baseline, { ...baseline, [key]: null }), /parity/);
-  }
-  assert.throws(() => assertParity({}, {}), /parity/);
-});
-
-test("adapter methods are normalized without inventing an action or successful unsupported target", () => {
-  assert.equal(normalizeStagehand({ status: "not_found", targets: [] }).outcome, "not_found");
-  const result = normalizeStagehand({
-    status: "found",
-    targets: [{ method: "fill", xpaths: ["//input"], frame: { chain: [] } }],
+test("qualification preparation does not supply synthetic prices to the Resolver cache", async (t) => {
+  let calls = 0;
+  const upstream = createServer((req, res) => {
+    calls++;
+    res.end("{}");
   });
-  assert.equal(result.actions[0].action, "fill");
-  assert.equal(result.actions[0].target.xpaths[0], "//input");
+  upstream.listen(0, "127.0.0.1");
+  await once(upstream, "listening");
+  const proxy = fixtureProxy(`http://127.0.0.1:${upstream.address().port}`, 1000);
+  proxy.listen(0, "127.0.0.1");
+  await once(proxy, "listening");
+  t.after(() => {
+    proxy.closeAllConnections();
+    proxy.close();
+    upstream.closeAllConnections();
+    upstream.close();
+  });
+  const base = `http://127.0.0.1:${proxy.address().port}`;
+  assert.equal((await fetch(`${base}/api/v1/models/example/model/endpoints`)).status, 404);
+  assert.equal(calls, 0);
   assert.equal(
-    normalizeStagehand({ status: "unsupported", targets: [], unsupported: [{}] }).outcome,
-    "unsupported",
+    (await fetch(`${base}/api/v1/chat/completions`, { method: "POST", body: "{}" })).status,
+    200,
   );
-  assert.equal(
-    normalizeStagehand({ status: "found", targets: [{ method: "invented" }] }).actions[0].action,
-    "unsupported",
+  assert.equal(calls, 1);
+});
+
+test("replay preserves absent planned attempts and rejects swapped trial identities", async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), "xpathed-qualification-replay-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  await mkdir(join(directory, "trials"));
+  const digest = (value) =>
+    createHash("sha256")
+      .update(typeof value === "string" ? value : JSON.stringify(value))
+      .digest("hex");
+  const files = {};
+  for (const path of [
+    "evaluation/compare.mjs",
+    "evaluation/grader.mjs",
+    "evaluation/policy.mjs",
+    "evaluation/comparison.mjs",
+  ])
+    files[path] = digest(await readFile(new URL(`../${path}`, import.meta.url), "utf8"));
+  const spec = loadCases().cases[0];
+  const planned = { id: "test", caseId: spec.id, profileId: "deepseek", repetition: 1, attempt: 1 };
+  const manifest = {
+    kind: "model-qualification",
+    profiles: [{ id: "deepseek" }],
+    cases: [spec],
+    plan: { trials: [planned] },
+    code: { files },
+  };
+  manifest.contentHash = digest(manifest);
+  await writeFile(join(directory, "manifest.json"), JSON.stringify(manifest));
+  assert.equal((await readRun(directory)).trials.length, 0);
+  await writeFile(
+    join(directory, "trials", "test.json"),
+    JSON.stringify({ ...planned, profileId: "gemini" }),
   );
+  await assert.rejects(readRun(directory), /identity mismatch/);
+  await writeFile(join(directory, "trials", "test.json"), JSON.stringify(planned));
+  assert.equal((await readRun(directory)).trials.length, 1);
+  manifest.code.revision = "a".repeat(40);
+  manifest.profiles = [{ id: "deepseek" }];
+  const artifact = releaseArtifact(manifest.code.revision);
+  manifest.qualification = { artifact };
+  delete manifest.contentHash;
+  manifest.contentHash = digest(manifest);
+  await writeFile(join(directory, "manifest.json"), JSON.stringify(manifest));
+  assert.deepEqual((await readRun(directory)).manifest.qualification.artifact, artifact);
+  manifest.qualification = { artifact: { version: 1 } };
+  delete manifest.contentHash;
+  manifest.contentHash = digest(manifest);
+  await writeFile(join(directory, "manifest.json"), JSON.stringify(manifest));
+  await assert.rejects(readRun(directory), /artifact/i);
+  delete manifest.qualification;
+  manifest.cases[0].instruction = "tampered";
+  await writeFile(join(directory, "manifest.json"), JSON.stringify(manifest));
+  await assert.rejects(readRun(directory), /integrity mismatch/);
+});
+
+test("a baseline reservation failure retains the completed candidate and partial baseline", async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), "xpathed-paired-evidence-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const trial = { id: "candidate", result: { outcome: "found" }, observation: { preserved: true } };
+  await assert.rejects(
+    () =>
+      savePairedTrial(directory, trial, async (retain) => {
+        const first = JSON.parse(await readFile(join(directory, "candidate.json"), "utf8"));
+        assert.deepEqual(first, trial);
+        await retain({ id: "baseline", result: null });
+        throw new Error("reservation unavailable");
+      }),
+    /reservation unavailable/,
+  );
+  const saved = JSON.parse(await readFile(join(directory, "candidate.json"), "utf8"));
+  assert.deepEqual(saved.observation, { preserved: true });
+  assert.deepEqual(saved.baseline, { id: "baseline", result: null });
+});
+
+test("release selection reuses every reviewed current case without a phase or split gate", () => {
+  const options = parseQualificationOptions([]);
+  assert.deepEqual(options.profileIds, ["deepseek"]);
+  for (const args of [
+    ["--phase", "pilot"],
+    ["--pilot", "previous"],
+    ["--split", "held-out"],
+    ["--repetitions", "2"],
+  ])
+    assert.throws(() => parseQualificationOptions(args));
+  const cases = [
+    { id: "old", contractVersion: "3" },
+    { id: "new", contractVersion: "4", split: "held-out" },
+    { id: "regression", contractVersion: "4", split: "regression" },
+    { id: "offline", track: "offline-selection" },
+    { id: "mutation", contractVersion: "4", mutation: {} },
+    { id: "fault", contractVersion: "4", provider: { fault: "timeout" } },
+  ];
+  const selected = selectQualificationCases(cases, options);
+  assert.deepEqual(
+    selected.cases.map((c) => c.id),
+    ["new", "regression", "offline"],
+  );
+  assert.equal(selected.exclusions.length, 3);
+  const plan = buildMatrixPlan(selected.cases, [{ id: "candidate" }], options);
+  assert.equal(plan.trials.length, 3);
+  assert.equal(plan.retries, 0);
+});
+test("artifact identities must bind both components to the tested source and profile", () => {
+  const sha = "a".repeat(40),
+    artifact = releaseArtifact(sha);
+  assert.equal(validateReleaseArtifact(artifact, sha, ["deepseek"]), artifact);
+  for (const broken of [
+    { ...artifact, sourceSha: "b".repeat(40) },
+    { ...artifact, images: artifact.images.slice(0, 1) },
+    { ...artifact, profileId: "unknown" },
+  ])
+    assert.throws(() => validateReleaseArtifact(broken, sha, ["deepseek"]));
+});
+
+test("nightly requires independent live generation IDs without matching the saved reference IDs", () => {
+  const cases = ["one", "two"].map((id) => ({
+    id,
+    contractVersion: "4",
+    expected: {
+      outcome: "not_found",
+      actions: [{ step: 1, action: "click", outcome: "not_found" }],
+    },
+  }));
+  const profile = { model: "model", provider: "provider" };
+  const manifest = {
+    monitoring: true,
+    mode: "live",
+    cases,
+    profiles: [profile],
+    policy: { hardFailureCategories: [] },
+  };
+  const trials = cases.map((spec, index) => ({
+    caseId: spec.id,
+    elapsedMs: 100,
+    result: {
+      contractVersion: "4",
+      action: "click",
+      outcome: "not_found",
+      actions: [{ step: 1, order: 1, actionId: "a1", action: "click", outcome: "not_found" }],
+      summary: { processingComplete: true },
+    },
+    provider: [
+      {
+        forwarded: true,
+        identityValid: true,
+        responseCacheHit: false,
+        responseReuseDisabled: true,
+        observedIdentity: { generationId: `new-${index}` },
+        requestedIdentity: profile,
+      },
+    ],
+  }));
+  const baseline = cases.map((spec, index) => ({
+    caseId: spec.id,
+    passed: true,
+    elapsedMs: 100,
+    operational: false,
+    hardFailure: false,
+    generationId: `old-${index}`,
+  }));
+  assert.equal(summarizeMonitoring(manifest, trials, baseline).status, "passed");
+  for (const invalid of ["new-0", "", " ", null]) {
+    const changed = structuredClone(trials);
+    changed[1].provider[0].observedIdentity.generationId = invalid;
+    const result = summarizeMonitoring(manifest, changed, baseline);
+    assert.equal(result.status, "infrastructure_failure");
+    assert.equal(result.entries[1].operational, true);
+    assert.equal(result.defaultActivated, false);
+  }
 });

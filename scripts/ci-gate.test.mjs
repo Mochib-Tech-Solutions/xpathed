@@ -146,7 +146,7 @@ function browserEvidence(work) {
     },
   };
   const suite = { version: "1", cases: [spec] };
-  work.write("evaluation/cases.json", suite);
+  work.write("evaluation/cases/index.json", suite);
   const planned = { caseId: spec.id, repetition: 1, attempt: 1, id: "a".repeat(32) };
   const trial = {
     ...planned,
@@ -176,7 +176,7 @@ function browserEvidence(work) {
       files: {
         "package.json": hash("{}"),
         "global.json": hash("{}"),
-        "evaluation/cases.json": hash(JSON.stringify(suite)),
+        "evaluation/cases/index.json": hash(JSON.stringify(suite)),
         "evaluation/grader.mjs": hash(
           readFileSync(new URL("../evaluation/grader.mjs", import.meta.url)),
         ),

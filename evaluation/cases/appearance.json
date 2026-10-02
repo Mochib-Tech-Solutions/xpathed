@@ -1,0 +1,414 @@
+[
+  {
+    "id": "color-only-reference-v4",
+    "family": "color-layout",
+    "split": "regression",
+    "category": "appearance",
+    "fixture": "qualification-color",
+    "instruction": "Click the red Choose button.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "expected": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "target": {
+            "selector": "#choose-warm",
+            "frames": []
+          },
+          "state": {
+            "enabled": true,
+            "inViewport": true
+          },
+          "interactability": {
+            "status": "ready",
+            "reasons": [],
+            "checks": {
+              "compatibleControl": "pass",
+              "enabled": "pass",
+              "viewport": "pass",
+              "pointerReception": "pass",
+              "eventOutcome": "unknown"
+            }
+          }
+        }
+      ],
+      "outcome": "found",
+      "summary": {
+        "processingComplete": true,
+        "semanticCompleteness": "unverified",
+        "total": 1,
+        "found": 1,
+        "notFound": 0,
+        "unsupported": 0,
+        "errors": 0,
+        "blocked": 0,
+        "readinessUnknown": 0,
+        "assessmentUnsupported": 0
+      }
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "label": "Choose",
+          "tag": "button",
+          "index": 1
+        }
+      ]
+    },
+    "oracleSentinels": ["QUALIFICATION_ORACLE_PRIVATE_37e2"],
+    "contractVersion": "4",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-fixture-source-review",
+      "reviewedAt": "2026-10-01T14:02:32.742094+00:00"
+    },
+    "setupRevision": "viewport-baseline-1",
+    "labelProvenance": {
+      "kind": "controlled-authored",
+      "sourceCaseId": "color-only-reference",
+      "scopeReview": "independent source review; browser observation pending"
+    },
+    "sourceSplit": "regression",
+    "sourceCatalogs": [
+      "current-view-qualification-cases.json",
+      "viewport-baseline-cases.json",
+      "cases.json"
+    ],
+    "sourceIds": ["color-only-reference-v4", "current-view-color-only-reference-v4"],
+    "group": "appearance"
+  },
+  {
+    "id": "release2-palette-1",
+    "family": "release2-palette",
+    "split": "regression",
+    "category": "current-view",
+    "fixture": "release2-palette",
+    "instruction": "Click the leftmost button in Drawing tools.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "setupRevision": "release-current-view-2",
+    "contractVersion": "4",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-release-label-review",
+      "reviewedAt": "2026-10-02T09:51:00.919216+00:00"
+    },
+    "expected": {
+      "outcome": "found",
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "target": {
+            "selector": "#palette-eraser",
+            "frames": []
+          },
+          "state": {
+            "inViewport": true,
+            "enabled": true
+          },
+          "interactability": {
+            "status": "ready"
+          }
+        }
+      ],
+      "summary": {
+        "processingComplete": true
+      }
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "label": "Eraser",
+          "tag": "button"
+        }
+      ]
+    },
+    "labelProvenance": {
+      "kind": "controlled-authored",
+      "modelExposure": "Reserved for interrupted live qualification 36994124655; retained as regression without relabeling",
+      "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
+      "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt9-holdout-check"
+    },
+    "previousSplit": "held-out",
+    "exposureRunId": "36994124655",
+    "exposedAt": "2026-10-02T10:26:06.108Z",
+    "sourceSplit": "regression",
+    "sourceCatalogs": ["current-view-qualification-cases.json"],
+    "group": "appearance"
+  },
+  {
+    "id": "release2-palette-2",
+    "family": "release2-palette",
+    "split": "regression",
+    "category": "current-view",
+    "fixture": "release2-palette",
+    "instruction": "Click Pen.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "setupRevision": "release-current-view-2",
+    "contractVersion": "4",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-release-label-review",
+      "reviewedAt": "2026-10-02T09:51:00.919216+00:00"
+    },
+    "expected": {
+      "outcome": "found",
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "target": {
+            "selector": "#palette-pen",
+            "frames": []
+          },
+          "state": {
+            "inViewport": true,
+            "enabled": true
+          },
+          "interactability": {
+            "status": "ready"
+          }
+        }
+      ],
+      "summary": {
+        "processingComplete": true
+      }
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "label": "Pen",
+          "tag": "button"
+        }
+      ]
+    },
+    "labelProvenance": {
+      "kind": "controlled-authored",
+      "modelExposure": "Reserved for interrupted live qualification 36994124655; retained as regression without relabeling",
+      "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
+      "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt9-holdout-check"
+    },
+    "previousSplit": "held-out",
+    "exposureRunId": "36994124655",
+    "exposedAt": "2026-10-02T10:26:06.108Z",
+    "sourceSplit": "regression",
+    "sourceCatalogs": ["current-view-qualification-cases.json"],
+    "group": "appearance"
+  },
+  {
+    "id": "release2-palette-3",
+    "family": "release2-palette",
+    "split": "regression",
+    "category": "current-view",
+    "fixture": "release2-palette",
+    "instruction": "Hover over Clear canvas.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "setupRevision": "release-current-view-2",
+    "contractVersion": "4",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-release-label-review",
+      "reviewedAt": "2026-10-02T09:51:00.919216+00:00"
+    },
+    "expected": {
+      "outcome": "found",
+      "actions": [
+        {
+          "step": 1,
+          "action": "hover",
+          "outcome": "found",
+          "target": {
+            "selector": "#clear-canvas",
+            "frames": []
+          },
+          "state": {
+            "inViewport": true,
+            "enabled": false
+          },
+          "interactability": {
+            "status": "ready"
+          }
+        }
+      ],
+      "summary": {
+        "processingComplete": true
+      }
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "hover",
+          "outcome": "found",
+          "label": "Clear canvas",
+          "tag": "button"
+        }
+      ]
+    },
+    "labelProvenance": {
+      "kind": "controlled-authored",
+      "modelExposure": "Reserved for interrupted live qualification 36994124655; retained as regression without relabeling",
+      "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
+      "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt9-holdout-check"
+    },
+    "previousSplit": "held-out",
+    "exposureRunId": "36994124655",
+    "exposedAt": "2026-10-02T10:26:06.108Z",
+    "sourceSplit": "regression",
+    "sourceCatalogs": ["current-view-qualification-cases.json"],
+    "group": "appearance"
+  },
+  {
+    "id": "above-reference-v4",
+    "family": "spatial-layout",
+    "split": "regression",
+    "category": "geometry",
+    "fixture": {
+      "kind": "derived-static-dom",
+      "tree": {
+        "tag": "main",
+        "children": [
+          {
+            "tag": "div",
+            "children": [
+              {
+                "tag": "button",
+                "text": "Preview",
+                "attributes": {
+                  "id": "preview-layout"
+                }
+              }
+            ]
+          },
+          {
+            "tag": "div",
+            "children": [
+              {
+                "tag": "button",
+                "text": "Delete",
+                "attributes": {
+                  "id": "delete-layout"
+                }
+              }
+            ]
+          },
+          {
+            "tag": "div",
+            "children": [
+              {
+                "tag": "button",
+                "text": "Restore",
+                "attributes": {
+                  "id": "restore-layout"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "instruction": "Click the button above Delete.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "expected": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "target": {
+            "selector": "#preview-layout",
+            "frames": []
+          },
+          "state": {
+            "enabled": true,
+            "inViewport": true
+          },
+          "interactability": {
+            "status": "ready",
+            "reasons": [],
+            "checks": {
+              "compatibleControl": "pass",
+              "enabled": "pass",
+              "viewport": "pass",
+              "pointerReception": "pass",
+              "eventOutcome": "unknown"
+            }
+          }
+        }
+      ],
+      "outcome": "found",
+      "summary": {
+        "processingComplete": true,
+        "semanticCompleteness": "unverified",
+        "total": 1,
+        "found": 1,
+        "notFound": 0,
+        "unsupported": 0,
+        "errors": 0,
+        "blocked": 0,
+        "readinessUnknown": 0,
+        "assessmentUnsupported": 0
+      }
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "label": "Preview",
+          "tag": "button"
+        }
+      ]
+    },
+    "oracleSentinels": ["QUALIFICATION_ORACLE_PRIVATE_37e2"],
+    "contractVersion": "4",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-fixture-source-review",
+      "reviewedAt": "2026-10-01T14:02:32.742091+00:00"
+    },
+    "setupRevision": "viewport-baseline-1",
+    "labelProvenance": {
+      "kind": "controlled-authored",
+      "sourceCaseId": "above-reference",
+      "scopeReview": "independent source review; browser observation pending"
+    },
+    "sourceSplit": "regression",
+    "sourceCatalogs": ["current-view-qualification-cases.json", "viewport-baseline-cases.json"],
+    "group": "appearance"
+  }
+]

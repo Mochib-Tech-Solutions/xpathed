@@ -6,6 +6,8 @@ import { fileURLToPath } from "node:url";
 import { isDeepStrictEqual } from "node:util";
 import { setTimeout as delay } from "node:timers/promises";
 
+import { loadCases } from "./cases/load.mjs";
+
 const directory = fileURLToPath(new URL(".", import.meta.url));
 const hash = (value) =>
   createHash("sha256")
@@ -666,12 +668,11 @@ export async function prune(path, now = new Date()) {
     return "records_deleted";
   }
   if (age < 30 * 86400000) return "retained";
-  if (context) {
-    delete manifest.preparedRequests;
-    manifest.evidenceAvailability = "expired";
-    // Keep the frozen hash: removed raw evidence intentionally cannot pass replay integrity.
-    await writeFile(join(path, "manifest.json"), JSON.stringify(manifest, null, 2) + "\n");
-  }
+  if (context) delete manifest.preparedRequests;
+  for (const spec of manifest.cases ?? []) delete spec.input;
+  manifest.evidenceAvailability = "expired";
+  // Keep the frozen hash: removed raw evidence intentionally cannot pass replay integrity.
+  await writeFile(join(path, "manifest.json"), JSON.stringify(manifest, null, 2) + "\n");
   for (const sub of ["trials", "imports", ...(context ? ["preflight"] : [])])
     for (const file of await readdir(join(path, sub)).catch((error) => {
       if (error.code === "ENOENT") return [];
@@ -695,6 +696,7 @@ export async function prune(path, now = new Date()) {
     }
   // Comparison provider snapshots contain the same expiring input/output evidence.
   await rm(join(path, "provider"), { recursive: true, force: true });
+  await rm(join(path, "offline"), { recursive: true, force: true });
   return "evidence_deleted";
 }
 
@@ -710,8 +712,8 @@ export async function main(args = process.argv.slice(2)) {
     return summary.passed ? 0 : 1;
   }
   const { gradeTrial, summarize } = await import("./grader.mjs");
-  const suite = await readJson(
-    process.env.XPATHED_EVALUATION_SUITE || join(directory, "cases.json"),
+  const suite = loadCases(
+    process.env.XPATHED_EVALUATION_SUITE || join(directory, "cases/index.json"),
   );
   if (process.env.XPATHED_EVALUATION_SUITE && options.mode !== "deterministic")
     throw new Error(

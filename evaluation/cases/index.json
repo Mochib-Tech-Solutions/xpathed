@@ -1,0 +1,15 @@
+{
+  "version": "1",
+  "groups": [
+    "compatibility.json",
+    "targeting.json",
+    "cardinality.json",
+    "appearance.json",
+    "context.json",
+    "scope.json",
+    "state.json",
+    "robustness.json",
+    "frames.json",
+    "locators.json"
+  ]
+}
