@@ -15,6 +15,8 @@ import {
 import { verify as verifyBundle } from "./release-bundle.mjs";
 import { fingerprints, configurationRecord } from "../evaluation/run.mjs";
 import { policyForSuite, summarizeQualification } from "../evaluation/qualification-policy.mjs";
+import { assertPilotReady } from "../evaluation/qualify.mjs";
+import { compareTrials } from "../evaluation/release-comparison.mjs";
 import { gradeTrial } from "../evaluation/grader.mjs";
 
 const hash = (value) =>
@@ -217,21 +219,32 @@ async function evidence(options) {
         receipt = JSON.parse(receiptBytes);
       const expectedKeys = (value, keys) =>
         value && isDeepStrictEqual(Object.keys(value).sort(), keys.sort());
-      const observed = (value) =>
+      const observed = (value, expectedArtifact = artifact) =>
         Array.isArray(value) &&
         value.length === 2 &&
         value.every(
           (item, index) =>
             expectedKeys(item, ["component", "imageId", "containerId"]) &&
-            item.component === artifact.images[index].component &&
-            item.imageId === artifact.images[index].id &&
+            item.component === expectedArtifact.images[index].component &&
+            item.imageId === expectedArtifact.images[index].id &&
             /^[a-f\d]{64}$/.test(item.containerId ?? ""),
         ) &&
         value[0].containerId !== value[1].containerId;
       ensure(
-        expectedKeys(before, ["version", "artifact", "observed"]) &&
+        expectedKeys(before, [
+          "version",
+          "artifact",
+          "observed",
+          ...(header.comparison ? ["comparison", "baselineObserved"] : []),
+        ]) &&
           before.version === 1 &&
-          expectedKeys(receipt, ["version", "artifact", "before", "after"]) &&
+          expectedKeys(receipt, [
+            "version",
+            "artifact",
+            "before",
+            "after",
+            ...(header.comparison ? ["comparison", "baselineBefore", "baselineAfter"] : []),
+          ]) &&
           receipt.version === 1 &&
           isDeepStrictEqual(before.artifact, artifact) &&
           isDeepStrictEqual(receipt.artifact, artifact) &&
@@ -242,6 +255,29 @@ async function evidence(options) {
           isDeepStrictEqual(receipt.before, receipt.after),
         "Artifact container attestation is missing or mismatched",
       );
+      if (header.comparison) {
+        const baseline = header.comparison;
+        ensure(
+          isDeepStrictEqual(
+            baseline.profile,
+            profiles.find((p) => p.id === baseline.profile.id),
+          ),
+          "Baseline profile differs from approved definition",
+        );
+        validateReleaseArtifact(baseline.artifact, baseline.artifact.sourceSha, [
+          baseline.profile.id,
+        ]);
+        ensure(
+          isDeepStrictEqual(before.comparison, baseline) &&
+            isDeepStrictEqual(receipt.comparison, baseline) &&
+            observed(before.baselineObserved, baseline.artifact) &&
+            observed(receipt.baselineBefore, baseline.artifact) &&
+            observed(receipt.baselineAfter, baseline.artifact) &&
+            isDeepStrictEqual(before.baselineObserved, receipt.baselineBefore) &&
+            isDeepStrictEqual(receipt.baselineBefore, receipt.baselineAfter),
+          "Baseline image attestation differs",
+        );
+      }
       snapshot["artifact-before.json"] = hash(beforeBytes);
       snapshot["artifact-receipt.json"] = hash(receiptBytes);
     }
@@ -268,6 +304,11 @@ async function evidence(options) {
         "Invalid compatibility trial identity",
       );
       const grade = gradeTrial(spec, trial);
+      if (header.comparison)
+        ensure(
+          trial.baseline?.mode === "deterministic" && gradeTrial(spec, trial.baseline).passed,
+          "Baseline compatibility failed",
+        );
       ensure(
         grade.passed && isDeepStrictEqual(grade, record.grade),
         "Compatibility evidence failed replay",
@@ -356,6 +397,20 @@ async function evidence(options) {
         "Configuration changed within profile and contract",
       );
       configurations[key] = record;
+      if (m.comparison) {
+        ensure(
+          trial.baseline?.caseId === trial.caseId && trial.baseline?.mode === trial.mode,
+          "Baseline trial identity differs",
+        );
+        const baselineRecord = configuration(trial.baseline, m.comparison.profile, defaultPolicy);
+        const baselineKey = `release-baseline:${trial.result.contractVersion}`;
+        ensure(
+          !configurations[baselineKey] ||
+            isDeepStrictEqual(configurations[baselineKey], baselineRecord),
+          "Baseline configuration changed during comparison",
+        );
+        configurations[baselineKey] = baselineRecord;
+      }
     }
     const summary = summarizeQualification(m, run.trials, defaultPolicy);
     if (summaryBytes !== null)
@@ -384,8 +439,19 @@ async function evidence(options) {
   }
   const pilot = await load(options.pilot, "pilot");
   const confirmation = await load(options.confirmation, "confirmation");
+  if (defaultPolicy.version === "4") {
+    ensure(
+      artifact && pilot.manifest.comparison && confirmation.manifest.comparison,
+      "Relative qualification requires exact candidate and baseline artifacts",
+    );
+    assertPilotReady(pilot);
+    ensure(
+      compareTrials(confirmation.manifest, confirmation.trials, defaultPolicy).status === "passed",
+      "Candidate regresses against baseline",
+    );
+  }
   const exposure = confirmation.manifest.qualification.exposure;
-  if (defaultPolicy.version === "3")
+  if (["3", "4"].includes(defaultPolicy.version))
     ensure(
       exposure?.runId === confirmation.manifest.id &&
         exposure.sourceSha === options.sourceSha &&
@@ -445,6 +511,7 @@ async function evidence(options) {
     sourceSha: options.sourceSha,
     ...(options.suite ? { suite: options.suite } : {}),
     profile: options.profile,
+    ...(confirmation.manifest.comparison ? { comparison: confirmation.manifest.comparison } : {}),
     pilot: evidencePath(options.pilot),
     confirmation: evidencePath(options.confirmation),
     ...(artifact

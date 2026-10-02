@@ -74,14 +74,14 @@ else if(args[0]==='build'){fs.readFileSync(0); const name=args[args.indexOf('--f
 else if(args[0]==='image'&&args[1]==='inspect'){const id=args.at(-1);console.log(JSON.stringify([{Id:id,Os:'linux',Architecture:'amd64',Config:{Labels:{'org.opencontainers.image.revision':process.env.TEST_SHA,'tn.chiboub.xpathed.component':id===ids.browser?'browser':'resolver'}}}]));}
 else if(args[0]==='image'&&args[1]==='save')fs.writeFileSync(args[args.indexOf('--output')+1],'images');
 else if(args[0]==='image'&&args[1]==='load'){}
-else if(args[0]==='ps') { if(fs.existsSync(process.env.TEST_STATE)){const filter=args.find(a=>a.includes('compose.service=')); const replacement=process.env.TEST_FAIL==='replacement'&&fs.existsSync(process.env.TEST_STATE+'.executed'); if(filter)console.log(filter.endsWith('=browser')?'1'.repeat(64):(replacement?'3':'2').repeat(64));} }
-else if(args[0]==='inspect'){const id=args.at(-1); const component=id==='1'.repeat(64)?'browser':'resolver';const after=fs.existsSync(process.env.TEST_STATE+'.executed');console.log(JSON.stringify([{Id:id,Image:process.env.TEST_FAIL===(after?'after':'before')?'sha256:'+'f'.repeat(64):ids[component],State:{Running:true},Config:{Labels:{'com.docker.compose.project':process.env.COMPOSE_PROJECT_NAME,'com.docker.compose.service':component==='browser'?'browser':'resolver-qwen','com.docker.compose.project.working_dir':process.env.TEST_ROOT}}}]));}
+else if(args[0]==='ps') { if(fs.existsSync(process.env.TEST_STATE)){const filter=args.find(a=>a.includes('compose.service=')); const replacement=process.env.TEST_FAIL==='replacement'&&fs.existsSync(process.env.TEST_STATE+'.executed'); if(filter)console.log(filter.endsWith('=browser-baseline')?'4'.repeat(64):filter.endsWith('=resolver-baseline')?'5'.repeat(64):filter.endsWith('=browser')?'1'.repeat(64):(replacement?'3':'2').repeat(64));} }
+else if(args[0]==='inspect'){const id=args.at(-1); const reference=['4','5'].some(n=>id===n.repeat(64));const component=['1','4'].some(n=>id===n.repeat(64))?'browser':'resolver';const after=fs.existsSync(process.env.TEST_STATE+'.executed');console.log(JSON.stringify([{Id:id,Image:process.env.TEST_FAIL===(after?'after':'before')?'sha256:'+'f'.repeat(64):ids[component],State:{Running:true},Config:{Labels:{'com.docker.compose.project':process.env.COMPOSE_PROJECT_NAME,'com.docker.compose.service':reference?component+'-baseline':component==='browser'?'browser':'resolver-qwen','com.docker.compose.project.working_dir':process.env.TEST_ROOT}}}]));}
 else if(args[0]==='compose'){
  const operation=args.find(a=>['config','down','run','up','exec'].includes(a));
  if(operation==='config'){}
  else if(operation==='down'){try{fs.unlinkSync(process.env.TEST_STATE);}catch{}if(process.env.TEST_FAIL==='cleanup'&&fs.existsSync(process.env.TEST_STATE+'.executed'))process.exit(9);}
  else if(operation==='run'){fs.accessSync('.artifacts/datasets',fs.constants.W_OK);const path=process.env.XPATHED_EVALUATION_OUTPUT+'/.mount-check';fs.writeFileSync(path,fs.readFileSync(path,'utf8')+'-ok');}
- else if(operation==='up'){if(args.includes('--build')||!args.includes('--no-build'))process.exit(91);const overlay=args.filter((a,i)=>args[i-1]==='-f').at(-1);const text=fs.readFileSync(overlay,'utf8');if(!text.includes(ids.browser)||!text.includes(ids.resolver)||!text.includes('!reset null'))process.exit(92);fs.writeFileSync(process.env.TEST_STATE,'running');}
+ else if(operation==='up'){if(args.includes('--build')||!args.includes('--no-build'))process.exit(91);const overlay=args.filter((a,i)=>args[i-1]==='-f').at(-1);const text=fs.readFileSync(overlay,'utf8');if(args.includes('browser-baseline')&&!text.includes('extends: {file:'))process.exit(95);if(!text.includes(ids.browser)||!text.includes(ids.resolver)||!text.includes('!reset null'))process.exit(92);fs.writeFileSync(process.env.TEST_STATE,'running');}
  else if(operation==='exec') {if(args.includes('/evaluation/qualify.mjs')){fs.writeFileSync(process.env.TEST_STATE+'.executed','yes');if(process.env.TEST_FAIL==='runner')process.exit(8);}else if(args.some(a=>a.includes('sha256sum')))console.log('c'.repeat(64));}
  else process.exit(93);
 }else process.exit(94);
@@ -206,4 +206,25 @@ test("container mismatch, runner failure and cleanup failure cannot report succe
       if (["before", "after", "replacement"].includes(failure))
         assert.equal(existsSync(join(work.cwd, work.output, "artifact-receipt.json")), false);
     });
+});
+
+test("paired qualification restores and attests the baseline as separate containers", (t) => {
+  const work = workspace(t);
+  const result = work.evaluate(
+    "--baseline-bundle",
+    work.bundle,
+    "--baseline-sha256",
+    work.digest,
+    "--baseline-approval",
+    "none",
+  );
+  assert.equal(result.status, 0, result.stderr);
+  const receipt = JSON.parse(readFileSync(join(work.cwd, work.output, "artifact-receipt.json")));
+  assert.equal(receipt.comparison.artifact.bundleManifestSha256, work.digest);
+  assert.deepEqual(receipt.baselineBefore, receipt.baselineAfter);
+  assert.notEqual(receipt.baselineBefore[0].containerId, receipt.before[0].containerId);
+  const calls = readFileSync(work.log, "utf8").trim().split("\n").map(JSON.parse);
+  assert.ok(calls.find((args) => args.includes("up")).includes("browser-baseline"));
+  const execute = calls.find((args) => args.includes("/evaluation/qualify.mjs"));
+  assert.ok(execute.some((arg) => arg.startsWith("XPATHED_RELEASE_COMPARISON_JSON=")));
 });

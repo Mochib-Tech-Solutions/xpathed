@@ -9,6 +9,7 @@ import {
 } from "../evaluation/qualify.mjs";
 import { validateCases } from "../evaluation/run.mjs";
 import { policyForSuite } from "../evaluation/qualification-policy.mjs";
+import { prepareBaseline } from "./release-baseline.mjs";
 import { readState } from "./release-state.mjs";
 
 export async function checkEvaluationKey(key, fetchImpl = fetch) {
@@ -217,6 +218,8 @@ async function main() {
     .update(await readFile(`${bundle}/manifest.json`))
     .digest("hex");
   await writeFile(`${root}/bundle-sha256.txt`, digest + "\n", { mode: 0o600 });
+  const baseline =
+    mode === "live" ? await prepareBaseline(releaseState, `${root}/baseline`, policy) : null;
   const evaluate = (phase, split, output, extra = []) =>
     node("scripts/release-evaluate.mjs", [
       "--bundle",
@@ -237,6 +240,16 @@ async function main() {
       output,
       "--suite",
       suitePath,
+      ...(baseline
+        ? [
+            "--baseline-bundle",
+            baseline.bundle,
+            "--baseline-sha256",
+            baseline.digest,
+            "--baseline-approval",
+            baseline.approval,
+          ]
+        : []),
       ...extra,
     ]);
   const pilot = `${root}/pilot`,

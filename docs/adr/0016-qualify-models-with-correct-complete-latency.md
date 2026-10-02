@@ -1,5 +1,7 @@
 # ADR-0016: Qualify models by correct, complete response latency
 
+Current release acceptance is superseded by [ADR-0022](0022-qualify-against-the-latest-baseline.md). The thresholds below describe the historical policy; original evidence retains those rules.
+
 Status: Accepted
 
 ## Decision

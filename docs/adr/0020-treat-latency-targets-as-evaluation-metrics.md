@@ -1,5 +1,7 @@
 # Treat latency targets as evaluation metrics
 
+Current release acceptance is superseded by [ADR-0022](0022-qualify-against-the-latest-baseline.md). The thresholds below describe the historical policy; original evidence retains those rules.
+
 Status: Accepted, 2026-10-01. Supersedes only the total-response deadline in [ADR-0018](0018-scope-resolution-to-the-current-view.md).
 
 The maintainer clarified that two seconds measures response speed rather than deciding whether the application may return an answer. Remove the Resolver-wide two-second cancellation deadline: return valid slower results with their measured duration. Keep the strictly sub-one-second goal and inclusive two-second qualification threshold; a response can be correct while missing the speed target. Preserve all original attempts and timeouts instead of reinterpreting historical results under this policy.
