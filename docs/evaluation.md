@@ -82,13 +82,13 @@ pnpm datasets:collection pack IMPORT_DIRECTORY .artifacts/datasets/reviewed.json
 
 Packing checks source/input identity, eligibility, submission review and duplicate case IDs. Record its emitted digest and inventory in the collection manifest. Publication is a separate authorized operation; packaging a file does not upload it.
 
-After the pinned private asset is published, obtain and verify it with:
+Obtain and verify the pinned private asset with:
 
 ```sh
 pnpm datasets:collection fetch
 ```
 
-The current local archive and pinned manifest are prepared. The intended `evaluation-data/reviewed-72d140c1.json.gz` asset has not yet been published. Hosted release evaluation therefore still needs that publication before fetching can succeed. A missing or changed required dataset fails completeness checks; it must not silently reduce the release denominator.
+The private `evaluation-data/reviewed-72d140c1.json.gz` asset is published. A fresh download was checked against the pinned digest; the workflow performs the same verification before reading the collection. A missing or changed required dataset fails completeness checks; it must not silently reduce the release denominator.
 
 The source acquisition and adaptation commands remain `pnpm datasets:fetch`, `pnpm datasets:import`, and `pnpm evaluate:dataset`. Use the checked-in source manifests and each command's options for a research cohort. Keep imported, excluded, unsupported, ambiguous and unreconstructible records visible with reasons. Dataset terms and submission review remain required even when cost is unrestricted.
 

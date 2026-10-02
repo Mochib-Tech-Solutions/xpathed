@@ -6,7 +6,7 @@ The release flow is **feature PR → main → release PR → live comparison →
 
 Keep a persistent `release` branch for release PRs from `main`. Feature PRs continue targeting `main` and run ordinary CI. Changes to main do not replace the approved baseline.
 
-Configure the dedicated `OPENROUTER_EVAL_API_KEY` Actions secret and preserve private release state and existing approved assets. The checked-in private dataset manifest pins the required reviewed collection. Its local archive has been prepared, but the intended `evaluation-data/reviewed-72d140c1.json.gz` release asset is not yet published. Publish that exact private asset through an authorized operation before hosted evaluation can fetch it; see [dataset collection setup](evaluation.md#private-dataset-collection).
+Configure the dedicated `OPENROUTER_EVAL_API_KEY` Actions secret and preserve private release state and existing approved assets. The checked-in private dataset manifest pins the required reviewed collection. The private `evaluation-data/reviewed-72d140c1.json.gz` asset is published and its downloaded bytes were verified against the pinned digest. The persistent `release` branch starts at the approved v1.0.0 source (`86d8937d`); the earlier branch is preserved as `archive/current-view-ec852f4`. See [dataset collection setup](evaluation.md#private-dataset-collection).
 
 Workflow files describe checks, not enforced branch protection. Verify the account's ability to require CI and release checks separately. Even if a PR is manually merged without passing checks, promotion must reject it rather than replacing the approval.
 
@@ -112,4 +112,4 @@ Run the same monitor locally with `pnpm release:monitor`. A controlled notificat
 
 ## Migration status
 
-The accepted design replaces historical pilot/confirmation, held-out exhaustion and aggregate-correctness gates. Existing approved images and historical evidence remain intact. Before claiming the new release path operational, verify private dataset publication, the persistent release branch, trusted PR execution, an actual complete comparison, merge-time approval checks and explicit activation independently. Documentation and local deterministic checks alone establish none of those external outcomes.
+The accepted design replaces historical pilot/confirmation, held-out exhaustion and aggregate-correctness gates. Existing approved images and historical evidence remain intact. Private dataset publication and the persistent release branch are configured. Before claiming the new release path operational, verify trusted release-PR execution, an actual complete comparison, merge-time approval checks and explicit activation independently. Documentation and local deterministic checks alone establish none of those external outcomes.
