@@ -3,9 +3,11 @@ set -eu
 cd "$(dirname "$0")/.."
 
 mode=deterministic
-comparison=false
 qualification=false
-context=false
+comparison=false
+resume=false
+basic_bundle=
+basic_digest=
 profile=deepseek
 repetitions=1
 seed=1
@@ -18,9 +20,13 @@ monitoring=
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --) shift; continue ;;
+    --resume) resume=true; shift; continue ;;
     --comparison) comparison=true; shift; continue ;;
+    --basic-bundle|--basic-sha256)
+      if [ "$#" -lt 2 ]; then echo "Missing value for $1" >&2; exit 2; fi
+      case "$1" in --basic-bundle) basic_bundle=$2 ;; --basic-sha256) basic_digest=$2 ;; esac
+      shift 2 ;;
     --qualification) qualification=true; shift; continue ;;
-    --context) context=true; shift; continue ;;
     --mode|--repetitions|--seed|--timeout-ms|--case|--output|--suite|--profile|--monitoring|--concurrency)
       if [ "$#" -lt 2 ]; then echo "Missing value for $1" >&2; exit 2; fi
       case "$1" in
@@ -39,25 +45,26 @@ while [ "$#" -gt 0 ]; do
     *) echo "Unknown evaluation option: $1" >&2; exit 2 ;;
   esac
 done
+if [ "$comparison" = true ]; then
+  if [ "$qualification" = true ] || [ -n "$suite" ] || [ -n "$concurrency" ] || [ "$repetitions" != 1 ]; then echo "Comparison requires one attempt, no qualification or custom suite/concurrency" >&2; exit 2; fi
+  if [ -z "$basic_bundle" ] || [ -z "$basic_digest" ]; then echo "Comparison requires --basic-bundle DIRECTORY --basic-sha256 DIGEST" >&2; exit 2; fi
+elif [ -n "$basic_bundle" ] || [ -n "$basic_digest" ]; then
+  echo "Basic bundle options require --comparison" >&2; exit 2
+fi
 if [ -n "$monitoring" ] && [ "$qualification" != true ]; then echo "Monitoring requires the comparison runner" >&2; exit 2; fi
 if [ -n "${XPATHED_RELEASE_STATE:-}" ]; then
   if [ "$qualification" != true ] || [ -z "${XPATHED_RELEASE_OVERLAY:-}" ] || [ -z "${XPATHED_RELEASE_SERVICE:-}" ]; then echo "Artifact qualification requires its verified launcher" >&2; exit 2; fi
-fi
-if { [ "$comparison" = true ] && [ "$qualification" = true ]; } || { [ "$context" = true ] && { [ "$comparison" = true ] || [ "$qualification" = true ]; }; }; then echo "Choose one evaluation mode" >&2; exit 2; fi
-if [ "$context" = true ]; then
-  if [ -n "$suite" ] || [ -n "$case_id" ] || [ "$repetitions" != 1 ] || [ "$seed" != 1 ]; then echo "Context comparison uses one attempt and its reviewed current-view suite" >&2; exit 2; fi
-  suite=evaluation/research/viewport-cases.json
 fi
 if [ "$qualification" != true ] && [ "$profile" != deepseek ]; then echo "Model profile requires qualification mode" >&2; exit 2; fi
 if [ "$qualification" = true ]; then
   case "$suite" in ''|evaluation/cases/index.json) ;; *) echo "Release qualification uses the complete reviewed collection" >&2; exit 2 ;; esac
   suite=${suite:-evaluation/cases/index.json}
 fi
-if [ "$comparison" = true ] && [ -n "$suite" ]; then echo "Comparison uses its reviewed fixture subset" >&2; exit 2; fi
+if [ "$resume" = true ] && { [ "$comparison" != true ] || [ -z "$output" ] || [ "$mode" != live ]; }; then echo "Resume requires live comparison and the original output directory" >&2; exit 2; fi
 export XPATHED_COMPARISON_MODE=$mode
 export XPATHED_EVALUATION_SUITE=
 if [ -n "$suite" ]; then
-  if [ "$mode" != deterministic ] && [ "$qualification" != true ] && [ "$context" != true ]; then echo "Custom suites support deterministic evaluation only" >&2; exit 2; fi
+  if [ "$mode" != deterministic ] && [ "$qualification" != true ]; then echo "Custom suites support deterministic evaluation only" >&2; exit 2; fi
   XPATHED_EVALUATION_SUITE=$(node --input-type=module -e '
     import { realpathSync, statSync } from "node:fs";
     import { relative, isAbsolute } from "node:path";
@@ -67,9 +74,8 @@ if [ -n "$suite" ]; then
     process.stdout.write("/workspace/" + rel);
   ' "$suite")
 fi
-if [ -n "$concurrency" ] && { [ "$qualification" = true ] || [ "$comparison" = true ] || [ "$context" = true ]; }; then echo "Concurrency is supported only by the direct browser evaluation runner" >&2; exit 2; fi
+if [ -n "$concurrency" ] && { [ "$qualification" = true ]; }; then echo "Concurrency is supported only by the direct browser evaluation runner" >&2; exit 2; fi
 set -- --mode "$mode" --repetitions "$repetitions" --seed "$seed" --timeout-ms "$timeout" --output /artifacts
-if [ "$context" = true ]; then set -- --mode "$mode" --timeout-ms "$timeout" --output /artifacts; fi
 if [ -n "$case_id" ]; then set -- "$@" --case "$case_id"; fi
 if [ -n "$concurrency" ]; then set -- "$@" --concurrency "$concurrency"; fi
 # Reuse the runner's validation before starting services or creating artifacts.
@@ -77,14 +83,15 @@ if [ "$qualification" = true ]; then
   set -- "$@" --profile "$profile"
   if [ -n "$monitoring" ]; then set -- "$@" --monitoring "$monitoring"; fi
   node --input-type=module -e 'import { parseQualificationOptions } from "./evaluation/compare.mjs"; parseQualificationOptions(process.argv.slice(1));' -- "$@"
-elif [ "$context" = true ]; then
-  node --input-type=module -e 'import { parseContextOptions } from "./evaluation/research/context.mjs"; parseContextOptions(process.argv.slice(1));' -- "$@"
+
 else
   node --input-type=module -e 'import { parseOptions } from "./evaluation/run.mjs"; parseOptions(process.argv.slice(1));' -- "$@"
+  if [ "$comparison" = true ]; then
+    node --input-type=module -e 'import { selectCases } from "./evaluation/research/compare.mjs"; selectCases(process.argv[1] || undefined);' "$case_id"
+  fi
 fi
 
 evaluation_default_project=xpathed-evaluation
-if [ "$context" = true ]; then evaluation_default_project=xpathed-evaluation-context; fi
 export COMPOSE_PROJECT_NAME=${XPATHED_EVALUATION_PROJECT:-$evaluation_default_project}
 case "$COMPOSE_PROJECT_NAME" in ''|*[!a-z0-9_-]*) echo "Invalid evaluation project name" >&2; exit 2 ;; esac
 case "$COMPOSE_PROJECT_NAME" in
@@ -133,15 +140,37 @@ if [ -z "$output" ]; then output=".artifacts/evaluation/$(node -p 'crypto.random
 export XPATHED_EVALUATION_OUTPUT=$(node -e 'process.stdout.write(require("node:path").resolve(process.argv[1]))' "$output")
 export XPATHED_EVALUATION_UID=$(id -u)
 export XPATHED_EVALUATION_GID=$(id -g)
+if [ "$comparison" = true ]; then
+  XPATHED_BASIC_ARTIFACT=$(node --input-type=module -e '
+    import { verify, restoreVerified, localDocker } from "./scripts/release/bundle.mjs";
+    const verified = await verify(process.argv[1], process.argv[2]);
+    await restoreVerified(verified, await localDocker());
+    process.stdout.write(JSON.stringify({...verified.manifest, manifestSha256: process.argv[2]}));
+  ' "$basic_bundle" "$basic_digest")
+  export XPATHED_BASIC_BROWSER=$(node -e 'process.stdout.write(JSON.parse(process.argv[1]).images.find(i=>i.component==="browser").id)' "$XPATHED_BASIC_ARTIFACT")
+  export XPATHED_BASIC_RESOLVER=$(node -e 'process.stdout.write(JSON.parse(process.argv[1]).images.find(i=>i.component==="resolver").id)' "$XPATHED_BASIC_ARTIFACT")
+fi
+if [ "$resume" = true ]; then
+  node --input-type=module -e '
+    import {readFileSync,writeFileSync} from "node:fs";
+    const dir=process.argv[1], manifest=JSON.parse(readFileSync(dir+"/manifest.json","utf8"));
+    const services=Object.fromEntries(["browser","resolver","stagehand"].map(name=>{
+      const image=manifest.artifacts?.currentImages?.[name];
+      if(!/^sha256:[a-f0-9]{64}$/.test(image ?? "")) throw new Error("Missing original comparison image");
+      return [name,{image}];
+    }));
+    writeFileSync(dir+"/continuation-images.json",JSON.stringify({services}));
+  ' "$XPATHED_EVALUATION_OUTPUT"
+fi
 compose() {
   if [ -n "${XPATHED_RELEASE_STATE:-}" ]; then
     docker/compose.sh --env-file "$evaluation_env" -f docker/compose.evaluation.yaml -f docker/compose.qualification.yaml -f "$XPATHED_RELEASE_OVERLAY" "$@"
-  elif [ "$context" = true ]; then
-    docker/compose.sh --env-file "$evaluation_env" -f docker/compose.evaluation.yaml -f docker/compose.context.yaml "$@"
-  elif [ "$qualification" = true ]; then
-    docker/compose.sh --env-file "$evaluation_env" -f docker/compose.evaluation.yaml -f docker/compose.qualification.yaml "$@"
+  elif [ "$comparison" = true ] && [ "$resume" = true ]; then
+    docker/compose.sh --env-file "$evaluation_env" -f docker/compose.evaluation.yaml -f docker/compose.comparison.yaml -f "$XPATHED_EVALUATION_OUTPUT/continuation-images.json" "$@"
   elif [ "$comparison" = true ]; then
     docker/compose.sh --env-file "$evaluation_env" -f docker/compose.evaluation.yaml -f docker/compose.comparison.yaml "$@"
+  elif [ "$qualification" = true ]; then
+    docker/compose.sh --env-file "$evaluation_env" -f docker/compose.evaluation.yaml -f docker/compose.qualification.yaml "$@"
   elif [ "$mode" = live ]; then
     docker/compose.sh --env-file "$evaluation_env" -f docker/compose.evaluation.yaml -f docker/compose.evaluation-live.yaml "$@"
   else
@@ -156,16 +185,18 @@ for container in $(docker ps -aq --filter "label=com.docker.compose.project=$COM
   service=$(docker inspect --format '{{ index .Config.Labels "com.docker.compose.service" }}' "$container")
   case "$service" in
     browser|resolver|evaluation-fixture) ;;
+    browser-basic|resolver-basic|stagehand) if [ "$comparison" != true ]; then echo "Unexpected comparison service" >&2; exit 2; fi ;;
     browser-baseline|resolver-baseline) if [ -z "${XPATHED_RELEASE_COMPARISON_JSON:-}" ]; then echo "Unexpected baseline service" >&2; exit 2; fi ;;
-    resolver-context) if [ "$context" != true ]; then echo "Context service belongs to a different runner" >&2; exit 2; fi ;;
-    stagehand) if [ "$comparison" != true ]; then echo "Comparison service belongs to a different runner" >&2; exit 2; fi ;;
-    resolver-luna|resolver-gemini|resolver-deepseek-concise|resolver-qwen) if [ "$qualification" != true ]; then echo "Qualification service belongs to a different runner" >&2; exit 2; fi ;;
     *) echo "Evaluation project contains a non-evaluation service: $service" >&2; exit 2 ;;
   esac
 done
 mkdir -p "$(dirname "$XPATHED_EVALUATION_OUTPUT")"
-mkdir "$XPATHED_EVALUATION_OUTPUT"
-if [ "$qualification" = true ] || [ "$comparison" = true ] || [ "$context" = true ]; then
+if [ "$resume" = true ]; then
+  test -f "$XPATHED_EVALUATION_OUTPUT/manifest.json"
+else
+  mkdir "$XPATHED_EVALUATION_OUTPUT"
+fi
+if [ "$qualification" = true ]; then
   mkdir -p .artifacts/datasets
 fi
 compose down
@@ -204,14 +235,15 @@ if [ -n "${XPATHED_RELEASE_STATE:-}" ]; then
   XPATHED_RELEASE_ARTIFACT_JSON=$(node scripts/release/evaluate.mjs attest "$XPATHED_RELEASE_STATE" before)
   export XPATHED_RELEASE_ARTIFACT_JSON
   release_started=true
-elif [ "$context" = true ]; then
-  compose up --build --wait browser resolver resolver-context evaluation-fixture
-elif [ "$qualification" = true ]; then
-  compose up --build --wait browser resolver resolver-luna resolver-gemini resolver-deepseek-concise resolver-qwen evaluation-fixture
-elif [ "$comparison" = true ]; then
-  compose up --build --wait browser resolver evaluation-fixture stagehand
+
 else
-  compose up --build --wait browser resolver evaluation-fixture
+  if [ "$comparison" = true ] && [ "$resume" = true ]; then
+    compose up --no-build --pull never --wait browser resolver browser-basic resolver-basic stagehand evaluation-fixture
+  elif [ "$comparison" = true ]; then
+    compose up --build --wait browser resolver browser-basic resolver-basic stagehand evaluation-fixture
+  else
+    compose up --build --wait browser resolver evaluation-fixture
+  fi
 fi
 if [ -n "${XPATHED_RELEASE_STATE:-}" ]; then
   compose exec -T evaluation-fixture node /checks/ready.mjs http://browser:8080/health "http://$XPATHED_RELEASE_SERVICE:8080/health" http://evaluation-fixture:8090/health
@@ -221,25 +253,39 @@ fi
 if [ -n "${XPATHED_RELEASE_COMPARISON_JSON:-}" ]; then
   compose exec -T evaluation-fixture node /checks/ready.mjs http://browser-baseline:8080/health http://resolver-baseline:8080/health
 fi
-echo "Evaluation artifacts: $XPATHED_EVALUATION_OUTPUT"
-if [ "$context" = true ]; then
-  compose exec -T evaluation-fixture node /checks/ready.mjs http://resolver-context:8080/health
+if [ "$comparison" = true ]; then
+  compose exec -T evaluation-fixture node /checks/ready.mjs http://browser-basic:8080/health http://resolver-basic:8080/health http://stagehand:8092/health
   browser_binary_hash=$(compose exec -T browser sh -c 'sha256sum /ms-playwright/chromium-*/chrome-linux*/chrome' | awk '{print $1}')
-  compose exec -T -e "XPATHED_BROWSER_BINARY_SHA256=$browser_binary_hash" evaluation-fixture node /evaluation/research/context.mjs "$@"
-elif [ "$qualification" = true ]; then
-  if [ -z "${XPATHED_RELEASE_STATE:-}" ]; then
-    compose exec -T evaluation-fixture node /checks/ready.mjs http://resolver-luna:8080/health http://resolver-gemini:8080/health http://resolver-deepseek-concise:8080/health http://resolver-qwen:8080/health
+  basic_binary_hash=$(compose exec -T browser-basic sh -c 'sha256sum /ms-playwright/chromium-*/chrome-linux*/chrome' | awk '{print $1}')
+  if [ "$browser_binary_hash" != "$basic_binary_hash" ]; then echo "Browser parity mismatch: Chromium binary" >&2; exit 2; fi
+  current_images=$(docker inspect --format '{{ index .Config.Labels "com.docker.compose.service" }} {{.Image}}' $(compose ps -q browser resolver stagehand))
+  XPATHED_ENGINEERING_ARTIFACTS=$(node -e 'process.stdout.write(JSON.stringify({basic:JSON.parse(process.argv[1]),currentImages:Object.fromEntries(process.argv[2].trim().split("\n").map(row=>row.split(" ")))}))' "$XPATHED_BASIC_ARTIFACT" "$current_images")
+  if [ "$resume" != true ]; then
+    node --input-type=module -e '
+      import {execFileSync} from "node:child_process";
+      import {randomUUID} from "node:crypto";
+      import {writeFileSync} from "node:fs";
+      const id=randomUUID(), images=JSON.parse(process.argv[1]).currentImages;
+      const tags=Object.fromEntries(Object.entries(images).map(([name,image])=>{
+        const tag=`xpathed-engineering-${id}-${name}`;
+        execFileSync("docker",["tag",image,tag]);
+        return [name,{image,tag}];
+      }));
+      writeFileSync(process.argv[2]+"/image-tags.json",JSON.stringify(tags,null,2)+"\n",{flag:"wx",mode:0o600});
+    ' "$XPATHED_ENGINEERING_ARTIFACTS" "$XPATHED_EVALUATION_OUTPUT"
   fi
+  compose exec -T -e "XPATHED_COMPARISON_RESUME=$resume" -e "XPATHED_BROWSER_BINARY_SHA256=$browser_binary_hash" -e "XPATHED_ENGINEERING_ARTIFACTS=$XPATHED_ENGINEERING_ARTIFACTS" evaluation-fixture node /evaluation/research/compare.mjs "$@"
+  exit $?
+fi
+echo "Evaluation artifacts: $XPATHED_EVALUATION_OUTPUT"
+if [ "$qualification" = true ]; then
   browser_binary_hash=$(compose exec -T browser sh -c 'sha256sum /ms-playwright/chromium-*/chrome-linux*/chrome' | awk '{print $1}')
   if [ -n "${XPATHED_RELEASE_STATE:-}" ]; then
     compose exec -T -e "XPATHED_BROWSER_BINARY_SHA256=$browser_binary_hash" -e "XPATHED_RELEASE_ARTIFACT_JSON=$XPATHED_RELEASE_ARTIFACT_JSON" -e "XPATHED_RELEASE_COMPARISON_JSON=${XPATHED_RELEASE_COMPARISON_JSON:-}" evaluation-fixture node /evaluation/compare.mjs "$@"
   else
     compose exec -T -e "XPATHED_BROWSER_BINARY_SHA256=$browser_binary_hash" evaluation-fixture node /evaluation/compare.mjs "$@"
   fi
-elif [ "$comparison" = true ]; then
-  compose exec -T evaluation-fixture node /checks/ready.mjs http://stagehand:8092/health
-  browser_binary_hash=$(compose exec -T browser sh -c 'sha256sum /ms-playwright/chromium-*/chrome-linux*/chrome' | awk '{print $1}')
-  compose exec -T -e "XPATHED_BROWSER_BINARY_SHA256=$browser_binary_hash" evaluation-fixture node /evaluation/research/compare.mjs "$@"
+
 else
   compose exec -T evaluation-fixture node /evaluation/run.mjs "$@"
 fi

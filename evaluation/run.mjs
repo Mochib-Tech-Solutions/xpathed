@@ -3,7 +3,6 @@ import { mkdir, readFile, writeFile, readdir, rm, rename, lstat, readlink } from
 import { resolve, join } from "node:path";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { isDeepStrictEqual } from "node:util";
 import { availableParallelism } from "node:os";
 import { setTimeout as delay } from "node:timers/promises";
 
@@ -114,39 +113,6 @@ export function validateCases(manifest) {
         !(offline ? action.target?.candidateId : action.target?.selector)
       )
         throw new Error("Found actions require an independent target mapping");
-    }
-  }
-  if (manifest.baseline) {
-    if (manifest.baseline.version !== 1 || manifest.baseline.kind !== "viewport-paired")
-      throw new Error("Unsupported paired baseline version");
-    for (const item of manifest.cases) {
-      if (!["development", "regression"].includes(item.split))
-        throw new Error("Paired baseline permits only development/regression evidence");
-      if (
-        !["3", "4"].includes(item.contractVersion) ||
-        !["paired", "scope-change", "capability"].includes(item.baselineStratum)
-      )
-        throw new Error("Invalid paired baseline contract or stratum");
-      if (item.baselineStratum === "paired") {
-        if (!/^[a-z0-9_-]+$/.test(item.pairId ?? ""))
-          throw new Error("Missing baseline pair identity");
-        const pair = manifest.cases.filter((c) => c.pairId === item.pairId);
-        if (
-          pair.length !== 2 ||
-          new Set(pair.map((c) => c.contractVersion)).size !== 2 ||
-          pair.some(
-            (c) =>
-              c.baselineStratum !== "paired" ||
-              ["instruction", "fixture", "setup", "viewport", "family", "split", "expected"].some(
-                (key) => !isDeepStrictEqual(c[key], item[key]),
-              ),
-          )
-        )
-          throw new Error(
-            "Baseline pair must retain identical fixture, instruction, setup and expected target/action labels",
-          );
-      } else if (item.pairId != null)
-        throw new Error("Changed scope/capability cases cannot be paired speed evidence");
     }
   }
   return manifest.cases;
@@ -372,7 +338,7 @@ async function resolveTrial(spec, trial, session, page, options, services, chann
       {
         instruction: spec.instruction,
         documentId: page.documentId,
-        contractVersion: spec.contractVersion ?? "2",
+        contractVersion: spec.contractVersion ?? "4",
       },
       options.timeoutMs,
       {
@@ -456,11 +422,11 @@ export async function execute(spec, trial, options, services) {
         `${services.browser}/pages/${session.pageId}/capture`,
         {
           documentId: page.documentId,
-          ...(spec.contractVersion === "4" ? { scope: "current_view" } : {}),
+          scope: "current_view",
         },
         options.timeoutMs,
       );
-      if (spec.contractVersion === "4" && capture.scope !== "current_view")
+      if (capture.scope !== "current_view")
         throw new Error("Current-view capture returned the wrong scope");
       const coverageTargets = await mapCandidates(
         capture.candidates,
@@ -491,7 +457,7 @@ export async function execute(spec, trial, options, services) {
       };
     }
     await resolveTrial(spec, trial, session, page, options, services);
-    if (spec.contractVersion === "4" && trial.captureObservation?.error)
+    if (trial.captureObservation?.error)
       trial.error ??= {
         code: "capture_scope_unverified",
         message: "Independent current-view capture could not be verified",
@@ -558,7 +524,6 @@ export async function fingerprints(
     "docker/compose.yaml",
     "docker/compose.evaluation.yaml",
     "docker/compose.qualification.yaml",
-    "docker/compose.context.yaml",
     "docker/compose.sh",
     "scripts/evaluate.sh",
     "tests/resolution/ready.mjs",

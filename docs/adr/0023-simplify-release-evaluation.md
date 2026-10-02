@@ -50,3 +50,5 @@ Keep existing unit/integration locations. Small helpers and harness tests stay b
 The maintainer accepted this design and authorized implementation. Acceptance records the decision; it does not establish hosted workflow execution, private dataset publication, successful live comparison, approval or deployment. Preserve those as separately verified operational outcomes.
 
 This decision supersedes current release workflow and qualification requirements in ADR-0016, ADR-0021 and ADR-0022, and makes billing/accounting availability nonblocking under ADR-0019. Historical approvals, experiments and reports retain their original rules. The existing approved release keeps its archived runner and original monitoring collection until a new approval is verified.
+
+[ADR-0024](0024-keep-one-resolution-implementation.md) supersedes the exception for retaining legacy API implementations and retires the old experiment runners. The release comparison and archived approval requirements above remain in force.

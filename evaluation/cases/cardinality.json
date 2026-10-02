@@ -108,9 +108,12 @@
     ],
     "sourceIds": [
       "single-action-plural-confirmations-v4",
-      "current-view-single-action-plural-confirmations-v4"
+      "current-view-single-action-plural-confirmations-v4",
+      "single-action-plural-confirmations-v3",
+      "single-action-plural-confirmations"
     ],
-    "group": "cardinality"
+    "group": "cardinality",
+    "cardinality": "all"
   },
   {
     "id": "named-found-missing-v4",
@@ -203,7 +206,9 @@
     },
     "sourceSplit": "development",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "cardinality"
+    "group": "cardinality",
+    "sourceIds": ["named-found-missing-v4", "named-found-missing"],
+    "cardinality": "all"
   },
   {
     "id": "mixed-interactions-v4",
@@ -266,7 +271,8 @@
     },
     "sourceSplit": "development",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "cardinality"
+    "group": "cardinality",
+    "sourceIds": ["mixed-interactions-v4", "mixed-interactions"]
   },
   {
     "id": "sequential-workflow-v4",
@@ -329,6 +335,7 @@
     },
     "sourceSplit": "development",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "cardinality"
+    "group": "cardinality",
+    "sourceIds": ["sequential-workflow-v4", "sequential-workflow"]
   }
 ]

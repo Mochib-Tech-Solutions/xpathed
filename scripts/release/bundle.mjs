@@ -182,7 +182,7 @@ function configuration(profile) {
       (value) => typeof value === "string" && value.length > 0,
     ) &&
       profile.maxTokens === 4096 &&
-      ["baseline", "concise"].includes(profile.variant) &&
+      profile.variant === "baseline" &&
       ((keys(profile.reasoning, ["enabled"]) && profile.reasoning.enabled === false) ||
         (keys(profile.reasoning, ["effort"]) &&
           typeof profile.reasoning.effort === "string" &&
@@ -200,7 +200,6 @@ function configuration(profile) {
     resolverEnvironment.OpenRouter__ReasoningEffort = profile.reasoning.effort;
   if (profile.promptCacheOptions?.mode)
     resolverEnvironment.OpenRouter__PromptCacheMode = profile.promptCacheOptions.mode;
-  if (profile.variant === "concise") resolverEnvironment.Resolution__PromptVariant = "concise";
   return {
     version: 1,
     profile,

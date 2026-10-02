@@ -76,7 +76,9 @@ Viewer and resolver address the same managed page. Browser owns live nodes; Reso
 
 The development default is **`deepseek/deepseek-v4.1-flash` through OpenRouter's `wafer` provider**, configured in `.env.example` and `docker/compose.yaml`. Runtime uses contract **4**, prompt **10**, capture **5** and XPath strategy **4**.
 
-`ActionSelectionStrategy` owns the prompt/schema. `OpenRouterGateway` pins the provider, disables reasoning and fallback, and limits output to 4,096 tokens. A configuration hash identifies effective settings. No model is trained here; changes to the pretrained model, prompt or context require evaluation. Runtime defaults and approved release configurations are separate.
+`main` keeps one selected implementation and one prompt/schema, updated in place through Git. Retired API versions and experiment runners are removed; historical experiments use their recorded revisions. See [ADR-0024](docs/adr/0024-keep-one-resolution-implementation.md).
+
+`ActionSelectionStrategy` owns the shared runtime/offline prompt, schema and selection validation. `OpenRouterGateway` pins the provider, disables reasoning and fallback, and limits output to 4,096 tokens. A configuration hash identifies effective settings. No model is trained here; changes to the pretrained model, prompt or context require evaluation. Runtime defaults and approved release configurations are separate.
 
 ## Failure diagnostics
 
@@ -100,35 +102,23 @@ This is a local application. Hosted use needs authentication, network isolation 
 
 Independent labels check target identity, complete target sets, action, XPath and readiness. Deterministic tests check the pipeline; live runs measure model behavior. Offline selection and browser results have separate denominators.
 
-### Compare configurations on the same cases
+### Basic resolver, Improved resolver and Stagehand
 
-Both configurations use **DeepSeek V4.1 Flash through Wafer**, with the same inference settings, cases and grader.
+The [engineering comparison](docs/research/engineering-comparison.md) uses **183 shared browser cases**, the same DeepSeek V4.1 Flash/Wafer route, and one original attempt per system. Three isolated workers run concurrently. Earlier resolver code stays in saved images; the application keeps one implementation.
 
-| Configuration       | What it tests                                                                                    | Correct browser cases |
-| ------------------- | ------------------------------------------------------------------------------------------------ | --------------------: |
-| Earlier — prompt 8  | Current-view selection and captured-target verification                                          |       111/140 (79.3%) |
-| Current — prompt 10 | Clearer control/context distinctions, explicit scoped absence and stronger viewport revalidation |   **120/140 (85.7%)** |
+| System            | Correct action and targets | Target selection only |
+| ----------------- | -------------------------: | --------------------: |
+| Basic resolver    |            161/183 (88.0%) |       160/175 (91.4%) |
+| Improved resolver |        **169/183 (92.3%)** |   **169/175 (96.6%)** |
+| Stagehand         |            103/183 (56.3%) |       136/175 (77.7%) |
 
-The current configuration gained **10 passes and lost one**, a net **6.4 percentage-point increase**. This measures the combined changes; it does not isolate an individual prompt rule. The regression remains visible and would fail the release requirement to preserve every baseline pass.
+[![Accuracy by behavior category](docs/assets/evaluation/engineering-category-results.svg)](docs/assets/evaluation/engineering-category-results.svg)
 
-[![Paired browser outcomes, including gains and regressions](docs/assets/evaluation/paired-outcomes.svg)](docs/assets/evaluation/paired-outcomes.svg)
+Improved gained **15 passes and lost 7**, a net increase of **4.4 percentage points**. Scope and targeting improved most; state cases lost one net pass. The regressions remain visible and prevent release approval under the no-regression rule.
 
-All **140 browser cases** received one original attempt per configuration:
+The target-selection score excludes eight unsupported-instruction cases and checks exact nodes/absence without requiring the action name. Stagehand uses stock `observe` with a current-view instruction; it does not provide xpathed's readiness contract. The [report](docs/research/engineering-comparison.md) explains these boundaries and separates the full resolver score, timing cohorts and failures.
 
-| Category    | What it checks                                     | Cases |
-| ----------- | -------------------------------------------------- | ----: |
-| Targeting   | Names, roles and language variations               |    27 |
-| Context     | Sections, repeated labels and relationships        |    51 |
-| Cardinality | Complete sets of requested targets                 |     4 |
-| Appearance  | CSS colors and relative positions                  |     5 |
-| Scope       | Current view, absence and unsupported instructions |    19 |
-| State       | Disabled, covered and partially visible controls   |    30 |
-| Robustness  | Untrusted page text and large pages                |     2 |
-| Frames      | Targets inside nested documents                    |     2 |
-
-The separate **1,084-case offline collection** returned **716/1,084 (66.1%)** and **710/1,084 (65.5%)** exact results. Both arms use the same offline prompt and implementation: this measures repeat variation, not the browser changes. Every reviewed input retains its supplied candidates.
-
-The [full comparison](docs/research/configuration-comparison.md) includes the category heatmap, remaining failures, timing by execution phase and recorded charges. All **2,448 arm attempts** are retained, including errors; none were retried.
+All **549 paid calls** are retained, with **$0.07312420** reported and no missing charges. These authored regression cases measure this setup, not unseen-site accuracy. The [historical browser/offline report](docs/research/configuration-comparison.md) preserves the earlier collection and its separate offline results.
 
 ```sh
 pnpm check                              # local checks

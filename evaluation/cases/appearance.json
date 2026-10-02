@@ -83,7 +83,12 @@
       "viewport-baseline-cases.json",
       "cases.json"
     ],
-    "sourceIds": ["color-only-reference-v4", "current-view-color-only-reference-v4"],
+    "sourceIds": [
+      "color-only-reference-v4",
+      "current-view-color-only-reference-v4",
+      "color-only-reference-v3",
+      "color-only-reference"
+    ],
     "group": "appearance"
   },
   {
@@ -409,6 +414,7 @@
     },
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json", "viewport-baseline-cases.json"],
-    "group": "appearance"
+    "group": "appearance",
+    "sourceIds": ["above-reference-v4", "above-reference-v3", "above-reference"]
   }
 ]

@@ -206,3 +206,31 @@ test("provider-limit comparisons keep cost gaps and overruns out of target corre
   invalid.provider[0].reportedUsd = -1;
   assert.equal(gradeComparison(spec(), invalid).passed, true);
 });
+
+test("expected refusal must be a resolver instruction refusal, not a selector conversion error", () => {
+  const refused = trial([]);
+  refused.strategy = "custom";
+  refused.result.outcome = "unsupported";
+  refused.result.actions = [{ action: "click", outcome: "unsupported" }];
+  const expected = {
+    expected: { outcome: "unsupported", actions: [{ action: "click", outcome: "unsupported" }] },
+  };
+  assert.equal(gradeComparison(expected, refused).passed, true);
+  refused.strategy = "stagehand";
+  assert.equal(gradeComparison(expected, refused).passed, false);
+});
+
+test("a labelled partial result still needs the complete independently found set", () => {
+  const expected = spec();
+  expected.expected.outcome = "partial";
+  expected.expected.actions.push({ action: "click", outcome: "not_found" });
+  const found = trial();
+  found.result.outcome = "partial";
+  found.result.actions.push({ action: "click", outcome: "not_found" });
+  assert.equal(gradeComparison(expected, found).passed, true);
+  assert.equal(
+    gradeComparison(expected, { ...found, observation: { ...found.observation, actions: [] } })
+      .passed,
+    false,
+  );
+});

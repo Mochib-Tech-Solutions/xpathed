@@ -265,7 +265,7 @@ public sealed class BrowserSessions(IConfiguration configuration, ILogger<Browse
                 await page.BeginCaptureAsync();
                 page.CaptureId = Guid.NewGuid().ToString("N");
                 var captureId = page.CaptureId;
-                page.Capture = new BrowserPageCapture(page, request.Scope);
+                page.Capture = new BrowserPageCapture(page);
                 var result = await page.Capture.CaptureAsync(s.Id, request.DocumentId, captureId);
                 await RequireFocusedDocumentAsync(s, page, request.DocumentId);
                 if (page.CaptureId != captureId)

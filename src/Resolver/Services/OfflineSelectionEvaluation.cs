@@ -11,7 +11,7 @@ namespace Xpathed.Resolver.Services;
 
 public static class OfflineSelectionEvaluation
 {
-    private const int InputBudgetBytes = 512000;
+    private const int InputBudgetBytes = ActionSelectionStrategy.InputBudgetBytes;
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
         Encoder = JavaScriptEncoder.Create(UnicodeRanges.All),
@@ -22,8 +22,8 @@ public static class OfflineSelectionEvaluation
     {
         var timer = Stopwatch.StartNew();
         string? configurationId = null;
-        var prompt = ActionSelectionStrategy.SingleInteractionPrompt;
-        var promptVersion = "7";
+        var prompt = ActionSelectionStrategy.Prompt;
+        var promptVersion = ActionSelectionStrategy.PromptVersion;
         var diagnostics = new ResolutionDiagnostics
         {
             Stage = "input",
@@ -40,20 +40,6 @@ public static class OfflineSelectionEvaluation
                     "Use --evaluate-offline INPUT [--prepare-only]."
                 );
             }
-            var variant = Environment.GetEnvironmentVariable("XPATHED_EVALUATION_PROMPT_VARIANT");
-            if (variant is not (null or "baseline" or "intent-cardinality"))
-            {
-                throw new ApiException(400, "invalid_offline_prompt_variant", "Unknown offline prompt variant.");
-            }
-            if (variant == "intent-cardinality")
-            {
-                prompt +=
-                    "\nReturn multiple targets only when the instruction requests multiple distinct elements, including plural/all requests. "
-                    + "Multiple words in one target description, or alternative candidate matches for it, do not themselves request multiple targets. "
-                    + "Preserve genuine ambiguity instead of returning alternatives.";
-                promptVersion = "7-intent-cardinality-1";
-            }
-            diagnostics = diagnostics with { PromptVersion = promptVersion };
             var input = await ReadInputAsync(args[1]);
             using var inputDocument = JsonDocument.Parse(input);
             var candidateIds = inputDocument
@@ -74,33 +60,7 @@ public static class OfflineSelectionEvaluation
             builder.Services.AddTransient<OpenRouterGateway>();
             using var host = builder.Build();
             var gateway = host.Services.GetRequiredService<OpenRouterGateway>();
-            if (Environment.GetEnvironmentVariable("XPATHED_EVALUATION_PRICE_LIMITS") is { Length: > 0 } limits)
-            {
-                var prices = JsonSerializer.Deserialize<Dictionary<string, decimal>>(limits);
-                if (
-                    prices is null
-                    || prices.Count != 3
-                    || !prices.TryGetValue("prompt", out var promptPrice)
-                    || promptPrice <= 0
-                    || !prices.TryGetValue("completion", out var completionPrice)
-                    || completionPrice <= 0
-                    || !prices.TryGetValue("request", out var requestPrice)
-                    || requestPrice < 0
-                )
-                {
-                    throw new JsonException();
-                }
-                gateway.EvaluationPriceLimits = prices;
-            }
-            configurationId = gateway.ConfigurationId(
-                diagnostics.Strategy,
-                prompt,
-                ActionSelectionStrategy.Schema,
-                InputBudgetBytes,
-                ActionSelectionStrategy.OutputTokens,
-                promptVersion,
-                ActionSelectionStrategy.MaximumActions
-            );
+            configurationId = gateway.ConfigurationId("offline");
             if (args.Length == 3)
             {
                 await Console.Out.WriteLineAsync(
@@ -113,15 +73,7 @@ public static class OfflineSelectionEvaluation
                             outputTokens = ActionSelectionStrategy.OutputTokens,
                             configurationId,
                             promptVersion,
-                            effective = gateway.DescribeConfiguration(
-                                diagnostics.Strategy,
-                                prompt,
-                                ActionSelectionStrategy.Schema,
-                                InputBudgetBytes,
-                                ActionSelectionStrategy.OutputTokens,
-                                promptVersion,
-                                ActionSelectionStrategy.MaximumActions
-                            ),
+                            effective = gateway.DescribeConfiguration("offline"),
                         },
                         JsonOptions
                     )
@@ -131,13 +83,7 @@ public static class OfflineSelectionEvaluation
             diagnostics = diagnostics with { Stage = "configuration" };
             gateway.EnsureConfigured();
             diagnostics = diagnostics with { Stage = "model", ModelCalls = 1 };
-            var completion = await gateway.CompleteAsync(
-                prompt,
-                input,
-                ActionSelectionStrategy.Schema,
-                CancellationToken.None,
-                ActionSelectionStrategy.OutputTokens
-            );
+            var completion = await gateway.CompleteAsync(input, CancellationToken.None);
             diagnostics = completion.Diagnostics with
             {
                 Stage = "selection",
@@ -152,7 +98,7 @@ public static class OfflineSelectionEvaluation
             {
                 throw new ApiException(502, code, "The provider could not return a valid selection.");
             }
-            var selections = ActionSelectionStrategy.Select(completion.Content!, candidateIds, singleInteraction: true);
+            var selections = ActionSelectionStrategy.Select(completion.Content!, candidateIds);
             diagnostics = diagnostics with { Stage = "complete" };
             var outcomes = selections.Select(item => item.Outcome).Distinct(StringComparer.Ordinal).ToArray();
             await WriteResultAsync(outcomes.Length == 1 ? outcomes[0] : "partial", selections);

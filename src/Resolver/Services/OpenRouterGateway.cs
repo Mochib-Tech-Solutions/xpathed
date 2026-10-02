@@ -19,11 +19,7 @@ public sealed class OpenRouterGateway(
     public string Model { get; } = configuration["OpenRouter:Model"] ?? "deepseek/deepseek-v4.1-flash";
     public string Provider { get; } = configuration["OpenRouter:Provider"] ?? "wafer";
 
-    internal Dictionary<string, decimal>? EvaluationPriceLimits { get; set; }
-
     private readonly string? apiKey = configuration["OpenRouter:ApiKey"];
-    private readonly string? reasoningEffort = configuration["OpenRouter:ReasoningEffort"];
-    private readonly string? promptCacheMode = configuration["OpenRouter:PromptCacheMode"];
     private readonly string endpoint =
         (configuration["OpenRouter:BaseUrl"] ?? "https://openrouter.ai/api/v1/").TrimEnd('/') + "/";
     private readonly double timeoutSeconds = double.TryParse(
@@ -56,8 +52,6 @@ public sealed class OpenRouterGateway(
             || timeoutSeconds > 600
             || string.IsNullOrWhiteSpace(Model)
             || string.IsNullOrWhiteSpace(Provider)
-            || reasoningEffort is not (null or "none" or "low")
-            || promptCacheMode is not (null or "explicit")
         )
         {
             throw new ApiException(
@@ -68,52 +62,18 @@ public sealed class OpenRouterGateway(
         }
     }
 
-    internal string ConfigurationId(
-        string strategy,
-        string prompt,
-        JsonElement schema,
-        int modelInputBudgetBytes,
-        int outputTokens,
-        string promptVersion,
-        int maximumActions,
-        object? contextPlanning = null
-    ) =>
+    internal string ConfigurationId(string scope = "current_view") =>
         Convert.ToHexStringLower(
-            SHA256.HashData(
-                Encoding.UTF8.GetBytes(
-                    JsonSerializer.Serialize(
-                        DescribeConfiguration(
-                            strategy,
-                            prompt,
-                            schema,
-                            modelInputBudgetBytes,
-                            outputTokens,
-                            promptVersion,
-                            maximumActions,
-                            contextPlanning
-                        )
-                    )
-                )
-            )
+            SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(DescribeConfiguration(scope))))
         );
 
-    internal object DescribeConfiguration(
-        string strategy,
-        string prompt,
-        JsonElement schema,
-        int modelInputBudgetBytes,
-        int outputTokens,
-        string promptVersion,
-        int maximumActions,
-        object? contextPlanning = null
-    )
-    {
-        var description = new
+    internal object DescribeConfiguration(string scope = "current_view") =>
+        new
         {
-            strategy,
-            promptVersion,
-            captureVersion = promptVersion is "8" or "9" or "10" ? "5" : "4",
-            scope = promptVersion is "8" or "9" or "10" ? "current_view" : "page",
+            strategy = ActionSelectionStrategy.Strategy,
+            promptVersion = ActionSelectionStrategy.PromptVersion,
+            captureVersion = scope == "current_view" ? "5" : null,
+            scope,
             serverDeadlineMs = (int?)null,
             estimateCost = true,
             pricingCacheSeconds = 300,
@@ -122,73 +82,47 @@ public sealed class OpenRouterGateway(
             xpathVersion = "4",
             endpoint = Uri.TryCreate(endpoint, UriKind.Absolute, out var address) ? address.AbsoluteUri : endpoint,
             timeoutSeconds = timeoutSeconds.ToString("R", CultureInfo.InvariantCulture),
-            modelInputBudgetBytes,
+            modelInputBudgetBytes = ActionSelectionStrategy.InputBudgetBytes,
             responseCache = false,
-            maximumActions,
-            request = CreateRequest(prompt, string.Empty, schema, outputTokens),
+            maximumActions = ActionSelectionStrategy.MaximumActions,
+            request = CreateRequest(string.Empty),
         };
-        if (contextPlanning is null)
-        {
-            return description;
-        }
-        var result = JsonSerializer.SerializeToNode(description)!;
-        result["contextPlanning"] = JsonSerializer.SerializeToNode(contextPlanning);
-        return result;
-    }
 
-    private Dictionary<string, object> CreateRequest(string prompt, string input, JsonElement schema, int outputTokens)
-    {
-        var request = new Dictionary<string, object>
+    private object CreateRequest(string input) =>
+        new
         {
-            ["model"] = Model,
-            ["stream"] = false,
-            ["max_tokens"] = outputTokens,
-            ["reasoning"] = reasoningEffort is null
-                ? (object)new { enabled = false }
-                : new { effort = reasoningEffort },
-            ["provider"] = ProviderSettings(),
-            ["plugins"] = new[] { new { id = "context-compression", enabled = false } },
-            ["messages"] = new[] { new { role = "system", content = prompt }, new { role = "user", content = input } },
-            ["response_format"] = new
+            model = Model,
+            stream = false,
+            max_tokens = ActionSelectionStrategy.OutputTokens,
+            reasoning = new { enabled = false },
+            provider = new
+            {
+                only = new[] { Provider },
+                order = new[] { Provider },
+                allow_fallbacks = false,
+                require_parameters = true,
+            },
+            plugins = new[] { new { id = "context-compression", enabled = false } },
+            messages = new[]
+            {
+                new { role = "system", content = ActionSelectionStrategy.Prompt },
+                new { role = "user", content = input },
+            },
+            response_format = new
             {
                 type = "json_schema",
                 json_schema = new
                 {
                     name = "target_selection",
                     strict = true,
-                    schema,
+                    schema = ActionSelectionStrategy.Schema,
                 },
             },
         };
-        if (promptCacheMode is not null)
-        {
-            request["prompt_cache_options"] = new { mode = promptCacheMode };
-        }
-        return request;
-    }
-
-    private Dictionary<string, object> ProviderSettings()
-    {
-        var settings = new Dictionary<string, object>(StringComparer.Ordinal)
-        {
-            ["only"] = new[] { Provider },
-            ["order"] = new[] { Provider },
-            ["allow_fallbacks"] = false,
-            ["require_parameters"] = true,
-        };
-        if (EvaluationPriceLimits is not null)
-        {
-            settings["max_price"] = EvaluationPriceLimits;
-        }
-        return settings;
-    }
 
     internal async Task<ProviderCompletion> CompleteAsync(
-        string prompt,
         string input,
-        JsonElement schema,
         CancellationToken cancellationToken,
-        int outputTokens = 512,
         Action<ResolutionDiagnostics>? observeUsage = null
     )
     {
@@ -199,7 +133,7 @@ public sealed class OpenRouterGateway(
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
         request.Headers.Add("X-OpenRouter-Cache", "false");
         request.Headers.Add("X-OpenRouter-Metadata", "enabled");
-        request.Content = JsonContent.Create(CreateRequest(prompt, input, schema, outputTokens));
+        request.Content = JsonContent.Create(CreateRequest(input));
         var providerTimer = Stopwatch.StartNew();
         using var response = await client.SendAsync(request, cancellationToken);
         JsonElement body;

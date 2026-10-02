@@ -12,60 +12,6 @@ namespace Xpathed.Resolver.Tests;
 public sealed class OfflineEvaluationTests
 {
     [Fact]
-    public async Task CardinalityVariantChangesOnlyTheVersionedSystemPrompt()
-    {
-        const string input =
-            """{"instruction":"the Save button","candidates":[{"id":"c1","tag":"button","label":"Save"}]}""";
-        var (_, baselineOutput) = await RunAsync(input, prepareOnly: true);
-        var (exitCode, variantOutput) = await RunAsync(input, prepareOnly: true, promptVariant: "intent-cardinality");
-        Assert.Equal(0, exitCode);
-        using var baseline = JsonDocument.Parse(baselineOutput);
-        using var variant = JsonDocument.Parse(variantOutput);
-        var before = baseline.RootElement;
-        var after = variant.RootElement;
-        Assert.Equal("7-intent-cardinality-1", after.GetProperty("promptVersion").GetString());
-        Assert.Equal(before.GetProperty("modelInput").GetString(), after.GetProperty("modelInput").GetString());
-        Assert.Equal(before.GetProperty("schema").GetRawText(), after.GetProperty("schema").GetRawText());
-        Assert.Equal(before.GetProperty("outputTokens").GetInt32(), after.GetProperty("outputTokens").GetInt32());
-        Assert.NotEqual(
-            before.GetProperty("configurationId").GetString(),
-            after.GetProperty("configurationId").GetString()
-        );
-        var prompt = after.GetProperty("prompt").GetString()!;
-        Assert.StartsWith(before.GetProperty("prompt").GetString()!, prompt, StringComparison.Ordinal);
-        Assert.Contains("alternative candidate matches", prompt, StringComparison.Ordinal);
-        Assert.Equal(
-            prompt,
-            after
-                .GetProperty("effective")
-                .GetProperty("request")
-                .GetProperty("messages")[0]
-                .GetProperty("content")
-                .GetString()
-        );
-    }
-
-    [Theory]
-    [InlineData("concise")]
-    [InlineData("declarative-inspect")]
-    public async Task UnknownPromptVariantIsRejectedBeforeInference(string variant)
-    {
-        var (exitCode, output) = await RunAsync(
-            """{"instruction":"Save","candidates":[{"id":"c1","tag":"button","label":"Save"}]}""",
-            prepareOnly: false,
-            endpoint: "http://127.0.0.1:1/api/v1/",
-            promptVariant: variant
-        );
-        Assert.Equal(1, exitCode);
-        using var result = JsonDocument.Parse(output);
-        Assert.Equal(
-            "invalid_offline_prompt_variant",
-            result.RootElement.GetProperty("diagnostics").GetProperty("code").GetString()
-        );
-        Assert.Equal(0, result.RootElement.GetProperty("diagnostics").GetProperty("modelCalls").GetInt32());
-    }
-
-    [Fact]
     public async Task PrepareOnlyBuildsTheVersionedRequestWithoutCredentialsOrBrowserClaims()
     {
         var (exitCode, output) = await RunAsync(
@@ -75,9 +21,9 @@ public sealed class OfflineEvaluationTests
         Assert.Equal(0, exitCode);
         using var json = JsonDocument.Parse(output);
         var result = json.RootElement;
-        Assert.Equal("7", result.GetProperty("promptVersion").GetString());
+        Assert.Equal("10", result.GetProperty("promptVersion").GetString());
         Assert.Equal(4096, result.GetProperty("outputTokens").GetInt32());
-        Assert.Contains("ONE interaction type", result.GetProperty("prompt").GetString(), StringComparison.Ordinal);
+        Assert.Contains("one interaction shared", result.GetProperty("prompt").GetString(), StringComparison.Ordinal);
         using var modelInput = JsonDocument.Parse(result.GetProperty("modelInput").GetString()!);
         Assert.Equal("c1", modelInput.RootElement.GetProperty("candidates")[0].GetProperty("id").GetString());
         Assert.False(modelInput.RootElement.GetProperty("candidates")[0].TryGetProperty("geometry", out _));
@@ -109,8 +55,7 @@ public sealed class OfflineEvaluationTests
 
     [Theory]
     [InlineData("valid", null)]
-    [InlineData("valid_variant", null)]
-    [InlineData("valid_variant_plural", null)]
+    [InlineData("plural", null)]
     [InlineData("unknown", "provider_unknown_candidate")]
     [InlineData("mixed", "provider_malformed_response")]
     [InlineData("duplicate", "provider_malformed_response")]
@@ -142,7 +87,7 @@ public sealed class OfflineEvaluationTests
                     """{"complete":true,"actions":[{"step":1,"instruction":"Click Save","outcome":"found","action":"click","candidateId":"c1","limitation":"none"}]}""";
                 var content = scenario switch
                 {
-                    "valid_variant_plural" => valid.Replace(
+                    "plural" => valid.Replace(
                         "]}",
                         """,{"step":2,"instruction":"Click Cancel","outcome":"found","action":"click","candidateId":"c2","limitation":"none"}]}""",
                         StringComparison.Ordinal
@@ -190,23 +135,20 @@ public sealed class OfflineEvaluationTests
             }
         );
         await provider.StartAsync();
-        var promptVariant = scenario is "valid_variant" or "valid_variant_plural" ? "intent-cardinality" : "baseline";
         var input =
-            scenario == "valid_variant_plural"
+            scenario == "plural"
                 ? """{"instruction":"Click Save and Cancel","candidates":[{"id":"c1","tag":"button","label":"Save"},{"id":"c2","tag":"button","label":"Cancel"}]}"""
                 : """{"instruction":"Click Save","candidates":[{"id":"c1","tag":"button","label":"Save"}]}""";
         var (_, preparedOutput) = await RunAsync(
             input,
             prepareOnly: true,
-            endpoint: provider.Urls.Single() + "/api/v1/",
-            promptVariant: promptVariant
+            endpoint: provider.Urls.Single() + "/api/v1/"
         );
         using var prepared = JsonDocument.Parse(preparedOutput);
         var (exitCode, output) = await RunAsync(
             input,
             prepareOnly: false,
-            endpoint: provider.Urls.Single() + "/api/v1/",
-            promptVariant: promptVariant
+            endpoint: provider.Urls.Single() + "/api/v1/"
         );
         Assert.Equal(prepared.RootElement.GetProperty("prompt").GetString(), sentPrompt);
         Assert.Equal(expectedCode is null ? 0 : 1, exitCode);
@@ -229,8 +171,8 @@ public sealed class OfflineEvaluationTests
         {
             Assert.Equal("click", result.GetProperty("action").GetString());
             Assert.Equal("c1", result.GetProperty("actions")[0].GetProperty("candidateId").GetString());
-            Assert.Equal(scenario == "valid_variant_plural" ? 2 : 1, result.GetProperty("actions").GetArrayLength());
-            if (scenario == "valid_variant_plural")
+            Assert.Equal(scenario == "plural" ? 2 : 1, result.GetProperty("actions").GetArrayLength());
+            if (scenario == "plural")
             {
                 Assert.Equal("c2", result.GetProperty("actions")[1].GetProperty("candidateId").GetString());
             }
@@ -312,37 +254,10 @@ public sealed class OfflineEvaluationTests
         Assert.Equal(0, json.RootElement.GetProperty("diagnostics").GetProperty("modelCalls").GetInt32());
     }
 
-    [Theory]
-    [InlineData("{\"prompt\":0.0749,\"completion\":0.7,\"request\":0}", 0)]
-    [InlineData("{\"prompt\":-1,\"completion\":0.7,\"request\":0}", 1)]
-    [InlineData("{\"prompt\":0.0749}", 1)]
-    public async Task OfflinePriceCeilingsAreValidatedAndPartOfTheEffectiveRequest(string limits, int expectedExit)
-    {
-        var (exitCode, output) = await RunAsync(
-            """{"instruction":"Click Save","candidates":[{"id":"n1","tag":"button","label":"Save"}]}""",
-            prepareOnly: true,
-            priceLimits: limits
-        );
-        Assert.Equal(expectedExit, exitCode);
-        using var json = JsonDocument.Parse(output);
-        if (exitCode == 0)
-        {
-            var prices = json
-                .RootElement.GetProperty("effective")
-                .GetProperty("request")
-                .GetProperty("provider")
-                .GetProperty("max_price");
-            Assert.Equal(0.0749m, prices.GetProperty("prompt").GetDecimal());
-            Assert.Equal(0.7m, prices.GetProperty("completion").GetDecimal());
-        }
-    }
-
     private static async Task<(int ExitCode, string Output)> RunAsync(
         string input,
         bool prepareOnly,
-        string? endpoint = null,
-        string? priceLimits = null,
-        string? promptVariant = null
+        string? endpoint = null
     )
     {
         var path = Path.Combine(Path.GetTempPath(), $"xpathed-offline-{Guid.NewGuid():N}.json");
@@ -365,8 +280,6 @@ public sealed class OfflineEvaluationTests
             {
                 process.StartInfo.ArgumentList.Add("--prepare-only");
             }
-            process.StartInfo.Environment["XPATHED_EVALUATION_PROMPT_VARIANT"] = promptVariant ?? "baseline";
-            process.StartInfo.Environment["XPATHED_EVALUATION_PRICE_LIMITS"] = priceLimits ?? "";
             process.StartInfo.Environment["OpenRouter__ApiKey"] = endpoint is null ? "" : "synthetic-api-key";
             process.StartInfo.Environment["OpenRouter__Model"] = "configured/model";
             process.StartInfo.Environment["OpenRouter__Provider"] = "configured-route";

@@ -65,12 +65,7 @@ esac
 }
 
 test("live evaluation wrappers pass the dedicated file key and reject an app-only file before Docker", async (t) => {
-  for (const args of [
-    [],
-    ["--comparison"],
-    ["--context"],
-    ["--qualification", "--profile", "deepseek"],
-  ]) {
+  for (const args of [[], ["--qualification", "--profile", "deepseek"]]) {
     await t.test(args[0] ?? "direct", (t) => {
       const selected = runWrapper(t, "xpathed-evaluation-key", "web", ["--mode", "live", ...args], {
         envText: "OPENROUTER_API_KEY=fixture-app\nOPENROUTER_EVAL_API_KEY=fixture-eval\n",
@@ -113,20 +108,6 @@ test("evaluation refuses existing development services before teardown", (t) => 
   assert.doesNotMatch(result.calls, /\bdown\b|\bup\b|\brun\b/);
 });
 
-test("Qwen service belongs only to the qualification runner", (t) => {
-  const rejected = runWrapper(t, "xpathed-evaluation-qwen-rejected", "resolver-qwen");
-  assert.equal(rejected.status, 2);
-  assert.match(rejected.stderr, /Qualification service belongs to a different runner/);
-  assert.doesNotMatch(rejected.calls, /\bdown\b|\bup\b|\brun\b/);
-  const accepted = runWrapper(t, "xpathed-evaluation-qwen-accepted", "resolver-qwen", [
-    "--qualification",
-    "--profile",
-    "qwen",
-  ]);
-  assert.equal(accepted.status, 77);
-  assert.match(accepted.calls, /\bdown\b/);
-});
-
 test("custom dataset suites cannot enter live mode or read outside the checkout", (t) => {
   const directory = mkdtempSync(join(tmpdir(), "xpathed-custom-suite-"));
   t.after(() => rmSync(directory, { recursive: true, force: true }));
@@ -149,7 +130,7 @@ test("custom dataset suites cannot enter live mode or read outside the checkout"
 test("qualification cannot combine strategy comparison or inject an unreviewed suite", () => {
   for (const args of [
     ["--qualification", "--comparison"],
-    ["--qualification", "--suite", "evaluation/research/viewport-cases.json"],
+    ["--qualification", "--suite", "evaluation/cases/unavailable.json"],
     ["--profile", "gemini"],
   ]) {
     const result = spawnSync("sh", ["scripts/evaluate.sh", ...args], {
@@ -157,31 +138,8 @@ test("qualification cannot combine strategy comparison or inject an unreviewed s
       cwd: resolve(import.meta.dirname, ".."),
     });
     assert.equal(result.status, 2);
-    assert.match(result.stderr, /qualification|Qualification|Choose one evaluation mode/);
+    assert.match(result.stderr, /qualification|Qualification|Unknown evaluation option/);
   }
-});
-
-test("context comparison isolates its service and rejects extra attempts or modes before Docker", (t) => {
-  for (const args of [
-    ["--context", "--qualification"],
-    ["--context", "--comparison"],
-    ["--context", "--repetitions", "2"],
-    ["--context", "--case", "basic-save"],
-    ["--context", "--seed", "2"],
-    ["--context", "--suite", "evaluation/cases/index.json"],
-  ]) {
-    const result = runWrapper(t, "xpathed-evaluation-context-options", "resolver-context", args);
-    assert.equal(result.status, 2);
-    assert.equal(result.calls, "");
-  }
-  const rejected = runWrapper(t, "xpathed-evaluation-context-reject", "resolver-context");
-  assert.equal(rejected.status, 2);
-  assert.match(rejected.stderr, /Context service belongs to a different runner/);
-  const accepted = runWrapper(t, "xpathed-evaluation-context-accept", "resolver-context", [
-    "--context",
-  ]);
-  assert.equal(accepted.status, 77);
-  assert.match(accepted.calls, /compose.context.yaml/);
 });
 
 test("release comparison accepts the unified collection and forwards its container path", (t) => {
@@ -202,8 +160,6 @@ test("browser concurrency is bounded and cannot leak into live or comparison run
     ["--concurrency", "5"],
     ["--concurrency", "2", "--mode", "live"],
     ["--concurrency", "2", "--qualification"],
-    ["--concurrency", "2", "--comparison"],
-    ["--concurrency", "2", "--context"],
   ]) {
     const result = runWrapper(t, "xpathed-evaluation-workers", "resolver", args);
     assert.notEqual(result.status, 0);

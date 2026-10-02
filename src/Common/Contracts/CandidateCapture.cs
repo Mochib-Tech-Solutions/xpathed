@@ -10,5 +10,5 @@ public sealed record CandidateCapture(
     CandidateElement[] Candidates,
     CaptureCoverage Coverage,
     int UnsupportedBoundaryCount,
-    string Scope = "page"
+    string Scope = "current_view"
 );

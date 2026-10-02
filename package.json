@@ -49,8 +49,6 @@
     "diagnostics": "scripts/diagnostics.sh",
     "evaluate": "scripts/evaluate.sh",
     "evaluate:live": "scripts/evaluate.sh --mode live",
-    "evaluate:compare": "scripts/evaluate.sh --comparison",
-    "evaluate:compare:replay": "node evaluation/research/compare.mjs --replay",
     "evaluate:qualify": "scripts/evaluate.sh --qualification",
     "evaluate:qualify:replay": "node evaluation/compare.mjs --replay",
     "release:seal": "node scripts/release/evidence.mjs seal",
@@ -62,7 +60,6 @@
     "evaluate:replay": "node evaluation/run.mjs --replay",
     "datasets:fetch": "node evaluation/datasets/sources.mjs",
     "datasets:import": "node evaluation/datasets/import.mjs",
-    "evaluate:dataset": "node evaluation/datasets/run.mjs",
     "prepare": "node scripts/install-hooks.mjs",
     "hooks:install": "node scripts/install-hooks.mjs",
     "check:staged": "node scripts/pre-commit.mjs",
@@ -73,7 +70,9 @@
     "release:rollback": "node scripts/release/control.mjs rollback",
     "release:activate": "node scripts/release/control.mjs activate",
     "release:monitor": "node scripts/release/monitor.mjs",
-    "datasets:collection": "node evaluation/datasets/collection.mjs"
+    "datasets:collection": "node evaluation/datasets/collection.mjs",
+    "evaluate:compare": "scripts/evaluate.sh --comparison",
+    "evaluate:compare:replay": "node evaluation/research/compare.mjs --replay"
   },
   "devDependencies": {
     "prettier": "3.9.9"

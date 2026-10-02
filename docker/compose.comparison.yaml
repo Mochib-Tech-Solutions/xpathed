@@ -1,17 +1,30 @@
 services:
   resolver:
-    environment:
+    environment: &comparison-provider
       OpenRouter__BaseUrl: http://evaluation-fixture:8091/api/v1/
-      OpenRouter__ApiKey: comparison-proxy-only
+      OpenRouter__ApiKey: evaluation-worker-1
       OpenRouter__Model: deepseek/deepseek-v4.1-flash
       OpenRouter__Provider: wafer
+  browser-basic:
+    image: ${XPATHED_BASIC_BROWSER:?Set the verified basic browser image}
+    init: true
+    shm_size: 1gb
+    security_opt: ["seccomp=./docker/browser/seccomp.json"]
+    environment:
+      ViewerOrigins: http://localhost:8080
+      MaxSessions: 4
+      Logging__LogLevel__Default: Warning
+    stop_grace_period: 20s
+  resolver-basic:
+    image: ${XPATHED_BASIC_RESOLVER:?Set the verified basic resolver image}
+    environment:
+      <<: *comparison-provider
+      OpenRouter__ApiKey: evaluation-worker-0
+      BrowserUrl: http://browser-basic:8080
+      Logging__LogLevel__Default: Warning
   evaluation-fixture:
     environment:
       OPENROUTER_EVAL_API_KEY: ${OPENROUTER_EVAL_API_KEY:-}
-      XPATHED_COMPARISON_MODE: ${XPATHED_COMPARISON_MODE:-deterministic}
-      XPATHED_BUDGET_PATH: /budget/experiment-budget.json
-    volumes:
-      - ./.artifacts/datasets:/budget
   stagehand:
     build:
       context: .

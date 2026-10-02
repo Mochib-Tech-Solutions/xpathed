@@ -20,8 +20,16 @@ const page = {
   title: "Checkout",
   blockedPopups: 0,
 };
+const target = {
+  candidateId: "candidate-1",
+  tag: "button",
+  label: "Pay now",
+  xpaths: ["//*[@data-testid='pay']", "//button[normalize-space(.)='Pay now']"],
+  state: { rendered: true, inViewport: false, enabled: false, editable: false, checked: null },
+  geometry: { x: 20, y: 1200, width: 100, height: 40 },
+};
 const found = {
-  contractVersion: "1",
+  contractVersion: "4",
   outcome: "found",
   sessionId: session.sessionId,
   pageId: session.pageId,
@@ -32,14 +40,17 @@ const found = {
   attemptId: "attempt-1",
   configurationId: "test-config",
   action: "click",
-  target: {
-    candidateId: "candidate-1",
-    tag: "button",
-    label: "Pay now",
-    xpaths: ["//*[@data-testid='pay']", "//button[normalize-space(.)='Pay now']"],
-    state: { rendered: true, inViewport: false, enabled: false, editable: false, checked: null },
-    geometry: { x: 20, y: 1200, width: 100, height: 40 },
-  },
+  target: null,
+  actions: [
+    {
+      actionId: "a1",
+      order: 1,
+      instruction: "Click Pay now",
+      action: "click",
+      outcome: "found",
+      target,
+    },
+  ],
   diagnostics: { code: null, message: null },
 };
 
@@ -103,13 +114,23 @@ describe("Workspace resolution", () => {
       Promise.resolve(
         Response.json({
           ...found,
-          target: {
-            ...found.target,
-            tag,
-            role,
-            accessibleName,
-            label: "Unrelated descendant content",
-          },
+          target: null,
+          actions: [
+            {
+              actionId: "a1",
+              order: 1,
+              instruction: "Click Pay now",
+              action: "click",
+              outcome: "found",
+              target: {
+                ...target,
+                tag,
+                role,
+                accessibleName,
+                label: "Unrelated descendant content",
+              },
+            },
+          ],
         }),
       ),
     );
@@ -118,7 +139,7 @@ describe("Workspace resolution", () => {
     expect(await screen.findByRole("heading", { name: type })).toBeVisible();
     expect(screen.getByText(accessibleName || "No accessible name")).toBeVisible();
     expect(screen.queryByText("Unrelated descendant content")).not.toBeInTheDocument();
-    expect(screen.getByText(found.target.xpaths[0]!)).toBeVisible();
+    expect(screen.getByText(target.xpaths[0]!)).toBeVisible();
   });
 
   it.each([false, true])(
@@ -153,6 +174,19 @@ describe("Workspace resolution", () => {
             : Response.json({
                 ...found,
                 diagnostics: { ...found.diagnostics, timingsMs: { total: 739 } },
+                target: null,
+                actions: [
+                  {
+                    actionId: "a1",
+                    order: 1,
+                    instruction: "Click Pay now",
+                    action: "click",
+                    outcome: "found",
+                    target: target,
+                    code: null,
+                    message: null,
+                  },
+                ],
               }),
         );
         const received = await screen.findByLabelText(/^Received /, { selector: "time" });
@@ -171,7 +205,7 @@ describe("Workspace resolution", () => {
           const content = [
             response.getByRole("heading", { name: "Button" }),
             response.getByText("Action: click"),
-            response.getByText(found.target.xpaths[0]!),
+            response.getByText(target.xpaths[0]!),
             response.getByRole("heading", { name: "Verification" }),
           ];
           for (let index = 0; index < content.length - 1; index++) {
@@ -188,8 +222,6 @@ describe("Workspace resolution", () => {
   );
 
   it.each([
-    ["3", "found"],
-    ["3", "not_found"],
     ["4", "found"],
     ["4", "not_found"],
   ])(
@@ -218,7 +250,7 @@ describe("Workspace resolution", () => {
                 instruction: "Click the first confirmation button",
                 action: "click",
                 outcome: "found",
-                target: found.target,
+                target: target,
               },
               {
                 actionId: "a2",
@@ -229,7 +261,7 @@ describe("Workspace resolution", () => {
                 target: missing
                   ? null
                   : {
-                      ...found.target,
+                      ...target,
                       label: "Confirm booking",
                       xpaths: ["//button[@id='confirm-booking']"],
                     },
@@ -266,14 +298,14 @@ describe("Workspace resolution", () => {
           expect(within(target).getByText(/Click the second confirmation button/)).toBeVisible();
         else expect(within(target).queryByText(/Click the/)).not.toBeInTheDocument();
       }
-      expect(within(targets[0]!).getByText(found.target.xpaths[0]!)).toBeVisible();
+      expect(within(targets[0]!).getByText(target.xpaths[0]!)).toBeVisible();
       expect(within(targets[0]!).getByText("Disabled")).toBeVisible();
       expect(
         within(targets[1]!).getByText(
           missing
             ? contractVersion === "4"
               ? "I couldn’t find that element in the current view."
-              : "I couldn’t find that element on this page."
+              : "I couldn’t find that element in the current view."
             : "//button[@id='confirm-booking']",
         ),
       ).toBeVisible();
@@ -291,13 +323,13 @@ describe("Workspace resolution", () => {
     },
   );
 
-  it("explains the single-action limit for unsupported version-3 commands", async () => {
+  it("explains the single-action limit for unsupported commands", async () => {
     const message = "Use one action per command. You can target several elements on this page.";
     mockApi(() =>
       Promise.resolve(
         Response.json({
           ...found,
-          contractVersion: "3",
+          contractVersion: "4",
           outcome: "unsupported",
           action: "unsupported",
           target: null,
@@ -337,14 +369,14 @@ describe("Workspace resolution", () => {
           ...found,
           contractVersion,
           action,
-          actions: [{ actionId: "a1", order: 1, action, outcome: "found", target: found.target }],
+          actions: [{ actionId: "a1", order: 1, action, outcome: "found", target: target }],
         }),
       ),
     );
     const user = await openWorkspace();
     await submitInstruction(user);
     expect(await screen.findByText(`Action: ${label}`)).toBeVisible();
-    expect(screen.getByText(found.target.xpaths[0]!)).toBeVisible();
+    expect(screen.getByText(target.xpaths[0]!)).toBeVisible();
   });
 
   it("shows the frame chain separately from the document XPath and selected state", async () => {
@@ -352,18 +384,28 @@ describe("Workspace resolution", () => {
       Promise.resolve(
         Response.json({
           ...found,
-          target: {
-            ...found.target,
-            frame: {
-              id: "f2",
-              documentId: "child-document",
-              chain: [
-                { frameId: "f1", label: "Employee", xpath: "//iframe[@id='employee']" },
-                { frameId: "f2", label: "Payroll", xpath: "//iframe[@id='payroll']" },
-              ],
+          target: null,
+          actions: [
+            {
+              actionId: "a1",
+              order: 1,
+              instruction: "Click Pay now",
+              action: "click",
+              outcome: "found",
+              target: {
+                ...target,
+                frame: {
+                  id: "f2",
+                  documentId: "child-document",
+                  chain: [
+                    { frameId: "f1", label: "Employee", xpath: "//iframe[@id='employee']" },
+                    { frameId: "f2", label: "Payroll", xpath: "//iframe[@id='payroll']" },
+                  ],
+                },
+                state: { ...target.state, selected: true, selectedOptionCount: 2 },
+              },
             },
-            state: { ...found.target.state, selected: true, selectedOptionCount: 2 },
-          },
+          ],
         }),
       ),
     );
@@ -382,7 +424,7 @@ describe("Workspace resolution", () => {
       Promise.resolve(
         Response.json({
           ...found,
-          contractVersion: "2",
+          contractVersion: "4",
           target: null,
           action: null,
           inspectedActionId: "a1",
@@ -402,7 +444,7 @@ describe("Workspace resolution", () => {
               instruction: "Click Pay now",
               action: "click",
               outcome: "found",
-              target: { ...found.target, interactability: { status: "unknown", reasons: [] } },
+              target: { ...target, interactability: { status: "unknown", reasons: [] } },
             },
           ],
         }),
@@ -419,11 +461,11 @@ describe("Workspace resolution", () => {
       within(transcript).queryByText(/No action was executed|Semantic completeness|Event delivery/),
     ).not.toBeInTheDocument();
     expect(within(transcript).queryByText(/1 target found/)).not.toBeInTheDocument();
-    expect(within(transcript).getByText(found.target.xpaths[0]!)).toBeVisible();
+    expect(within(transcript).getByText(target.xpaths[0]!)).toBeVisible();
     expect(
       within(transcript).queryByRole("button", { name: /Inspect action/ }),
     ).not.toBeInTheDocument();
-    expect(within(transcript).queryByText(found.target.xpaths[1]!)).not.toBeInTheDocument();
+    expect(within(transcript).queryByText(target.xpaths[1]!)).not.toBeInTheDocument();
     expect(
       within(transcript).queryByText(/Verified XPaths|alternative XPath|State details/),
     ).not.toBeInTheDocument();
@@ -434,9 +476,9 @@ describe("Workspace resolution", () => {
   it("renders independent action results with one request cost and no inspection control", async () => {
     const batch = {
       ...found,
-      contractVersion: "2",
+      contractVersion: "4",
       outcome: "partial",
-      action: null,
+      action: "click",
       target: null,
       inspectedActionId: "a1",
       summary: {
@@ -459,7 +501,7 @@ describe("Workspace resolution", () => {
           instruction: "Click Pay now",
           action: "click",
           outcome: "found",
-          target: found.target,
+          target: target,
           frameId: "main",
           diagnosticsReference: "attempt-1",
           code: null,
@@ -469,24 +511,28 @@ describe("Workspace resolution", () => {
           actionId: "a2",
           order: 2,
           step: 2,
-          instruction: "Hover Contact",
-          action: "hover",
+          instruction: "Click Contact",
+          action: "click",
           outcome: "not_found",
           target: null,
           frameId: "main",
           diagnosticsReference: "attempt-1",
           code: null,
-          message: "I couldn’t find that element on this page.",
+          message: "I couldn’t find that element in the current view.",
         },
       ],
     };
     mockApi(() => Promise.resolve(Response.json(batch)));
     const user = await openWorkspace();
     await submitInstruction(user);
-    expect(await screen.findByText("1 target found · 1 missing · 1 blocked")).toBeInTheDocument();
+    expect(
+      await screen.findByText("1 target found · 1 missing · 1 blocked · current view"),
+    ).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Partial result" })).toBeVisible();
-    expect(screen.getByText(/Hover Contact/)).toBeInTheDocument();
-    expect(screen.getByText("I couldn’t find that element on this page.")).toBeInTheDocument();
+    expect(screen.getByText(/Click Contact/)).toBeInTheDocument();
+    expect(
+      screen.getByText("I couldn’t find that element in the current view."),
+    ).toBeInTheDocument();
     expect(screen.getAllByText("Cost unavailable")).toHaveLength(1);
     expect(screen.queryByRole("button", { name: /Inspect action/ })).not.toBeInTheDocument();
     expect(fetch).toHaveBeenCalledWith(
@@ -513,22 +559,34 @@ describe("Workspace resolution", () => {
         Promise.resolve(
           Response.json({
             ...found,
-            target: {
-              ...found.target,
-              interactability: {
-                version: status === "ready" ? "2" : "1",
-                action: "click",
-                status,
-                reasons,
-                checks: {
-                  enabled: status === "ready" ? "pass" : "fail",
-                  viewport: status === "ready" ? "pass" : "fail",
-                  pointerReception: status === "ready" ? "pass" : "unknown",
-                  eventOutcome: "unknown",
-                },
-              },
-            },
             diagnostics: { ...found.diagnostics, timingsMs: { total: 125 } },
+            target: null,
+            actions: [
+              {
+                actionId: "a1",
+                order: 1,
+                instruction: "Click Pay now",
+                action: "click",
+                outcome: "found",
+                target: {
+                  ...target,
+                  interactability: {
+                    version: status === "ready" ? "2" : "1",
+                    action: "click",
+                    status,
+                    reasons,
+                    checks: {
+                      enabled: status === "ready" ? "pass" : "fail",
+                      viewport: status === "ready" ? "pass" : "fail",
+                      pointerReception: status === "ready" ? "pass" : "unknown",
+                      eventOutcome: "unknown",
+                    },
+                  },
+                },
+                code: null,
+                message: null,
+              },
+            ],
           }),
         ),
       );
@@ -597,10 +655,20 @@ describe("Workspace resolution", () => {
           Response.json({
             ...found,
             action,
-            target: {
-              ...found.target,
-              interactability: { version: "2", action, status, reasons: [], checks },
-            },
+            target: null,
+            actions: [
+              {
+                actionId: "a1",
+                order: 1,
+                instruction: "Click Pay now",
+                action,
+                outcome: "found",
+                target: {
+                  ...target,
+                  interactability: { version: "2", action, status, reasons: [], checks },
+                },
+              },
+            ],
           }),
         ),
       );
@@ -646,6 +714,19 @@ describe("Workspace resolution", () => {
               pricingFetchedAt: "2026-09-30T09:00:00Z",
             },
           },
+          target: null,
+          actions: [
+            {
+              actionId: "a1",
+              order: 1,
+              instruction: "Click Pay now",
+              action: "click",
+              outcome: "found",
+              target: target,
+              code: null,
+              message: null,
+            },
+          ],
         }),
       ),
     );
@@ -690,6 +771,19 @@ describe("Workspace resolution", () => {
                   }
                 : null,
           },
+          target: null,
+          actions: [
+            {
+              actionId: "a1",
+              order: 1,
+              instruction: "Click Pay now",
+              action: "click",
+              outcome: "found",
+              target: target,
+              code: null,
+              message: null,
+            },
+          ],
         }),
       ),
     );
@@ -758,8 +852,20 @@ describe("Workspace resolution", () => {
         Response.json({
           ...found,
           outcome: ++attempt === 1 ? "found" : "not_found",
-          target: attempt === 1 ? found.target : null,
           diagnostics: { ...found.diagnostics, timingsMs: { total: attempt === 1 ? 1260 : 430 } },
+          target: null,
+          actions: [
+            {
+              actionId: "a1",
+              order: 1,
+              instruction: "Click Pay now",
+              action: "click",
+              outcome: attempt === 1 ? "found" : "not_found",
+              target: attempt === 1 ? target : null,
+              code: null,
+              message: null,
+            },
+          ],
         }),
       ),
     );
@@ -771,7 +877,7 @@ describe("Workspace resolution", () => {
     await user.type(composer, "Click the missing button{Enter}");
 
     expect(
-      await screen.findByText("I couldn’t find that element on this page."),
+      await screen.findByText("I couldn’t find that element in the current view."),
     ).toBeInTheDocument();
     expect(screen.getByText("Click Pay now")).toBeInTheDocument();
     expect(screen.getByText("Click the missing button", { selector: "p" })).toBeInTheDocument();
@@ -865,6 +971,19 @@ describe("Workspace resolution", () => {
         Response.json({
           ...found,
           diagnostics: { ...found.diagnostics, timingsMs: { total: 1260 } },
+          target: null,
+          actions: [
+            {
+              actionId: "a1",
+              order: 1,
+              instruction: "Click Pay now",
+              action: "click",
+              outcome: "found",
+              target: target,
+              code: null,
+              message: null,
+            },
+          ],
         }),
       ),
     );
@@ -889,7 +1008,17 @@ describe("Workspace resolution", () => {
         Response.json({
           ...found,
           action: "fill",
-          target: { ...found.target, tag: "input", label: "Name" },
+          target: null,
+          actions: [
+            {
+              actionId: "a1",
+              order: 1,
+              instruction: "Click Pay now",
+              action: "fill",
+              outcome: "found",
+              target: { ...target, tag: "input", label: "Name" },
+            },
+          ],
         }),
       ),
     );
@@ -899,7 +1028,7 @@ describe("Workspace resolution", () => {
     expect(await screen.findByText("Name", { selector: "bdi" })).toBeInTheDocument();
     expect(screen.getByText("Not editable")).toBeInTheDocument();
     expect(
-      screen.queryByText("I couldn’t find that element on this page."),
+      screen.queryByText("I couldn’t find that element in the current view."),
     ).not.toBeInTheDocument();
   });
 
@@ -924,7 +1053,24 @@ describe("Workspace resolution", () => {
   ])("rejects a result from $name", async ({ result, current: changed }) => {
     let current = page;
     mockApi(
-      () => Promise.resolve(Response.json({ ...found, ...result })),
+      () =>
+        Promise.resolve(
+          Response.json({
+            ...found,
+            ...result,
+            target: null,
+            actions: [
+              {
+                actionId: "a1",
+                order: 1,
+                instruction: "Click Pay now",
+                action: "click",
+                outcome: "found",
+                target: target,
+              },
+            ],
+          }),
+        ),
       () => current,
     );
     const user = await openWorkspace();
@@ -946,8 +1092,8 @@ describe("Workspace resolution", () => {
 
     expect(screen.getByText("Pay now", { selector: "bdi" })).toBeInTheDocument();
     expect(screen.getByText(/Earlier result/)).toBeInTheDocument();
-    expect(screen.getByText(found.target.xpaths[0]!)).toBeVisible();
-    expect(screen.queryByText(found.target.xpaths[1]!)).not.toBeInTheDocument();
+    expect(screen.getByText(target.xpaths[0]!)).toBeVisible();
+    expect(screen.queryByText(target.xpaths[1]!)).not.toBeInTheDocument();
     expect(screen.getByText("Interaction readiness unavailable.")).toBeVisible();
   });
 
@@ -1007,7 +1153,17 @@ describe("Workspace resolution", () => {
           sessionId: freshSession.sessionId,
           pageId: freshPage.pageId,
           documentId: freshPage.documentId,
-          target: { ...found.target, label: "Fresh target" },
+          target: null,
+          actions: [
+            {
+              actionId: "a1",
+              order: 1,
+              instruction: "Click Pay now",
+              action: "click",
+              outcome: "found",
+              target: { ...target, label: "Fresh target" },
+            },
+          ],
         }),
       ),
     );
@@ -1169,7 +1325,7 @@ describe("Workspace resolution", () => {
 
       expect(await screen.findByRole("alert")).toHaveTextContent(message);
       expect(
-        screen.queryByText("I couldn’t find that element on this page."),
+        screen.queryByText("I couldn’t find that element in the current view."),
       ).not.toBeInTheDocument();
       expect(screen.getByRole("textbox", { name: "Describe an element" })).toBeEnabled();
       expect(screen.getByRole("textbox", { name: "Describe an element" })).toHaveValue("");
@@ -1296,9 +1452,10 @@ describe("Workspace resolution", () => {
     expect(await screen.findByRole("heading", { name: title })).toBeVisible();
     expect(screen.getByText(message)).toBeVisible();
     expect(screen.queryByRole("button", { name: /Copy XPath/ })).not.toBeInTheDocument();
-    expect(
-      screen.queryByText("I couldn’t find that element on this page."),
-    ).not.toBeInTheDocument();
+    if (outcome !== "not_found")
+      expect(
+        screen.queryByText("I couldn’t find that element in the current view."),
+      ).not.toBeInTheDocument();
     if (outcome !== "not_found")
       expect(screen.queryByRole("heading", { name: "Target not found" })).not.toBeInTheDocument();
     if (outcome === "error") expect(screen.getByRole("alert")).toHaveTextContent(message);
@@ -1337,7 +1494,7 @@ describe("Workspace resolution", () => {
                     action: "click",
                     code: null,
                     message: null,
-                    target: found.target,
+                    target: target,
                   },
                   failed,
                 ]
@@ -1367,11 +1524,12 @@ describe("Workspace resolution", () => {
         Response.json({
           ...found,
           outcome: "error",
-          target: null,
           diagnostics: {
             code: "provider_rate_limit",
             message: "The model provider is rate limited.",
           },
+          target: null,
+          actions: [],
         }),
       ),
     );
@@ -1381,7 +1539,7 @@ describe("Workspace resolution", () => {
     expect(await screen.findByRole("alert")).toBeInTheDocument();
     expect(screen.getByRole("alert")).toHaveTextContent("The model provider is rate limited.");
     expect(
-      screen.queryByText("I couldn’t find that element on this page."),
+      screen.queryByText("I couldn’t find that element in the current view."),
     ).not.toBeInTheDocument();
   });
 
@@ -1439,11 +1597,23 @@ describe("Workspace resolution", () => {
         Response.json({
           ...found,
           outcome: "unsupported",
-          target: null,
           diagnostics: {
             code: "unsupported_action",
             message: "Drag and drop is unsupported.",
           },
+          target: null,
+          actions: [
+            {
+              actionId: "a1",
+              order: 1,
+              instruction: "Click Pay now",
+              action: "click",
+              outcome: "unsupported",
+              target: null,
+              code: "unsupported_action",
+              message: "Drag and drop is unsupported.",
+            },
+          ],
         }),
       ),
     );
@@ -1453,17 +1623,35 @@ describe("Workspace resolution", () => {
     expect(await screen.findByRole("heading", { name: "Unsupported interaction" })).toBeVisible();
     expect(screen.getByText("Drag and drop is unsupported.")).toBeVisible();
     expect(
-      screen.queryByText("I couldn’t find that element on this page."),
+      screen.queryByText("I couldn’t find that element in the current view."),
     ).not.toBeInTheDocument();
   });
 
   it("reports semantic absence without displaying a target", async () => {
-    mockApi(() => Promise.resolve(Response.json({ ...found, outcome: "not_found", target: null })));
+    mockApi(() =>
+      Promise.resolve(
+        Response.json({
+          ...found,
+          outcome: "not_found",
+          target: null,
+          actions: [
+            {
+              actionId: "a1",
+              order: 1,
+              instruction: "Click Pay now",
+              action: "click",
+              outcome: "not_found",
+              target: null,
+            },
+          ],
+        }),
+      ),
+    );
     const user = await openWorkspace();
     await submitInstruction(user);
 
     expect(
-      await screen.findByText("I couldn’t find that element on this page."),
+      await screen.findByText("I couldn’t find that element in the current view."),
     ).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Copy XPath 1" })).not.toBeInTheDocument();
   });
@@ -1505,7 +1693,7 @@ describe("Workspace resolution", () => {
 
     expect(await screen.findByText("Pay now", { selector: "bdi" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Copy XPath 2" })).not.toBeInTheDocument();
-    expect(screen.queryByText(found.target.xpaths[1]!)).not.toBeInTheDocument();
+    expect(screen.queryByText(target.xpaths[1]!)).not.toBeInTheDocument();
     expect(screen.queryByText("1 alternative XPath")).not.toBeInTheDocument();
     expect(screen.getByText("Off-screen")).toBeInTheDocument();
     expect(screen.getByText("Disabled")).toBeInTheDocument();

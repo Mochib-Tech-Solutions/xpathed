@@ -74,12 +74,12 @@ export async function runWorkerQueues(tasks, concurrency, executeTask, shouldSto
 }
 
 // Keep BaseUrl unchanged: it contributes to Resolver configuration identity.
-export function workerRouter(ports) {
+export function workerRouter(ports, tokens = { "qualification-proxy-only": 0 }) {
   return createServer((incoming, outgoing) => {
     const token = /^Bearer (.+)$/i.exec(incoming.headers.authorization ?? "")?.[1];
     const match = /^evaluation-worker-(\d+)$/.exec(token ?? "");
-    const workerId = match ? Number(match[1]) : 0;
-    if ((!match && token !== "qualification-proxy-only") || !Number.isInteger(ports[workerId])) {
+    const workerId = match ? Number(match[1]) : tokens[token];
+    if (!Number.isInteger(workerId) || !Number.isInteger(ports[workerId])) {
       outgoing.writeHead(403);
       outgoing.end();
       return;

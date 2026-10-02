@@ -10,7 +10,7 @@ Every job checks out `github.sha`: the synthetic merge commit for a pull request
 
 The deterministic browser runner schedules individual cases across up to four workers inside one run. Each case gets a fresh managed session, Chromium process and display. The fixture provider routes by the propagated request trace, including fresh mutation resolutions. Trial files remain independent; manifest writes are serialized. The gate still requires every original case exactly once, with no retries, and independently replays the complete evidence.
 
-CI uses four browser workers. Local evaluation defaults to the available CPU count capped at four; `pnpm evaluate -- --concurrency 1` selects serial execution. Live and comparison runners remain serial. Parallel-run latency includes resource contention and should not be compared as isolated resolver latency.
+CI uses four browser workers. Local evaluation defaults to the available CPU count capped at four; `pnpm evaluate -- --concurrency 1` selects serial execution. Ordinary live and release comparison runners remain serial. The engineering comparison uses three isolated workers, one per system. Parallel-run latency includes resource contention and should not be compared as isolated resolver latency.
 
 ## Local commit checks
 
@@ -58,7 +58,7 @@ Stack checks reuse [dotnet format verification](https://learn.microsoft.com/en-u
 
 After its checks succeed, each selected job writes a receipt containing the actual checkout SHA, workflow run and attempt, job identity and workflow/package/SDK fingerprints. Each .NET matrix member has its own receipt. The final `check` job requires exactly the selected receipts and successful job results. Missing, unexpected, stale, skipped, cancelled or failed selected jobs fail the gate; unselected jobs must be skipped.
 
-The browser job runs `pnpm evaluate --mode deterministic --concurrency 4` with a fresh output directory and isolated Compose project. It builds only Browser, Resolver and the controlled evaluation fixture. It has no OpenRouter key, reads no local `.env`, and uses the fixture model endpoint with response reuse disabled. The shared case catalog includes current-view, compatibility and deterministic locator coverage in one run. Persistence remains a separate PostgreSQL-only job.
+The browser job runs `pnpm evaluate --mode deterministic --concurrency 4` with a fresh output directory and isolated Compose project. It builds only Browser, Resolver and the controlled evaluation fixture. It has no OpenRouter key, reads no local `.env`, and uses the fixture model endpoint with response reuse disabled. The shared case catalog includes current-view resolution, deterministic provider failures and saved-locator mutation coverage in one run. Persistence remains a separate PostgreSQL-only job.
 
 Both the browser receipt and aggregate replay the saved browser evidence through the existing grader. They require the complete original `evaluation/cases/index.json` suite, one first attempt per case, matching source/configuration identities and a saved summary equal to replay. Partial, retried, live, missing or failing results cannot pass. These are deterministic engineering checks; they do not measure model quality or qualify a release.
 

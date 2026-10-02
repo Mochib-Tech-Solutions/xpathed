@@ -6,11 +6,10 @@ internal static class BrowserCaptureScript
         async identity => {
           let environment = JSON.parse(identity.environment);
           const frame = JSON.parse(identity.frame);
-          const currentView = identity.scope === 'current_view';
           const viewport = () => [innerWidth, innerHeight, scrollX, scrollY, visualViewport?.offsetLeft ?? 0, visualViewport?.offsetTop ?? 0, visualViewport?.scale ?? 1];
-          const initialViewport = currentView ? viewport() : [];
+          const initialViewport = viewport();
           const scrollContainers = [];
-          const viewUnchanged = () => !currentView || viewport().every((value, index) => value === initialViewport[index]) &&
+          const viewUnchanged = () => viewport().every((value, index) => value === initialViewport[index]) &&
             scrollContainers.every(([element, x, y, width, height]) => element.isConnected && element.scrollLeft === x && element.scrollTop === y && element.clientWidth === width && element.clientHeight === height);
           const capturedDocument = document;
           const capturedRoot = document.documentElement;
@@ -283,7 +282,7 @@ internal static class BrowserCaptureScript
             id: `${frame.id}:c${index + 1}`, frame, tag: element.localName, role: role(element), text: text(element),
             label: label(element), placeholder: normalize(element.getAttribute('placeholder')), scope: [...new Set([...scope(element), ...(environment.scope ?? [])])],
             state: { ...state(element), checked: null, selected: null, selectedOptionCount: null }, geometry: geometry(element),
-            ...(currentView ? { appearance: appearance(element) } : {})
+            appearance: appearance(element)
           });
           const nodes = [];
           const frameElements = [];
@@ -297,40 +296,37 @@ internal static class BrowserCaptureScript
               if (scannedCount === 20000) throw budgetExceeded;
               scannedCount++;
               const element = walker.currentNode;
-              if (currentView && (element.scrollWidth > element.clientWidth || element.scrollHeight > element.clientHeight))
+              if (element.scrollWidth > element.clientWidth || element.scrollHeight > element.clientHeight)
                 scrollContainers.push([element, element.scrollLeft, element.scrollTop, element.clientWidth, element.clientHeight]);
               if (element.shadowRoot && accessibilityExposed(element)) {
-                if (currentView) shadowHosts.push(element); else unsupportedBoundaryCount++;
+                shadowHosts.push(element);
               }
               if (element.matches('iframe,frame') && accessibilityExposed(element)) frameElements.push(element);
               if (!eligible(element)) continue;
               eligibleCount++;
-              if (!currentView && eligibleCount > 2000) complete = false;
               if (!complete) continue;
               nodes.push(element);
             }
             if (complete) {
               await observeIntersections([...nodes, ...frameElements, ...shadowHosts, ...scrollContainers.map(([element]) => element)]);
               if (!viewUnchanged()) { viewChanged = true; throw budgetExceeded; }
-              if (currentView) unsupportedBoundaryCount = shadowHosts.filter(inView).length;
-              if (currentView) {
-                const retained = nodes.filter(inView);
-                excludedOffscreenCount = nodes.length - retained.length;
-                nodes.length = 0; nodes.push(...retained);
-                const retainedFrames = frameElements.filter(inView);
-                frameElements.length = 0; frameElements.push(...retainedFrames);
-                const relevantAncestors = new Set();
-                for (const node of [...nodes, ...frameElements]) {
-                  for (let ancestor = node.parentElement; ancestor && !relevantAncestors.has(ancestor); ancestor = ancestor.parentElement) {
-                    checkBudget(); relevantAncestors.add(ancestor);
-                  }
+              unsupportedBoundaryCount = shadowHosts.filter(inView).length;
+              const retained = nodes.filter(inView);
+              excludedOffscreenCount = nodes.length - retained.length;
+              nodes.length = 0; nodes.push(...retained);
+              const retainedFrames = frameElements.filter(inView);
+              frameElements.length = 0; frameElements.push(...retainedFrames);
+              const relevantAncestors = new Set();
+              for (const node of [...nodes, ...frameElements]) {
+                for (let ancestor = node.parentElement; ancestor && !relevantAncestors.has(ancestor); ancestor = ancestor.parentElement) {
+                  checkBudget(); relevantAncestors.add(ancestor);
                 }
-                for (let index = scrollContainers.length - 1; index >= 0; index--) {
-                  const [element] = scrollContainers[index];
-                  if (!inView(element) && !relevantAncestors.has(element)) scrollContainers.splice(index, 1);
-                }
-                if (nodes.length > 2000) throw budgetExceeded;
               }
+              for (let index = scrollContainers.length - 1; index >= 0; index--) {
+                const [element] = scrollContainers[index];
+                if (!inView(element) && !relevantAncestors.has(element)) scrollContainers.splice(index, 1);
+              }
+              if (nodes.length > 2000) throw budgetExceeded;
               for (const element of nodes) {
                 checkBudget();
                 const candidate = describe(element, candidates.length);
@@ -344,7 +340,7 @@ internal static class BrowserCaptureScript
             complete = false;
           }
           if (!complete) { nodes.length = 0; candidates.length = 0; }
-          const capturedView = currentView ? new Set([...nodes, ...frameElements, ...shadowHosts.filter(inView)]) : null;
+          const capturedView = new Set([...nodes, ...frameElements, ...shadowHosts.filter(inView)]);
           const literal = value => !value.includes("'") ? `'${value}'` : !value.includes('"') ? `"${value}"` : `concat(${value.split("'").map(part => `'${part}'`).join(`,"'",`)})`;
           const tag = element => element.namespaceURI === 'http://www.w3.org/1999/xhtml' ? element.localName : `*[local-name()=${literal(element.localName)}]`;
           const testAttributes = ['data-testid', 'data-test-id', 'data-test', 'data-cy', 'data-qa'];
@@ -437,23 +433,19 @@ internal static class BrowserCaptureScript
                 environment = value ? JSON.parse(value) : { x:0, y:0, scaleX:1, scaleY:1, exposed:true, rendered:true, clip:{left:0,top:0,right:innerWidth,bottom:innerHeight} };
                 reset(budgetMs);
                 if (!viewUnchanged()) return { errorCode: 'stale_capture' };
-                const observed = currentView ? [] : [...nodes, ...frameElements];
+                const observed = [];
                 let scanned = 0;
-                if (currentView) {
-                  const walker = document.createTreeWalker(document, NodeFilter.SHOW_ELEMENT);
-                  while (walker.nextNode()) {
-                    checkBudget();
-                    if (++scanned > scanBudget) throw budgetExceeded;
-                    const element = walker.currentNode;
-                    if (eligible(element) || (element.matches('iframe,frame') || element.shadowRoot) && accessibilityExposed(element)) observed.push(element);
-                  }
+                const walker = document.createTreeWalker(document, NodeFilter.SHOW_ELEMENT);
+                while (walker.nextNode()) {
+                  checkBudget();
+                  if (++scanned > scanBudget) throw budgetExceeded;
+                  const element = walker.currentNode;
+                  if (eligible(element) || (element.matches('iframe,frame') || element.shadowRoot) && accessibilityExposed(element)) observed.push(element);
                 }
                 await observeIntersections(observed);
                 if (!viewUnchanged()) return { errorCode: 'stale_capture' };
-                if (currentView) {
-                  const visible = observed.filter(inView);
-                  if (visible.length !== capturedView.size || visible.some(element => !capturedView.has(element))) return { errorCode: 'stale_capture' };
-                }
+                const visible = observed.filter(inView);
+                if (visible.length !== capturedView.size || visible.some(element => !capturedView.has(element))) return { errorCode: 'stale_capture' };
                 return { scannedCount: scanned };
               } catch (error) { if (error === budgetExceeded) return { errorCode: 'validation_budget_exceeded' }; throw error; }
             },
@@ -482,7 +474,7 @@ internal static class BrowserCaptureScript
                   clip: intersection(visibleRect(element), { left: rect.x + element.clientLeft * scaleX, top: rect.y + element.clientTop * scaleY,
                     right: rect.x + (element.clientLeft + element.clientWidth) * scaleX, bottom: rect.y + (element.clientTop + element.clientHeight) * scaleY }),
                   exposed: accessibilityExposed(element), rendered: rendered(element), enabled: state(element).enabled, geometrySupported,
-                  ...(currentView ? { complexEffects: complexEffects(element) } : {}) } };
+                  complexEffects: complexEffects(element) } };
               } catch (error) { if (error === budgetExceeded) return { errorCode: 'capture_budget_exceeded' }; throw error; }
             },
             data: { sessionId: identity.sessionId, pageId: identity.pageId, documentId: identity.documentId, captureId: identity.captureId, frameId: frame.id, capturedAt: new Date().toISOString(), candidates, scope: identity.scope,
@@ -502,7 +494,7 @@ internal static class BrowserCaptureScript
               if (index < 0) return { errorCode: 'unknown_candidate' };
               const element = nodes[index];
               if (!element.isConnected || !accessibilityExposed(element)) return { errorCode: 'stale_capture' };
-              if (currentView && !inView(element)) return { errorCode: 'stale_capture' };
+              if (!inView(element)) return { errorCode: 'stale_capture' };
               const xpaths = xpathsFor(element);
               if (!xpaths.length) return { errorCode: 'xpath_validation_failed' };
               return { target: { candidateId, frame, tag: element.localName, role: role(element), accessibleName: label(element), label: candidates[index].label || candidates[index].text,

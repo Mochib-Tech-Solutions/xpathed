@@ -8,35 +8,6 @@ import { createFixtureServer } from "./server.mjs";
 import { renderFixture } from "./pages.mjs";
 import { validateCases } from "../run.mjs";
 
-test("viewport baseline keeps matched target pairs separate from appearance and clipped-scope changes", () => {
-  const suite = loadCases(new URL("../research/viewport-cases.json", import.meta.url));
-  const cases = validateCases(suite);
-  assert.equal(
-    new Set(cases.filter((c) => c.baselineStratum === "paired").map((c) => c.pairId)).size,
-    12,
-  );
-  assert.equal(cases.length, 32);
-  for (const spec of cases) {
-    const html = renderFixture(spec.fixture, "private-trial");
-    assert.doesNotMatch(html, /baselineStratum|pairId|expected-target/);
-    assert.equal(spec.labelProvenance.kind, "controlled-authored");
-    assert.notEqual(spec.split, "held-out");
-  }
-  assert.equal(
-    cases.find((c) => c.id === "clipped-frame-v4").expected.actions[0].outcome,
-    "not_found",
-  );
-  assert.equal(
-    cases.find((c) => c.id === "clipped-frame-v3").expected.actions[0].target.selector,
-    "#frame-lower",
-  );
-  assert.match(renderFixture("viewport-clipped", "private-trial"), /overflow:hidden/);
-  assert.match(
-    renderFixture("viewport-clipped", "private-trial", "viewport-clipped-child"),
-    /frame-lower/,
-  );
-});
-
 test("qualification cases preserve family boundaries and render without oracle instructions", () => {
   const suite = loadCases(new URL("../cases/index.json", import.meta.url));
   const cases = validateCases(suite);
@@ -51,7 +22,7 @@ test("qualification cases preserve family boundaries and render without oracle i
     assert.ok(Number.isFinite(Date.parse(spec.exposedAt)));
   }
   for (const spec of cases) {
-    assert.ok(["1", "2", "3", "4"].includes(spec.contractVersion ?? "2"));
+    assert.equal(spec.contractVersion, "4");
     assert.equal(spec.review.status, "reviewed");
     const html = renderFixture(spec.fixture, "qualification-test");
     assert.ok(html.startsWith("<!doctype html>"));
@@ -216,9 +187,13 @@ test("provider plans select captured labels and preserve isolated trial evidence
 test("provider doubles distinguish malformed output, invalid identities and upstream errors", async (t) => {
   const baseline = loadCases(new URL("../cases/index.json", import.meta.url));
   const extra = ["refusal", "empty", "truncated", "missing_usage"].map((fault) => ({
-    ...baseline.cases.find((c) => c.id === "basic-save-v3"),
+    ...baseline.cases.find((c) => c.id === "basic-save" || c.sourceIds?.includes("basic-save")),
     id: `provider-${fault}`,
-    provider: { ...baseline.cases.find((c) => c.id === "basic-save-v3").provider, fault },
+    provider: {
+      ...baseline.cases.find((c) => c.id === "basic-save" || c.sourceIds?.includes("basic-save"))
+        .provider,
+      fault,
+    },
   }));
   const server = createFixtureServer({ cases: [...baseline.cases, ...extra] });
   server.listen(0, "127.0.0.1");
