@@ -382,10 +382,10 @@ export function summarizeMonitoring(manifest, trials, baseline) {
   if (
     manifest.monitoring !== true ||
     manifest.mode !== "live" ||
-    !["3", "4", "5", "6"].includes(manifest.policy?.version)
+    !["3", "4", "5", "6", "7"].includes(manifest.policy?.version)
   )
     throw new Error("Monitoring requires a frozen current-view live run");
-  if (["4", "5", "6"].includes(manifest.policy.version)) {
+  if (["4", "5", "6", "7"].includes(manifest.policy.version)) {
     const entries = manifest.cases.map((spec) =>
       measuredEntry(
         spec,
@@ -397,7 +397,8 @@ export function summarizeMonitoring(manifest, trials, baseline) {
     const report = compareMeasurements(
       entries,
       baseline,
-      manifest.policy.version === "6" ? null : (manifest.policy.latencyMargin ?? 0),
+      ["6", "7"].includes(manifest.policy.version) ? null : (manifest.policy.latencyMargin ?? 0),
+      manifest.policy.version === "7",
     );
     if (trials.length !== entries.length) report.status = "infrastructure_failure";
     return { ...report, entries, defaultActivated: false };
@@ -413,7 +414,7 @@ export function assertPilotReady({ manifest, trials }) {
     manifest.cases.some((spec) => spec.split === "held-out" || spec.capabilityGap)
   )
     throw new Error("Confirmation requires a live development pilot without capability gaps");
-  const report = ["4", "5", "6"].includes(manifest.policy.version)
+  const report = ["4", "5", "6", "7"].includes(manifest.policy.version)
     ? compareTrials(manifest, trials, manifest.policy)
     : summarizeLiveChecks(manifest, trials);
   if (report.status !== "passed")
@@ -626,7 +627,7 @@ export async function main(args = process.argv.slice(2)) {
   const allCases = validateCases(suite);
   const defaultPolicy = policyForSuite(suite);
   if (
-    ["4", "5", "6"].includes(defaultPolicy.version) &&
+    ["4", "5", "6", "7"].includes(defaultPolicy.version) &&
     options.mode === "live" &&
     !options.sentinels &&
     !comparison
@@ -642,7 +643,7 @@ export async function main(args = process.argv.slice(2)) {
     Boolean(suite.baseline) || defaultPolicy.latencyProtocol === "resolver-http-pre-reserved-v2";
   if (
     options.sentinels &&
-    (!["3", "4", "5", "6"].includes(defaultPolicy.version) ||
+    (!["3", "4", "5", "6", "7"].includes(defaultPolicy.version) ||
       !Array.isArray(suite.sentinels) ||
       !suite.sentinels.length ||
       new Set(suite.sentinels).size !== suite.sentinels.length ||
@@ -863,7 +864,7 @@ export async function main(args = process.argv.slice(2)) {
       if (gates.some((t) => !t.grade.passed || (comparison && !t.baseline?.grade.passed)))
         throw new Error("Deterministic compatibility failed; no paid calls made");
       if (
-        ["3", "4", "5", "6"].includes(defaultPolicy.version) &&
+        ["3", "4", "5", "6", "7"].includes(defaultPolicy.version) &&
         options.phase === "confirmation"
       ) {
         assertPilotReady(pilot);

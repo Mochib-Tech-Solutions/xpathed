@@ -48,10 +48,16 @@ export function releaseNotes({
     `- Provider: \`${profile.provider}\` through OpenRouter`,
     `- Profile: \`${profile.id}\`; prompt variant: \`${profile.variant}\``,
     `- Reasoning: \`${JSON.stringify(profile.reasoning)}\`; output limit: ${profile.maxTokens} tokens`,
-    policy.version === "6"
+    ["6", "7"].includes(policy.version)
       ? `- Qualification policy: ${policy.version}; latency is reported and does not gate approval`
       : `- Qualification policy: ${policy.version}; latency margin: ${100 * (policy.latencyMargin ?? 0)}%`,
     "",
+    ...(policy.version === "7"
+      ? [
+          "Overall correctness must match or exceed the baseline. Individual lost passes remain reported; preserving every baseline pass is a future policy change.",
+          "",
+        ]
+      : []),
     "## Evaluation results",
     "",
     "| Phase | Arm | Correct cases | Median latency | p95 latency |",
@@ -77,6 +83,16 @@ export function releaseNotes({
   );
   for (const phase of phases) {
     const reasons = phase.comparison?.reasons ?? [];
+    for (const [key, label] of [
+      ["gains", "New passes"],
+      ["regressions", "Lost baseline passes"],
+    ]) {
+      const cases = phase.comparison?.[key] ?? [];
+      if (cases.length)
+        lines.push(
+          `- ${phase.name} ${label.toLowerCase()}: ${cases.map((id) => `\`${id}\``).join(", ")}.`,
+        );
+    }
     if (reasons.length)
       lines.push(`- ${phase.name}: ${reasons.map((reason) => `\`${reason}\``).join(", ")}.`);
     if (phase.error) lines.push(`- ${phase.name}: ${phase.error}`);

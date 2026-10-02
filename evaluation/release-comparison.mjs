@@ -20,7 +20,8 @@ export function measuredEntry(spec, trial, profile, policy) {
       (grade.metrics.operationalError &&
         trial.result?.diagnostics?.code !== "provider_malformed_response" &&
         !(
-          policy.version === "6" && trial.result?.diagnostics?.code === "decomposition_incomplete"
+          ["6", "7"].includes(policy.version) &&
+          trial.result?.diagnostics?.code === "decomposition_incomplete"
         )) ||
       Boolean(trial.accountingError) ||
       !finite(trial.elapsedMs) ||
@@ -39,7 +40,12 @@ export function measuredEntry(spec, trial, profile, policy) {
   };
 }
 
-export function compareMeasurements(candidate, baseline, latencyMargin = 0) {
+export function compareMeasurements(
+  candidate,
+  baseline,
+  latencyMargin = 0,
+  overallCorrectness = false,
+) {
   const valid = (entries) =>
     Array.isArray(entries) &&
     entries.length > 0 &&
@@ -75,7 +81,8 @@ export function compareMeasurements(candidate, baseline, latencyMargin = 0) {
     .filter((e) => e.passed && !candidate.find((c) => c.caseId === e.caseId).passed)
     .map((e) => e.caseId);
   const reasons = [];
-  if (regressions.length || after.correct < before.correct) reasons.push("correctness_regression");
+  if ((!overallCorrectness && regressions.length) || after.correct < before.correct)
+    reasons.push("correctness_regression");
   if (latencyMargin !== null && after.p50 > before.p50 * (1 + latencyMargin))
     reasons.push("median_latency_regression");
   if (latencyMargin !== null && after.p95 > before.p95 * (1 + latencyMargin))
@@ -88,6 +95,9 @@ export function compareMeasurements(candidate, baseline, latencyMargin = 0) {
         : "passed",
     reasons,
     regressions,
+    gains: candidate
+      .filter((e) => e.passed && !baseline.find((b) => b.caseId === e.caseId).passed)
+      .map((e) => e.caseId),
     baseline: before,
     candidate: after,
   };
@@ -126,6 +136,7 @@ export function compareTrials(manifest, trials, policy) {
   return compareMeasurements(
     candidate,
     baseline,
-    policy.version === "6" ? null : (policy.latencyMargin ?? 0),
+    ["6", "7"].includes(policy.version) ? null : (policy.latencyMargin ?? 0),
+    policy.version === "7",
   );
 }

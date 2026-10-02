@@ -78,4 +78,11 @@ test("release notes show both arms, incomplete qualification and unknown charges
   const reportOnly = releaseNotes({ ...input, policy: { version: "6" } });
   assert.ok(reportOnly.includes("latency is reported and does not gate approval"));
   assert.ok(!reportOnly.includes("latency margin"));
+  input.phases[0].comparison.gains = ["new-pass"];
+  input.phases[0].comparison.regressions = ["lost-pass"];
+  const overall = releaseNotes({ ...input, qualified: true, policy: { version: "7" } });
+  assert.ok(overall.includes("Overall correctness must match or exceed the baseline"));
+  assert.ok(overall.includes("new passes: `new-pass`"));
+  assert.ok(overall.includes("lost baseline passes: `lost-pass`"));
+  assert.ok(overall.includes("future policy change"));
 });
