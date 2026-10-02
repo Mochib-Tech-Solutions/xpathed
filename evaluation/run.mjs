@@ -377,7 +377,11 @@ async function resolveTrial(spec, trial, session, page, options, services, chann
       options.timeoutMs,
       {
         "X-Xpathed-Attempt-Id": trial.id,
-        traceparent: `00-${hash(channelId).slice(0, 32)}-${randomUUID().replaceAll("-", "").slice(0, 16)}-01`,
+        ...(options.concurrency > 1
+          ? {
+              traceparent: `00-${hash(channelId).slice(0, 32)}-${randomUUID().replaceAll("-", "").slice(0, 16)}-01`,
+            }
+          : {}),
       },
     );
     trial.result = envelope.result;
@@ -428,7 +432,11 @@ export async function execute(spec, trial, options, services) {
   try {
     await request(
       `${services.fixture}/trial`,
-      { id: trial.id, caseId: spec.id, traceId: hash(trial.id).slice(0, 32) },
+      {
+        id: trial.id,
+        caseId: spec.id,
+        ...(options.concurrency > 1 ? { traceId: hash(trial.id).slice(0, 32) } : {}),
+      },
       options.timeoutMs,
     );
     session = await request(`${services.browser}/sessions`, {}, options.timeoutMs);
