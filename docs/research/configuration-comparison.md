@@ -43,7 +43,7 @@ The browser gain is 6.4 percentage points. The one regression, [`release3-listbo
 
 Offline prompt 7, its configuration identity and implementation are unchanged. The 78 gains and 84 losses show variation across repeated calls; they do not demonstrate an offline improvement from prompt 10. Failed attempts remain in every denominator.
 
-The saved gate reports `infrastructure_failure`, and lost passes also violate the no-regression rule. Complete evidence is not release approval; this research run does not activate images.
+Fourteen offline attempts exceeded the Resolver’s 30-second provider timeout: ten current and four earlier. These timeouts cause the saved `infrastructure_failure` status. Another 65 malformed responses and 76 incomplete decompositions count as model-output failures in the scores; they do not trigger that infrastructure classification. Lost passes also violate the no-regression rule. This research run retains every outcome and does not approve or activate a release.
 
 ### Latency and cost
 
