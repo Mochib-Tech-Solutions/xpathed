@@ -151,4 +151,4 @@ The [completed source baseline and provider comparison](docs/research/deepinfra-
 - [Controller and Docker conventions](docs/research/2026-09-29-controllers-and-docker-layout.md)
 - [UI and repository guidance sources](docs/research/2026-09-29-ui-and-repository-guidance.md)
 
-Release candidates use the package version (`v1.0.0-rc.1`) and publish model settings, measured qualification results and a changelog. Stable publication and approval follow the [release runbook](docs/releases.md#release-versions-and-notes).
+The first approved release is [v1.0.0](https://github.com/Mochib-Tech-Solutions/xpathed/releases/tag/v1.0.0); its [qualification and operational evidence](docs/research/2026-10-01-release-monitoring-setup.md#first-approved-release--2026-10-02) records measured correctness, retained failures and deployment limits. Release candidates use the package version (`v1.0.0-rc.1`) and publish model settings, measured qualification results and a changelog. Stable publication and approval follow the [release runbook](docs/releases.md#release-versions-and-notes).
