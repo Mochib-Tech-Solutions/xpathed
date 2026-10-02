@@ -37,7 +37,7 @@ export default function Workspace() {
     <div className="flex h-dvh min-h-80 flex-col">
       <header className="flex h-14 shrink-0 items-center justify-between border-b border-border px-4">
         <div className="flex min-w-0 items-center gap-4">
-          <span className="text-xl font-semibold tracking-[-1px]">xpathed</span>
+          <span className="font-serif text-xl font-normal tracking-[-0.03em]">xpathed</span>
           {session && (
             <span
               className="truncate font-mono text-xs text-muted-foreground"

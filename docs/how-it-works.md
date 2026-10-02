@@ -2,7 +2,7 @@
 
 “Hover over OK under Employee” sounds simple. A page might contain six OK buttons, two Employee sections, an open dialog and a disabled control. A useful answer has to identify the intended element, locate it in the actual browser and explain whether hovering over it is currently possible.
 
-xpathed is the local prototype built for this natural-language-to-XPath case study. Its central design decision is to give the language model one job: select targets from observed page candidates. Browser code constructs the XPath and checks it against the retained element. This makes the uncertain part of the system measurable while keeping locator verification deterministic.
+xpathed is a local workspace for resolving natural-language instructions to XPath. Its central design decision is to give the language model one job: select targets from observed page candidates. Browser code constructs the XPath and checks it against the retained element. This makes the uncertain part of the system measurable while keeping locator verification deterministic.
 
 This walkthrough follows that command through the implemented system. The [resolution contract](resolution.md) contains exact schemas and policies; the [runtime reference](runtime.md) contains endpoints and configuration.
 
@@ -138,11 +138,11 @@ Privacy relies on restricted capture fields and additional persistence sanitizat
 
 The local deployment preserves Chromium's sandbox, separate session contexts and origin checks. Browser/debugging ports are not published. It is a local prototype, with no hosted tenant-authentication or production network-access policy. The [runtime security details](runtime.md) document the implemented boundary.
 
-## Where it would fit in the test platform
+## Integrating with a test runner
 
-The proposed integration point is between a test instruction and the platform's existing action executor. the test platform would supply the current page context and instruction; a resolver component would return target identity, frame context, XPath and readiness observations. The executor would own revalidation at execution time, action delivery and assertions about the application's response.
+The proposed integration point is between a test instruction and the platform's existing action executor. A test runner would supply the current page context and instruction; a resolver component would return target identity, frame context, XPath and readiness observations. The executor would own revalidation at execution time, action delivery and assertions about the application's response.
 
-That integration has not been implemented. The current prototype owns its browser instead of attaching to a the test platform session. Adapting browser ownership, authentication and evidence access would require an explicit platform contract. Executing an action would also introduce a new race between resolution and execution, so a stored XPath should never be treated as permanently verified.
+That integration has not been implemented. The current prototype owns its browser instead of attaching to an existing test-runner session. Adapting browser ownership, authentication and evidence access would require an explicit platform contract. Executing an action would also introduce a new race between resolution and execution, so a stored XPath should never be treated as permanently verified.
 
 The immediate engineering question is measurable: **does the system select the intended elements reliably across realistic page states?** Continue with [the engineering journey](engineering-journey.md) for model choices, experiments and evaluation evidence. The [evaluation reference](evaluation.md) covers running those checks; [release operations](releases.md) explains how tested images are approved and explicitly activated.
 

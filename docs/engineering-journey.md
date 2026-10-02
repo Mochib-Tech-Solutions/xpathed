@@ -2,7 +2,7 @@
 
 “Click Save” sounds simple until a page has three Save buttons, one hidden copy and a disabled control. A model can return a valid XPath for the wrong one. The engineering problem is to establish what the user meant, what the browser actually contains and what evidence supports the answer.
 
-xpathed was built for the the test platform internship case study: a working natural-language-to-XPath prototype, an explained architecture, an evaluation strategy and a deployment pipeline. This article follows the decisions and experiments behind it. For the request flow, start with [how the system works](how-it-works.md); for commands, use the [evaluation](evaluation.md) and [release](releases.md) runbooks.
+xpathed combines a natural-language-to-XPath resolver with a browser workspace, independent evaluation and a release pipeline. This article follows the decisions and experiments behind it. For the request flow, start with [how the system works](how-it-works.md); for commands, use the [evaluation](evaluation.md) and [release](releases.md) runbooks.
 
 The measurements below are historical observations from **September 30–October 1, 2026**. Each linked report retains its own source revision, configuration, limitations and evidence references. They are not a benchmark of today's hosted models or a score for the current application.
 

@@ -247,7 +247,9 @@ export default function ChatPanel({
                 </div>
               </div>
               <div className="mr-2 min-w-0 space-y-1.5" aria-label="Response message">
-                <p className="px-1 text-xs font-medium text-muted-foreground">xpathed</p>
+                <p className="px-1 font-serif text-sm font-normal tracking-[-0.03em] text-muted-foreground">
+                  xpathed
+                </p>
                 <div className="space-y-3 rounded-2xl rounded-tl-sm border border-border bg-background p-3.5 shadow-sm">
                   {resolution.historical && (
                     <p className="text-xs text-muted-foreground">Earlier result</p>

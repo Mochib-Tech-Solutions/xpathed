@@ -1,10 +1,10 @@
 # Writing xpathed for a technical reviewer
 
-Research date: 2026-10-02. This note records the writing approach for the internship case study. It is editorial guidance, not a change to the product contract.
+Research date: 2026-10-02. This note records the writing approach for the project documentation. It is editorial guidance, not a change to the product contract.
 
 ## What the reader needs
 
-The supplied assignment asks for a working natural-language-to-XPath prototype, architecture, evaluation and deployment, followed by trade-offs and strategic direction. Architecture and evaluation each account for 40% of the assessment; leadership and strategy account for 20%. The documentation should let a reviewer understand the answer, run the prototype and inspect the evidence without reconstructing the project from issue history.
+The documentation should explain the natural-language-to-XPath resolver, its architecture, evaluation, deployment and trade-offs. A new reader should be able to understand the design, run the prototype and inspect the evidence without reconstructing the project from issue history.
 
 The previous README already contained useful implementation details. Its opening mixed session behavior, keyboard shortcuts, highlights, costs, frame handling and historical results in one long paragraph. The core design appeared much later: a model selects targets from page evidence; application code builds and verifies their XPath expressions. Setup, contributor conventions and release operations competed for attention. These are observations from the README reviewed for this rewrite.
 
@@ -24,7 +24,7 @@ Diátaxis separates learning, task completion, reference and explanation. Its ex
 
 ### Give the article a concrete promise and a worked example
 
-Netlify's first-party authoring guidance recommends a descriptive title, a short introduction explaining relevance, an early summary, practical examples and useful next steps. For xpathed, open with an instruction from the assignment and the problem it creates: an element can have the right text while still being the wrong target. Follow that example through capture, selection, XPath construction and verification. Label illustrative HTML and outputs so readers do not mistake them for measured runs. [Netlify: Guidance for writing a guide](https://developers.netlify.com/guides/contributing-to-the-netlify-developer-hub/#guidance-for-writing-a-guide)
+Netlify's first-party authoring guidance recommends a descriptive title, a short introduction explaining relevance, an early summary, practical examples and useful next steps. For xpathed, open with a concrete instruction and the problem it creates: an element can have the right text while still being the wrong target. Follow that example through capture, selection, XPath construction and verification. Label illustrative HTML and outputs so readers do not mistake them for measured runs. [Netlify: Guidance for writing a guide](https://developers.netlify.com/guides/contributing-to-the-netlify-developer-hub/#guidance-for-writing-a-guide)
 
 ### Give each diagram one takeaway
 
@@ -36,7 +36,7 @@ Use real headings in order, meaningful link text, short paragraphs and image alt
 
 ## The narrative to use
 
-The following structure is an application of the sources, tailored to this assignment:
+The following structure is an application of the sources, tailored to this project:
 
 1. **The problem:** translate an instruction into the intended element on the open page.
 2. **The central decision:** let the model interpret intent; let the browser establish identity and verify the XPath.
@@ -49,7 +49,7 @@ The following structure is an application of the sources, tailored to this assig
 
 The story should follow decisions and their consequences. A commit-by-commit diary would make the reader do the synthesis.
 
-## Evidence rules for this case study
+## Evidence rules for this project
 
 These are project-specific editorial checks:
 
@@ -58,6 +58,6 @@ These are project-specific editorial checks:
 - Explain what verification proves: uniqueness and same-node identity do not demonstrate that an interaction completed successfully.
 - Distinguish measured results, accepted design, configured workflow and verified operation. A workflow file alone does not prove a deployment happened.
 - Preserve failed attempts and unavailable cost information. Describe limitations next to the affected result.
-- Say why a choice fit this prototype. Avoid unsupported claims of universal superiority, production readiness or completed the test platform integration.
+- Say why a choice fit this prototype. Avoid unsupported claims of universal superiority, production readiness or completed test-platform integration.
 
 Before finishing, check that a reviewer can find the demo, the design decision, model-selection evidence, evaluation limits and run commands directly from the README. Check local links, image rendering and claims against the repository. Keep detailed operational instructions in the guides that own them.

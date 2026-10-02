@@ -4,7 +4,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 const source = readFileSync(new URL("banner-painting.jpg", import.meta.url));
 const destination = new URL("banner.svg", import.meta.url);
 const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="2161" height="728" viewBox="0 0 2161 728" role="img" aria-labelledby="title description">
-  <title id="title">xpathed — Natural language to verified XPath</title>
+  <title id="title">xpathed</title>
   <desc id="description">An old oil painting of a branching library, with a golden thread leading through its arches. A grainy ink bloom reveals the scene once.</desc>
   <style>@media (prefers-reduced-motion: reduce) { .painting { mask: none; } }</style>
   <defs>
@@ -19,11 +19,10 @@ const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="2161" height="728" v
       </circle>
     </mask>
   </defs>
-  <rect width="2161" height="728" fill="#13110d"/>
+  <rect width="2161" height="728" fill="#0d1117"/>
   <image class="painting" width="2161" height="728" preserveAspectRatio="xMidYMid meet" mask="url(#reveal)" href="data:image/jpeg;base64,${source.toString("base64")}"/>
   <g fill="#eee5ce">
     <text x="118" y="349" font-family="Georgia, 'Times New Roman', serif" font-size="148" letter-spacing="-5">xpathed</text>
-    <text x="124" y="405" font-family="Arial, Helvetica, sans-serif" font-size="29" letter-spacing="0.7">Natural language → verified XPath</text>
   </g>
 </svg>
 `;

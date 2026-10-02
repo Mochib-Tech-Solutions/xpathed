@@ -1,8 +1,8 @@
 # Presenting xpathed
 
-The case study asks for a working natural-language-to-XPath prototype, its architecture, an evaluation strategy and a deployment pipeline. Technical architecture and evaluation each carry 40% of the assessment; leadership and strategy carry 20%.
+This guide walks through a live demonstration of xpathed, its architecture, evaluation evidence and proposed integrations.
 
-Use the demo to establish the behavior, then explain the decisions and their evidence. The supplied durations are indicative; the sections below follow the assignment's order.
+Start by showing the behavior, then explain the decisions and their evidence. The suggested timings can be adapted to the audience.
 
 ## Prepare the demo
 
@@ -37,7 +37,7 @@ Use [the service diagram](diagrams/system-design.svg) and [request flow](diagram
 4. **What does verification prove?** One match to the selected node in its document, with current-view membership rechecked. Independent labels assess whether that selection was intended.
 5. **Why separate services?** Browser owns live state; Resolver can be evaluated without the client database; ClientApi owns persistence.
 
-Close with the proposed the test platform integration boundary and hosted requirements. Clearly mark these as proposed work; the implementation is a local Chromium prototype.
+Close with the proposed test-runner integration boundary and hosted requirements. Clearly mark these as proposed work; the implementation is a local Chromium prototype.
 
 ## 3. Evaluation: explain one score and one failure
 

@@ -1,8 +1,8 @@
 # README banner
 
-`banner-painting.jpg` is the original painting. `banner.svg` embeds its exact bytes at the original 2161 × 728 aspect ratio, with a title and a short caption over the quiet left side. It contains no external resources or scripts.
+`banner-painting.jpg` is the original painting. `banner.svg` embeds its exact bytes at the original 2161 × 728 aspect ratio, with the xpathed wordmark over the quiet left side. It contains no external resources or scripts.
 
-The painting appears through one 4.8-second ink bloom. Native SVG animation expands a circle; turbulence and displacement give its boundary a grainy edge. The finished image stays visible. Reduced-motion preferences show the full painting immediately. The circle's underlying radius also reveals the full image when SVG animation is unavailable or removed.
+The painting appears from a GitHub-dark (`#0d1117`) backdrop through one 4.8-second ink bloom. Native SVG animation expands a circle; turbulence and displacement give its boundary a grainy edge. The finished image stays visible. Reduced-motion preferences show the full painting immediately. The circle's underlying radius also reveals the full image when SVG animation is unavailable or removed.
 
 Rebuild or check the generated SVG from the repository root:
 
