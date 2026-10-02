@@ -6,6 +6,20 @@ import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { startOfflineWorker } from "./offline.mjs";
 
+test("polling failures remain observed until shutdown reports them", async () => {
+  const root = await mkdtemp(join(tmpdir(), "xpathed-offline-poll-failure-"));
+  await writeFile(join(root, "offline"), "not a directory");
+  const stop = startOfflineWorker({ output: root }, async () =>
+    assert.fail("Unexpected Docker call"),
+  );
+  try {
+    await delay(50);
+    await assert.rejects(stop(), { code: "ENOTDIR" });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("offline worker sends only model input to pinned images and retains execution errors", async () => {
   const root = await mkdtemp(join(tmpdir(), "xpathed-offline-worker-"));
   const bin = join(root, "bin"),
