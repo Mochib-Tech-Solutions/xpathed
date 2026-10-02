@@ -103,6 +103,20 @@ Private candidate Release assets retain the bundle files plus the independently 
 
 The hosted runner uses Linux ARM64. Validate its Docker image-store identity and browser sandbox with `deterministic` before enabling live runs. The workflow does not connect to or update the local application. The separately authorized nightly workflow below uses the evaluation key. No workflow automatically changes the approved default.
 
+## Release versions and notes
+
+The package version starts at `1.0.0`. Qualification publishes sequential SemVer candidates (`v1.0.0-rc.1`, `v1.0.0-rc.2`) with model/provider settings, policy version, both arms' correctness and median/p95 latency, reported/unknown costs, qualification status and GitHub-generated changelog. Failed and incomplete runs remain explicitly unapproved. Bump `package.json` before beginning candidates for the next stable version.
+
+After successful qualification, retain the candidate digest, source SHA and original candidate tag. Publish the same verified assets under the stable tag before selecting that tag for approval; do not rebuild or replace files. For the first release:
+
+```sh
+gh release edit v1.0.0-rc.1 --tag v1.0.0 --target QUALIFIED_SOURCE_SHA --prerelease
+pnpm release:promote --tag v1.0.0 --sha256 CANDIDATE_DIGEST --expected-current none --reason "Reviewed exact-image qualification"
+gh release edit v1.0.0 --title "xpathed v1.0.0" --prerelease=false --latest
+```
+
+Update the release notes with the verified approval result. Approval state is authoritative; a stable tag alone does not approve or activate a release. Keep tags/assets referenced by the current or previous approval. Legacy unapproved candidate releases may be deleted after their diagnostic evidence is retained and the replacement is verified.
+
 ## Portable evidence and explicit approval
 
 Version-2 seals use paths under the exact checkout's `.artifacts/` directory. `pnpm release:archive CANDIDATE --sha256 DIGEST OUTPUT` preserves the candidate and every referenced evidence file in a private compressed archive. `pnpm release:archive:restore ARCHIVE --sha256 DIGEST` requires the exact source checkout and restored bundle, rejects unsafe paths/altered inventories and re-verifies the original evidence. It never overwrites existing files. Qualification publishes `release-evidence.json.gz` and `candidate-sha256.txt` alongside the private candidate images. Retain the candidate digest independently before approving it.
@@ -119,7 +133,7 @@ pnpm release:state status
 Select a candidate explicitly through **Release Promotion** or the CLI:
 
 ```sh
-pnpm release:promote --tag candidate-RUN-ATTEMPT --sha256 CANDIDATE_DIGEST \
+pnpm release:promote --tag v1.0.0 --sha256 CANDIDATE_DIGEST \
   --expected-current none --reason "Reviewed exact-image qualification"
 pnpm release:activate --expected-current CANDIDATE_DIGEST
 ```

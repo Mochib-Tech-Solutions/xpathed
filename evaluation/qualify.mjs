@@ -638,7 +638,7 @@ export async function main(args = process.argv.slice(2)) {
     Boolean(suite.baseline) || defaultPolicy.latencyProtocol === "resolver-http-pre-reserved-v2";
   if (
     options.sentinels &&
-    (!["3", "4"].includes(defaultPolicy.version) ||
+    (!["3", "4", "5"].includes(defaultPolicy.version) ||
       !Array.isArray(suite.sentinels) ||
       !suite.sentinels.length ||
       new Set(suite.sentinels).size !== suite.sentinels.length ||
@@ -858,7 +858,7 @@ export async function main(args = process.argv.slice(2)) {
       );
       if (gates.some((t) => !t.grade.passed || (comparison && !t.baseline?.grade.passed)))
         throw new Error("Deterministic compatibility failed; no paid calls made");
-      if (["3", "4"].includes(defaultPolicy.version) && options.phase === "confirmation") {
+      if (["3", "4", "5"].includes(defaultPolicy.version) && options.phase === "confirmation") {
         assertPilotReady(pilot);
         const { reserveHoldout } = await import("./release-exposure.mjs");
         manifest.qualification.exposure = await reserveHoldout(

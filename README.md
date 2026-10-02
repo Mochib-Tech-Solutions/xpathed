@@ -150,3 +150,5 @@ The [completed source baseline and provider comparison](docs/research/deepinfra-
 - [Domain vocabulary](CONTEXT.md) and [architecture decisions](docs/adr/)
 - [Controller and Docker conventions](docs/research/2026-09-29-controllers-and-docker-layout.md)
 - [UI and repository guidance sources](docs/research/2026-09-29-ui-and-repository-guidance.md)
+
+Release candidates use the package version (`v1.0.0-rc.1`) and publish model settings, measured qualification results and a changelog. Stable publication and approval follow the [release runbook](docs/releases.md#release-versions-and-notes).

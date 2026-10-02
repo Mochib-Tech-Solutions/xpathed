@@ -46,7 +46,7 @@ export async function fetchApprovedRelease(snapshot, destination) {
 async function fetch(repo, tag, candidateSha256, destination, approved = null) {
   ensure(
     /^[\w.-]+\/[\w.-]+$/.test(repo) &&
-      /^candidate-\d+-\d+$/.test(tag) &&
+      /^(?:candidate-\d+-\d+|v\d+\.\d+\.\d+(?:-rc\.[1-9]\d*)?)$/.test(tag) &&
       /^[a-f\d]{64}$/.test(candidateSha256),
     "Use an exact private candidate tag and independently pinned candidate digest",
   );

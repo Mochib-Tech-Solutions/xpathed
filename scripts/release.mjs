@@ -451,7 +451,7 @@ async function evidence(options) {
     );
   }
   const exposure = confirmation.manifest.qualification.exposure;
-  if (["3", "4"].includes(defaultPolicy.version))
+  if (["3", "4", "5"].includes(defaultPolicy.version))
     ensure(
       exposure?.runId === confirmation.manifest.id &&
         exposure.sourceSha === options.sourceSha &&

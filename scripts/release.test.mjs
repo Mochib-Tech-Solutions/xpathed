@@ -487,7 +487,7 @@ test("published candidates require a pinned digest and restore the exact source,
       [
         "--input-type=module",
         "--eval",
-        `import {fetchRelease} from ${JSON.stringify(module)}; const result=await fetchRelease('example/private','candidate-1-1',process.argv[1],process.argv[2]); console.log(JSON.stringify(result.release));`,
+        `import {fetchRelease} from ${JSON.stringify(module)}; const result=await fetchRelease('example/private','v1.0.0-rc.1',process.argv[1],process.argv[2]); console.log(JSON.stringify(result.release));`,
         sha,
         directory,
       ],
@@ -549,7 +549,7 @@ test("published candidates require a pinned digest and restore the exact source,
     [
       "--input-type=module",
       "--eval",
-      `import {fetchRelease} from ${JSON.stringify(module)}; await fetchRelease('example/private','candidate-1-1',process.argv[1],process.argv[2]);`,
+      `import {fetchRelease} from ${JSON.stringify(module)}; await fetchRelease('example/private','v1.0.0-rc.1',process.argv[1],process.argv[2]);`,
       digest,
       ".artifacts/expired-promotion",
     ],
@@ -775,6 +775,16 @@ test("current-view evidence seals only under its frozen policy and actual scope"
   const file = join(work.cwd, ".artifacts/candidate.json");
   assert.equal(work.run("verify", file, "--sha256", hash(readFileSync(file))).status, 0);
   rmSync(file);
+  const exposure = work.confirmation.manifest.qualification.exposure;
+  delete work.confirmation.manifest.qualification.exposure;
+  delete work.confirmation.manifest.contentHash;
+  work.confirmation.manifest.contentHash = hash(work.confirmation.manifest);
+  work.write(`${work.confirmation.path}/manifest.json`, work.confirmation.manifest);
+  assert.match(bound.seal().stderr, /held-out exposure reservation/);
+  work.confirmation.manifest.qualification.exposure = exposure;
+  delete work.confirmation.manifest.contentHash;
+  work.confirmation.manifest.contentHash = hash(work.confirmation.manifest);
+  work.write(`${work.confirmation.path}/manifest.json`, work.confirmation.manifest);
   const trial = work.confirmation.trials[0];
   const config = JSON.parse(trial.evidence.configurationJson);
   config.effective.scope = "page";
