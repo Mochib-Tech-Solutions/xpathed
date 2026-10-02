@@ -156,6 +156,18 @@ test("frozen sentinel monitoring separates semantic drift, latency and infrastru
   const monitoring = { ...relative, monitoring: true };
   const baseline = [{ caseId: spec.id, passed: true, elapsedMs: 3500 }];
   assert.equal(summarizeMonitoring(monitoring, [trial], baseline).status, "passed");
+  const boundary = { ...trial, elapsedMs: 3675 };
+  assert.equal(assertPilotReady({ manifest: relative, trials: [boundary] }).status, "passed");
+  assert.equal(summarizeMonitoring(monitoring, [boundary], baseline).status, "passed");
+  const historical = { ...currentPolicy, version: "4", latencyMargin: undefined };
+  assert.throws(
+    () => assertPilotReady({ manifest: { ...relative, policy: historical }, trials: [boundary] }),
+    /Pilot failed/,
+  );
+  assert.equal(
+    summarizeMonitoring({ ...monitoring, policy: historical }, [boundary], baseline).status,
+    "latency_regression",
+  );
   assert.equal(
     summarizeMonitoring(monitoring, [{ ...trial, elapsedMs: 4000 }], baseline).status,
     "latency_regression",
@@ -182,6 +194,50 @@ test("qualification interleaves every profile per case and rotates first positio
   assert.equal(new Set(plan.trials.filter((_, i) => i % 3 === 0).map((t) => t.profileId)).size, 3);
   assert.equal(plan.concurrency, 1);
   assert.equal(plan.retries, 0);
+});
+
+test("the current policy sentinel launcher reaches browser preflight without paid calls", async (t) => {
+  const output = await mkdtemp(join(tmpdir(), "xpathed-sentinel-launch-"));
+  t.after(() => rm(output, { recursive: true, force: true }));
+  const result = spawnSync(
+    process.execPath,
+    [
+      "evaluation/qualify.mjs",
+      "--mode",
+      "live",
+      "--profile",
+      "deepseek",
+      "--suite",
+      "evaluation/current-view-qualification-cases.json",
+      "--sentinels",
+      "true",
+      "--split",
+      "development,regression",
+      "--output",
+      output,
+    ],
+    {
+      encoding: "utf8",
+      timeout: 10000,
+      env: {
+        ...process.env,
+        XPATHED_BROWSER_BINARY_SHA256: "b".repeat(64),
+        XPATHED_BROWSER_URL: "http://127.0.0.1:1",
+        XPATHED_FIXTURE_URL: "http://127.0.0.1:1",
+        XPATHED_RELEASE_COMPARISON_JSON: "",
+        XPATHED_RELEASE_ARTIFACT_JSON: undefined,
+      },
+    },
+  );
+  assert.equal(result.status, 1, result.stderr);
+  const manifest = JSON.parse(await readFile(join(output, "manifest.json"), "utf8"));
+  assert.equal(manifest.monitoring, true);
+  assert.equal(manifest.policy.version, currentPolicy.version);
+  assert.ok(manifest.cases.every((c) => c.split !== "held-out"));
+  assert.match(
+    await readFile(join(output, "run-error.json"), "utf8"),
+    /fetch failed|bad port|compatibility failed/,
+  );
 });
 
 test("held-out calls require a recorded pilot; unsupported filters cannot silently select defaults", () => {

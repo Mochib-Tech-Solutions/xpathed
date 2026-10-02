@@ -73,13 +73,14 @@ jobs:
                 exit 1
               fi
             done
-            tag="candidate-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+            node scripts/release-notes.mjs .artifacts/release-ci
+            tag=$(cat .artifacts/release-ci/release-tag.txt)
             evidence=()
             if [ -f .artifacts/release-ci/release-evidence.json.gz ]; then
               evidence=(.artifacts/release-ci/release-evidence.json.gz .artifacts/release-ci/candidate-sha256.txt)
             fi
-            printf 'Packaged candidate; no default activation. Qualification is established only by verified evidence. Concatenate images.tar.gz.part-* in numeric order and decompress to images.tar before bundle verification.\n\nManifest SHA-256: %s\nSource: %s\n' "$digest" "$GITHUB_SHA" > .artifacts/release-ci/release-notes.md
-            gh release create "$tag" --target "$GITHUB_SHA" --draft --prerelease --title "$tag" --notes-file .artifacts/release-ci/release-notes.md \
+            gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" -f "ref=refs/tags/$tag" -f "sha=$GITHUB_SHA" > /dev/null
+            gh release create "$tag" --verify-tag --target "$GITHUB_SHA" --draft --prerelease --title "xpathed $tag" --notes-file .artifacts/release-ci/release-notes.md \
               "$bundle/manifest.json" "$bundle/configuration.json" "$bundle/source.tar" .artifacts/release-ci/transport/images.tar.gz.part-* \
               .artifacts/release-ci/bundle-sha256.txt "${evidence[@]}"
             gh release edit "$tag" --draft=false
