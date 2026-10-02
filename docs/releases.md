@@ -27,21 +27,21 @@ Success means the referenced evidence meets this verification contract. Without 
 
 ## Current boundary
 
-A model must pass real qualification before the first approval. Policy 4 uses the reviewed current-view suite and exact source/artifact identity. Existing exposed cases remain development/regression evidence; new held-out families are reserved in private `release-state` by the shared evaluator before any confirmation inference, including local CLI runs. Initialize this authority before a policy-4 live confirmation. Failed or interrupted reservations cannot be reused as fresh qualification. Synthetic verifier tests do not qualify a real model.
+A model must pass real qualification before the first approval. Policy 5 uses the reviewed current-view suite and exact source/artifact identity. Existing exposed cases remain development/regression evidence; new held-out families are reserved in private `release-state` by the shared evaluator before any confirmation inference, including local CLI runs. Initialize this authority before a policy-5 live confirmation. Failed or interrupted reservations cannot be reused as fresh qualification. Synthetic verifier tests do not qualify a real model.
 
-Historical policies retain their original rules. Policy 4 explicitly requires contract 4, prompt 8, capture 5 and current-view scope; legacy-only evidence cannot qualify the client default. Each policy is frozen with its suite and source before held-out inference.
+Historical policies retain their original rules. Policy 5 explicitly requires contract 4, prompt 8, capture 5 and current-view scope; legacy-only evidence cannot qualify the client default. Each policy is frozen with its suite and source before held-out inference.
 
 Approval, activation and monitoring follow [ADR-0021](adr/0021-monitor-explicitly-approved-current-view-releases.md). A failed qualification leaves the existing application available and produces no approval. Verification alone never switches models.
 
 ## Baseline-relative acceptance
 
-Policy 4 replaces fixed accuracy and deadline percentages. Preserve every baseline pass; median and p95 Resolver HTTP latency over all original cases must be no worse. Equal results pass. Existing semantic failures, including accounted malformed model output, are retained and reported; safety, valid API contracts, provider accounting, completeness of evidence and artifact identity remain required. The one- and two-second metrics describe speed without blocking qualification. Exact ties need no invented improvement claim.
+Policy 5 replaces fixed accuracy and deadline percentages. Preserve every baseline pass; median and p95 Resolver HTTP latency over all original cases may each increase by at most 5%. Equal results pass. Existing semantic failures, including accounted malformed model output, are retained and reported; safety, valid API contracts, provider accounting, completeness of evidence and artifact identity remain required. The one- and two-second metrics describe speed without blocking qualification. Exact ties need no invented improvement claim.
 
 The hosted workflow pins the latest approved release before the pilot, or builds the explicitly pinned DeepSeek/Wafer bootstrap source before the first approval. It compares both exact image sets on the same cases, with one inference per arm and independent page resets, and retains both original responses. This doubles inference attempts compared with a candidate-only run. Promotion rejects a result compared with a superseded approval. The comparison baseline is fixed through pilot and confirmation; the current approval is checked again at promotion.
 
 For local current-view live runs, add `--baseline-bundle DIRECTORY --baseline-sha256 DIGEST --baseline-approval APPROVED_CANDIDATE_DIGEST` to both `release:evaluate` commands, using `none` for the bootstrap. The baseline bundle may come from a different source checkout; its exact images and configuration are verified and attested independently. Candidate source must still match the clean current checkout. Baseline trials are nested under each candidate trial and sealed with the same evidence archive. A baseline-free current-view live qualification fails before inference.
 
-Nightly checks compare with the approved sentinel measurements, including retained semantic failures, rather than requiring every sentinel to be correct or under two seconds. Missing or altered measurements fail. Timing jitter can still produce a relative regression; one-attempt comparisons describe observed performance, not statistical significance. No automatic retries, tolerance tuning or default changes are introduced.
+Nightly checks compare with the approved sentinel measurements, including retained semantic failures, rather than requiring every sentinel to be correct or under two seconds. Missing or altered measurements fail. Timing jitter can still produce a relative regression; one-attempt comparisons describe observed performance, not statistical significance. The 5% margin is frozen before inference. No automatic retries or default changes are introduced.
 
 ## Private Docker artifact bundles
 
@@ -87,13 +87,13 @@ The **Release Qualification** Actions workflow accepts a maintainer manual dispa
 
 - `preflight`: read the authoritative ledger and OpenRouter key metadata, report cost accounting, key metadata and qualification coverage; no inference or image build.
 - `deterministic`: build and preserve a candidate, then exercise its exact images with controlled responses; no provider key or inference.
-- `live`: require fresh reviewed held-out coverage and no declared capability gaps before building or billing. Run the complete current-view development pilot, compare pilot correctness and median/p95 latency against the pinned baseline, then run paired confirmation under policy 4, then require successful artifact-bound sealing. An unqualified model fails this workflow even when the measurement itself completed.
+- `live`: require fresh reviewed held-out coverage and no declared capability gaps before building or billing. Run the complete current-view development pilot, compare pilot correctness and median/p95 latency against the pinned baseline, then run paired confirmation under policy 5, then require successful artifact-bound sealing. An unqualified model fails this workflow even when the measurement itself completed.
 
 Preflight verifies reviewed coverage and previous family exposure before inference. Passing preflight verifies setup, not model quality. Release branches use the same exact-revision CI, private-repository and maintainer gates as main. Deterministic authored fixtures are engineering evidence, not original dataset model-quality scores.
 
 Set the repository Actions secret `OPENROUTER_EVAL_API_KEY` to an ordinary dedicated inference key. Its configured provider-side limit is the spending control; the workflow adds no local monetary ceiling. The workflow passes that secret as `OPENROUTER_EVAL_API_KEY`, matching local evaluation configuration. The workflow reads `/api/v1/key` and reports configured limits without imposing a cap/reset/balance policy; invalid, expired or management credentials remain rejected. Do not put a management key, personal GitHub token, local `.env` or runtime application key in this workflow. GitHub's job token supplies repository contents access; only the evaluation fixture's proxy receives credentials. Standard routes, original attempts and durable per-request accounting remain enforced. Historical hosted policy-2 qualification end-to-end latency includes both durable GitHub accounting writes. Provider records expose their reservation/reconciliation `remoteAccountingMs` separately, without subtracting them from qualification latency or weakening the 1s/2s policy. These measurements describe the hosted execution path, not model-only latency; the separate current-view development baseline uses the pre-reserved timing protocol below and cannot qualify a release under this hosted contract.
 
-The current-view paired baseline records `resolver-http-pre-reserved-v2`: record each frozen request estimate durably before starting resolution; validate the actual request identity; return the validated provider response before the remote reconciliation write. Await reconciliation and retained evidence before another attempt or reporting. A failed durable write or invalid identity halts the run; unknown costs and unused estimates remain explicit without a money-based continuation block. This isolates evaluation bookkeeping from Resolver HTTP timing; the application has no two-second total-response cutoff. The original inline-accounting run remains failed evidence; no overhead is subtracted retrospectively. Policy 4 retains this protocol for new release evidence, retaining every original attempt and binding each live request to its prepared payload.
+The current-view paired baseline records `resolver-http-pre-reserved-v2`: record each frozen request estimate durably before starting resolution; validate the actual request identity; return the validated provider response before the remote reconciliation write. Await reconciliation and retained evidence before another attempt or reporting. A failed durable write or invalid identity halts the run; unknown costs and unused estimates remain explicit without a money-based continuation block. This isolates evaluation bookkeeping from Resolver HTTP timing; the application has no two-second total-response cutoff. The original inline-accounting run remains failed evidence; no overhead is subtracted retrospectively. Policy 5 retains this protocol for new release evidence, retaining every original attempt and binding each live request to its prepared payload.
 
 Before enabling hosted spending, migrate the existing `.artifacts/datasets/experiment-budget.json` intact to `experiment-budget.json` on the private `evaluation-budget` branch. Preserve the historical ceiling, entries and reservation reviews, record `budgetPolicy: "provider-limit"`, and add `remoteAuthority: "github:mochib-tech-solutions/xpathed:evaluation-budget:experiment-budget.json"`. Verify the remote content before marking the local copy with the identical authority. Keep an independent private backup. Never bootstrap a fresh empty campaign, run an older checkout against a pre-migration ledger, delete pending charges, or reset the ledger on a rerun.
 
@@ -102,6 +102,21 @@ Hosted calls set `XPATHED_BUDGET_GITHUB_REPOSITORY` and `GH_TOKEN`. The shared p
 Private candidate Release assets retain the bundle files plus the independently recorded manifest digest. Image archives use gzip transport split into numbered chunks of at most 1,000,000,000 bytes, safely below GitHub's per-asset limit even when compression is ineffective. In a private transport directory, reconstruct with `cat images.tar.gz.part-* | gzip -d > ../bundle/images.tar`, then verify against the original manifest digest. Missing, reordered or altered chunks cannot pass the original image-archive hash. Keep only the four original bundle files in the bundle directory, with the retained digest separately. Publication first creates a draft and publishes only after all assets upload. The fixture runs as the invoking host UID/GID so private evidence remains readable by the uploader on Linux. Assets remain unapproved candidates and are never silently substituted with latest. Private evaluation artifacts retain original failures and evidence for 30 days; Release assets do not extend that evidence deadline. Promotion retains the previous approved release. Publication or upload failure remains a workflow failure.
 
 The hosted runner uses Linux ARM64. Validate its Docker image-store identity and browser sandbox with `deterministic` before enabling live runs. The workflow does not connect to or update the local application. The separately authorized nightly workflow below uses the evaluation key. No workflow automatically changes the approved default.
+
+## Release versions and notes
+
+The package version starts at `1.0.0`. Qualification publishes sequential SemVer candidates (`v1.0.0-rc.1`, `v1.0.0-rc.2`) with model/provider settings, policy version, both arms' correctness and median/p95 latency, reported/unknown costs, qualification status and [GitHub-generated changelog](https://docs.github.com/en/repositories/releasing-projects-on-github/automatically-generated-release-notes). Failed and incomplete runs remain explicitly unapproved. Bump `package.json` before beginning candidates for the next stable version.
+
+After successful qualification, retain the candidate digest, source SHA and original candidate tag. Publish the same verified assets under the stable tag before selecting that tag for approval; do not rebuild or replace files. For the first release:
+
+```sh
+gh api --method POST repos/Mochib-Tech-Solutions/xpathed/git/refs -f ref=refs/tags/v1.0.0 -f sha=QUALIFIED_SOURCE_SHA
+gh release edit v1.0.0-rc.1 --tag v1.0.0 --verify-tag --prerelease
+pnpm release:promote --tag v1.0.0 --sha256 CANDIDATE_DIGEST --expected-current none --reason "Reviewed exact-image qualification"
+gh release edit v1.0.0 --title "xpathed v1.0.0" --prerelease=false --latest
+```
+
+Update the release notes with the verified approval result. Approval state is authoritative; a stable tag alone does not approve or activate a release. Keep tags/assets referenced by the current or previous approval. Legacy unapproved candidate releases may be deleted after their diagnostic evidence is retained and the replacement is verified.
 
 ## Portable evidence and explicit approval
 
@@ -119,7 +134,7 @@ pnpm release:state status
 Select a candidate explicitly through **Release Promotion** or the CLI:
 
 ```sh
-pnpm release:promote --tag candidate-RUN-ATTEMPT --sha256 CANDIDATE_DIGEST \
+pnpm release:promote --tag v1.0.0 --sha256 CANDIDATE_DIGEST \
   --expected-current none --reason "Reviewed exact-image qualification"
 pnpm release:activate --expected-current CANDIDATE_DIGEST
 ```

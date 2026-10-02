@@ -656,6 +656,28 @@ test("relative comparisons accept ties and retained failures but reject lost pas
     assert.equal(compareMeasurements(baseline, invalid).status, "infrastructure_failure");
 });
 
+test("a frozen five-percent latency margin accepts its boundary without relaxing correctness", () => {
+  const baseline = [
+    { caseId: "a", passed: true, elapsedMs: 1000 },
+    { caseId: "b", passed: false, elapsedMs: 2000 },
+  ];
+  const candidate = [
+    { ...baseline[0], elapsedMs: 1050 },
+    { ...baseline[1], elapsedMs: 2100 },
+  ];
+  assert.equal(compareMeasurements(candidate, baseline, 0.05).status, "passed");
+  assert.equal(compareMeasurements(candidate, baseline).status, "latency_regression");
+  for (const index of [0, 1]) {
+    const slower = structuredClone(candidate);
+    slower[index].elapsedMs += 1;
+    assert.equal(compareMeasurements(slower, baseline, 0.05).status, "latency_regression");
+  }
+  candidate[0].passed = false;
+  assert.equal(compareMeasurements(candidate, baseline, 0.05).status, "semantic_drift");
+  for (const margin of [-1, NaN, Infinity, "0.05"])
+    assert.equal(compareMeasurements(baseline, baseline, margin).status, "infrastructure_failure");
+});
+
 test("paid provider evidence cannot turn infrastructure failures into baseline semantic failures", () => {
   const { manifest, trials } = evidence();
   const trial = trials[0],

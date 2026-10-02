@@ -36,7 +36,7 @@ export function measuredEntry(spec, trial, profile, policy) {
   };
 }
 
-export function compareMeasurements(candidate, baseline) {
+export function compareMeasurements(candidate, baseline, latencyMargin = 0) {
   const valid = (entries) =>
     Array.isArray(entries) &&
     entries.length > 0 &&
@@ -50,6 +50,8 @@ export function compareMeasurements(candidate, baseline) {
         !e.hardFailure,
     );
   if (
+    !finite(latencyMargin) ||
+    latencyMargin > 1 ||
     !valid(candidate) ||
     !valid(baseline) ||
     candidate.length !== baseline.length ||
@@ -72,8 +74,8 @@ export function compareMeasurements(candidate, baseline) {
     .map((e) => e.caseId);
   const reasons = [];
   if (regressions.length || after.correct < before.correct) reasons.push("correctness_regression");
-  if (after.p50 > before.p50) reasons.push("median_latency_regression");
-  if (after.p95 > before.p95) reasons.push("tail_latency_regression");
+  if (after.p50 > before.p50 * (1 + latencyMargin)) reasons.push("median_latency_regression");
+  if (after.p95 > before.p95 * (1 + latencyMargin)) reasons.push("tail_latency_regression");
   return {
     status: reasons.includes("correctness_regression")
       ? "semantic_drift"
@@ -117,5 +119,5 @@ export function compareTrials(manifest, trials, policy) {
   }
   if (trials.length !== manifest.cases.length)
     return { status: "infrastructure_failure", reasons: ["comparison_inventory_invalid"] };
-  return compareMeasurements(candidate, baseline);
+  return compareMeasurements(candidate, baseline, policy.latencyMargin ?? 0);
 }

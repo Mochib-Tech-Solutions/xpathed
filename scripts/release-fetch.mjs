@@ -46,7 +46,7 @@ export async function fetchApprovedRelease(snapshot, destination) {
 async function fetch(repo, tag, candidateSha256, destination, approved = null) {
   ensure(
     /^[\w.-]+\/[\w.-]+$/.test(repo) &&
-      /^candidate-\d+-\d+$/.test(tag) &&
+      /^(?:candidate-\d+-\d+|v\d+\.\d+\.\d+(?:-rc\.[1-9]\d*)?)$/.test(tag) &&
       /^[a-f\d]{64}$/.test(candidateSha256),
     "Use an exact private candidate tag and independently pinned candidate digest",
   );
@@ -204,7 +204,7 @@ async function fetch(repo, tag, candidateSha256, destination, approved = null) {
             suite.sentinels.includes(t.caseId) &&
             Number.isFinite(t.elapsedMs) &&
             t.elapsedMs >= 0 &&
-            (policy.version === "4"
+            (["4", "5"].includes(policy.version)
               ? typeof t.passed === "boolean" && !t.operational && !t.hardFailure
               : t.elapsedMs <= policy.deadlineMs),
         ),
@@ -212,10 +212,9 @@ async function fetch(repo, tag, candidateSha256, destination, approved = null) {
     );
     return { source, candidate, release: approved };
   }
-  const { measuredEntry } =
-    policy.version === "4"
-      ? await import(pathToFileURL(join(source, "evaluation/release-comparison.mjs")))
-      : {};
+  const { measuredEntry } = ["4", "5"].includes(policy.version)
+    ? await import(pathToFileURL(join(source, "evaluation/release-comparison.mjs")))
+    : {};
   const measured = [];
   for (const run of [candidate.pilot, candidate.confirmation]) {
     const manifest = JSON.parse(await readFile(join(source, run, "manifest.json"), "utf8"));
@@ -224,15 +223,14 @@ async function fetch(repo, tag, candidateSha256, destination, approved = null) {
         const trial = JSON.parse(
           await readFile(join(source, run, "trials", `${planned.id}.json`), "utf8"),
         );
-        const measurement =
-          policy.version === "4"
-            ? measuredEntry(
-                suite.cases.find((c) => c.id === trial.caseId),
-                trial,
-                manifest.profiles.find((p) => p.id === trial.profileId),
-                policy,
-              )
-            : null;
+        const measurement = ["4", "5"].includes(policy.version)
+          ? measuredEntry(
+              suite.cases.find((c) => c.id === trial.caseId),
+              trial,
+              manifest.profiles.find((p) => p.id === trial.profileId),
+              policy,
+            )
+          : null;
         ensure(
           trial.mode === "live" &&
             (measurement
