@@ -916,51 +916,23 @@ test("The public viewer paints an offscreen target highlight after scrolling and
       });
       assert.equal((await observe()).scrollY, 0);
       await withFramebuffer(session, async (frame) => {
-        const bluePixels = ({ pixels, width }, top) => {
-          let count = 0;
-          for (let y = top + 10; y < top + 40; y++)
-            for (let x = 110; x < 330; x++) {
-              const offset = (y * width + x) * 4;
-              if (
-                pixels[offset] > pixels[offset + 2] + 15 &&
-                pixels[offset + 1] > pixels[offset + 2] + 5
-              )
-                count++;
-            }
-          return count;
-        };
-        assert.equal(bluePixels(await frame(), 100), 0);
+        await expectHighlights(frame, [[100, 100]], false);
         await observe({ scrollToY: 2100 });
-        await new Promise((resolve) => setTimeout(resolve, 200));
-        let highlighted = 0;
-        for (let attempt = 0; attempt < 20 && highlighted < 500; attempt++) {
-          highlighted = bluePixels(await frame(), 100);
-          if (highlighted < 500) await new Promise((resolve) => setTimeout(resolve, 50));
-        }
-        assert.ok(
-          highlighted >= 500,
-          `Expected blue target pixels after scrolling, got ${highlighted}`,
-        );
+        await expectHighlights(frame, [[100, 100]], true);
         await request(`/pages/${page.pageId}/capture`, { documentId: page.documentId });
-        let remaining = highlighted;
-        for (let attempt = 0; attempt < 20 && remaining; attempt++) {
-          remaining = bluePixels(await frame(), 100);
-          if (remaining) await new Promise((resolve) => setTimeout(resolve, 50));
-        }
-        assert.equal(remaining, 0);
+        await expectHighlights(frame, [[100, 100]], false);
         assert.equal((await observe()).scrollY, 2100);
       });
     },
   );
 });
 
-function blueTargetPixels({ pixels, width }, left, top) {
+function outlinePixels({ pixels, width }, left, top) {
   let count = 0;
-  for (let y = top + 10; y < top + 40; y++)
+  for (let y = top - 8; y < top; y++)
     for (let x = left + 10; x < left + 230; x++) {
       const offset = (y * width + x) * 4;
-      if (pixels[offset] > pixels[offset + 2] + 15 && pixels[offset + 1] > pixels[offset + 2] + 5)
-        count++;
+      if (pixels.subarray(offset, offset + 3).every((channel) => channel < 30)) count++;
     }
   return count;
 }
@@ -969,12 +941,12 @@ async function expectHighlights(frame, locations, visible) {
   let counts;
   for (let attempt = 0; attempt < 20; attempt++) {
     const image = await frame();
-    counts = locations.map(([left, top]) => blueTargetPixels(image, left, top));
-    if (counts.every((count) => (visible ? count >= 500 : count === 0))) return;
+    counts = locations.map(([left, top]) => outlinePixels(image, left, top));
+    if (counts.every((count) => (visible ? count >= 500 : count === 0))) return image;
     await new Promise((resolve) => setTimeout(resolve, 50));
   }
   assert.fail(
-    `Expected highlights ${visible ? "visible" : "cleared"} at ${JSON.stringify(locations)}; blue pixels: ${counts}`,
+    `Expected highlights ${visible ? "visible" : "cleared"} at ${JSON.stringify(locations)}; outline pixels: ${counts}`,
   );
 }
 
@@ -1009,6 +981,36 @@ async function selectHighlights(page, plural = false, scope = "page") {
   return batch;
 }
 
+test("Viewer outlines leave every target pixel unchanged", async () => {
+  await withFixture(
+    `<style>body{margin:0;background:#888}button{position:absolute;left:100px;top:100px;width:240px;height:100px;border:2px solid #c23;background:white;color:black}button+button{left:400px;width:8px;height:8px;padding:0}</style>
+    <button>Readable target</button><button aria-label="Tiny target"></button>
+    <script>const nativeMatchMedia = matchMedia; window.matchMedia = query => query === '(prefers-reduced-motion: reduce)' ? {matches:true} : nativeMatchMedia(query);</script>`,
+    async (session, page) => {
+      await withFramebuffer(session, async (frame) => {
+        const initial = await frame();
+        const before = Buffer.from(initial.pixels);
+        await selectHighlights(page, true);
+        const after = await expectHighlights(frame, [[100, 100]], true);
+        for (const [left, top, width, height] of [
+          [100, 100, 240, 100],
+          [400, 100, 8, 8],
+        ]) {
+          for (let y = top; y < top + height; y++) {
+            const start = (y * after.width + left) * 4;
+            const end = start + width * 4;
+            assert.deepEqual(
+              after.pixels.subarray(start, end),
+              before.subarray(start, end),
+              `Target row ${y} stays unchanged`,
+            );
+          }
+        }
+      });
+    },
+  );
+});
+
 test("Viewer outlines contrast on light, dark, blue and patterned surfaces", async () => {
   await withFixture(
     `<style>body{margin:0;background:white}section{position:absolute;top:60px;width:280px;height:200px}button{position:absolute;left:20px;top:40px;width:240px;height:100px;border:0;background:inherit;color:inherit}</style>
@@ -1030,7 +1032,7 @@ test("Viewer outlines contrast on light, dark, blue and patterned surfaces", asy
         for (let index = 0; index < 4; index++) {
           let dark = 0,
             light = 0;
-          for (let y = 96; y < 104; y++)
+          for (let y = 92; y < 100; y++)
             for (let x = 120 + index * 290; x < 320 + index * 290; x++) {
               const rgb = image.pixels.subarray(
                 (y * image.width + x) * 4,
@@ -1049,7 +1051,7 @@ test("Viewer outlines contrast on light, dark, blue and patterned surfaces", asy
   );
 });
 
-test("Clipped targets keep a visible outline at viewport and scroll-container edges", async () => {
+test("Clipped targets keep outlines outside their visible bounds", async () => {
   await withFixture(
     '<style>body{margin:0;background:white}button{position:absolute;left:-40px;top:-40px;width:240px;height:100px;border:0;background:white}section{position:absolute;left:100px;top:200px;width:80px;height:60px;overflow:hidden}</style><button aria-label="Viewport target"></button><section><button aria-label="Clipped target"></button></section>',
     async (session, page) => {
@@ -1057,19 +1059,26 @@ test("Clipped targets keep a visible outline at viewport and scroll-container ed
       await withFramebuffer(session, async (frame) => {
         const image = await frame();
         for (const [x, y] of [
-          [40, 0],
-          [140, 200],
+          [40, 60],
+          [140, 260],
         ]) {
-          const edge = (y * image.width + x) * 4;
-          const inside = ((y + 3) * image.width + x) * 4;
+          const innerEdge = (y * image.width + x) * 4;
+          const whiteEdge = ((y + 3) * image.width + x) * 4;
+          const outerEdge = ((y + 7) * image.width + x) * 4;
           assert.ok(
-            image.pixels[edge] > 225 && image.pixels[inside] < 30,
-            `Visible outline at ${x},${y}`,
+            image.pixels[innerEdge] < 30 &&
+              image.pixels[whiteEdge] > 225 &&
+              image.pixels[outerEdge] < 30,
+            `Outside outline at ${x},${y}`,
+          );
+          assert.ok(
+            image.pixels[((y - 1) * image.width + x) * 4] > 240,
+            "Visible target remains unpainted",
           );
         }
         assert.ok(
-          image.pixels[(199 * image.width + 140) * 4] > 240,
-          "The outline stays inside its scroll container",
+          image.pixels[(200 * image.width + 140) * 4] > 240,
+          "Clipped interior stays clear",
         );
       });
     },
@@ -1097,7 +1106,7 @@ for (const reducedMotion of [false, true])
             "The small target has a larger clear locator area",
           );
           assert.ok(
-            image.pixels[(125 * image.width + 292) * 4] > 240,
+            image.pixels[(125 * image.width + 290) * 4] > 240,
             "Other selected targets also keep a clear aperture",
           );
         });
@@ -1108,8 +1117,8 @@ for (const reducedMotion of [false, true])
           const settled = await frame();
           const ambient = (40 * settled.width + 40) * 4;
           assert.ok(settled.pixels[ambient] > 240, "The spotlight fades away");
-          const border = (100 * settled.width + 104) * 4;
-          const outerBorder = (97 * settled.width + 104) * 4;
+          const border = (96 * settled.width + 104) * 4;
+          const outerBorder = (92 * settled.width + 104) * 4;
           assert.ok(
             settled.pixels[border] > 225 && settled.pixels[outerBorder] < 30,
             "Both outline edges remain after the spotlight",

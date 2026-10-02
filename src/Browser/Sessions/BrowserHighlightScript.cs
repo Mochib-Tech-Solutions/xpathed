@@ -41,7 +41,7 @@ internal static class BrowserHighlightScript
               for (const rect of node.getClientRects()) {
                 const x = Math.max(left, rect.left), y = Math.max(top, rect.top);
                 const width = Math.min(right, rect.right) - x, height = Math.min(bottom, rect.bottom) - y;
-                if (width > 0 && height > 0) boxes.push({rect, left, top, right, bottom, x, y, width, height});
+                if (width > 0 && height > 0) boxes.push({x, y, width, height});
               }
             }
             if (spotlightStarted === undefined && boxes.some(box => box.width <= 24 || box.height <= 24)) {
@@ -62,16 +62,12 @@ internal static class BrowserHighlightScript
               }
               context.globalCompositeOperation = 'source-over';
             }
-            for (const {rect, left, top, right, bottom, x, y, width, height} of boxes) {
-              context.save(); context.beginPath(); context.rect(left, top, right-left, bottom-top); context.clip();
-              context.fillStyle = 'rgba(59,130,246,0.18)';
-              context.fillRect(rect.x, rect.y, rect.width, rect.height);
-              // Both edges remain distinguishable on light, dark and patterned page content.
+            for (const {x, y, width, height} of boxes) {
+              // Offset by half the outer stroke so every painted pixel stays outside the target.
               context.strokeStyle = 'black'; context.lineWidth = 8;
-              context.strokeRect(x, y, width, height);
+              context.strokeRect(x - 4, y - 4, width + 8, height + 8);
               context.strokeStyle = 'white'; context.lineWidth = 4;
-              context.strokeRect(x, y, width, height);
-              context.restore();
+              context.strokeRect(x - 4, y - 4, width + 8, height + 8);
             }
             animation = requestAnimationFrame(draw);
           };
