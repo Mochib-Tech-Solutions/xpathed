@@ -15,6 +15,8 @@ internal static class ActionSelectionStrategy
         All candidates intersect the current view, including partially visible, disabled, readonly, transparent and covered controls. Browser determines readiness.
         Use labels, safe text, headings/rows/scope, frame labels and geometry. "All" means every matching candidate in this view, never hidden or off-screen targets.
         Geometry is in main-viewport CSS pixels; use it for left/right/above/below and visual order, not DOM order. A button description may identify a link, image or custom role.
+        Match the requested target itself using its tag, role and accessible label. Scope containers, headings and descendant text are context, not additional matching controls.
+        A container that repeats child button text is not another button. For plural controls, return only matching controls; never add their parent or a nearby label to satisfy "all".
         Omitted state fields mean rendered=true, inViewport=true, enabled=true, editable=false, readonly=false; omitted appearance limitations mean none.
         appearance gives measured opaque CSS backgroundColor, textColor and borderColor, or null when unknown; limitations are evidence gaps.
         Distinguish foreground, background and border. Never infer disabled state from gray, image/canvas pixels, gradients or complex effects.

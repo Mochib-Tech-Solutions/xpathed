@@ -112,8 +112,8 @@ public sealed class OpenRouterGateway(
         {
             strategy,
             promptVersion,
-            captureVersion = promptVersion is "8" or "9" ? "5" : "4",
-            scope = promptVersion is "8" or "9" ? "current_view" : "page",
+            captureVersion = promptVersion is "8" or "9" or "10" ? "5" : "4",
+            scope = promptVersion is "8" or "9" or "10" ? "current_view" : "page",
             serverDeadlineMs = (int?)null,
             estimateCost = true,
             pricingCacheSeconds = 300,

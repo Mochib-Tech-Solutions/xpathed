@@ -933,7 +933,7 @@ public sealed class ResolutionContractTests
         Assert.Equal(20, candidate.GetProperty("geometry").GetProperty("x").GetInt32());
         if (version == "4")
         {
-            Assert.Equal("9", result.GetProperty("diagnostics").GetProperty("promptVersion").GetString());
+            Assert.Equal("10", result.GetProperty("diagnostics").GetProperty("promptVersion").GetString());
             Assert.Equal("current_view", input.RootElement.GetProperty("scope").GetString());
             Assert.Equal(
                 "rgb(255, 0, 0)",
