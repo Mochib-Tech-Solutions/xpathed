@@ -216,7 +216,11 @@ async function archivedConfiguration(source, profileId, sha) {
     (await command("git", ["get-tar-commit-id"], source)) === sha,
     "Archived source revision mismatch",
   );
-  const profiles = JSON.parse(await command("tar", ["-xOf", source, "evaluation/profiles.json"]));
+  const files = (await command("tar", ["-tf", source])).split("\n");
+  const path = files.includes("evaluation/profiles.json")
+    ? "evaluation/profiles.json"
+    : "evaluation/qualification-profiles.json";
+  const profiles = JSON.parse(await command("tar", ["-xOf", source, path]));
   const matches = Array.isArray(profiles) ? profiles.filter((item) => item.id === profileId) : [];
   ensure(matches.length === 1, "Unknown or duplicate archived profile");
   const profile = matches[0];
