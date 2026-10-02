@@ -204,12 +204,18 @@ async function fetch(repo, tag, candidateSha256, destination, approved = null) {
             suite.sentinels.includes(t.caseId) &&
             Number.isFinite(t.elapsedMs) &&
             t.elapsedMs >= 0 &&
-            t.elapsedMs <= policy.deadlineMs,
+            (policy.version === "4"
+              ? typeof t.passed === "boolean" && !t.operational && !t.hardFailure
+              : t.elapsedMs <= policy.deadlineMs),
         ),
       "Approved sentinel baseline is invalid",
     );
     return { source, candidate, release: approved };
   }
+  const { measuredEntry } =
+    policy.version === "4"
+      ? await import(pathToFileURL(join(source, "evaluation/release-comparison.mjs")))
+      : {};
   const measured = [];
   for (const run of [candidate.pilot, candidate.confirmation]) {
     const manifest = JSON.parse(await readFile(join(source, run, "manifest.json"), "utf8"));
@@ -218,18 +224,29 @@ async function fetch(repo, tag, candidateSha256, destination, approved = null) {
         const trial = JSON.parse(
           await readFile(join(source, run, "trials", `${planned.id}.json`), "utf8"),
         );
+        const measurement =
+          policy.version === "4"
+            ? measuredEntry(
+                suite.cases.find((c) => c.id === trial.caseId),
+                trial,
+                manifest.profiles.find((p) => p.id === trial.profileId),
+                policy,
+              )
+            : null;
         ensure(
           trial.mode === "live" &&
-            gradeTrial(
-              suite.cases.find((c) => c.id === trial.caseId),
-              trial,
-            ).passed === true &&
-            trial.result?.summary?.processingComplete === true &&
-            Number.isFinite(trial.elapsedMs) &&
-            trial.elapsedMs <= policy.deadlineMs,
-          "A sentinel lacks a correct complete measured baseline",
+            (measurement
+              ? !measurement.operational && !measurement.hardFailure
+              : gradeTrial(
+                  suite.cases.find((c) => c.id === trial.caseId),
+                  trial,
+                ).passed === true &&
+                trial.result?.summary?.processingComplete === true &&
+                Number.isFinite(trial.elapsedMs) &&
+                trial.elapsedMs <= policy.deadlineMs),
+          "A sentinel lacks a valid measured baseline",
         );
-        measured.push({ caseId: trial.caseId, elapsedMs: trial.elapsedMs });
+        measured.push(measurement ?? { caseId: trial.caseId, elapsedMs: trial.elapsedMs });
       }
   }
   ensure(
@@ -242,6 +259,7 @@ async function fetch(repo, tag, candidateSha256, destination, approved = null) {
     candidate,
     release: {
       status: "qualified",
+      ...(candidate.comparison ? { comparison: candidate.comparison } : {}),
       tag,
       candidateSha256,
       bundleSha256: candidate.bundleSha256,

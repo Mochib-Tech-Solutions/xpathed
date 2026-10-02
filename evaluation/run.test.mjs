@@ -363,13 +363,20 @@ test("artifact cleanup erases both model inputs at30 days without discarding out
       JSON.stringify({
         result: { outcome: "found" },
         evidence: { modelInput: "secret" },
+        baseline: { result: { outcome: "not_found" }, evidence: { modelInput: "baseline secret" } },
         mutation: { fresh: { evidence: { modelInput: "secret" } } },
       }),
     );
+    await writeFile(join(path, "trials", "a.json.partial"), '{"evidence":"interrupted raw input"');
     await prune(path, new Date("2026-09-01T00:00:00Z"));
+    await assert.rejects(() => readFile(join(path, "trials", "a.json.partial")), {
+      code: "ENOENT",
+    });
     const trial = JSON.parse(await readFile(join(path, "trials", "a.json"), "utf8"));
     assert.equal(trial.evidence, null);
     assert.equal(trial.mutation.fresh.evidence, null);
+    assert.equal(trial.baseline.evidence, null);
+    assert.equal(trial.baseline.result.outcome, "not_found");
     assert.equal(trial.result.outcome, "found");
   } finally {
     await rm(path, { recursive: true, force: true });

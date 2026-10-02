@@ -1,3 +1,4 @@
+import { assertLatestBaseline } from "./release-baseline.mjs";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFile } from "node:fs/promises";
@@ -105,4 +106,42 @@ test("live release coverage blocks reused or absent holdout before any inference
   delete fresh.cases[1].previousSplit;
   fresh.cases[1].family = base.family;
   assert.throws(() => qualificationCoverage(fresh), /family cannot cross split/);
+});
+
+test("promotion compares with the latest approval or the pinned initial baseline", () => {
+  const policy = { bootstrap: { sourceSha: "a".repeat(40), profileId: "deepseek" } };
+  const initial = {
+    approval: "none",
+    artifact: { ...policy.bootstrap, bundleManifestSha256: "b".repeat(64) },
+  };
+  assert.doesNotThrow(() => assertLatestBaseline(initial, null, policy));
+  assert.throws(
+    () =>
+      assertLatestBaseline(
+        { ...initial, artifact: { ...initial.artifact, sourceSha: "c".repeat(40) } },
+        null,
+        policy,
+      ),
+    /baseline/,
+  );
+  const current = {
+    candidateSha256: "d".repeat(64),
+    sourceSha: "e".repeat(40),
+    profile: "gemini",
+    bundleSha256: "f".repeat(64),
+  };
+  const reference = {
+    approval: current.candidateSha256,
+    artifact: {
+      sourceSha: current.sourceSha,
+      profileId: current.profile,
+      bundleManifestSha256: current.bundleSha256,
+    },
+  };
+  assert.doesNotThrow(() => assertLatestBaseline(reference, current, policy));
+  assert.throws(() => assertLatestBaseline(initial, current, policy), /baseline/);
+  assert.throws(
+    () => assertLatestBaseline(reference, { ...current, candidateSha256: "a".repeat(64) }, policy),
+    /baseline/,
+  );
 });

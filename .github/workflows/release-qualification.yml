@@ -92,6 +92,7 @@ jobs:
           path: |
             .artifacts/release-ci/
             !.artifacts/release-ci/bundle/
+            !.artifacts/release-ci/baseline/
             !.artifacts/release-ci/transport/
           include-hidden-files: true
           if-no-files-found: error

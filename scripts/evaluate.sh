@@ -176,6 +176,7 @@ for container in $(docker ps -aq --filter "label=com.docker.compose.project=$COM
   service=$(docker inspect --format '{{ index .Config.Labels "com.docker.compose.service" }}' "$container")
   case "$service" in
     browser|resolver|evaluation-fixture) ;;
+    browser-baseline|resolver-baseline) if [ -z "${XPATHED_RELEASE_COMPARISON_JSON:-}" ]; then echo "Unexpected baseline service" >&2; exit 2; fi ;;
     resolver-context) if [ "$context" != true ]; then echo "Context service belongs to a different runner" >&2; exit 2; fi ;;
     stagehand) if [ "$comparison" != true ]; then echo "Comparison service belongs to a different runner" >&2; exit 2; fi ;;
     resolver-luna|resolver-gemini|resolver-deepseek-concise|resolver-qwen) if [ "$qualification" != true ]; then echo "Qualification service belongs to a different runner" >&2; exit 2; fi ;;
@@ -215,7 +216,11 @@ if ! compose run --rm --no-deps --entrypoint node evaluation-fixture -e '
 fi
 rm "$XPATHED_EVALUATION_OUTPUT/.mount-check"
 if [ -n "${XPATHED_RELEASE_STATE:-}" ]; then
-  compose up --no-build --pull never --wait browser "$XPATHED_RELEASE_SERVICE" evaluation-fixture
+  if [ -n "${XPATHED_RELEASE_COMPARISON_JSON:-}" ]; then
+    compose up --no-build --pull never --wait browser "$XPATHED_RELEASE_SERVICE" browser-baseline resolver-baseline evaluation-fixture
+  else
+    compose up --no-build --pull never --wait browser "$XPATHED_RELEASE_SERVICE" evaluation-fixture
+  fi
   XPATHED_RELEASE_ARTIFACT_JSON=$(node scripts/release-evaluate.mjs attest "$XPATHED_RELEASE_STATE" before)
   export XPATHED_RELEASE_ARTIFACT_JSON
   release_started=true
@@ -233,6 +238,9 @@ if [ -n "${XPATHED_RELEASE_STATE:-}" ]; then
 else
   compose exec -T evaluation-fixture node /checks/ready.mjs http://browser:8080/health http://resolver:8080/health http://evaluation-fixture:8090/health
 fi
+if [ -n "${XPATHED_RELEASE_COMPARISON_JSON:-}" ]; then
+  compose exec -T evaluation-fixture node /checks/ready.mjs http://browser-baseline:8080/health http://resolver-baseline:8080/health
+fi
 echo "Evaluation artifacts: $XPATHED_EVALUATION_OUTPUT"
 if [ "$context" = true ]; then
   compose exec -T evaluation-fixture node /checks/ready.mjs http://resolver-context:8080/health
@@ -244,7 +252,7 @@ elif [ "$qualification" = true ]; then
   fi
   browser_binary_hash=$(compose exec -T browser sh -c 'sha256sum /ms-playwright/chromium-*/chrome-linux*/chrome' | awk '{print $1}')
   if [ -n "${XPATHED_RELEASE_STATE:-}" ]; then
-    compose exec -T -e "XPATHED_BROWSER_BINARY_SHA256=$browser_binary_hash" -e "XPATHED_RELEASE_ARTIFACT_JSON=$XPATHED_RELEASE_ARTIFACT_JSON" evaluation-fixture node /evaluation/qualify.mjs "$@"
+    compose exec -T -e "XPATHED_BROWSER_BINARY_SHA256=$browser_binary_hash" -e "XPATHED_RELEASE_ARTIFACT_JSON=$XPATHED_RELEASE_ARTIFACT_JSON" -e "XPATHED_RELEASE_COMPARISON_JSON=${XPATHED_RELEASE_COMPARISON_JSON:-}" evaluation-fixture node /evaluation/qualify.mjs "$@"
   else
     compose exec -T -e "XPATHED_BROWSER_BINARY_SHA256=$browser_binary_hash" evaluation-fixture node /evaluation/qualify.mjs "$@"
   fi

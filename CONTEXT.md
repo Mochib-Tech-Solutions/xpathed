@@ -131,6 +131,9 @@ The qualified resolver release selected for clients that do not request another 
 **Qualification**:
 The evaluation of a resolver release against the agreed acceptance criteria before it can become an approved default.
 
+**Release baseline**:
+The previously approved resolver release used as the comparison reference, or the explicitly chosen operational configuration before the first approval.
+
 **Sentinel case**:
 An evaluation case frozen with an approved release and repeated to detect changes in its observed behavior.
 
