@@ -29,7 +29,7 @@ Success means the referenced evidence meets this verification contract. Without 
 
 A model must pass real qualification before the first approval. Policy 6 uses the reviewed current-view suite and exact source/artifact identity. Existing exposed cases remain development/regression evidence; new held-out families are reserved in private `release-state` by the shared evaluator before any confirmation inference, including local CLI runs. Initialize this authority before a policy-6 live confirmation. Failed or interrupted reservations cannot be reused as fresh qualification. Synthetic verifier tests do not qualify a real model.
 
-Historical policies retain their original rules. Policy 6 explicitly requires contract 4, prompt 8, capture 5 and current-view scope; legacy-only evidence cannot qualify the client default. Each policy is frozen with its suite and source before held-out inference.
+Historical policies retain their original rules. Policy 6 explicitly requires contract 4, the source-pinned prompt (currently 9), capture 5 and current-view scope; legacy-only evidence cannot qualify the client default. Each policy is frozen with its suite and source before held-out inference.
 
 Approval, activation and monitoring follow [ADR-0021](adr/0021-monitor-explicitly-approved-current-view-releases.md). A failed qualification leaves the existing application available and produces no approval. Verification alone never switches models.
 

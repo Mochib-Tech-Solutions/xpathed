@@ -25,7 +25,12 @@ const hash = (value) =>
     .digest("hex");
 async function workspace(
   t,
-  { contractVersion = "3", promptVersion = "7", qualificationPolicy } = {},
+  {
+    contractVersion = "3",
+    promptVersion = "7",
+    qualificationPolicy,
+    bootstrapBaseline = false,
+  } = {},
 ) {
   const cwd = realpathSync(mkdtempSync(join(tmpdir(), "xpathed-release-")));
   t.after(() => rmSync(cwd, { recursive: true, force: true }));
@@ -231,6 +236,12 @@ async function workspace(
         trial.baseline.id = hash(`${trial.id}:baseline`).slice(0, 32);
         trial.baseline.provider[0].observedIdentity.generationId = trial.baseline.id;
         trial.baseline.elapsedMs = 3500;
+        if (bootstrapBaseline) {
+          const config = JSON.parse(trial.baseline.evidence.configurationJson);
+          config.PromptVersion = "8";
+          trial.baseline.evidence.configurationJson = JSON.stringify(config);
+          trial.baseline.configuration = configurationRecord(trial.baseline);
+        }
       }
       write(`${path}/trials/${trial.id}.json`, trial);
       return trial;
@@ -353,7 +364,19 @@ async function workspace(
     }));
     for (const run of [pilot, confirmation]) {
       run.manifest.qualification.artifact = structuredClone(artifact);
-      const comparison = qualificationPolicy ? { artifact, profile, approval: "none" } : undefined;
+      const baselineArtifact = bootstrapBaseline
+        ? {
+            ...artifact,
+            sourceSha: defaultPolicy.bootstrap.sourceSha,
+            images: images.map((image) => ({
+              ...image,
+              sourceSha: defaultPolicy.bootstrap.sourceSha,
+            })),
+          }
+        : artifact;
+      const comparison = qualificationPolicy
+        ? { artifact: baselineArtifact, profile, approval: "none" }
+        : undefined;
       if (comparison) run.manifest.comparison = comparison;
       if (run === confirmation) run.manifest.baselineEvidence = baselineEvidence(pilot);
       delete run.manifest.contentHash;
@@ -444,8 +467,9 @@ test("portable evidence archives verify in a relocated exact-source checkout and
 test("published candidates require a pinned digest and restore the exact source, images and measured sentinels", async (t) => {
   const work = await workspace(t, {
     contractVersion: "4",
-    promptVersion: "8",
+    promptVersion: "9",
     qualificationPolicy: "6",
+    bootstrapBaseline: true,
   });
   const bound = work.bindArtifact();
   assert.equal(bound.seal().status, 0);
@@ -753,7 +777,7 @@ test("seal and verify bind qualified evidence without activating a default or ov
 });
 
 test("legacy release policy cannot seal current-view evidence with either current or legacy prompts", async (t) => {
-  for (const promptVersion of ["8", "5"]) {
+  for (const promptVersion of ["9", "5"]) {
     await t.test(`prompt ${promptVersion}`, async (t) => {
       const work = await workspace(t, { contractVersion: "4", promptVersion });
       const sealed = work.seal();
@@ -766,7 +790,7 @@ test("legacy release policy cannot seal current-view evidence with either curren
 test("current-view evidence seals only under its frozen policy and actual scope", async (t) => {
   const work = await workspace(t, {
     contractVersion: "4",
-    promptVersion: "8",
+    promptVersion: "9",
     qualificationPolicy: "6",
   });
   const bound = work.bindArtifact();
