@@ -69,6 +69,8 @@ internal static class BrowserHighlightScript
               context.strokeStyle = 'white'; context.lineWidth = 4;
               context.strokeRect(x - 4, y - 4, width + 8, height + 8);
             }
+            // Neighboring or overlapping outlines must not cover another selected target's content.
+            for (const {x, y, width, height} of boxes) context.clearRect(x, y, width, height);
             animation = requestAnimationFrame(draw);
           };
           host = document.createElement('div');

@@ -927,13 +927,17 @@ test("The public viewer paints an offscreen target highlight after scrolling and
   );
 });
 
-function outlinePixels({ pixels, width }, left, top) {
+function outlineColumns({ pixels, width }, left, top) {
   let count = 0;
-  for (let y = top - 8; y < top; y++)
-    for (let x = left + 10; x < left + 230; x++) {
-      const offset = (y * width + x) * 4;
-      if (pixels.subarray(offset, offset + 3).every((channel) => channel < 30)) count++;
-    }
+  for (let x = left + 10; x < left + 110; x++) {
+    const rgb = (y) => pixels.subarray((y * width + x) * 4, (y * width + x) * 4 + 3);
+    if (
+      rgb(top - 8).every((channel) => channel < 30) &&
+      rgb(top - 4).every((channel) => channel > 225) &&
+      rgb(top - 1).every((channel) => channel < 30)
+    )
+      count++;
+  }
   return count;
 }
 
@@ -941,12 +945,12 @@ async function expectHighlights(frame, locations, visible) {
   let counts;
   for (let attempt = 0; attempt < 20; attempt++) {
     const image = await frame();
-    counts = locations.map(([left, top]) => outlinePixels(image, left, top));
-    if (counts.every((count) => (visible ? count >= 500 : count === 0))) return image;
+    counts = locations.map(([left, top]) => outlineColumns(image, left, top));
+    if (counts.every((count) => (visible ? count >= 90 : count === 0))) return image;
     await new Promise((resolve) => setTimeout(resolve, 50));
   }
   assert.fail(
-    `Expected highlights ${visible ? "visible" : "cleared"} at ${JSON.stringify(locations)}; outline pixels: ${counts}`,
+    `Expected highlights ${visible ? "visible" : "cleared"} at ${JSON.stringify(locations)}; outline columns: ${counts}`,
   );
 }
 
@@ -983,7 +987,7 @@ async function selectHighlights(page, plural = false, scope = "page") {
 
 test("Viewer outlines leave every target pixel unchanged", async () => {
   await withFixture(
-    `<style>body{margin:0;background:#888}button{position:absolute;left:100px;top:100px;width:240px;height:100px;border:2px solid #c23;background:white;color:black}button+button{left:400px;width:8px;height:8px;padding:0}</style>
+    `<style>body{margin:0;background:#888}button{position:absolute;left:100px;top:100px;width:240px;height:100px;border:2px solid #c23;background:white;color:black}button+button{left:340px;width:8px;height:8px;padding:0}</style>
     <button>Readable target</button><button aria-label="Tiny target"></button>
     <script>const nativeMatchMedia = matchMedia; window.matchMedia = query => query === '(prefers-reduced-motion: reduce)' ? {matches:true} : nativeMatchMedia(query);</script>`,
     async (session, page) => {
@@ -994,7 +998,7 @@ test("Viewer outlines leave every target pixel unchanged", async () => {
         const after = await expectHighlights(frame, [[100, 100]], true);
         for (const [left, top, width, height] of [
           [100, 100, 240, 100],
-          [400, 100, 8, 8],
+          [340, 100, 8, 8],
         ]) {
           for (let y = top; y < top + height; y++) {
             const start = (y * after.width + left) * 4;
@@ -2061,25 +2065,7 @@ test("Nested frame targets retain document XPath identity and main viewport geom
       assert.equal((await observe({}, "/fixture")).scrollY, 0);
       assert.equal((await observe({}, "/inner")).clicks, "0");
       await withFramebuffer(session, async (frame) => {
-        let blue = 0;
-        for (let attempt = 0; attempt < 20 && blue < 200; attempt++) {
-          const { pixels, width } = await frame();
-          blue = 0;
-          for (let y = 150; y < 190; y++)
-            for (let x = 150; x < 270; x++) {
-              const offset = (y * width + x) * 4;
-              if (
-                pixels[offset] > pixels[offset + 2] + 10 &&
-                pixels[offset + 1] > pixels[offset + 2] + 5
-              )
-                blue++;
-            }
-          if (blue < 200) await new Promise((resolve) => setTimeout(resolve, 50));
-        }
-        assert.ok(
-          blue >= 200,
-          `Expected nested target overlay at main viewport coordinates, got ${blue} blue pixels`,
-        );
+        await expectHighlights(frame, [[150, 150]], true);
       });
       await observe({ scrollToY: 20 }, "/inner");
       await observe({ scrollToY: 50 }, "/fixture");
