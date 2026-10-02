@@ -344,6 +344,7 @@ internal static class BrowserCaptureScript
             complete = false;
           }
           if (!complete) { nodes.length = 0; candidates.length = 0; }
+          const capturedView = currentView ? new Set([...nodes, ...frameElements, ...shadowHosts.filter(inView)]) : null;
           const literal = value => !value.includes("'") ? `'${value}'` : !value.includes('"') ? `"${value}"` : `concat(${value.split("'").map(part => `'${part}'`).join(`,"'",`)})`;
           const tag = element => element.namespaceURI === 'http://www.w3.org/1999/xhtml' ? element.localName : `*[local-name()=${literal(element.localName)}]`;
           const testAttributes = ['data-testid', 'data-test-id', 'data-test', 'data-cy', 'data-qa'];
@@ -431,14 +432,29 @@ internal static class BrowserCaptureScript
                 return node;
               });
             },
-            async updateEnvironment(value, budgetMs) {
+            async updateEnvironment(value, budgetMs, scanBudget) {
               try {
                 environment = value ? JSON.parse(value) : { x:0, y:0, scaleX:1, scaleY:1, exposed:true, rendered:true, clip:{left:0,top:0,right:innerWidth,bottom:innerHeight} };
                 reset(budgetMs);
                 if (!viewUnchanged()) return { errorCode: 'stale_capture' };
-                await observeIntersections([...nodes, ...frameElements]);
+                const observed = currentView ? [] : [...nodes, ...frameElements];
+                let scanned = 0;
+                if (currentView) {
+                  const walker = document.createTreeWalker(document, NodeFilter.SHOW_ELEMENT);
+                  while (walker.nextNode()) {
+                    checkBudget();
+                    if (++scanned > scanBudget) throw budgetExceeded;
+                    const element = walker.currentNode;
+                    if (eligible(element) || (element.matches('iframe,frame') || element.shadowRoot) && accessibilityExposed(element)) observed.push(element);
+                  }
+                }
+                await observeIntersections(observed);
                 if (!viewUnchanged()) return { errorCode: 'stale_capture' };
-                return {};
+                if (currentView) {
+                  const visible = observed.filter(inView);
+                  if (visible.length !== capturedView.size || visible.some(element => !capturedView.has(element))) return { errorCode: 'stale_capture' };
+                }
+                return { scannedCount: scanned };
               } catch (error) { if (error === budgetExceeded) return { errorCode: 'validation_budget_exceeded' }; throw error; }
             },
             receivesPoint(element, point, budgetMs) { reset(budgetMs); return receivesPoint(element, point); },

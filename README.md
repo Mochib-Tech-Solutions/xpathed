@@ -114,7 +114,7 @@ Root commands are defined in `package.json`. Host C# build and formatting comman
 
 `clean` preserves source, `.env`, installed dependencies and database volumes. Each service has its own Dockerfile under `docker/<service>/`; `docker/compose.sh` resolves paths from the repository root.
 
-Preferred XPaths use explicit test contracts and meaningful target semantics before ordinary IDs, with live singleton same-node verification. See the [selection policy](docs/resolution.md#preferred-xpath) and [research](docs/research/2026-10-01-semantic-xpath-reuse.md) for scope and reuse limits.
+Preferred XPaths use explicit test contracts and meaningful target semantics before ordinary IDs, with live singleton same-node verification. Current-view results revalidate clipped viewport membership, including absence; changes to the captured target set require a new resolution. XPath uniqueness still covers the target's entire document. See the [selection policy](docs/resolution.md#preferred-xpath) and [research](docs/research/2026-10-01-semantic-xpath-reuse.md) for scope and reuse limits.
 
 ## CI
 
