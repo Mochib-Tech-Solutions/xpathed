@@ -1,0 +1,211 @@
+{
+  "date": "2026-10-02",
+  "generator": "Archify 2.17",
+  "export": "Canonical viewer SVG export with embedded fonts, background and both themes",
+  "diagrams": [
+    {
+      "name": "system-design",
+      "diagram_type": "architecture",
+      "specification": {
+        "sha256": "1c9ddc718dafd96440054eb1a6830035c2dff67b0c7cdf40418e1434e9724d8f",
+        "bytes": 2534
+      },
+      "artifact": {
+        "sha256": "c59ee3920390c84138d29a544640dd2f4cd8a853fc7e67a9546d86ae8c7be5c2",
+        "bytes": 802989
+      },
+      "svg_sha256": "d4e670a42a1a7c7c797402f7b22957e6eb4dffdd698b29a2d24b1712ede167be",
+      "validation": {
+        "checksPassed": 9,
+        "checkCount": 9,
+        "compositionProfile": "showcase",
+        "compositionStatus": "pass",
+        "errors": 0,
+        "warnings": 0
+      },
+      "browser_evidence": "pass",
+      "viewports": [
+        {
+          "width": 1440,
+          "height": 900,
+          "theme": "light",
+          "overflowX": false,
+          "overflowY": false
+        },
+        {
+          "width": 1600,
+          "height": 1000,
+          "theme": "light",
+          "overflowX": false,
+          "overflowY": false
+        },
+        {
+          "width": 1920,
+          "height": 1080,
+          "theme": "light",
+          "overflowX": false,
+          "overflowY": false
+        },
+        {
+          "width": 2048,
+          "height": 1320,
+          "theme": "light",
+          "overflowX": false,
+          "overflowY": false
+        }
+      ],
+      "captured_themes": [
+        "light",
+        "dark"
+      ],
+      "visual_review": "passed",
+      "correction_rounds": 2,
+      "embedded_svg_review": {
+        "image_width_px": 900,
+        "themes": [
+          "light",
+          "dark"
+        ],
+        "status": "passed",
+        "primary_text_px": 12.375,
+        "secondary_text_px": 10.125
+      }
+    },
+    {
+      "name": "resolution-flow",
+      "diagram_type": "sequence",
+      "specification": {
+        "sha256": "858fd12a5272aecd1678ae580aa63d08e71724ddc6223a42c312f33102ad79fd",
+        "bytes": 2338
+      },
+      "artifact": {
+        "sha256": "e81162f587e2bca234e58b3dc43b3f0a827066910b57efdcc687c4263852a350",
+        "bytes": 802170
+      },
+      "svg_sha256": "9d0f6cf7f4998996035c4189f1545567a08ac90a9421ccd90ed94e192a5edf97",
+      "validation": {
+        "checksPassed": 9,
+        "checkCount": 9,
+        "compositionProfile": "showcase",
+        "compositionStatus": "pass",
+        "errors": 0,
+        "warnings": 0
+      },
+      "browser_evidence": "pass",
+      "viewports": [
+        {
+          "width": 1440,
+          "height": 900,
+          "theme": "light",
+          "overflowX": false,
+          "overflowY": false
+        },
+        {
+          "width": 1600,
+          "height": 1000,
+          "theme": "light",
+          "overflowX": false,
+          "overflowY": false
+        },
+        {
+          "width": 1920,
+          "height": 1080,
+          "theme": "light",
+          "overflowX": false,
+          "overflowY": false
+        },
+        {
+          "width": 2048,
+          "height": 1320,
+          "theme": "light",
+          "overflowX": false,
+          "overflowY": false
+        }
+      ],
+      "captured_themes": [
+        "light",
+        "dark"
+      ],
+      "visual_review": "passed",
+      "correction_rounds": 2,
+      "embedded_svg_review": {
+        "image_width_px": 900,
+        "themes": [
+          "light",
+          "dark"
+        ],
+        "status": "passed",
+        "primary_text_px": 12.375,
+        "secondary_text_px": 10.125
+      }
+    },
+    {
+      "name": "evaluation-release",
+      "diagram_type": "architecture",
+      "specification": {
+        "sha256": "c9b80a50437f04262f5fba9165175fa3312fdc4a8c46d1ad835a043de222e885",
+        "bytes": 2943
+      },
+      "artifact": {
+        "sha256": "dbf2ad5a93ac1b5abfa3e0c173df23de7b36f97eaa61574ecb98ac9bcecc3bc3",
+        "bytes": 803333
+      },
+      "svg_sha256": "7f4a2a6bb7cf686bf052554c4054342d116af61a470741859cf914dc69a32fa7",
+      "validation": {
+        "checksPassed": 9,
+        "checkCount": 9,
+        "compositionProfile": "showcase",
+        "compositionStatus": "pass",
+        "errors": 0,
+        "warnings": 0
+      },
+      "browser_evidence": "pass",
+      "viewports": [
+        {
+          "width": 1440,
+          "height": 900,
+          "theme": "light",
+          "overflowX": false,
+          "overflowY": false
+        },
+        {
+          "width": 1600,
+          "height": 1000,
+          "theme": "light",
+          "overflowX": false,
+          "overflowY": false
+        },
+        {
+          "width": 1920,
+          "height": 1080,
+          "theme": "light",
+          "overflowX": false,
+          "overflowY": false
+        },
+        {
+          "width": 2048,
+          "height": 1320,
+          "theme": "light",
+          "overflowX": false,
+          "overflowY": false
+        }
+      ],
+      "captured_themes": [
+        "light",
+        "dark"
+      ],
+      "visual_review": "passed",
+      "correction_rounds": 2,
+      "embedded_svg_review": {
+        "image_width_px": 900,
+        "themes": [
+          "light",
+          "dark"
+        ],
+        "status": "passed",
+        "primary_text_px": 13.75,
+        "secondary_text_px": 11.25
+      }
+    }
+  ]
+}
