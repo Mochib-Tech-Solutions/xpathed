@@ -1,12 +1,12 @@
 # Evaluation figures
 
-These figures use the latest recorded paired browser confirmation from 2026-10-02. They are a fixed measurement snapshot, not a live dashboard.
+The figures compare two configurations on identical browser cases. Offline results are stored separately in the same aggregate data file.
 
-- `paired-outcomes.svg` includes every planned case: 104 passed both arms, 15 improved, one regressed and 15 failed both.
-- `changed-families.svg` shows every family with a changed case and combines the 38 unchanged families in one explicit row. Cell labels show counts; color uses a shared 0–100% scale.
-- `confirmation-2026-10-02.json` contains the 135 paired grades, original case/family IDs, settings and source hashes. It excludes raw page and provider content.
+- `paired-outcomes.svg`: retained passes, gains, regressions and shared failures.
+- `category-results.svg`: all eight browser behavior categories, with passing/total counts and a shared 0–100% color scale.
+- `configuration-comparison.json`: saved grades, configuration identities, latency, available charges and evidence hashes. Raw inputs and provider responses remain private.
 
-The export follows the frozen live trial plan; 148 deterministic setup trials found beside those files are excluded. The saved comparison includes one regression, which would fail the current release gate. Small authored case groups do not establish production accuracy.
+Case membership follows the frozen run plan. Every planned case must have both original attempts before exporting a complete comparison. Categories come from `evaluation/cases/index.json`; historical fixture-family names are retained only as provenance.
 
 ## Rebuild
 
@@ -14,6 +14,6 @@ The export follows the frozen live trial plan; 148 deterministic setup trials fo
 uv run docs/assets/evaluation/plot.py
 ```
 
-The script pins Matplotlib, checks the matrix totals against individual case grades, writes SVGs here and writes PNG previews to the system temporary directory. It performs no inference. Review both figures after changing data or layout.
+The script pins Matplotlib, checks totals against individual grades and writes the SVGs here. PNG previews go to the system temporary directory. It performs no inference. Review both figures after changing data or layout.
 
-Measurement details are in the [release report](../../research/2026-10-01-release-monitoring-setup.md#first-approved-release--2026-10-02). Archive, manifest and trial hashes are retained in the JSON.
+The [comparison report](../../research/configuration-comparison.md) records the configurations, results, commands and measurement limits.

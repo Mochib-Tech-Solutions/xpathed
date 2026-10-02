@@ -61,7 +61,7 @@ pnpm evaluate:live -- --case CASE_ID --output .artifacts/evaluation/my-live-chec
 pnpm evaluate:replay RUN_DIRECTORY
 ```
 
-Deterministic mode is the default. Individual cases run concurrently in fresh browser sessions, with up to four workers based on available CPUs. Use `--concurrency 1` for serial timing or a value from 1 to 4 to limit resource use. Live and comparison runners remain serial. The manifest records concurrency; parallel-run timings include contention.
+Deterministic mode is the default. Individual cases run concurrently in fresh browser sessions, with up to four workers based on available CPUs. Use `--concurrency 1` for serial timing or a value from 1 to 4 to limit resource use. Ordinary live checks and release comparisons remain serial. Research continuation has its own bounded parallel runner below. The manifest records concurrency; parallel-run timings include contention.
 
 A controlled provider response makes fixtures, contracts and grader checks repeatable; those results are not model-quality scores. Live mode calls the configured route. Use `OPENROUTER_EVAL_API_KEY` in the environment or ignored evaluation environment file. Keep the application's key separate; deterministic CI receives no provider credentials.
 
@@ -123,6 +123,21 @@ Research remains part of the interview assignment. It uses shared fixtures, prov
 ### Compare and qualify models
 
 Model profiles permit controlled comparisons of explicit routes and settings. Record prompt or provider changes so a whole-configuration comparison is not mistaken for a model-only result.
+
+### Continue a research comparison in parallel
+
+`evaluation/research/parallel-comparison.mjs` continues a frozen paired research run with up to eight provider workers. One worker owns browser cases; the others run offline Resolver processes. Each worker has its own proxy state and charge ledger. A routing token selects the worker while the Resolver endpoint and configuration identity stay unchanged.
+
+The operator first drains the original run, preserves its directory, and starts an isolated stack from the same verified candidate and baseline images. The continuation requires those artifact identities, an explicit `XPATHED_RESEARCH_CONTINUATION=true`, and a host offline worker with the matching concurrency. Inside that prepared stack:
+
+```sh
+node evaluation/research/parallel-comparison.mjs \
+  --source ORIGINAL_RUN --output NEW_RUN --concurrency 8
+```
+
+The runner copies the frozen plan and evidence, retains completed successes and failures, and executes only missing arms. An unfinished attempted arm blocks continuation; it is never silently retried. Identity, response-reuse or evidence-integrity failures stop new work while active attempts drain.
+
+Keep the phase manifest, per-arm claims, worker charge ledgers and before/after image receipts. Report serial and parallel latency cohorts separately because contention and cache conditions differ. This path produces research evidence; ordinary release comparison and approval remain unchanged.
 
 ### External datasets
 
