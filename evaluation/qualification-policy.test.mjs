@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import test from "node:test";
 import policy from "./qualification-policy.json" with { type: "json" };
+import { compareTrials, compareMeasurements } from "./release-comparison.mjs";
 import { summarizeQualification } from "./qualification-policy.mjs";
 import currentViewPolicy from "./current-view-qualification-policy.json" with { type: "json" };
 
@@ -137,7 +138,31 @@ test("current-view release qualification requires its own coverage and measured 
   }));
   assert.ok(status().reasons.includes("latency_protocol_mismatch"));
   manifest.measurement = { latencyProtocol: currentViewPolicy.latencyProtocol };
+  assert.ok(status().reasons.includes("baseline_missing"));
+  manifest.comparison = { profile: manifest.profiles[0] };
+  for (const trial of trials) {
+    trial.baseline = structuredClone(trial);
+    trial.baseline.profileId = "release-baseline";
+    trial.baseline.provider[0].observedIdentity.generationId += "-baseline";
+    trial.baseline.elapsedMs = 4000;
+    trial.elapsedMs = 3500;
+  }
+  // Existing model failures do not impose an absolute accuracy gate.
+  for (const trial of trials.slice(0, 4)) {
+    trial.observation.actions[0].matches[0].intended = false;
+    trial.baseline.observation.actions[0].matches[0].intended = false;
+  }
   assert.equal(status().status, "qualified");
+  assert.ok(status().correctness.rate < 0.95);
+  assert.equal(status().correctCompleteWithinDeadline.rate, 0);
+  trials[4].observation.actions[0].matches[0].intended = false;
+  assert.ok(status().reasons.includes("correctness_regression"));
+  trials[4].observation.actions[0].matches[0].intended = true;
+  trials[0].elapsedMs = 9000;
+  trials[1].elapsedMs = 9000;
+  assert.ok(status().reasons.includes("tail_latency_regression"));
+  trials[0].baseline.elapsedMs = null;
+  assert.equal(compareTrials(manifest, trials, currentViewPolicy).status, "infrastructure_failure");
 });
 
 test("paired baseline reports both contracts, keeps missing attempts and excludes scope changes from speed gains", () => {
@@ -586,4 +611,43 @@ test("a noncritical baseline privacy failure still blocks an otherwise perfect c
   assert.equal(report.firstAttempt.passRate, 1);
   assert.equal(report.qualification.status, "not-qualified");
   assert.ok(report.qualification.reasons.includes("baseline_hard_invariant_failure"));
+});
+
+test("relative comparisons accept ties and retained failures but reject lost passes, slower tails and invalid evidence", () => {
+  const baseline = [
+    { caseId: "a", passed: true, elapsedMs: 3000 },
+    { caseId: "b", passed: false, elapsedMs: 4000 },
+  ];
+  assert.equal(compareMeasurements(baseline, baseline).status, "passed");
+  assert.equal(
+    compareMeasurements(
+      baseline.map((e) => ({ ...e, elapsedMs: e.elapsedMs - 100 })),
+      baseline,
+    ).status,
+    "passed",
+  );
+  assert.equal(
+    compareMeasurements(
+      baseline.map((e) => ({ ...e, passed: !e.passed })),
+      baseline,
+    ).status,
+    "semantic_drift",
+  );
+  assert.equal(
+    compareMeasurements([{ ...baseline[0], elapsedMs: 3001 }, baseline[1]], baseline).status,
+    "latency_regression",
+  );
+  assert.equal(
+    compareMeasurements([baseline[0], { ...baseline[1], elapsedMs: 5000 }], baseline).status,
+    "latency_regression",
+  );
+  for (const invalid of [
+    null,
+    [],
+    [baseline[0]],
+    [baseline[0], baseline[0]],
+    [baseline[0], { ...baseline[1], hardFailure: true }],
+    [baseline[0], { ...baseline[1], elapsedMs: null }],
+  ])
+    assert.equal(compareMeasurements(baseline, invalid).status, "infrastructure_failure");
 });

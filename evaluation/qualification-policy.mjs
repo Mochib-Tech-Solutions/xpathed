@@ -1,12 +1,13 @@
 import { createHash } from "node:crypto";
 import defaultPolicy from "./qualification-policy.json" with { type: "json" };
 import currentViewPolicy from "./current-view-qualification-policy.json" with { type: "json" };
+import { compareTrials } from "./release-comparison.mjs";
 import { gradeTrial, summarize } from "./grader.mjs";
 
 export { defaultPolicy, currentViewPolicy };
 
 export function policyForSuite(suite) {
-  if (suite.qualificationPolicy === "3") return currentViewPolicy;
+  if (suite.qualificationPolicy === currentViewPolicy.version) return currentViewPolicy;
   if (suite.qualificationPolicy === undefined) return defaultPolicy;
   throw new Error("Unknown qualification policy");
 }
@@ -94,8 +95,10 @@ function assess(manifest, trials, policy) {
   if (manifest.baseline) insufficient.push("development_baseline_not_release_qualification");
   if (manifest.monitoring) insufficient.push("monitoring_not_release_qualification");
   const baseline = manifest.baselineEvidence?.profiles?.[manifest.profile.id];
-  if (baseline?.criticalFailures?.length) reasons.push("baseline_critical_failure");
-  if (baseline?.hardFailures?.length) reasons.push("baseline_hard_invariant_failure");
+  if (policy.version !== "4" && baseline?.criticalFailures?.length)
+    reasons.push("baseline_critical_failure");
+  if (policy.version !== "4" && baseline?.hardFailures?.length)
+    reasons.push("baseline_hard_invariant_failure");
   if (baseline?.capabilityGaps?.length || entries.some(({ spec }) => spec.capabilityGap))
     reasons.push("unresolved_capability_gap");
   if (
@@ -129,9 +132,15 @@ function assess(manifest, trials, policy) {
       }
     }
   }
+  const comparison = policy.version === "4" ? compareTrials(manifest, trials, policy) : null;
+  if (comparison?.status === "infrastructure_failure") insufficient.push(...comparison.reasons);
+  else if (comparison) reasons.push(...comparison.reasons);
   const overall = rates(entries);
   if (hardFailures.length) reasons.push("hard_invariant_failure");
-  if (entries.some(({ spec, grade }) => spec.critical === true && !grade.passed))
+  if (
+    policy.version !== "4" &&
+    entries.some(({ spec, grade }) => spec.critical === true && !grade.passed)
+  )
     reasons.push("critical_case_failed");
   if (overall.correctness.rate < policy.minimumCorrectness) reasons.push("correctness_below_gate");
   if (overall.correctCompleteWithinDeadline.rate < policy.minimumCorrectCompleteWithinDeadline)
@@ -181,7 +190,9 @@ function assess(manifest, trials, policy) {
   }
   const families = [...new Set(heldOut.map(({ spec }) => spec.family))];
   const successfulFamilies = families.filter((family) =>
-    heldOut.filter(({ spec }) => spec.family === family).every(({ onTime }) => onTime),
+    heldOut
+      .filter(({ spec }) => spec.family === family)
+      .every(({ onTime, correct }) => (policy.version === "4" ? correct : onTime)),
   ).length;
   if (manifest.mode !== "live") insufficient.push("live_evidence_required");
   if (
@@ -242,6 +253,7 @@ function assess(manifest, trials, policy) {
       policyVersion: policy.version,
       reasons: [...new Set([...reasons, ...insufficient])],
       hardFailures,
+      ...(comparison ? { comparison } : {}),
       ...overall,
       correctCompleteWithinGoal: ratio(
         entries.filter(

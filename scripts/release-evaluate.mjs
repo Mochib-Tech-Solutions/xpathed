@@ -38,8 +38,19 @@ async function attest(path, stage) {
   );
   const docker = await localDocker(state.dockerHost);
   const observed = [];
-  for (const image of state.artifact.images) {
-    const service = image.component === "browser" ? "browser" : state.service;
+  const baselineObserved = [];
+  const images = state.comparison
+    ? [...state.artifact.images, ...state.comparison.artifact.images]
+    : state.artifact.images;
+  for (let index = 0; index < images.length; index++) {
+    const image = images[index];
+    const reference = index >= 2;
+    const service = reference
+      ? `${image.component}-baseline`
+      : image.component === "browser"
+        ? "browser"
+        : state.service;
+
     const ids = (
       await docker([
         "ps",
@@ -71,7 +82,7 @@ async function attest(path, stage) {
         labels?.["com.docker.compose.project.working_dir"] === state.directory,
       "Running container artifact identity mismatch",
     );
-    observed.push({
+    (reference ? baselineObserved : observed).push({
       component: image.component,
       imageId: container.Image,
       containerId: container.Id,
@@ -84,12 +95,15 @@ async function attest(path, stage) {
       version: 1,
       artifact: state.artifact,
       observed,
+      ...(state.comparison ? { comparison: state.comparison, baselineObserved } : {}),
     });
   else {
     const before = await json(join(output, "artifact-before.json"));
     ensure(
       isDeepStrictEqual(before.artifact, state.artifact) &&
-        isDeepStrictEqual(before.observed, observed),
+        isDeepStrictEqual(before.observed, observed) &&
+        isDeepStrictEqual(before.comparison, state.comparison) &&
+        (!state.comparison || isDeepStrictEqual(before.baselineObserved, baselineObserved)),
       "Artifact containers changed during qualification",
     );
     await save(join(output, "artifact-receipt.json"), {
@@ -97,6 +111,13 @@ async function attest(path, stage) {
       artifact: state.artifact,
       before: before.observed,
       after: observed,
+      ...(state.comparison
+        ? {
+            comparison: state.comparison,
+            baselineBefore: before.baselineObserved,
+            baselineAfter: baselineObserved,
+          }
+        : {}),
     });
   }
   process.stdout.write(JSON.stringify(state.artifact));
@@ -114,7 +135,15 @@ async function main() {
   const qualificationArgs = [];
   for (let i = 0; i < args.length; i += 2) {
     ensure(args[i + 1] && !args[i + 1].startsWith("--"), "Missing release evaluation option");
-    if (["--bundle", "--sha256"].includes(args[i])) {
+    if (
+      [
+        "--bundle",
+        "--sha256",
+        "--baseline-bundle",
+        "--baseline-sha256",
+        "--baseline-approval",
+      ].includes(args[i])
+    ) {
       ensure(!options[args[i]], "Duplicate release evaluation option");
       options[args[i]] = args[i + 1];
     } else qualificationArgs.push(args[i], args[i + 1]);
@@ -144,6 +173,35 @@ async function main() {
     manifest.profileId === qualification.profileIds[0],
     "Qualification profile differs from bundle",
   );
+  ensure(
+    Boolean(options["--baseline-bundle"]) === Boolean(options["--baseline-sha256"]),
+    "Baseline bundle and digest are required together",
+  );
+  let comparison, baselineBundle, baselineConfig;
+  if (options["--baseline-bundle"]) {
+    baselineBundle = await verify(options["--baseline-bundle"], options["--baseline-sha256"]);
+    baselineConfig = await json(join(baselineBundle.directory, "configuration.json"));
+    const baselineManifest = baselineBundle.manifest;
+    ensure(
+      isDeepStrictEqual(baselineManifest.platform, manifest.platform),
+      "Baseline platform differs",
+    );
+    comparison = {
+      approval: options["--baseline-approval"] ?? null,
+      artifact: {
+        version: 1,
+        bundleManifestSha256: options["--baseline-sha256"],
+        sourceSha: baselineManifest.sourceSha,
+        profileId: baselineManifest.profileId,
+        images: baselineManifest.images,
+        platform: baselineManifest.platform,
+      },
+      profile: baselineConfig.profile,
+    };
+    validateReleaseArtifact(comparison.artifact, baselineManifest.sourceSha, [
+      baselineManifest.profileId,
+    ]);
+  }
   const config = await json(join(bundle.directory, "configuration.json"));
   const profile = profiles.find((p) => p.id === manifest.profileId);
   ensure(isDeepStrictEqual(config.profile, profile), "Current profile differs from bundle profile");
@@ -161,6 +219,7 @@ async function main() {
   const host = await localDockerHost();
   const docker = await localDocker(host);
   await restoreVerified(bundle, docker);
+  if (baselineBundle) await restoreVerified(baselineBundle, docker);
   const parent = resolve(".artifacts/releases");
   await mkdir(parent, { recursive: true, mode: 0o700 });
   const temporary = await mkdtemp(join(parent, ".qualification-"));
@@ -169,6 +228,7 @@ async function main() {
     const output = resolve(qualification.output);
     const state = {
       artifact,
+      ...(comparison ? { comparison } : {}),
       service,
       project,
       directory: process.cwd(),
@@ -179,12 +239,21 @@ async function main() {
     await save(statePath, state);
     const overlay = join(temporary, "compose.yaml");
     const imageService = (name, image, environment) =>
-      `  ${name}:\n    build: !reset null\n    image: ${JSON.stringify(image.id)}\n    platform: ${manifest.platform.os}/${manifest.platform.architecture}\n    pull_policy: never\n${environment ? `    environment: ${JSON.stringify(environment)}\n` : ""}`;
+      `  ${name}:\n${name === "browser-baseline" ? "    extends: {service: browser}\n" : ""}    build: !reset null\n    image: ${JSON.stringify(image.id)}\n    platform: ${manifest.platform.os}/${manifest.platform.architecture}\n    pull_policy: never\n${environment ? `    environment: ${JSON.stringify(environment)}\n` : ""}`;
     await writeFile(
       overlay,
       "services:\n" +
         imageService("browser", manifest.images[0]) +
-        imageService(service, manifest.images[1], config.resolverEnvironment),
+        imageService(service, manifest.images[1], config.resolverEnvironment) +
+        (comparison
+          ? imageService("browser-baseline", comparison.artifact.images[0]) +
+            imageService("resolver-baseline", comparison.artifact.images[1], {
+              ...baselineConfig.resolverEnvironment,
+              BrowserUrl: "http://browser-baseline:8080",
+              OpenRouter__BaseUrl: "http://evaluation-fixture:8091/api/v1/",
+              OpenRouter__ApiKey: "qualification-proxy-only",
+            })
+          : ""),
       { flag: "wx", mode: 0o600 },
     );
     const env = {
@@ -196,6 +265,7 @@ async function main() {
       XPATHED_RELEASE_STATE: statePath,
       XPATHED_RELEASE_OVERLAY: overlay,
       XPATHED_RELEASE_SERVICE: service,
+      XPATHED_RELEASE_COMPARISON_JSON: comparison ? JSON.stringify(comparison) : "",
     };
     for (const key of Object.keys(env)) if (key.startsWith("GIT_")) delete env[key];
     const forwarded = [...qualificationArgs];

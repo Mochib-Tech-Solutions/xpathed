@@ -1,0 +1,7 @@
+# Qualify against the latest baseline
+
+Accepted, 2026-10-02. The maintainer replaced the absolute 95% requirements with no regression against the latest baseline. Policy 4 supersedes the numerical gates in ADR-0016 and ADR-0021; two seconds remains an aspirational speed metric under ADR-0020. Historical evidence keeps its original policy.
+
+Use the latest approved release as the baseline. Before the first approval, use the maintainer-confirmed current DeepSeek/Wafer configuration pinned to its source. Freeze both exact Browser/Resolver image sets before the pilot, then run one attempt per arm on identical cases with independently reset browser state. Preserve every baseline pass and require candidate median and p95 Resolver HTTP time to be no worse; ties pass. Keep existing failures visible instead of imposing an absolute accuracy floor. No statistical improvement claim follows from a small single-attempt comparison.
+
+Retain privacy, oracle isolation, passive behavior, valid API contracts, complete original evidence, independent labels, fresh held-out families, provider identity/accounting and artifact verification. Both arms belong to the same frozen exposure reservation. Seal raw baseline trials and their image attestations with candidate evidence. Promotion checks that the pinned comparison is still against the latest approval. Nightly checks use the approved sentinel measurements, including known semantic failures, without changing defaults or retrying failed samples. Missing comparison evidence fails closed.

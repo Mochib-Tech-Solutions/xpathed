@@ -22,6 +22,7 @@ import {
   summarizeMonitoring,
   assertPilotReady,
 } from "./qualify.mjs";
+import currentPolicy from "./current-view-qualification-policy.json" with { type: "json" };
 import { fingerprints } from "./run.mjs";
 
 const releaseArtifact = (sourceSha) => ({
@@ -129,6 +130,32 @@ test("frozen sentinel monitoring separates semantic drift, latency and infrastru
   for (const trials of [[], [wrong], [{ ...trial, elapsedMs: 2500 }]])
     assert.throws(() => assertPilotReady({ manifest: pilot, trials }), /Pilot failed/);
   assert.throws(() => assertPilotReady({ manifest, trials: [trial] }), /development pilot/);
+  const profile = profiles.find((p) => p.id === "deepseek");
+  const relative = {
+    ...pilot,
+    policy: currentPolicy,
+    profiles: [profile],
+    comparison: { profile },
+  };
+  trial.elapsedMs = 3000;
+  Object.assign(trial.provider[0], {
+    responseReuseDisabled: true,
+    observedIdentity: { generationId: "candidate" },
+    requestedIdentity: { model: profile.model, provider: profile.provider },
+  });
+  trial.baseline = structuredClone(trial);
+  trial.baseline.profileId = "release-baseline";
+  trial.baseline.elapsedMs = 3500;
+  trial.baseline.provider[0].observedIdentity.generationId = "baseline";
+  assert.equal(assertPilotReady({ manifest: relative, trials: [trial] }).status, "passed");
+  const monitoring = { ...relative, monitoring: true };
+  const baseline = [{ caseId: spec.id, passed: true, elapsedMs: 3500 }];
+  assert.equal(summarizeMonitoring(monitoring, [trial], baseline).status, "passed");
+  assert.equal(
+    summarizeMonitoring(monitoring, [{ ...trial, elapsedMs: 4000 }], baseline).status,
+    "latency_regression",
+  );
+  assert.equal(summarizeMonitoring(monitoring, [trial]).status, "infrastructure_failure");
 });
 
 test("qualification interleaves every profile per case and rotates first position", () => {
@@ -295,6 +322,7 @@ test("replay preserves absent planned attempts and rejects swapped trial identit
     "evaluation/qualify.mjs",
     "evaluation/grader.mjs",
     "evaluation/qualification-policy.mjs",
+    "evaluation/release-comparison.mjs",
   ])
     files[path] = digest(await readFile(new URL(`../${path}`, import.meta.url), "utf8"));
   const spec = JSON.parse(await readFile(new URL("./cases.json", import.meta.url), "utf8"))

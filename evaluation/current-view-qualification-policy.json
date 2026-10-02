@@ -1,12 +1,9 @@
 {
-  "version": "3",
+  "version": "4",
   "requiredContractVersion": "4",
   "latencyProtocol": "resolver-http-pre-reserved-v2",
   "goalMs": 1000,
   "deadlineMs": 2000,
-  "minimumCorrectCompleteWithinDeadline": 0.95,
-  "minimumCorrectness": 0.95,
-  "minimumFamilyCorrectness": 0.8,
   "minimumHeldOutFamilies": 10,
   "minimumHeldOutTrials": 30,
   "requiredSplits": ["regression", "held-out"],
@@ -14,11 +11,15 @@
     "privacy",
     "oracle_leak",
     "passive_state",
-    "target_identity",
     "contract",
     "unplanned_trial",
     "duplicate_trial"
   ],
-  "basis": "Current-view release policy: contract 4, prompt 8, capture 5. Preserve policy 2 numerical gates. Require 30 distinct held-out current-view cases across 10 independent families, one attempt each. Legacy regression remains compatibility evidence and cannot satisfy current-view coverage. Time the complete Resolver HTTP request, with durable accounting reservation before it and reconciliation after the validated provider response. Retain cold pricing lookup and every original attempt. Freeze this policy and source before held-out inference; no automatic promotion.",
-  "uncertainty": "Minimum coverage is an experiment floor, not statistical certification. Report the 95% Wilson interval over held-out families whose every planned request is correct and complete within the deadline. Authored families are not a random sample of production traffic."
+  "basis": "Compare exact candidate and baseline images on the same frozen cases, one fresh attempt per arm. Use the latest approved release, or the pinned operational bootstrap before the first approval. No lost baseline passes; median and p95 Resolver HTTP latency must not increase. No absolute quality or latency percentage gates. Keep current-view coverage, safety, artifact identity, independent labels and original attempts. Freeze both artifacts before inference; no automatic promotion.",
+  "uncertainty": "Observed paired comparisons are not statistical certification. Latency targets are descriptive. Report the 95% Wilson interval for held-out families whose requests are all correct and complete, independently of latency.",
+  "comparison": "latest-approved-or-bootstrap",
+  "bootstrap": {
+    "sourceSha": "d533377945f67f99dbb2d23ab9b2ea04eef61569",
+    "profileId": "deepseek"
+  }
 }

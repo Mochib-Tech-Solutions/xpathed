@@ -12,6 +12,7 @@ import {
   fingerprints,
   configurationRecord,
 } from "./run.mjs";
+import { compareTrials, compareMeasurements, measuredEntry } from "./release-comparison.mjs";
 import { gradeTrial } from "./grader.mjs";
 import defaultPolicy from "./qualification-policy.json" with { type: "json" };
 
@@ -328,6 +329,7 @@ export async function readRun(directory) {
     "evaluation/qualify.mjs",
     "evaluation/grader.mjs",
     "evaluation/qualification-policy.mjs",
+    "evaluation/release-comparison.mjs",
   ])
     if (
       manifest.code.files[path] !==
@@ -357,9 +359,26 @@ export async function readRun(directory) {
   return { manifest, trials };
 }
 
-export function summarizeMonitoring(manifest, trials) {
-  if (manifest.monitoring !== true || manifest.mode !== "live" || manifest.policy?.version !== "3")
+export function summarizeMonitoring(manifest, trials, baseline) {
+  if (
+    manifest.monitoring !== true ||
+    manifest.mode !== "live" ||
+    !["3", "4"].includes(manifest.policy?.version)
+  )
     throw new Error("Monitoring requires a frozen current-view live run");
+  if (manifest.policy.version === "4") {
+    const entries = manifest.cases.map((spec) =>
+      measuredEntry(
+        spec,
+        trials.find((t) => t.caseId === spec.id),
+        manifest.profiles[0],
+        manifest.policy,
+      ),
+    );
+    const report = compareMeasurements(entries, baseline);
+    if (trials.length !== entries.length) report.status = "infrastructure_failure";
+    return { ...report, entries, defaultActivated: false };
+  }
   return summarizeLiveChecks(manifest, trials);
 }
 
@@ -371,7 +390,10 @@ export function assertPilotReady({ manifest, trials }) {
     manifest.cases.some((spec) => spec.split === "held-out" || spec.capabilityGap)
   )
     throw new Error("Confirmation requires a live development pilot without capability gaps");
-  const report = summarizeLiveChecks(manifest, trials);
+  const report =
+    manifest.policy.version === "4"
+      ? compareTrials(manifest, trials, manifest.policy)
+      : summarizeLiveChecks(manifest, trials);
   if (report.status !== "passed")
     throw new Error(`Pilot failed before held-out reservation: ${report.status}`);
   return report;
@@ -493,6 +515,8 @@ export function assertFrozenImplementation(current, previous) {
   ]))
     if (currentCode.files[path] !== previousCode.files[path])
       throw new Error(`Implementation changed after pilot: ${path}`);
+  if (!isDeepStrictEqual(current.comparison, previous.comparison))
+    throw new Error("Implementation changed after pilot: comparison baseline");
   if (current.browserBinarySha256 !== previous.browserBinarySha256)
     throw new Error("Implementation changed after pilot: Chromium binary");
   if (!isDeepStrictEqual(current.qualification?.artifact, previous.qualification?.artifact))
@@ -547,6 +571,21 @@ export async function main(args = process.argv.slice(2)) {
     !/^[a-f0-9]{64}$/.test(process.env.XPATHED_BROWSER_BINARY_SHA256 ?? "")
   )
     throw new Error("Live qualification requires the measured Chromium binary fingerprint");
+  const comparison = process.env.XPATHED_RELEASE_COMPARISON_JSON
+    ? JSON.parse(process.env.XPATHED_RELEASE_COMPARISON_JSON)
+    : undefined;
+  if (comparison) {
+    validateReleaseArtifact(comparison.artifact, comparison.artifact.sourceSha, [
+      comparison.profile.id,
+    ]);
+    if (
+      !isDeepStrictEqual(
+        comparison.profile,
+        profiles.find((p) => p.id === comparison.profile.id),
+      )
+    )
+      throw new Error("Unknown baseline profile");
+  }
   const selectedProfiles = options.profileIds.map((id) => profiles.find((p) => p.id === id));
   const code = await fingerprints();
   const artifact =
@@ -564,11 +603,19 @@ export async function main(args = process.argv.slice(2)) {
   );
   const allCases = validateCases(suite);
   const defaultPolicy = policyForSuite(suite);
+  if (defaultPolicy.version === "4" && options.mode === "live" && !options.sentinels && !comparison)
+    throw new Error("Baseline-relative qualification requires a pinned baseline image bundle");
+  const baselineProfile = comparison
+    ? { ...comparison.profile, id: "release-baseline", resolver: "http://resolver-baseline:8080" }
+    : null;
+  const inferenceProfiles = baselineProfile
+    ? [...selectedProfiles, baselineProfile]
+    : selectedProfiles;
   const preparedAccounting =
     Boolean(suite.baseline) || defaultPolicy.latencyProtocol === "resolver-http-pre-reserved-v2";
   if (
     options.sentinels &&
-    (defaultPolicy.version !== "3" ||
+    (!["3", "4"].includes(defaultPolicy.version) ||
       !Array.isArray(suite.sentinels) ||
       !suite.sentinels.length ||
       new Set(suite.sentinels).size !== suite.sentinels.length ||
@@ -580,6 +627,10 @@ export async function main(args = process.argv.slice(2)) {
     requiredContractVersion: defaultPolicy.requiredContractVersion,
     sentinelIds: options.sentinels ? suite.sentinels : undefined,
   });
+  if (options.sentinels && comparison)
+    throw new Error("Monitoring uses saved baseline measurements, not a second inference arm");
+  if (comparison && (options.profileIds.length !== 1 || options.repetitions !== 1))
+    throw new Error("Paired release qualification requires one candidate and one attempt per arm");
   if (options.sentinels && cases.length !== suite.sentinels.length)
     throw new Error("Sentinel selection is incomplete");
   if (
@@ -640,6 +691,7 @@ export async function main(args = process.argv.slice(2)) {
     exclusions,
     sourceManifestHash: hash(suite),
     profiles: selectedProfiles,
+    ...(comparison ? { comparison } : {}),
     baselineEvidence: pilot ? baselineEvidence(pilot) : null,
     plan: buildMatrixPlan(cases, selectedProfiles, options),
     code,
@@ -682,8 +734,8 @@ export async function main(args = process.argv.slice(2)) {
   const trials = [];
   let proxy, deterministicProxy, runError;
   const preparedRequests = new Map();
-  async function runTrial(spec, planned, mode) {
-    const profile = selectedProfiles.find((p) => p.id === planned.profileId);
+  async function runTrial(spec, planned, mode, reference = false) {
+    const profile = inferenceProfiles.find((p) => p.id === planned.profileId);
     const trial = {
       ...planned,
       mode,
@@ -701,7 +753,16 @@ export async function main(args = process.argv.slice(2)) {
         );
       else proxy.beginAttempt(trial.id, profile.id);
     }
-    await execute(spec, trial, { ...options, mode }, { ...services, resolver: profile.resolver });
+    await execute(
+      spec,
+      trial,
+      { ...options, mode },
+      {
+        ...services,
+        ...(reference ? { browser: "http://browser-baseline:8080" } : {}),
+        resolver: profile.resolver,
+      },
+    );
     trial.configuration = configurationRecord(trial);
     if (mode === "live") {
       await proxy.awaitIdle();
@@ -717,7 +778,24 @@ export async function main(args = process.argv.slice(2)) {
       trial.evidence = { ...trial.evidence, provider: calls };
     }
     trial.grade = gradeTrial(spec, trial);
-    await save(join(output, "trials", `${trial.id}.json`), trial);
+    if (!reference) {
+      if (
+        comparison &&
+        !trial.accountingError &&
+        !trial.provider?.some((p) => p.identityValid === false || p.responseCacheHit)
+      )
+        trial.baseline = await runTrial(
+          spec,
+          {
+            ...planned,
+            id: hash(`${planned.id}:baseline`).slice(0, 32),
+            profileId: "release-baseline",
+          },
+          mode,
+          true,
+        );
+      await save(join(output, "trials", `${trial.id}.json`), trial);
+    }
     return trial;
   }
   try {
@@ -748,9 +826,9 @@ export async function main(args = process.argv.slice(2)) {
         join(output, "compatibility.json"),
         gates.map(({ id, caseId, profileId, grade }) => ({ id, caseId, profileId, grade })),
       );
-      if (gates.some((t) => !t.grade.passed))
+      if (gates.some((t) => !t.grade.passed || (comparison && !t.baseline?.grade.passed)))
         throw new Error("Deterministic compatibility failed; no paid calls made");
-      if (defaultPolicy.version === "3" && options.phase === "confirmation") {
+      if (["3", "4"].includes(defaultPolicy.version) && options.phase === "confirmation") {
         assertPilotReady(pilot);
         const { reserveHoldout } = await import("./release-exposure.mjs");
         manifest.qualification.exposure = await reserveHoldout(
@@ -764,7 +842,7 @@ export async function main(args = process.argv.slice(2)) {
       const { createBudgetProxy } = await import("./comparison-budget.mjs");
       await mkdir(join(output, "provider"));
       proxy = await createBudgetProxy({
-        profiles: selectedProfiles,
+        profiles: inferenceProfiles,
         ledgerPath:
           process.env.XPATHED_BUDGET_PATH ?? resolve(".artifacts/datasets/experiment-budget.json"),
         onRecord: (record) =>
@@ -779,17 +857,34 @@ export async function main(args = process.argv.slice(2)) {
       manifest.routeMetadata = proxy.profiles;
       if (preparedAccounting) {
         manifest.preparedForecast = proxy.forecastRequests(
-          manifest.plan.trials.map((planned) => {
-            const prepared = gates.find(
-              (gate) => gate.caseId === planned.caseId && gate.profileId === planned.profileId,
-            );
-            preparedRequests.set(planned.id, prepared?.evidence?.preparedProviderRequest);
-            return {
-              id: planned.id,
-              profileId: planned.profileId,
-              request: prepared?.evidence?.preparedProviderRequest,
-            };
-          }),
+          manifest.plan.trials
+            .flatMap((planned) =>
+              comparison
+                ? [
+                    planned,
+                    {
+                      ...planned,
+                      id: hash(`${planned.id}:baseline`).slice(0, 32),
+                      profileId: "release-baseline",
+                    },
+                  ]
+                : [planned],
+            )
+            .map((planned) => {
+              const reference = planned.profileId === "release-baseline";
+              const gate = gates.find(
+                (gate) =>
+                  gate.caseId === planned.caseId &&
+                  (reference || gate.profileId === planned.profileId),
+              );
+              const prepared = reference ? gate?.baseline : gate;
+              preparedRequests.set(planned.id, prepared?.evidence?.preparedProviderRequest);
+              return {
+                id: planned.id,
+                profileId: planned.profileId,
+                request: prepared?.evidence?.preparedProviderRequest,
+              };
+            }),
         );
         await save(join(output, "forecast.json"), manifest.preparedForecast);
         if (options.forecastOnly) {
@@ -822,10 +917,13 @@ export async function main(args = process.argv.slice(2)) {
       console.log(
         `${trial.grade.passed ? "PASS" : "FAIL"} ${trial.profileId} ${trial.caseId} #${trial.repetition} ${Math.round(trial.elapsedMs ?? 0)}ms`,
       );
-      if (trial.accountingError) throw new Error(trial.accountingError);
+      if (trial.accountingError || trial.baseline?.accountingError)
+        throw new Error(trial.accountingError ?? trial.baseline.accountingError);
       if (
         options.mode === "live" &&
-        trial.provider.some((p) => p.identityValid === false || p.responseCacheHit)
+        [...trial.provider, ...(trial.baseline?.provider ?? [])].some(
+          (p) => p.identityValid === false || p.responseCacheHit,
+        )
       )
         throw new Error(
           "Provider identity or response-cache gate failed; remaining planned attempts were not run",

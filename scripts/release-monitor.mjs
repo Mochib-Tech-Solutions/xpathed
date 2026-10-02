@@ -75,7 +75,10 @@ async function main() {
       pathToFileURL(join(staged.source, "evaluation/qualify.mjs"))
     );
     const observed = await readRun(join(staged.source, output));
-    Object.assign(run, summarizeMonitoring(observed.manifest, observed.trials));
+    Object.assign(
+      run,
+      summarizeMonitoring(observed.manifest, observed.trials, selected.sentinelBaseline),
+    );
     await writeFile(join(directory, "monitoring.json"), JSON.stringify(run, null, 2) + "\n", {
       mode: 0o600,
     });

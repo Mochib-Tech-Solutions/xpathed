@@ -1,5 +1,7 @@
 # Monitor explicitly approved current-view releases
 
+Current release acceptance is superseded by [ADR-0022](0022-qualify-against-the-latest-baseline.md). The thresholds below describe the historical policy; original evidence retains those rules.
+
 Accepted, 2026-10-01. The maintainer authorized completing release setup and recurring monitoring with `OPENROUTER_EVAL_API_KEY`, using GitHub Actions failure notifications. This supersedes the earlier deferral of paid scheduled monitoring. Application credentials remain separate and provider key limits remain the spending control.
 
 Policy 3 qualifies contract 4, prompt 8 and capture 5. Keep policy 2 and its historical results unchanged. Preserve the existing numerical quality and latency gates; require thirty distinct current-view held-out cases across ten authored families and one attempt per case. Legacy contracts remain deterministic compatibility evidence. Source/template review and deterministic browser checks precede inference; authored families do not establish production-wide statistical confidence. Reserve held-out families in the authoritative private release state before confirmation, including failed or interrupted waves, so later runs cannot silently reuse exposed data as fresh qualification.
