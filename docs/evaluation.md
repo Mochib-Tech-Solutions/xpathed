@@ -49,7 +49,9 @@ pnpm evaluate:live -- --case CASE_ID --output .artifacts/evaluation/my-live-chec
 pnpm evaluate:replay RUN_DIRECTORY
 ```
 
-Deterministic mode is the default. A controlled provider response makes fixtures, contracts and grader checks repeatable; those results are not model-quality scores. Live mode calls the configured route. Use `OPENROUTER_EVAL_API_KEY` in the environment or ignored evaluation environment file. Keep the application's key separate; deterministic CI receives no provider credentials.
+Deterministic mode is the default. Individual cases run concurrently in fresh browser sessions, with up to four workers based on available CPUs. Use `--concurrency 1` for serial timing or a value from 1 to 4 to limit resource use. Live and comparison runners remain serial. The manifest records concurrency; parallel-run timings include contention.
+
+A controlled provider response makes fixtures, contracts and grader checks repeatable; those results are not model-quality scores. Live mode calls the configured route. Use `OPENROUTER_EVAL_API_KEY` in the environment or ignored evaluation environment file. Keep the application's key separate; deterministic CI receives no provider credentials.
 
 The wrapper runs Browser, Resolver and the controlled fixture in an isolated Compose project, then stops its containers. It does not require Web, ClientApi or PostgreSQL. `XPATHED_EVALUATION_PROJECT` selects a distinct `xpathed-evaluation-...` project for concurrent work. Output directories must be new and writable through Docker's mount; a VM-backed engine requires a shared host path. Preserve every original attempt in its own run directory, including interrupted and failed attempts.
 

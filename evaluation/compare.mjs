@@ -102,6 +102,7 @@ export function parseQualificationOptions(args) {
     } else rest.push(args[i], args[i + 1]);
   }
   const options = { ...parseOptions(rest), ...extra };
+  if (options.concurrency !== 1) throw new Error("Comparison requires concurrency 1");
   if (options.replay && seen.size) throw new Error("Replay cannot be combined with run options");
   if (options.prune || options.repetitions !== 1)
     throw new Error("Release comparison uses one attempt per case");

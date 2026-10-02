@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   buildPlan,
+  runTrials,
   validateCases,
   parseOptions,
   toArtifact,
@@ -474,4 +475,48 @@ test("current-view runs request scoped capture and reject a legacy-scope respons
   });
   assert.match(trial.captureObservation.error.message, /wrong scope/);
   assert.equal(trial.error.code, "capture_scope_unverified");
+});
+
+test("browser workers overlap, respect the cap, retain plan order and never retry", async () => {
+  let active = 0,
+    peak = 0;
+  const started = [],
+    completed = [];
+  const trials = Array.from({ length: 9 }, (_, id) => ({ id }));
+  const result = await runTrials({ trials, concurrency: 3 }, async (trial) => {
+    started.push(trial.id);
+    peak = Math.max(peak, ++active);
+    await new Promise((resolve) => setTimeout(resolve, trial.id === 0 ? 40 : 5));
+    active--;
+    completed.push(trial.id);
+    return trial.id;
+  });
+  assert.equal(peak, 3);
+  assert.equal(active, 0);
+  assert.deepEqual(
+    started,
+    trials.map((t) => t.id),
+  );
+  assert.notDeepEqual(completed, result);
+  assert.deepEqual(
+    result,
+    trials.map((t) => t.id),
+  );
+  assert.equal(buildPlan([example], { seed: 1, repetitions: 1, concurrency: 3 }).concurrency, 3);
+});
+
+test("workers finish pending cleanup before reporting an infrastructure failure", async () => {
+  let finished = false;
+  await assert.rejects(
+    runTrials({ trials: [0, 1], concurrency: 2 }, async (trial) => {
+      if (trial === 0) throw new Error("disk full");
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      finished = true;
+    }),
+    /Evaluation worker failed/,
+  );
+  assert.equal(finished, true);
+  for (const value of ["0", "5", "1.5", "NaN"])
+    assert.throws(() => parseOptions(["--concurrency", value]), /concurrency/);
+  assert.throws(() => parseOptions(["--mode", "live", "--concurrency", "2"]), /Live evaluation/);
 });

@@ -1,4 +1,4 @@
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { classifyChanges } from "./ci-changes.mjs";
 
 export function checkCommands(paths) {
@@ -30,7 +30,28 @@ export function checkCommands(paths) {
   return commands;
 }
 
-export function checkStaged(cwd = process.cwd()) {
+export async function runCheckGroups(groups, options) {
+  const results = await Promise.allSettled(
+    groups.map(async (commands) => {
+      for (const [command, ...args] of commands) {
+        console.log(`\n> ${command} ${args.join(" ")}`);
+        await new Promise((resolve, reject) => {
+          const child = spawn(command, args, { ...options, stdio: "inherit" });
+          child.once("error", reject);
+          child.once("exit", (code, signal) =>
+            code === 0
+              ? resolve()
+              : reject(new Error(`${command} ${args.join(" ")} failed (${signal ?? code})`)),
+          );
+        });
+      }
+    }),
+  );
+  const failures = results.filter((result) => result.status === "rejected");
+  if (failures.length) throw new Error(failures.map((result) => result.reason.message).join("\n"));
+}
+
+export async function checkStaged(cwd = process.cwd()) {
   const git = (...args) => execFileSync("git", args, { cwd, encoding: "utf8" });
   const paths = (output) => output.split("\0").filter(Boolean);
   const staged = paths(git("diff", "--cached", "--name-only", "--no-renames", "-z", "--"));
@@ -49,10 +70,12 @@ export function checkStaged(cwd = process.cwd()) {
   const index = git("write-tree").trim();
   const env = { ...process.env };
   for (const key of git("rev-parse", "--local-env-vars").trim().split("\n")) delete env[key];
-  for (const [command, ...args] of commands) {
-    console.log(`\n> ${command} ${args.join(" ")}`);
-    execFileSync(command, args, { cwd, env, stdio: "inherit" });
-  }
+  // .NET projects share build outputs; independent frontend/tooling/Docker checks do not.
+  const dotnet = commands.filter(
+    (cmd) => !["check:web", "check:tooling", "docker:check"].includes(cmd[1]),
+  );
+  const independent = commands.filter((cmd) => !dotnet.includes(cmd));
+  await runCheckGroups([dotnet, ...independent.map((cmd) => [cmd])], { cwd, env });
   if (
     git("write-tree").trim() !== index ||
     paths(git("diff", "--name-only", "--no-renames", "-z", "--")).some(
@@ -68,7 +91,7 @@ export function checkStaged(cwd = process.cwd()) {
 
 if (import.meta.main) {
   try {
-    checkStaged();
+    await checkStaged();
   } catch (error) {
     console.error(error.message);
     process.exitCode = 1;

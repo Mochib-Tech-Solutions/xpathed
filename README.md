@@ -94,7 +94,7 @@ Root commands are defined in `package.json`. Host C# build and formatting comman
 | `pnpm run setup`                                                       | Create local configuration and install locked workspace dependencies           |
 | `pnpm dev`                                                             | Run all services in Docker with source watching                                |
 | `pnpm build`                                                           | Build the .NET solution and production frontend                                |
-| `pnpm check`                                                           | Run the repository's formatting, lint, build and validation gates              |
+| `pnpm check`                                                           | Run independent validation groups in parallel                                 |
 | `pnpm check:dotnet` / `pnpm check:web` / `pnpm check:tooling`          | Validate one part of the repository                                            |
 | `pnpm lint`                                                            | Run analyzers, frontend lint and script syntax checks                          |
 | `pnpm format` / `pnpm format:check`                                    | Apply or verify shared formatting                                              |
@@ -111,6 +111,8 @@ Root commands are defined in `package.json`. Host C# build and formatting comman
 | `pnpm docker:build` / `pnpm docker:check`                              | Build runtime images or validate Docker definitions                            |
 | `pnpm docker:logs` / `pnpm docker:status`                              | Inspect running services                                                       |
 | `pnpm clean`                                                           | Remove generated .NET output and the frontend build                            |
+
+Local checks run independent groups concurrently. Deterministic browser evaluation runs individual cases in isolated sessions with up to four workers; use `pnpm evaluate -- --concurrency 1` for serial execution. See [CI execution](docs/ci.md#parallel-execution) for shared-resource limits.
 
 `clean` preserves source, `.env`, installed dependencies and database volumes. Each service has its own Dockerfile under `docker/<service>/`; `docker/compose.sh` resolves paths from the repository root.
 

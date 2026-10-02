@@ -190,6 +190,7 @@ export function summarizePairs(manifest, trials) {
 
 export async function main(args = process.argv.slice(2)) {
   const options = parseOptions(args);
+  if (options.concurrency !== 1) throw new Error("Comparison requires concurrency 1");
   const { gradeComparison } = await import("./grade.mjs");
   const runnerHash = hash(await readFile(new URL("./compare.mjs", import.meta.url), "utf8"));
   const graderHash = hash(await readFile(new URL("./grade.mjs", import.meta.url), "utf8"));

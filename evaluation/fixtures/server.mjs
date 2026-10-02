@@ -13,6 +13,7 @@ export function createFixtureServer({
 } = {}) {
   const trials = new Map();
   let activeTrial;
+  const traceTrials = new Map();
   return createServer(async (request, response) => {
     const send = (status, value, type = "application/json") => {
       response.writeHead(status, { "Content-Type": type, "Cache-Control": "no-store" });
@@ -22,11 +23,17 @@ export function createFixtureServer({
       const url = new URL(request.url, "http://fixture");
       if (url.pathname === "/health") return send(200, { ready: true });
       if (url.pathname === "/trial" && request.method === "POST") {
-        const { id, caseId } = JSON.parse(await readBody(request));
+        const { id, caseId, traceId } = JSON.parse(await readBody(request));
         const entry = cases.find((item) => item.id === caseId || item.sourceIds?.includes(caseId));
-        if (!/^[a-zA-Z0-9_-]{1,100}$/.test(id ?? "") || !entry || trials.has(id))
+        if (
+          !/^[a-zA-Z0-9_-]{1,100}$/.test(id ?? "") ||
+          !entry ||
+          trials.has(id) ||
+          (traceId !== undefined && (!/^[a-f0-9]{32}$/.test(traceId) || traceTrials.has(traceId)))
+        )
           return send(400, { code: "invalid_trial" });
-        trials.set(id, { entry, command: null, observation: null, providerRequest: null });
+        trials.set(id, { entry, traceId, command: null, observation: null, providerRequest: null });
+        if (traceId) traceTrials.set(traceId, id);
         activeTrial = id;
         return send(200, { id });
       }
@@ -44,7 +51,11 @@ export function createFixtureServer({
           },
         });
       if (url.pathname === "/api/v1/chat/completions" && request.method === "POST") {
-        const current = trials.get(activeTrial);
+        const traceId = request.headers.traceparent?.split("-")[1];
+        // Legacy research runners register serial trials without a trace binding.
+        const trialId =
+          traceTrials.get(traceId) ?? (!trials.get(activeTrial)?.traceId ? activeTrial : undefined);
+        const current = trials.get(trialId);
         if (!current) return send(409, { code: "trial_required" });
         const body = JSON.parse(await readBody(request));
         current.providerRequest = body;
@@ -79,7 +90,7 @@ export function createFixtureServer({
           };
         });
         return send(200, {
-          id: `deterministic-${activeTrial}`,
+          id: `deterministic-${trialId}`,
           model: body.model ?? "deepseek/deepseek-v4.1-flash",
           provider: "Wafer",
           choices: [

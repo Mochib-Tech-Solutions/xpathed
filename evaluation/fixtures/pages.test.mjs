@@ -288,3 +288,61 @@ test("the default deterministic CI suite exercises reviewed current-view scope a
     );
   for (const entry of cases) assert.equal(entry.review.status, "reviewed");
 });
+
+test("concurrent provider calls use trace ownership, including fresh mutation calls", async (t) => {
+  const cases = loadCases(new URL("../cases/index.json", import.meta.url)).cases;
+  const server = createFixtureServer();
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  t.after(() => {
+    server.closeAllConnections();
+    server.close();
+  });
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const post = (path, body, headers = {}) =>
+    fetch(base + path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...headers },
+      body: JSON.stringify(body),
+    });
+  const traceA = "a".repeat(32),
+    traceB = "b".repeat(32);
+  assert.equal(
+    (await post("/trial", { id: "first", caseId: "basic-save", traceId: traceA })).status,
+    200,
+  );
+  assert.equal(
+    (await post("/trial", { id: "second", caseId: "provider-rate_limit", traceId: traceB })).status,
+    200,
+  );
+  assert.equal(
+    (await post("/trial", { id: "duplicate", caseId: cases[0].id, traceId: traceA })).status,
+    400,
+  );
+  const input = {
+    messages: [
+      {
+        role: "user",
+        content: JSON.stringify({
+          candidates: [{ id: "c1", label: "Save changes", tag: "button" }],
+        }),
+      },
+    ],
+  };
+  const call = (trace) =>
+    post("/api/v1/chat/completions", input, { traceparent: `00-${trace}-0123456789abcdef-01` });
+  const results = await Promise.all([call(traceA), call(traceB), call(traceA)]);
+  assert.deepEqual(
+    results.map((r) => r.status),
+    [200, 429, 200],
+  );
+  for (const response of [results[0], results[2]]) {
+    const result = await response.json();
+    assert.equal(result.id, "deterministic-first");
+    assert.equal(JSON.parse(result.choices[0].message.content).actions[0].candidateId, "c1");
+  }
+  assert.equal((await call("c".repeat(32))).status, 409);
+  assert.equal((await post("/api/v1/chat/completions", input)).status, 409);
+  assert.deepEqual(await (await fetch(base + "/provider-request?trial=first")).json(), input);
+  assert.deepEqual(await (await fetch(base + "/provider-request?trial=second")).json(), input);
+});

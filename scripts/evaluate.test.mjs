@@ -195,3 +195,22 @@ test("release comparison accepts the unified collection and forwards its contain
   assert.equal(result.status, 77);
   assert.match(result.calls, /suite=\/workspace\/evaluation\/cases\/index.json/);
 });
+
+test("browser concurrency is bounded and cannot leak into live or comparison runners", (t) => {
+  for (const args of [
+    ["--concurrency", "0"],
+    ["--concurrency", "5"],
+    ["--concurrency", "2", "--mode", "live"],
+    ["--concurrency", "2", "--qualification"],
+    ["--concurrency", "2", "--comparison"],
+    ["--concurrency", "2", "--context"],
+  ]) {
+    const result = runWrapper(t, "xpathed-evaluation-workers", "resolver", args);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /concurrency/i);
+    assert.equal(result.calls, "");
+  }
+  const valid = runWrapper(t, "xpathed-evaluation-workers", "resolver", ["--concurrency", "4"]);
+  assert.equal(valid.status, 77);
+  assert.match(valid.calls, /down/);
+});
