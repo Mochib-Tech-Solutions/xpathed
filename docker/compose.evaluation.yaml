@@ -19,4 +19,4 @@ services:
       - type: bind
         source: ${XPATHED_EVALUATION_OUTPUT:?Set the evaluation artifact directory}
         target: /artifacts
-    command: ["node", "server.mjs"]
+    command: ["node", "fixtures/server.mjs"]

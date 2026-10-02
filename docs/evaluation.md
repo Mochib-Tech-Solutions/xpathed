@@ -1,203 +1,127 @@
 # Independent resolution evaluation
 
-Browser evaluation creates a fresh session for each trial and compares results with independently labelled targets and actions. External-dataset evaluation uses the same grading/reporting artifacts for offline target selection, with browser-dependent observations explicitly unavailable. Neither requires Web, ClientApi or PostgreSQL. Resolution never executes the requested interaction.
+Evaluation answers whether the resolver selected the intended targets, interpreted the action correctly, and returned verified XPath and state information. Independent labels define the expected answer; a unique XPath alone cannot establish intended-target correctness. Resolution inspects and highlights targets without executing the requested interaction.
 
-## Run a suite
+[ADR-0023](adr/0023-simplify-release-evaluation.md) defines the accepted simplification. This runbook describes the new source layout and workflow contract; it does not establish that hosted workflows, private dataset publication, or live qualification have been exercised. The existing approved release keeps its original evidence until replaced.
+
+## One collection, grouped by behavior
+
+```text
+evaluation/
+  cases/          # Shared browser cases grouped by behavior, with one loader
+  fixtures/       # Controlled pages and independent target oracles
+  datasets/       # Source adapters and the reviewed private collection manifest
+  research/       # Stagehand, model and context comparisons
+  accounting/     # Shared charge records
+  run.mjs         # Browser trials and replay
+  compare.mjs     # Candidate/baseline and monitoring orchestration
+  grader.mjs      # Independent grading
+  policy.json     # One current release acceptance policy
+  profiles.json   # Explicit model/provider configurations
+  provider.mjs    # Shared provider integration
+scripts/release/  # Images, evidence, approval, activation and rollback
+```
+
+Cases are organized by the behavior they check, rather than by the version that introduced them. The shared loader also serves deterministic CI. Legacy compatibility, injected-provider failures and saved-locator mutation cases remain engineering checks; selection records why they are excluded from live release inference. Unit, integration and UI tests keep their existing locations and ordinary CI ownership.
+
+Each release comparison freezes the complete eligible browser collection and every reviewed eligible imported case. Both candidate and approved baseline receive the same case inputs and current grading rules, with one original attempt per arm. Browser state resets independently. New cases and improved checks are welcome: apply the same updated expectations to both arms. Changing the collection or grader after a run requires another comparison.
+
+### Browser cases
+
+A live case exercises the complete Resolver request: Browser captures candidates, the real model selects targets, Browser constructs and verifies XPath expressions and observes readiness, and the independent oracle grades the final response. There is no separate paid XPath-algorithm phase.
+
+Grading distinguishes capture coverage, intended-target identity, unique same-node XPath matching, action interpretation, exact plural target sets, scoped absence, readiness and completeness. Missing, extra, duplicate and incorrect targets remain distinct. Privacy, oracle leakage and unintended page changes are hard failures. Deterministic mutation checks separately assess old-locator reuse and fresh resolution after a page change.
+
+### Imported cases
+
+PhraseNode and adapted Mind2Web retain original source IDs, splits, family relationships, checksums, labels, transformation history and review evidence. Import support does not imply that every imported record is approved for live submission. Mind2Web contributes only after an eligible adaptation is independently reviewed; the presently prepared release collection contains reviewed PhraseNode inputs.
+
+Offline cases use the Resolver's offline selection path. They can establish target-selection correctness, but historical data cannot establish current viewport membership, live XPath identity, pointer interception, readiness or plural completeness. One report includes both tracks with separate denominators and limitations. Original dataset splits describe provenance; repeated release runs are regression evidence, not unseen-data generalization.
+
+## Run and replay
+
+From the repository root:
 
 ```sh
 pnpm evaluate
-pnpm evaluate -- --repetitions 3 --seed 42
-pnpm evaluate -- --case CASE_ID --output .artifacts/evaluation/my-run
-pnpm evaluate:live -- --case CASE_ID
+pnpm evaluate -- --case CASE_ID --output .artifacts/evaluation/my-check
+pnpm evaluate:live -- --case CASE_ID --output .artifacts/evaluation/my-live-check
+pnpm evaluate:replay RUN_DIRECTORY
 ```
 
-Deterministic mode is the default. It uses a local provider double to test contracts, fixtures and grading; its score does not measure model quality. Live mode explicitly calls the checked-in DeepSeek V4.1 Flash/Wafer route with a 4,096-token list output limit and reasoning disabled. This is a compatibility-check route, not a measured model recommendation. Live evaluation prefers `OPENROUTER_EVAL_API_KEY` from the process environment, then the ignored `.env` (or `XPATHED_ENV_FILE`). An explicitly exported legacy `OPENROUTER_API_KEY` remains a fallback only when no dedicated evaluation key is configured; the application key in an environment file is never used. Deterministic runs do not load an evaluation key. Use standard serving and the configured provider key limits. These basic browser-fixture commands report their own costs; comparisons and dataset runs additionally preserve the shared accounting ledger described below.
+Deterministic mode is the default. A controlled provider response makes fixtures, contracts and grader checks repeatable; those results are not model-quality scores. Live mode calls the configured route. Use `OPENROUTER_EVAL_API_KEY` in the environment or ignored evaluation environment file. Keep the application's key separate; deterministic CI receives no provider credentials.
 
-The wrapper starts only Browser, Resolver and the evaluation fixture in the separate `xpathed-evaluation` Compose project. It stops those containers on completion or failure and preserves artifacts. The development workspace is independent. For concurrent runs, set `XPATHED_EVALUATION_PROJECT` to a name beginning with `xpathed-evaluation-`; other project names are rejected before Docker is invoked. A lock prevents overlapping runs in one project. Existing containers from another checkout or belonging to services other than Browser, Resolver and the evaluation fixture are rejected before teardown. No host browser port is needed.
+The wrapper runs Browser, Resolver and the controlled fixture in an isolated Compose project, then stops its containers. It does not require Web, ClientApi or PostgreSQL. `XPATHED_EVALUATION_PROJECT` selects a distinct `xpathed-evaluation-...` project for concurrent work. Output directories must be new and writable through Docker's mount; a VM-backed engine requires a shared host path. Preserve every original attempt in its own run directory, including interrupted and failed attempts.
 
-Output defaults to a new directory under ignored `.artifacts/evaluation/`. `--output` selects a new host directory, mounted as `/artifacts` in the runner. Existing output directories are rejected to protect previous evidence. Before starting evaluation services, a marker round-trip verifies Docker can read and write that exact host directory. With a VM-backed Docker engine such as Colima, choose a shared path under this checkout; an unshared temporary directory fails before any resolution calls. Defaults are one repetition, seed 1, sequential execution, no retries and a 45-second operation timeout. `--repetitions`, `--seed` and `--timeout-ms` declare changes before the run. A later rerun is a new artifact directory, not a replacement for the first attempt.
+Run the complete paired release comparison through `pnpm release:evaluate`; see [release workflow](releases.md). This launcher verifies the saved images and starts the offline Resolver worker. The underlying `pnpm evaluate:qualify` runner cannot start a complete collection by itself; filtered browser-only deterministic checks remain available. `pnpm evaluate:qualify:replay RUN_DIRECTORY` regrades saved comparison evidence without services or paid calls. A filtered check cannot replace the complete release comparison.
 
-## Compare the custom resolver and Stagehand
+Replay reads the saved manifest, observations and original trials with their matching grader. It makes no provider calls and does not recreate the historical browser. Use the recorded source revision for older artifacts rather than applying today's policy to old approval claims.
+
+## Release acceptance
+
+The single current policy is `evaluation/policy.json`:
+
+- Every case the approved baseline passes must also pass for the candidate. Gains elsewhere cannot offset a lost pass.
+- Safety violations, operational failures, invalid contracts, missing required results and artifact mismatches fail the comparison.
+- Existing semantic failures remain visible. Equality can pass when there are no lost passes and the required invariants hold.
+- Median/p95 latency and reported/estimated/unknown costs are descriptive. Slow results and missing billing metadata are not release blockers.
+
+There is one complete comparison, with no required pilot or fresh held-out phase. The collection grows as regressions and useful new cases are reviewed. Retain independent labels and all outcomes; do not retry away failures or claim generalization from repeatedly inspected cases.
+
+Resolver HTTP timing includes capture, inference and live verification. Fixture setup and independent grading are outside the timer; these results do not measure the complete browser-to-chat experience. One-attempt results are observations of this run, not statistical guarantees.
+
+## Private dataset collection
+
+`evaluation/datasets/collection.json` pins the private archive's repository, release asset, local path, digest and inventory. The payload lives under ignored `.artifacts/datasets/`; raw or derived page inputs are not committed to source.
+
+Build a reviewed collection from imported inputs and explicit review files:
 
 ```sh
-pnpm evaluate:compare -- --case basic-save --output .artifacts/evaluation/comparison-check
-pnpm evaluate:compare -- --case basic-save --mode live --output .artifacts/evaluation/comparison-live
-pnpm evaluate:compare:replay .artifacts/evaluation/comparison-live
+pnpm datasets:collection pack IMPORT_DIRECTORY .artifacts/datasets/reviewed.json.gz REVIEW_FILE...
 ```
 
-The default deterministic mode checks adapter compatibility with controlled responses. Omit `--case` to run the declared comparison subset; use `--repetitions` and `--seed` to declare repeated trials. Each pair gets separate fresh fixture pages. The custom resolver uses contract 3; the standalone adapter pins Stagehand 4.1.0 and calls only `observe`. It preserves Stagehand's prompt and DOM representation, so the result compares whole configurations even when model/provider settings match. It changes neither the production resolver nor the client.
+Packing checks source/input identity, eligibility, submission review and duplicate case IDs. Record its emitted digest and inventory in the collection manifest. Publication is a separate authorized operation; packaging a file does not upload it.
 
-Before either arm performs inference, the runner requires matching Chromium binary hashes, viewport, user agent, locale, timezone, initial scroll/focus/field structure and normalized fixture-document checksums. The document checksum detects controlled-fixture differences; it is not a security hash. Source and dependency fingerprints retain the code inputs. The adapter's extension and CDP connection live only in its isolated evaluation container, using the same pinned Chromium build and sandbox policy. No production browser control port or Browserbase account is added. Stagehand's separate `evaluation/stagehand/package-lock.json` is installed in that Docker image, outside ordinary workspace dependency installation and tooling CI.
-
-**Singleton requests grade the first suggestion; explicit plural requests grade the whole returned set.** A wrong first suggestion remains wrong even if a later suggestion is correct. Plural results are order independent, with missing, extra, duplicate and wrong nodes reported separately. The oracle receives expected labels only after inference and independently evaluates each document-scoped XPath and its explicit frame chain. Accessibility-hidden nodes are excluded; offscreen and disabled nodes can still be legitimate targets. Interaction methods must match the shared requested action. An empty observation has no inferred action and records action availability accordingly. Stagehand readiness remains unavailable rather than borrowing the custom resolver's observations. Selector-conversion failures, unsupported scope, empty results and operational failures remain distinct; neither adapter executes actions, retries inference or uses self-healing to repair a selection.
-
-Every live comparison first runs the deterministic basic and plural compatibility gate. Both must pass before the runner initializes the paid proxy or submits a provider request. Live comparison uses the standard DeepSeek V4.1 Flash/Wafer route with reasoning disabled and a 4,096-token output limit. Both arms pass through the same accounting proxy and preserve `.artifacts/datasets/experiment-budget.json`. New runs use provider-limit accounting: record each attempt and its estimate before submission, then retain its reported charge or explicit unknown cost. Local ceilings, provider price filters and estimate overruns do not gate continuation. Preserve the ledger when deleting run artifacts. No priority or fast tier is enabled. Provider prompt-cached tokens are distinct from response reuse; fresh local observations and actual request evidence establish which path ran.
-
-Comparison directories retain `manifest.json`, each original `trials/` entry, `summary.json` and live `provider/` request/response evidence. Every planned strategy attempt remains in the report denominator, including errors and unsupported cases. Singleton and plural results stay separate. Replay requires the matching manifest and grader and regrades retained observations without services or provider calls. It does not rerun the browser. Keep these directories private because provider evidence can contain page text. The ordinary `node evaluation/run.mjs --prune RUN_DIRECTORY` command removes comparison page/provider evidence after 30 days and the complete run after 90 days; comparison manifests use version `"1"` and need no diagnostic imports. Preserve the separate charge ledger. These development cases and small live pilots do not qualify a release or establish a model default. See the dated [Stagehand compatibility research](research/stagehand-v4-compatibility.md) for the pinned API evidence and its limits.
-
-## Compare and qualify models
-
-The dated [qualification report](research/model-qualification-report.md) records measured latency, correctness, costs and the decision to leave defaults unchanged.
-
-`pnpm evaluate:qualify` uses the same browser execution and independent grader, with the profiles in `evaluation/qualification-profiles.json`. It compares the baseline prompt/schema/DOM on standard Luna/OpenAI, Gemini/Google AI Studio and DeepSeek/Wafer routes; `--profile qwen` adds Qwen3.8 Flash/Alibaba with reasoning disabled. Model-specific reasoning and caching settings are explicit, fingerprinted and checked against current endpoint metadata. The optional `deepseek-concise` profile changes only the contract-3 prompt and records its own prompt version; it is an experimental development variant. Application defaults stay unchanged.
+Obtain and verify the pinned private asset with:
 
 ```sh
-pnpm evaluate:qualify -- --mode deterministic --split development,regression --output .artifacts/evaluation/qualification-contracts
-pnpm evaluate:qualify -- --mode deterministic --profile luna,gemini,deepseek,qwen --repetitions 1 --output .artifacts/evaluation/qualification-pilot
-pnpm evaluate:qualify -- --mode deterministic --split regression --profile luna,gemini,deepseek,qwen --repetitions 1 --output .artifacts/evaluation/qualification-confirmation
-pnpm evaluate:qualify:replay .artifacts/evaluation/qualification-confirmation
+pnpm datasets:collection fetch
 ```
 
-The pilot is development evidence. The 2026-09-30 held-out families are now regression with `previousSplit` and exposure-run provenance. Current runs cannot qualify a release until fresh independent held-out families are added; the second command above is a deterministic regression comparison. Historical policy-1 artifacts remain unchanged and replay requires their recorded source revision. Confirmation checks its configuration and source fingerprints, forecasts cost from recorded input/output token distributions at fresh endpoint rates, and freezes the policy before held-out calls. Never change settings or thresholds in response to held-out results: move exposed families to regression before another tuning cycle. A run uses seeded case order, rotates profile order, executes one request at a time, and retains every original attempt without retries or discarded warmups. Provider prompt-cache warmth is uncontrolled and recorded separately from response caching. The proxy sends `X-OpenRouter-Cache: false`; cached responses or mismatched identities are invalid fresh-inference evidence.
+The private `evaluation-data/reviewed-72d140c1.json.gz` asset is published. A fresh download was checked against the pinned digest; the workflow performs the same verification before reading the collection. A missing or changed required dataset fails completeness checks; it must not silently reduce the release denominator.
 
-Current-view release **policy 7** is declared in `evaluation/current-view-qualification-policy.json` and selected by the current-view suite. It compares one candidate attempt with one baseline attempt on the same case and independently reset browser state. Both exact Browser/Resolver image identities and model configurations are frozen before inference. The baseline is the latest approved release; before the first approval, use the pinned DeepSeek/Wafer bootstrap source. A candidate must match or exceed overall baseline correctness, report every individual gain and lost pass, and report median and p95 Resolver HTTP time over the same complete case inventory without gating on speed. Ties qualify. Existing semantic failures, including accounted malformed model output, remain visible without an absolute accuracy floor; privacy, oracle leakage, passive-state violations, invalid API contracts, missing/duplicate evidence and unverified provider accounting still block. Two seconds is a reported target only. Pilot, confirmation and nightly sentinel comparisons share this rule; monitoring compares with the approved release's saved measurements. See [ADR-0022](adr/0022-qualify-against-the-latest-baseline.md).
+The source acquisition and adaptation commands remain `pnpm datasets:fetch`, `pnpm datasets:import`, and `pnpm evaluate:dataset`. Use the checked-in source manifests and each command's options for a research cohort. Keep imported, excluded, unsupported, ambiguous and unreconstructible records visible with reasons. Dataset terms and submission review remain required even when cost is unrestricted.
 
-Keep thirty distinct held-out current-view cases across ten independent families, one attempt per arm, fresh family reservations, deterministic compatibility and the prepared accounting protocol. The candidate and baseline share one frozen experiment and exposure reservation; never tune either after viewing held-out results. Reports retain original failures, per-arm evidence and uncertainty. Historical policies 1–4 and their recorded reports retain their original thresholds and require their recorded source revision for replay. The legacy page-wide policy file remains historical compatibility tooling, not the current release gate.
+## Cost and provider evidence
 
-Timing covers the Resolver HTTP request, including capture, inference and live same-node XPath/readiness verification. Fixture setup and the independent oracle run outside that timer. Endpoint price lookup uses the proxy's frozen metadata snapshot; production currently fetches that metadata over the network. These measurements therefore describe the evaluation resolver path, not guaranteed browser-to-chat UI latency. Stage timings and all-attempt latency remain separate from correct-only latency.
+Track estimates, token usage, provider generation IDs, reported charges and unknown amounts separately. Cost amounts, estimate overruns, missing prices, unavailable billing metadata and accounting-service availability do not stop resolution evaluation or reject a release. Preserve charge records where available and report accounting failures explicitly; never invent a zero charge.
 
-Before paid calls, deterministic positive, absent, scoped/plural and provider-failure checks exercise the same services. Live calls retain their estimates and charges in the existing shared ledger. Missing usage or charges stay unknown and do not impose a financial continuation gate. Use standard routes without response healing or fallback models. Paid CI uses the explicit release workflow or the approved-release nightly sentinel workflow; both use the evaluation key.
+Authentication, transport failures, provider rejection and missing resolution results are operational failures. A provider-enforced key limit can reject a call, but the evaluator adds no monetary continuation gate. Keep the dedicated evaluation key, standard routes, original attempts and existing charge history. Successful billing reconciliation never turns a failed model response into a passing case.
 
-The qualification manifest links source/dependency/browser fingerprints, full selected cases and exclusions, policy, route metadata and configuration identities. Per-trial artifacts retain nonsecret effective settings and expiring page/provider evidence. Replay uses the recorded runner and grader, checks manifest/trial identities and recomputes results without services. A completed measurement can exit successfully with **no qualified candidate**; inspect the qualification status rather than treating process success as approval. There is no automatic default promotion.
+## Research comparisons
 
-For an offline check that requires an actually qualified profile, use [release evidence sealing and verification](releases.md). It binds the original pilot and confirmation files, regrades both, and requires a clean checkout at the candidate's exact source revision. Ordinary replay success is insufficient for this boundary.
+Research remains part of the interview assignment. It uses shared fixtures, provider integration, grading and evidence while keeping source-specific limitations explicit. It is not an additional sequence required on every release PR.
 
-The original legacy cases remain unchanged. The ordinary deterministic browser suite also includes contract-4 variants of the saved-locator mutation cases; they preserve the original target labels and family/split boundaries and are engineering regression checks, not new qualification evidence. Imported PhraseNode and Mind2Web cases retain original split identities and offline-only limitations; these controlled browser results do not claim those corpora were rerun or that reconstructed DOMs reproduce historical readiness. Historical contract-3 appearance-only commands expose a known gap: those captures carry geometry but not computed color. Contract 4 adds bounded CSS evidence in the separately measured current-view baseline. Preserve the historical gap rather than relabelling old results.
+### Compare the custom resolver and Stagehand
 
-## Current-view baseline
+`pnpm evaluate:compare` compares the resolver with the pinned Stagehand adapter. A browser-parity check establishes equivalent Chromium, page state and fixture documents. Singleton commands grade the first suggestion; plural commands grade the whole set. Stagehand uses observation only and does not execute actions. Replay uses `pnpm evaluate:compare:replay RUN_DIRECTORY`.
 
-[Issue #47](https://github.com/Mochib-Tech-Solutions/xpathed/issues/47) measures contract 3 page-wide input against contract 4 current-view input on the same source revision and fixed standard DeepSeek route. `evaluation/viewport-baseline-cases.json` contains independently reviewed authored browser labels, one attempt per case/arm, with explicit unchanged-target pairs and separate scope-change/appearance strata. It is development/regression evidence and cannot qualify a release. Selected current-view cases also run in the ordinary deterministic CI browser suite.
+### Compare and qualify models
 
-```sh
-pnpm evaluate:qualify -- --suite evaluation/viewport-baseline-cases.json \
-  --mode deterministic --phase pilot --split regression --profile deepseek \
-  --repetitions 1 --seed 47 --output .artifacts/evaluation/viewport-deterministic
-```
+Model profiles permit controlled comparisons of explicit routes and settings. Record prompt or provider changes so a whole-configuration comparison is not mistaken for a model-only result.
 
-For a live measurement, set `OPENROUTER_EVAL_API_KEY` in the ignored root `.env` or another ignored environment file selected by `XPATHED_ENV_FILE`, and configure access to the existing authoritative GitHub ledger as described in [release accounting](releases.md#manual-github-qualification). The app key and its limit are separate. First run the same command with `--mode live --forecast-only true` and a new output directory: it prepares the complete suite using deterministic responses, fetches current pricing and reports an informational forecast, without inference. The paid command omits `--forecast-only true`, uses another new output directory and repeats the guards. Prepared request identities remain binding; forecast amounts and unknown charges do not block subsequent calls under the provider-limit policy. These commands never reset the ledger or enable recurring paid CI.
+### External datasets
 
-The paired baseline timing protocol `resolver-http-pre-reserved-v2` records each forecast estimate in the authoritative ledger before the timed Resolver request. The proxy validates the actual bounded request, returns its provider response, then completes durable accounting before another attempt. Failure to retain durable accounting evidence halts the run. Missing reported cost remains unknown and does not itself halt a provider-limit run. Original inline-accounting measurements remain separate; never subtract bookkeeping durations to reclassify their timeouts. General hosted release qualification retains its existing timing contract.
+Dataset experiments retain original source/split denominators and explicit prompt variants. Preparation and forecasts are informational; reviewed exact input identities remain binding.
 
-Retain every original timeout/failure and await late proxy accounting before collecting evidence. Server total time, client request duration, provider time and durable accounting overhead are different measurements. Historical baseline runs retain their original two-second cutoff. New runs follow [ADR-0020](adr/0020-treat-latency-targets-as-evaluation-metrics.md): two seconds grades latency without cancelling a valid slower result. A quick transport or resource timeout remains a failure, not an improvement. Report paired deltas only where target sets are unchanged, and successful latency gains only where both attempts are correct and complete. Include input bytes/tokens, stage and total p50/p95, coverage, correct responses below one second/within two seconds, unknown/reported/estimated costs and cost per correct complete result. Small one-attempt samples describe the observed run, not a production percentile guarantee.
+### Context-planning experiment
 
-The historical paired baseline skipped optional runtime pricing for contract 4. Current runtime contracts all perform the bounded pricing lookup and cache successful metadata. Qualification preparation suppresses fixture prices so the live phase fetches its own frozen route metadata through the evaluation proxy; this is not a production Internet-latency measurement. The legacy control preserves its prompt/schema/prepared-input semantics; this comparison is not a claim that the historical source binary was rerun. Preserve source/configuration fingerprints and raw evidence. Original imported dataset scores remain separate historical source-quality evidence: their labels do not establish current viewport membership, plural sets or readiness. No new viewport score may be inferred from them. Fresh holdout claims additionally require a family-exposure audit across preparation, reviews and previous runs. The [measured current-view report](research/viewport-baseline-report.md) retains both timing protocols, all attempts, known model failures and the before/after efficiency comparison. This baseline supplies the scope and measurement contract for the separate [Jev context-planning comparison #48](https://github.com/Mochib-Tech-Solutions/xpathed/issues/48).
+The context-planning experiment, `pnpm evaluate -- --context`, tests optional CSS/layout evidence with a fixed final model and preserved candidates. It remains evaluation-only; findings do not automatically change runtime settings.
 
-## Context-planning experiment
+Dated reports in `docs/research/` preserve their original scores, policies, limits and commands. See the [external dataset pilot](research/external-dataset-pilot-report.md), [labelled baseline](research/deepinfra-labelled-baseline-report.md), [Stagehand evidence](research/stagehand-v4-compatibility.md), [current-view comparison](research/viewport-baseline-report.md) and [context experiment](research/jev-context-comparison-report.md). Replay historical experiments from their recorded revision.
 
-The [measured comparison](research/jev-context-comparison-report.md) records the historical hard-cutoff pilot and the fresh metric-only baseline separately. The provisional Jev policy saved no context; it remains evaluation-only. These exposed regression measurements do not qualify a release.
+## Evidence and monitoring
 
-[Issue #48](https://github.com/Mochib-Tech-Solutions/xpathed/issues/48) compares fresh contract-4 control and Jev-assisted attempts on the same 16 authored current-view cases: 32 trials, one attempt per case/arm, alternating which arm runs first. Both arms use the fixed standard DeepSeek V4.1 Flash/DeepInfra FP8 profile. This is a separate development experiment, not a replay of the earlier Wafer baseline or a production configuration change.
+A run saves its manifest, frozen cases and configuration, every original trial, summaries, and available provider evidence. Keep these artifacts private because sanitized page text can still be sensitive. Preserve source/image identity and approval history separately from expiring page/provider evidence. Run pruning does not erase the charge history or extend original retention deadlines.
 
-```sh
-pnpm evaluate -- --context --output .artifacts/evaluation/context-deterministic
-pnpm evaluate -- --context --mode live --output .artifacts/evaluation/context-live
-node evaluation/context-experiment.mjs --replay .artifacts/evaluation/context-live
-```
-
-Deterministic mode is the default. Live mode first runs the complete deterministic service preflight, then starts fresh paid trials using `OPENROUTER_EVAL_API_KEY` and the shared provider-limit accounting policy. Each control attempt uses one final LLM call; each assisted attempt may first make one Jev request. There are no retries, model routing or automatic promotion. The fixed experiment accepts `--output` and `--timeout-ms`; the latter changes only the client wait. The two-second latency threshold grades response speed; it does not cancel a slower valid response. Case/profile/suite/repetition overrides are unavailable. Replay uses saved evidence without Docker or inference.
-
-Only the isolated assisted Resolver enables `Evaluation:ContextPlanning=jev-v1`, and only its diagnostic contract-4 route applies it. Public resolution and legacy contracts retain their existing behavior. After the unchanged full viewport capture, `typesafe/jev-1.13` receives the original instruction and two fixed Noul questions about appearance and layout. It receives no page candidates or labels. The final LLM still receives the original instruction, every candidate in capture order, core semantic/state context and frame identities. Planning can omit only whole appearance or geometry groups; a code-owned availability field and fixed prompt suffix distinguish omitted evidence from observed absence.
-
-The provisional policy omits an evidence group only at a probability of at most 0.05 and retains it at 0.95 or above. A score between those thresholds for either question retains both groups. Malformed responses, identity mismatches, errors and the 500ms classifier timeout also retain full evidence. Classification, final inference and browser verification contribute to total response time. Responses over two seconds miss the speed threshold but retain their actual correctness; ordinary provider/transport timeouts remain failed attempts. Planning is measured separately from final-model and validation time. Classification starts after capture, so this version claims neither overlap nor reduced browser capture cost.
-
-Retain the frozen questions, thresholds, prompt/schema/configuration identities, chosen evidence groups, probabilities, timings, all provider records and original outcomes. The runner writes `manifest.json`, `trials/`, `provider/`, `summary.json` and `execution.json`, with live preflight evidence kept separately. Compare paired correctness, complete target sets, input bytes/tokens, total/stage latency and combined Jev-plus-LLM costs. Unknown costs remain unknown. Deterministic score-mapping checks do not establish semantic classifier accuracy; the authored browser labels remain independent of classifier decisions.
-
-Use `node evaluation/run.mjs --prune RUN_DIRECTORY` for retention: after 30 days it removes prepared requests, preflight/trial evidence and provider payloads; after 90 days it removes the run directory. Expired evidence cannot be replayed as intact original evidence. The separate shared ledger is retained.
-
-## Cases and oracles
-
-`evaluation/cases.json` versions instructions, fixture/setup revisions, viewport, expected ordered actions and targets, state/readiness, request summaries, categories, family/split membership and label provenance. The declared managed viewport is 1280×800 with an explicit one-pixel tolerance for kiosk window bounds; each trial records its observed viewport. Related templates, paraphrases and mutations remain in one split. Expected node mappings live outside model-visible fixture content and provider requests. DOM identity establishes intended-target correctness; matching XPath text is not the oracle.
-
-The fixture command channel independently observes returned XPath matches and expected nodes. Reports count missing, extra, duplicate and wrong targets separately and expose whole-target-set completeness. Extra returned entries include wrong nodes and duplicate occurrences; the duplicate count identifies the latter. Capture/model-input coverage, semantic selection, XPath identity, action decomposition, state/readiness, summary correctness, unsupported outcomes and operational errors remain separate checks. Saved-locator reuse after mutation is graded separately from fresh resolution; retaining a unique XPath that now identifies a distractor is a failure. Current-view mutation cases check viewport state on fresh resolution. The real-browser resolution checks additionally exercise in-flight viewport membership changes, off-screen duplicates, nested clipping and stale absence; these are separate from reusing an XPath after a completed request.
-
-The initial labelled suite is development/regression evidence, not a genuine unseen holdout. Label review provenance is recorded rather than inferred from a green run. Future holdout cases must remain unexposed during tuning; once inspected or used to change behavior, move the entire related family to regression and replace the held-out family. Basic version-3 coverage grades one shared action and its complete distinct target set; historical version-2 action-list cases remain identified separately. Single-target external annotations do not establish multi-target coverage.
-
-## External datasets
-
-Prepare dependencies with the normal setup, then fetch pinned source assets and import them locally:
-
-```sh
-pnpm datasets:fetch --output .artifacts/datasets/sources
-pnpm datasets:import --manifest .artifacts/datasets/sources/phrasenode-sources.json --output .artifacts/datasets/phrasenode-import
-pnpm datasets:import --manifest .artifacts/datasets/sources/mind2web-sources.json --output .artifacts/datasets/mind2web-import
-```
-
-Fetching uses the official command/processed-page archives and one pinned Mind2Web training shard. Each asset has a fixed URL, size and independently checked SHA-256; an existing matching file is reused without a download. ZIP extraction reads only approved named members into regular files and refuses overwrite mismatches. It preserves PhraseNode's train/dev/test command files separately and excludes the duplicate `all` file. Raw HTML/CSS archives, source-session storage and current websites are not fetched. See the dated [PhraseNode](research/phrasenode-import-feasibility.md) and [Mind2Web](research/mind2web-import-feasibility.md) source research for attribution and reconstruction limits.
-
-Import output must be a new directory. Relative source paths resolve against the manifest's directory; pass `--source-root DIRECTORY` when a reviewed manifest lives elsewhere. `manifest.json` retains original source URLs, checksums, splits, attribution and transformation version. `cases.json` retains per-record identities, independent target mappings and exclusion reasons; `inventory.json` records complete import denominators. Sanitized candidate inputs are deduplicated in `inputs/` by content hash. Family/split conflicts and invalid target mappings cannot become eligible cases. Imports do not call a model or execute source scripts.
-
-Mind2Web's fetched shard is an identity/adaptation pilot, not the full corpus or a held-out suite. Its task-level descriptions are insufficient as independent single-step instructions. Optional manifest `adaptations` must record `annotationId`, `actionUid`, instruction, action, distinct author/reviewer identities, `reviewed:true`, `targetHiddenDuringAuthoring:true` and a policy version. The importer preserves the original interaction, including HOVER/ENTER before their source benchmark normalization. Unreviewed or conflicting adaptations remain visible exclusions. Never copy a gold action description into the input and report it as an independently authored instruction.
-
-Run a reproducible diagnostic sample from one original split:
-
-```sh
-pnpm evaluate:dataset --import .artifacts/datasets/phrasenode-import --output .artifacts/datasets/phrasenode-run --split train --limit 30 --seed 1
-pnpm evaluate:dataset --replay .artifacts/datasets/phrasenode-run
-```
-
-The default mode uses a simple lexical baseline with no provider call. It tests accounting and target grading; a poor score is an honest diagnostic result, not a model-quality measurement. A nonzero exit means the declared target expectations were not all met. The imported inventory stays complete even when the run samples only eligible cases. Select another split explicitly and use a new output directory for each run; source splits are not silently mixed. To process all eligible cases in a selected split, set `--limit` to its eligible count, within the runner's documented bound; inspect the written plan before treating a sampled report as whole-split evidence.
-
-Offline live runs accept `--prompt-variant baseline` (default) or `--prompt-variant intent-cardinality`. The latter appends one experimental clarification: multiple words or alternative matches for a single target description do not request multiple targets. Explicit plural requests and genuine ambiguity retain their existing behavior. It changes only the versioned system prompt, not the original instruction, candidate payload, schema or production defaults. The prepared request, sent request and retained configuration share that prompt and its version. Deterministic lexical runs reject experimental variants because they do not execute a model prompt. The [recorded paired confirmation](research/labelled-prompt-comparison-report.md) did not confirm improvement from `intent-cardinality`, so the baseline remains selected. Preserve that negative result and replay its evidence instead of repeating paid calls.
-
-Use this only after choosing a model from the common-baseline comparison. Reuse original development baseline attempts, freeze a family-diverse tuning subset and run each new variant once per case. Confirm baseline versus the chosen variant on separately frozen, unexposed labelled families; do not tune from those confirmation outputs. Existing privacy reviews, standard provider profiles and the shared accounting ledger remain required; provider key limits control spending. Original target labels do not establish action/readiness correctness or app-wide qualification. See [issue #34](https://github.com/Mochib-Tech-Solutions/xpathed/issues/34).
-
-These source adapters support **offline target selection**. Rebuilding a DOM from processed nodes can validate mapping and XPath identity in that derivative document, but it does not reproduce historical geometry, visibility, hit testing or readiness. Browser replay and offline scores stay separate. No source record becomes a successful browser case merely because its synthetic rendering loads. Missing assets, unsupported scope, ambiguous labels and adaptation failures remain in the denominator report.
-
-For a PhraseNode identity check, `evaluation/reconstruction.mjs` creates a sanitized static tree and a unique original-node-to-selector mapping. It verifies imported-case, command, page and candidate-input checksums, confines source paths to the supplied root, removes scripts/assets/form values and rejects parser changes that break the mapping. Regenerate the Home pilot from the pinned import with:
-
-```sh
-node evaluation/reconstruction.mjs --import .artifacts/datasets/phrasenode-import --source-root .artifacts/datasets/sources --case phrasenode-666c99296b76c2f02bb28f50 --output .artifacts/datasets/phrasenode-browser-suite.json
-pnpm evaluate --suite .artifacts/datasets/phrasenode-browser-suite.json --output .artifacts/evaluation/phrasenode-derived-pilot
-```
-
-The output must be a new private file. Construction validates source identity automatically; it does not claim independent human label review. The provider double uses a controlled click probe, recorded as `actionLabelSource: controlled-browser-probe`; PhraseNode does not supply an annotated action. Its original instruction and target remain unchanged. Custom suites support deterministic mode only. Report these trials as derivative DOM identity checks with historical state unavailable, not model quality or source action accuracy.
-
-### Explicit live dataset pilot
-
-Restore dependencies with `pnpm restore:dotnet`. The live runner builds the current Resolver before freezing its manifest and invokes its offline selection entrypoint and existing gateway, without starting the application stack. It sends sanitized command/candidate input, not target-oracle fields. The offline dataset runner defaults to standard DeepSeek V4.1 Flash through Wafer. The explicit dataset `--profile deepseek-deepinfra` uses standard DeepInfra FP8 with the same model, baseline prompt and reasoning/output settings; retain it as a separate provider cohort, never pool it into prior Wafer measurements or add it to the browser qualification matrix implicitly. `--profile qwen` or `--profile gemini` selects the same approved baseline settings as the browser matrix, using the shared budget proxy. The offline-only `--profile luna-azure` keeps Luna's baseline prompt, reasoning `none`, explicit cache mode and output limit, while pinning Azure. The budget proxy maps the frozen output cap to Azure's advertised `max_completion_tokens`; forecasting, exact-request binding and reservations use that same normalized request. Conflicting cap aliases fail before inference. Keep Azure results separate from OpenAI results; adding this route does not establish provider stability or qualify it for release. The model profile remains separate from the explicitly selected offline prompt variant. Each profile uses a separate output directory and the same reviewed sample/seed for comparison. The browser matrix evaluates controlled cases; offline source results remain a separate track. Offline elapsed time includes input preparation and .NET process startup, with provider timing reported separately; neither establishes browser or UI response latency.
-
-Review each complete instruction/candidate payload before provider submission. Sanitization removes known form values and prunes frame and explicitly concealed subtree text before collecting ancestor text. Ordinary page text can still contain personal account details, location or search history. Public dataset availability does not make every captured page suitable for submission. Keep the review file private under `.artifacts/datasets/`; do not upload raw assets or payloads to CI or the repository.
-
-The required `--reviewed-inputs` file has `version: 1` and an `entries` array. Each entry records `caseId`, `inputHash`, `reviewer`, an ISO `reviewedAt` timestamp and `providerSubmission: true`. Compute `inputHash` as SHA-256 of `JSON.stringify({ instruction: case.instruction, ...input })`, where `input` is the parsed imported input file. The runner selects only reviewed cases in the requested split and verifies their exact payload hashes before any provider call; changing the command or candidates requires a new review.
-
-For forecasted batches, also pass `--prepared-plan PATH`. This private JSON has `version: 1`, `profileId`, `promptVariant` and an `entries` array containing `caseId`, `inputHash`, `requestSha256` and `maximumUsd` (a finite positive estimate, or null when unavailable under provider-limit accounting). Its case set must exactly match the selected batch and its input hashes must match the submission review. Prepare each request with the offline `--prepare-only` entrypoint: clone `effective.request`, set `messages[1].content` to `modelInput`, and set `stream` to `false`; `requestSha256` is SHA-256 of its `JSON.stringify` bytes. Obtain each estimate from the shared proxy's exact-request forecast. The runner checks regenerated requests against those hashes, and the proxy checks actual normalized request identity before recording the estimate and forwarding. Changed instructions, prompts, schemas or models fail closed; forecast-cost differences are retained as accounting observations under the provider-limit policy. The manifest retains the complete prepared plan for replay evidence. This optional plan binds a reviewed batch to its forecast; the shared accounting ledger remains authoritative for every live run.
-
-Deduplicate prepared requests before paid expansion, including matches to earlier attempts under another source record ID. Retain duplicate and review exclusions separately from model failures. The [expanded original-labelled evaluation](research/expanded-labelled-evaluation-report.md) records its frozen selection, review and partial Wafer coverage; the [completed DeepInfra baseline and provider comparison](research/deepinfra-labelled-baseline-report.md) records the separately authorized full measurement. Source-only results remain separate from the current-view browser baseline.
-
-```sh
-pnpm evaluate:dataset --import .artifacts/datasets/phrasenode-import --output .artifacts/datasets/phrasenode-qwen-pilot --split dev --mode live --profile qwen --limit 10 --reviewed-inputs .artifacts/datasets/phrasenode-reviewed-inputs.json
-```
-
-New live research and statistics runs use **provider-limit accounting**: the configured OpenRouter evaluation key controls available credit. There is no additional local campaign ceiling, Jev sub-cap, key-reset restriction or remaining-credit gate. The maintainer explicitly replaced the former $10 policy on 2026-10-01; older reports and ledger entries retain their original ceilings and results. See [ADR-0019](adr/0019-use-provider-key-limits-for-evaluation.md). The app key remains separate. No scheduled paid job is enabled.
-
-The existing authoritative ledger is retained, with `budgetPolicy: "provider-limit"` recording the policy change. Its historical `ceilingUsd` is not an active gate; current reports expose no local ceiling or remaining allowance. Every reported charge, unknown reservation and historical review remains visible. Missing reported cost stays null, with its forecast/reservation shown separately. Proven unsent reservations retain `reportedUsd:null` and explicit `not_forwarded` status, outside unknown provider-charge totals. A cost estimate is never substituted for a provider-reported charge. Monetary forecasts, missing usage and charges above estimates do not stop a run solely on financial grounds.
-
-Keep consumption modest through the experiment design: freeze a representative reviewed pilot, run one attempt per case/approach, retain failures and forecast the remainder from actual usage. Do not repeat paid cases to improve a score, silently add retries, launch a full model-by-prompt-by-corpus matrix or expand a clearly unhelpful experiment. Preserve original source instructions and labels; no invented paraphrases, viewport labels or action labels. Cases excluded during review retain their reasons. Source-quality results remain separate from authored browser behavior and qualification.
-
-Standard model/provider identity, disabled response reuse, fixed input/output bounds and prepared-request hashes remain enforced. The proxy saves cost evidence before/after each call and retains generation-ID headers when available for bounded metadata recovery. A failed completion stays failed even if its charge is recovered. Unknown billing no longer needs a financial approval to continue, but loss of durable evidence, wrong identity and integrity failures still stop the run. Keep the ledger when removing temporary run directories; deleting it would erase accounting. Historical local-ceiling mode remains readable for old evidence and tests, not the default for new research.
-
-## Artifacts and replay
-
-Each run writes:
-
-- `manifest.json`: the complete selected case definitions, declared trial order/settings, code/tree and dependency fingerprints, versions and incomplete qualification policy. Its configuration registry retains effective nonsecret gateway settings and prompt/schema hashes by configuration ID independently of expiring page evidence; it is enriched atomically as attempts finish.
-- `trials/<attempt>.json`: each original result or operational failure, observations and permitted evidence, including separate mutation/fresh-resolution results.
-- `summary.json`: separate grading and coverage results, timing/usage/cost aggregates and qualification status.
-- `summary.txt`: a readable report of the same run.
-- `imports/<attempt>.json`: version-1 diagnostic envelopes accepted by the [backend import contract](diagnostics.md).
-
-```sh
-pnpm evaluate:replay .artifacts/evaluation/RUN_DIRECTORY
-pnpm diagnostics -- import < .artifacts/evaluation/RUN_DIRECTORY/imports/ATTEMPT_ID.json
-```
-
-Replay regrades the saved manifest and observations with the recorded grader revision. It uses no Docker, browser or provider. This reproduces a report from saved evidence; it does not reconstruct the historical browser or prove the saved XPath works on today's page. A mismatched manifest or grader is rejected, and missing planned trials remain failures.
-
-Artifacts carry the ordinary 90-day and page-evidence 30-day retention policy. Backend imports enforce those bounds. Local artifact directories remain operator-owned. The deterministic browser CI job uploads only its controlled-fixture run and log as private artifacts for 30 days; SHA/job receipts and the aggregate decision remain for 90 days. That automatic deterministic CI job does not upload dataset assets, local experiments or paid-run evidence. The separate manual release workflow retains its private qualification evidence for 30 days. See the [CI runbook](ci.md). Run `node evaluation/run.mjs --prune RUN_DIRECTORY` for either browser or dataset run artifacts to remove expired evidence after 30 days or the complete run after 90 days. Cleanup is explicitly invoked; there is no local retention daemon. Deleting the entire local run within 30 days is a conservative option when separate evidence retention is unnecessary. Source downloads and dataset import directories are separate private caches; prune does not discover them. Remove them after the experiment or within the page-evidence window unless an explicit reviewed retention decision covers them. Keep the experiment charge ledger separately. Approved sanitized regression fixtures and qualification evidence require explicit review and retention decisions.
-
-## Checks and limits
-
-The ordinary evaluator exits nonzero when declared deterministic identity/privacy/contract checks fail. Its zero exit means those checks passed and does not approve a release. The separate model qualification runner applies the versioned policy above and can record a completed experiment with no qualifying model. Unknown and missing observations remain explicit.
-
-`pnpm check:tooling` runs Node tests for acquisition, adapters, runners, fixtures and grading, including negative controls. Evaluation source and manifest changes select that existing CI job. Tests use local synthetic samples, not source-corpus downloads or paid providers. Compose overlays are validated by the Docker configuration job. A separate CI job starts only Browser, Resolver and the evaluation fixture for the complete deterministic suite. Its saved evidence is replayed by the aggregate gate. PR/push CI makes no paid calls. Manual release qualification can use the dedicated key and authoritative campaign ledger; live mode and model comparisons remain explicit. Future release/quality gates remain governed by the live issue tracker.
-
+After a new approval, nightly monitoring runs the entire approved live collection once against the exact approved images and compares with saved approval measurements. It uses one arm, preserves lost passes and operational failures, and never activates a release or changes the model. New cases enter monitoring only with the next approval. The existing `v1.0.0` approval continues through its archived runner and original sentinel receipt until a new-format approval replaces it. See [monitoring](releases.md#nightly-monitoring).

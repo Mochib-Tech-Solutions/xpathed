@@ -1,0 +1,2092 @@
+[
+  {
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "setupRevision": "release-current-view-3",
+    "contractVersion": "4",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-release-label-review",
+      "reviewedAt": "2026-10-02T10:54:07.294887+00:00"
+    },
+    "labelProvenance": {
+      "kind": "controlled-authored",
+      "modelExposure": "Reserved for live qualification 37000295638; retained as regression without relabeling",
+      "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
+      "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt10-reviewed-holdout-check"
+    },
+    "id": "release3-radio-1",
+    "family": "release3-radio",
+    "split": "regression",
+    "category": "current-view",
+    "fixture": "release3-radio",
+    "instruction": "Select the Monthly digest radio option.",
+    "expected": {
+      "outcome": "found",
+      "actions": [
+        {
+          "step": 1,
+          "action": "check",
+          "outcome": "found",
+          "target": {
+            "selector": "#monthly",
+            "frames": []
+          },
+          "state": {
+            "inViewport": true,
+            "enabled": true
+          },
+          "interactability": {
+            "status": "unsupported",
+            "reasons": ["custom_control_unverified"]
+          }
+        }
+      ],
+      "summary": {
+        "processingComplete": true
+      }
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "check",
+          "outcome": "found",
+          "label": "Monthly digest",
+          "tag": "div"
+        }
+      ]
+    },
+    "previousSplit": "held-out",
+    "exposureRunId": "37000295638",
+    "exposedAt": "2026-10-02T11:36:32.165Z",
+    "sourceSplit": "regression",
+    "sourceCatalogs": ["current-view-qualification-cases.json"],
+    "group": "state"
+  },
+  {
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "setupRevision": "release-current-view-3",
+    "contractVersion": "4",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-release-label-review",
+      "reviewedAt": "2026-10-02T10:54:07.294887+00:00"
+    },
+    "labelProvenance": {
+      "kind": "controlled-authored",
+      "modelExposure": "Reserved for live qualification 37000295638; retained as regression without relabeling",
+      "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
+      "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt10-reviewed-holdout-check"
+    },
+    "id": "release3-radio-2",
+    "family": "release3-radio",
+    "split": "regression",
+    "category": "current-view",
+    "fixture": "release3-radio",
+    "instruction": "Inspect the Weekly digest radio option.",
+    "expected": {
+      "outcome": "found",
+      "actions": [
+        {
+          "step": 1,
+          "action": "inspect",
+          "outcome": "found",
+          "target": {
+            "selector": "#weekly",
+            "frames": []
+          },
+          "state": {
+            "inViewport": true,
+            "enabled": true
+          },
+          "interactability": {
+            "status": "ready"
+          }
+        }
+      ],
+      "summary": {
+        "processingComplete": true
+      }
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "inspect",
+          "outcome": "found",
+          "label": "Weekly digest",
+          "tag": "div"
+        }
+      ]
+    },
+    "previousSplit": "held-out",
+    "exposureRunId": "37000295638",
+    "exposedAt": "2026-10-02T11:36:32.165Z",
+    "sourceSplit": "regression",
+    "sourceCatalogs": ["current-view-qualification-cases.json"],
+    "group": "state"
+  },
+  {
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "setupRevision": "release-current-view-3",
+    "contractVersion": "4",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-release-label-review",
+      "reviewedAt": "2026-10-02T10:54:07.294887+00:00"
+    },
+    "labelProvenance": {
+      "kind": "controlled-authored",
+      "modelExposure": "Reserved for live qualification 37000295638; retained as regression without relabeling",
+      "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
+      "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt10-reviewed-holdout-check"
+    },
+    "id": "release3-radio-3",
+    "family": "release3-radio",
+    "split": "regression",
+    "category": "current-view",
+    "fixture": "release3-radio",
+    "instruction": "Click the Instant digest radio option.",
+    "expected": {
+      "outcome": "found",
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "target": {
+            "selector": "#instant",
+            "frames": []
+          },
+          "state": {
+            "inViewport": true,
+            "enabled": false
+          },
+          "interactability": {
+            "status": "blocked"
+          }
+        }
+      ],
+      "summary": {
+        "processingComplete": true
+      }
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "label": "Instant digest",
+          "tag": "div"
+        }
+      ]
+    },
+    "previousSplit": "held-out",
+    "exposureRunId": "37000295638",
+    "exposedAt": "2026-10-02T11:36:32.165Z",
+    "sourceSplit": "regression",
+    "sourceCatalogs": ["current-view-qualification-cases.json"],
+    "group": "state"
+  },
+  {
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "setupRevision": "release-current-view-3",
+    "contractVersion": "4",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-release-label-review",
+      "reviewedAt": "2026-10-02T10:54:07.294887+00:00"
+    },
+    "labelProvenance": {
+      "kind": "controlled-authored",
+      "modelExposure": "Reserved for live qualification 37000295638; retained as regression without relabeling",
+      "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
+      "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt10-reviewed-holdout-check"
+    },
+    "id": "release3-listbox-1",
+    "family": "release3-listbox",
+    "split": "regression",
+    "category": "current-view",
+    "fixture": "release3-listbox",
+    "instruction": "Click the Greek option in Available languages.",
+    "expected": {
+      "outcome": "found",
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "target": {
+            "selector": "#greek",
+            "frames": []
+          },
+          "state": {
+            "inViewport": true,
+            "enabled": true
+          },
+          "interactability": {
+            "status": "ready"
+          }
+        }
+      ],
+      "summary": {
+        "processingComplete": true
+      }
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "label": "Greek",
+          "tag": "div"
+        }
+      ]
+    },
+    "previousSplit": "held-out",
+    "exposureRunId": "37000295638",
+    "exposedAt": "2026-10-02T11:36:32.165Z",
+    "sourceSplit": "regression",
+    "sourceCatalogs": ["current-view-qualification-cases.json"],
+    "group": "state"
+  },
+  {
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "setupRevision": "release-current-view-3",
+    "contractVersion": "4",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-release-label-review",
+      "reviewedAt": "2026-10-02T10:54:07.294887+00:00"
+    },
+    "labelProvenance": {
+      "kind": "controlled-authored",
+      "modelExposure": "Reserved for live qualification 37000295638; retained as regression without relabeling",
+      "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
+      "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt10-reviewed-holdout-check"
+    },
+    "id": "release3-listbox-2",
+    "family": "release3-listbox",
+    "split": "regression",
+    "category": "current-view",
+    "fixture": "release3-listbox",
+    "instruction": "Inspect all options in Available languages.",
+    "expected": {
+      "outcome": "found",
+      "actions": [
+        {
+          "step": 1,
+          "action": "inspect",
+          "outcome": "found",
+          "target": {
+            "selector": "#finnish",
+            "frames": []
+          },
+          "state": {
+            "inViewport": true,
+            "enabled": true
+          },
+          "interactability": {
+            "status": "ready"
+          }
+        },
+        {
+          "step": 1,
+          "action": "inspect",
+          "outcome": "found",
+          "target": {
+            "selector": "#greek",
+            "frames": []
+          },
+          "state": {
+            "inViewport": true,
+            "enabled": true
+          },
+          "interactability": {
+            "status": "ready"
+          }
+        },
+        {
+          "step": 1,
+          "action": "inspect",
+          "outcome": "found",
+          "target": {
+            "selector": "#korean",
+            "frames": []
+          },
+          "state": {
+            "inViewport": true,
+            "enabled": true
+          },
+          "interactability": {
+            "status": "ready"
+          }
+        }
+      ],
+      "summary": {
+        "processingComplete": true
+      }
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "inspect",
+          "outcome": "found",
+          "label": "Finnish",
+          "tag": "div"
+        },
+        {
+          "step": 1,
+          "action": "inspect",
+          "outcome": "found",
+          "label": "Greek",
+          "tag": "div"
+        },
+        {
+          "step": 1,
+          "action": "inspect",
+          "outcome": "found",
+          "label": "Korean",
+          "tag": "div"
+        }
+      ]
+    },
+    "previousSplit": "held-out",
+    "exposureRunId": "37000295638",
+    "exposedAt": "2026-10-02T11:36:32.165Z",
+    "sourceSplit": "regression",
+    "sourceCatalogs": ["current-view-qualification-cases.json"],
+    "group": "state"
+  },
+  {
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "setupRevision": "release-current-view-3",
+    "contractVersion": "4",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-release-label-review",
+      "reviewedAt": "2026-10-02T10:54:07.294887+00:00"
+    },
+    "labelProvenance": {
+      "kind": "controlled-authored",
+      "modelExposure": "Reserved for live qualification 37000295638; retained as regression without relabeling",
+      "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
+      "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt10-reviewed-holdout-check"
+    },
+    "id": "release3-listbox-3",
+    "family": "release3-listbox",
+    "split": "regression",
+    "category": "current-view",
+    "fixture": "release3-listbox",
+    "instruction": "Click the Swedish option in Available languages.",
+    "expected": {
+      "outcome": "not_found",
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "not_found"
+        }
+      ],
+      "summary": {
+        "processingComplete": true
+      }
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "not_found"
+        }
+      ]
+    },
+    "previousSplit": "held-out",
+    "exposureRunId": "37000295638",
+    "exposedAt": "2026-10-02T11:36:32.165Z",
+    "sourceSplit": "regression",
+    "sourceCatalogs": ["current-view-qualification-cases.json"],
+    "group": "state"
+  },
+  {
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "setupRevision": "release-current-view-3",
+    "contractVersion": "4",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-release-label-review",
+      "reviewedAt": "2026-10-02T10:54:07.294887+00:00"
+    },
+    "labelProvenance": {
+      "kind": "controlled-authored",
+      "modelExposure": "Reserved for live qualification 37000295638; retained as regression without relabeling",
+      "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
+      "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt10-reviewed-holdout-check"
+    },
+    "id": "release3-spin-1",
+    "family": "release3-spin",
+    "split": "regression",
+    "category": "current-view",
+    "fixture": "release3-spin",
+    "instruction": "Fill Print copies with 4.",
+    "expected": {
+      "outcome": "found",
+      "actions": [
+        {
+          "step": 1,
+          "action": "fill",
+          "outcome": "found",
+          "target": {
+            "selector": "#copies",
+            "frames": []
+          },
+          "state": {
+            "inViewport": true,
+            "enabled": true
+          },
+          "interactability": {
+            "status": "unknown"
+          }
+        }
+      ],
+      "summary": {
+        "processingComplete": true
+      }
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "fill",
+          "outcome": "found",
+          "label": "Print copies",
+          "tag": "input"
+        }
+      ]
+    },
+    "previousSplit": "held-out",
+    "exposureRunId": "37000295638",
+    "exposedAt": "2026-10-02T11:36:32.165Z",
+    "sourceSplit": "regression",
+    "sourceCatalogs": ["current-view-qualification-cases.json"],
+    "group": "state"
+  },
+  {
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "setupRevision": "release-current-view-3",
+    "contractVersion": "4",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-release-label-review",
+      "reviewedAt": "2026-10-02T10:54:07.294887+00:00"
+    },
+    "labelProvenance": {
+      "kind": "controlled-authored",
+      "modelExposure": "Reserved for live qualification 37000295638; retained as regression without relabeling",
+      "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
+      "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt10-reviewed-holdout-check"
+    },
+    "id": "release3-spin-2",
+    "family": "release3-spin",
+    "split": "regression",
+    "category": "current-view",
+    "fixture": "release3-spin",
+    "instruction": "Click Reserved copies.",
+    "expected": {
+      "outcome": "found",
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "target": {
+            "selector": "#reserved",
+            "frames": []
+          },
+          "state": {
+            "inViewport": true,
+            "enabled": false
+          },
+          "interactability": {
+            "status": "blocked"
+          }
+        }
+      ],
+      "summary": {
+        "processingComplete": true
+      }
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "label": "Reserved copies",
+          "tag": "input"
+        }
+      ]
+    },
+    "previousSplit": "held-out",
+    "exposureRunId": "37000295638",
+    "exposedAt": "2026-10-02T11:36:32.165Z",
+    "sourceSplit": "regression",
+    "sourceCatalogs": ["current-view-qualification-cases.json"],
+    "group": "state"
+  },
+  {
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "setupRevision": "release-current-view-3",
+    "contractVersion": "4",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-release-label-review",
+      "reviewedAt": "2026-10-02T10:54:07.294887+00:00"
+    },
+    "labelProvenance": {
+      "kind": "controlled-authored",
+      "modelExposure": "Reserved for live qualification 37000295638; retained as regression without relabeling",
+      "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
+      "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt10-reviewed-holdout-check"
+    },
+    "id": "release3-spin-3",
+    "family": "release3-spin",
+    "split": "regression",
+    "category": "current-view",
+    "fixture": "release3-spin",
+    "instruction": "Focus Print copies.",
+    "expected": {
+      "outcome": "found",
+      "actions": [
+        {
+          "step": 1,
+          "action": "focus",
+          "outcome": "found",
+          "target": {
+            "selector": "#copies",
+            "frames": []
+          },
+          "state": {
+            "inViewport": true,
+            "enabled": true
+          },
+          "interactability": {
+            "status": "unknown"
+          }
+        }
+      ],
+      "summary": {
+        "processingComplete": true
+      }
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "focus",
+          "outcome": "found",
+          "label": "Print copies",
+          "tag": "input"
+        }
+      ]
+    },
+    "previousSplit": "held-out",
+    "exposureRunId": "37000295638",
+    "exposedAt": "2026-10-02T11:36:32.165Z",
+    "sourceSplit": "regression",
+    "sourceCatalogs": ["current-view-qualification-cases.json"],
+    "group": "state"
+  },
+  {
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "setupRevision": "release-current-view-3",
+    "contractVersion": "4",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-release-label-review",
+      "reviewedAt": "2026-10-02T10:54:07.294887+00:00"
+    },
+    "labelProvenance": {
+      "kind": "controlled-authored",
+      "modelExposure": "Reserved for live qualification 37000295638; retained as regression without relabeling",
+      "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
+      "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt10-reviewed-holdout-check"
+    },
+    "id": "release3-switch-1",
+    "family": "release3-switch",
+    "split": "regression",
+    "category": "current-view",
+    "fixture": "release3-switch",
+    "instruction": "Click the SMS alerts switch.",
+    "expected": {
+      "outcome": "found",
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "target": {
+            "selector": "#sms-alerts",
+            "frames": []
+          },
+          "state": {
+            "inViewport": true,
+            "enabled": true
+          },
+          "interactability": {
+            "status": "ready"
+          }
+        }
+      ],
+      "summary": {
+        "processingComplete": true
+      }
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "label": "SMS alerts",
+          "tag": "button"
+        }
+      ]
+    },
+    "previousSplit": "held-out",
+    "exposureRunId": "37000295638",
+    "exposedAt": "2026-10-02T11:36:32.165Z",
+    "sourceSplit": "regression",
+    "sourceCatalogs": ["current-view-qualification-cases.json"],
+    "group": "state"
+  },
+  {
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "setupRevision": "release-current-view-3",
+    "contractVersion": "4",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-release-label-review",
+      "reviewedAt": "2026-10-02T10:54:07.294887+00:00"
+    },
+    "labelProvenance": {
+      "kind": "controlled-authored",
+      "modelExposure": "Reserved for live qualification 37000295638; retained as regression without relabeling",
+      "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
+      "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt10-reviewed-holdout-check"
+    },
+    "id": "release3-switch-2",
+    "family": "release3-switch",
+    "split": "regression",
+    "category": "current-view",
+    "fixture": "release3-switch",
+    "instruction": "Inspect all switches in Channel alerts.",
+    "expected": {
+      "outcome": "found",
+      "actions": [
+        {
+          "step": 1,
+          "action": "inspect",
+          "outcome": "found",
+          "target": {
+            "selector": "#push-alerts",
+            "frames": []
+          },
+          "state": {
+            "inViewport": true,
+            "enabled": true
+          },
+          "interactability": {
+            "status": "ready"
+          }
+        },
+        {
+          "step": 1,
+          "action": "inspect",
+          "outcome": "found",
+          "target": {
+            "selector": "#sms-alerts",
+            "frames": []
+          },
+          "state": {
+            "inViewport": true,
+            "enabled": true
+          },
+          "interactability": {
+            "status": "ready"
+          }
+        }
+      ],
+      "summary": {
+        "processingComplete": true
+      }
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "inspect",
+          "outcome": "found",
+          "label": "Push alerts",
+          "tag": "button"
+        },
+        {
+          "step": 1,
+          "action": "inspect",
+          "outcome": "found",
+          "label": "SMS alerts",
+          "tag": "button"
+        }
+      ]
+    },
+    "previousSplit": "held-out",
+    "exposureRunId": "37000295638",
+    "exposedAt": "2026-10-02T11:36:32.165Z",
+    "sourceSplit": "regression",
+    "sourceCatalogs": ["current-view-qualification-cases.json"],
+    "group": "state"
+  },
+  {
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "setupRevision": "release-current-view-3",
+    "contractVersion": "4",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-release-label-review",
+      "reviewedAt": "2026-10-02T10:54:07.294887+00:00"
+    },
+    "labelProvenance": {
+      "kind": "controlled-authored",
+      "modelExposure": "Reserved for live qualification 37000295638; retained as regression without relabeling",
+      "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
+      "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt10-reviewed-holdout-check"
+    },
+    "id": "release3-switch-3",
+    "family": "release3-switch",
+    "split": "regression",
+    "category": "current-view",
+    "fixture": "release3-switch",
+    "instruction": "Click the Fax alerts switch.",
+    "expected": {
+      "outcome": "not_found",
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "not_found"
+        }
+      ],
+      "summary": {
+        "processingComplete": true
+      }
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "not_found"
+        }
+      ]
+    },
+    "previousSplit": "held-out",
+    "exposureRunId": "37000295638",
+    "exposedAt": "2026-10-02T11:36:32.165Z",
+    "sourceSplit": "regression",
+    "sourceCatalogs": ["current-view-qualification-cases.json"],
+    "group": "state"
+  },
+  {
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "setupRevision": "release-current-view-3",
+    "contractVersion": "4",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-release-label-review",
+      "reviewedAt": "2026-10-02T10:54:07.294887+00:00"
+    },
+    "labelProvenance": {
+      "kind": "controlled-authored",
+      "modelExposure": "Reserved for live qualification 37000295638; retained as regression without relabeling",
+      "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
+      "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt10-reviewed-holdout-check"
+    },
+    "id": "release3-richtext-1",
+    "family": "release3-richtext",
+    "split": "regression",
+    "category": "current-view",
+    "fixture": "release3-richtext",
+    "instruction": "Fill the Public biography textbox with Hello.",
+    "expected": {
+      "outcome": "found",
+      "actions": [
+        {
+          "step": 1,
+          "action": "fill",
+          "outcome": "found",
+          "target": {
+            "selector": "#bio",
+            "frames": []
+          },
+          "state": {
+            "inViewport": true,
+            "enabled": true
+          },
+          "interactability": {
+            "status": "unknown"
+          }
+        }
+      ],
+      "summary": {
+        "processingComplete": true
+      }
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "fill",
+          "outcome": "found",
+          "label": "Public biography",
+          "tag": "div"
+        }
+      ]
+    },
+    "previousSplit": "held-out",
+    "exposureRunId": "37000295638",
+    "exposedAt": "2026-10-02T11:36:32.165Z",
+    "sourceSplit": "regression",
+    "sourceCatalogs": ["current-view-qualification-cases.json"],
+    "group": "state"
+  },
+  {
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "setupRevision": "release-current-view-3",
+    "contractVersion": "4",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-release-label-review",
+      "reviewedAt": "2026-10-02T10:54:07.294887+00:00"
+    },
+    "labelProvenance": {
+      "kind": "controlled-authored",
+      "modelExposure": "Reserved for live qualification 37000295638; retained as regression without relabeling",
+      "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
+      "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt10-reviewed-holdout-check"
+    },
+    "id": "release3-richtext-2",
+    "family": "release3-richtext",
+    "split": "regression",
+    "category": "current-view",
+    "fixture": "release3-richtext",
+    "instruction": "Clear the Signature line textbox.",
+    "expected": {
+      "outcome": "found",
+      "actions": [
+        {
+          "step": 1,
+          "action": "clear",
+          "outcome": "found",
+          "target": {
+            "selector": "#signature",
+            "frames": []
+          },
+          "state": {
+            "inViewport": true,
+            "enabled": true
+          },
+          "interactability": {
+            "status": "unknown"
+          }
+        }
+      ],
+      "summary": {
+        "processingComplete": true
+      }
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "clear",
+          "outcome": "found",
+          "label": "Signature line",
+          "tag": "div"
+        }
+      ]
+    },
+    "previousSplit": "held-out",
+    "exposureRunId": "37000295638",
+    "exposedAt": "2026-10-02T11:36:32.165Z",
+    "sourceSplit": "regression",
+    "sourceCatalogs": ["current-view-qualification-cases.json"],
+    "group": "state"
+  },
+  {
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "setupRevision": "release-current-view-3",
+    "contractVersion": "4",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-release-label-review",
+      "reviewedAt": "2026-10-02T10:54:07.294887+00:00"
+    },
+    "labelProvenance": {
+      "kind": "controlled-authored",
+      "modelExposure": "Reserved for live qualification 37000295638; retained as regression without relabeling",
+      "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
+      "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt10-reviewed-holdout-check"
+    },
+    "id": "release3-richtext-3",
+    "family": "release3-richtext",
+    "split": "regression",
+    "category": "current-view",
+    "fixture": "release3-richtext",
+    "instruction": "Focus the Public biography textbox.",
+    "expected": {
+      "outcome": "found",
+      "actions": [
+        {
+          "step": 1,
+          "action": "focus",
+          "outcome": "found",
+          "target": {
+            "selector": "#bio",
+            "frames": []
+          },
+          "state": {
+            "inViewport": true,
+            "enabled": true
+          },
+          "interactability": {
+            "status": "unknown"
+          }
+        }
+      ],
+      "summary": {
+        "processingComplete": true
+      }
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "focus",
+          "outcome": "found",
+          "label": "Public biography",
+          "tag": "div"
+        }
+      ]
+    },
+    "previousSplit": "held-out",
+    "exposureRunId": "37000295638",
+    "exposedAt": "2026-10-02T11:36:32.165Z",
+    "sourceSplit": "regression",
+    "sourceCatalogs": ["current-view-qualification-cases.json"],
+    "group": "state"
+  },
+  {
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "setupRevision": "release-current-view-3",
+    "contractVersion": "4",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-release-label-review",
+      "reviewedAt": "2026-10-02T10:54:07.294887+00:00"
+    },
+    "labelProvenance": {
+      "kind": "controlled-authored",
+      "modelExposure": "Reserved for live qualification 37000295638; retained as regression without relabeling",
+      "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
+      "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt10-reviewed-holdout-check"
+    },
+    "id": "release3-slider-1",
+    "family": "release3-slider",
+    "split": "regression",
+    "category": "current-view",
+    "fixture": "release3-slider",
+    "instruction": "Focus the Music volume slider.",
+    "expected": {
+      "outcome": "found",
+      "actions": [
+        {
+          "step": 1,
+          "action": "focus",
+          "outcome": "found",
+          "target": {
+            "selector": "#music-volume",
+            "frames": []
+          },
+          "state": {
+            "inViewport": true,
+            "enabled": true
+          },
+          "interactability": {
+            "status": "unknown"
+          }
+        }
+      ],
+      "summary": {
+        "processingComplete": true
+      }
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "focus",
+          "outcome": "found",
+          "label": "Music volume",
+          "tag": "input"
+        }
+      ]
+    },
+    "previousSplit": "held-out",
+    "exposureRunId": "37000295638",
+    "exposedAt": "2026-10-02T11:36:32.165Z",
+    "sourceSplit": "regression",
+    "sourceCatalogs": ["current-view-qualification-cases.json"],
+    "group": "state"
+  },
+  {
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "setupRevision": "release-current-view-3",
+    "contractVersion": "4",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-release-label-review",
+      "reviewedAt": "2026-10-02T10:54:07.294887+00:00"
+    },
+    "labelProvenance": {
+      "kind": "controlled-authored",
+      "modelExposure": "Reserved for live qualification 37000295638; retained as regression without relabeling",
+      "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
+      "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt10-reviewed-holdout-check"
+    },
+    "id": "release3-slider-2",
+    "family": "release3-slider",
+    "split": "regression",
+    "category": "current-view",
+    "fixture": "release3-slider",
+    "instruction": "Click the Voice volume slider.",
+    "expected": {
+      "outcome": "found",
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "target": {
+            "selector": "#voice-volume",
+            "frames": []
+          },
+          "state": {
+            "inViewport": true,
+            "enabled": false
+          },
+          "interactability": {
+            "status": "blocked"
+          }
+        }
+      ],
+      "summary": {
+        "processingComplete": true
+      }
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "label": "Voice volume",
+          "tag": "input"
+        }
+      ]
+    },
+    "previousSplit": "held-out",
+    "exposureRunId": "37000295638",
+    "exposedAt": "2026-10-02T11:36:32.165Z",
+    "sourceSplit": "regression",
+    "sourceCatalogs": ["current-view-qualification-cases.json"],
+    "group": "state"
+  },
+  {
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "setupRevision": "release-current-view-3",
+    "contractVersion": "4",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-release-label-review",
+      "reviewedAt": "2026-10-02T10:54:07.294887+00:00"
+    },
+    "labelProvenance": {
+      "kind": "controlled-authored",
+      "modelExposure": "Reserved for live qualification 37000295638; retained as regression without relabeling",
+      "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
+      "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt10-reviewed-holdout-check"
+    },
+    "id": "release3-slider-3",
+    "family": "release3-slider",
+    "split": "regression",
+    "category": "current-view",
+    "fixture": "release3-slider",
+    "instruction": "Inspect all sliders in Sound levels.",
+    "expected": {
+      "outcome": "found",
+      "actions": [
+        {
+          "step": 1,
+          "action": "inspect",
+          "outcome": "found",
+          "target": {
+            "selector": "#music-volume",
+            "frames": []
+          },
+          "state": {
+            "inViewport": true,
+            "enabled": true
+          },
+          "interactability": {
+            "status": "ready"
+          }
+        },
+        {
+          "step": 1,
+          "action": "inspect",
+          "outcome": "found",
+          "target": {
+            "selector": "#voice-volume",
+            "frames": []
+          },
+          "state": {
+            "inViewport": true,
+            "enabled": false
+          },
+          "interactability": {
+            "status": "ready"
+          }
+        }
+      ],
+      "summary": {
+        "processingComplete": true
+      }
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "inspect",
+          "outcome": "found",
+          "label": "Music volume",
+          "tag": "input"
+        },
+        {
+          "step": 1,
+          "action": "inspect",
+          "outcome": "found",
+          "label": "Voice volume",
+          "tag": "input"
+        }
+      ]
+    },
+    "previousSplit": "held-out",
+    "exposureRunId": "37000295638",
+    "exposedAt": "2026-10-02T11:36:32.165Z",
+    "sourceSplit": "regression",
+    "sourceCatalogs": ["current-view-qualification-cases.json"],
+    "group": "state"
+  },
+  {
+    "id": "release4-optgroups-1",
+    "family": "release4-optgroups",
+    "split": "regression",
+    "category": "current-view",
+    "fixture": "release4-optgroups",
+    "instruction": "Focus the Arrival harbor selector.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "setupRevision": "release-current-view-4",
+    "contractVersion": "4",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-release-label-review",
+      "reviewedAt": "2026-10-02T12:12:17.485317+00:00"
+    },
+    "expected": {
+      "outcome": "found",
+      "actions": [
+        {
+          "step": 1,
+          "action": "focus",
+          "outcome": "found",
+          "target": {
+            "selector": "#harbor",
+            "frames": []
+          },
+          "state": {
+            "inViewport": true,
+            "enabled": true
+          },
+          "interactability": {
+            "status": "unknown"
+          }
+        }
+      ],
+      "summary": {
+        "processingComplete": true
+      }
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "focus",
+          "outcome": "found",
+          "label": "Arrival harbor",
+          "tag": "select"
+        }
+      ]
+    },
+    "labelProvenance": {
+      "kind": "controlled-authored",
+      "modelExposure": "No model inference; authored before policy-7 qualification",
+      "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
+      "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/policy7-fresh-check"
+    },
+    "sourceSplit": "held-out",
+    "sourceCatalogs": ["current-view-qualification-cases.json"],
+    "group": "state"
+  },
+  {
+    "id": "release4-optgroups-2",
+    "family": "release4-optgroups",
+    "split": "regression",
+    "category": "current-view",
+    "fixture": "release4-optgroups",
+    "instruction": "Inspect the Backup harbor selector.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "setupRevision": "release-current-view-4",
+    "contractVersion": "4",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-release-label-review",
+      "reviewedAt": "2026-10-02T12:12:17.485318+00:00"
+    },
+    "expected": {
+      "outcome": "found",
+      "actions": [
+        {
+          "step": 1,
+          "action": "inspect",
+          "outcome": "found",
+          "target": {
+            "selector": "#backup-harbor",
+            "frames": []
+          },
+          "state": {
+            "inViewport": true,
+            "enabled": false
+          },
+          "interactability": {
+            "status": "ready"
+          }
+        }
+      ],
+      "summary": {
+        "processingComplete": true
+      }
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "inspect",
+          "outcome": "found",
+          "label": "Backup harbor",
+          "tag": "select"
+        }
+      ]
+    },
+    "labelProvenance": {
+      "kind": "controlled-authored",
+      "modelExposure": "No model inference; authored before policy-7 qualification",
+      "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
+      "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/policy7-fresh-check"
+    },
+    "sourceSplit": "held-out",
+    "sourceCatalogs": ["current-view-qualification-cases.json"],
+    "group": "state"
+  },
+  {
+    "id": "release4-optgroups-3",
+    "family": "release4-optgroups",
+    "split": "regression",
+    "category": "current-view",
+    "fixture": "release4-optgroups",
+    "instruction": "Focus the Departure airport selector.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "setupRevision": "release-current-view-4",
+    "contractVersion": "4",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-release-label-review",
+      "reviewedAt": "2026-10-02T12:12:17.485319+00:00"
+    },
+    "expected": {
+      "outcome": "not_found",
+      "actions": [
+        {
+          "step": 1,
+          "action": "focus",
+          "outcome": "not_found"
+        }
+      ],
+      "summary": {
+        "processingComplete": true
+      }
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "focus",
+          "outcome": "not_found"
+        }
+      ]
+    },
+    "labelProvenance": {
+      "kind": "controlled-authored",
+      "modelExposure": "No model inference; authored before policy-7 qualification",
+      "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
+      "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/policy7-fresh-check"
+    },
+    "sourceSplit": "held-out",
+    "sourceCatalogs": ["current-view-qualification-cases.json"],
+    "group": "state"
+  },
+  {
+    "id": "release4-native-radios-1",
+    "family": "release4-native-radios",
+    "split": "regression",
+    "category": "current-view",
+    "fixture": "release4-native-radios",
+    "instruction": "Check Normal reading.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "setupRevision": "release-current-view-4",
+    "contractVersion": "4",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-release-label-review",
+      "reviewedAt": "2026-10-02T12:12:17.485320+00:00"
+    },
+    "expected": {
+      "outcome": "found",
+      "actions": [
+        {
+          "step": 1,
+          "action": "check",
+          "outcome": "found",
+          "target": {
+            "selector": "#pace-normal",
+            "frames": []
+          },
+          "state": {
+            "inViewport": true,
+            "enabled": true
+          },
+          "interactability": {
+            "status": "ready"
+          }
+        }
+      ],
+      "summary": {
+        "processingComplete": true
+      }
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "check",
+          "outcome": "found",
+          "label": "Normal reading",
+          "tag": "input"
+        }
+      ]
+    },
+    "labelProvenance": {
+      "kind": "controlled-authored",
+      "modelExposure": "No model inference; authored before policy-7 qualification",
+      "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
+      "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/policy7-fresh-check"
+    },
+    "sourceSplit": "held-out",
+    "sourceCatalogs": ["current-view-qualification-cases.json"],
+    "group": "state"
+  },
+  {
+    "id": "release4-native-radios-2",
+    "family": "release4-native-radios",
+    "split": "regression",
+    "category": "current-view",
+    "fixture": "release4-native-radios",
+    "instruction": "Check Fast reading.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "setupRevision": "release-current-view-4",
+    "contractVersion": "4",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-release-label-review",
+      "reviewedAt": "2026-10-02T12:12:17.485321+00:00"
+    },
+    "expected": {
+      "outcome": "found",
+      "actions": [
+        {
+          "step": 1,
+          "action": "check",
+          "outcome": "found",
+          "target": {
+            "selector": "#pace-fast",
+            "frames": []
+          },
+          "state": {
+            "inViewport": true,
+            "enabled": false
+          },
+          "interactability": {
+            "status": "blocked"
+          }
+        }
+      ],
+      "summary": {
+        "processingComplete": true
+      }
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "check",
+          "outcome": "found",
+          "label": "Fast reading",
+          "tag": "input"
+        }
+      ]
+    },
+    "labelProvenance": {
+      "kind": "controlled-authored",
+      "modelExposure": "No model inference; authored before policy-7 qualification",
+      "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
+      "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/policy7-fresh-check"
+    },
+    "sourceSplit": "held-out",
+    "sourceCatalogs": ["current-view-qualification-cases.json"],
+    "group": "state"
+  },
+  {
+    "id": "release4-native-radios-3",
+    "family": "release4-native-radios",
+    "split": "regression",
+    "category": "current-view",
+    "fixture": "release4-native-radios",
+    "instruction": "Inspect Slow reading.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "setupRevision": "release-current-view-4",
+    "contractVersion": "4",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-release-label-review",
+      "reviewedAt": "2026-10-02T12:12:17.485322+00:00"
+    },
+    "expected": {
+      "outcome": "found",
+      "actions": [
+        {
+          "step": 1,
+          "action": "inspect",
+          "outcome": "found",
+          "target": {
+            "selector": "#pace-slow",
+            "frames": []
+          },
+          "state": {
+            "inViewport": true,
+            "enabled": true
+          },
+          "interactability": {
+            "status": "ready"
+          }
+        }
+      ],
+      "summary": {
+        "processingComplete": true
+      }
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "inspect",
+          "outcome": "found",
+          "label": "Slow reading",
+          "tag": "input"
+        }
+      ]
+    },
+    "labelProvenance": {
+      "kind": "controlled-authored",
+      "modelExposure": "No model inference; authored before policy-7 qualification",
+      "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
+      "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/policy7-fresh-check"
+    },
+    "sourceSplit": "held-out",
+    "sourceCatalogs": ["current-view-qualification-cases.json"],
+    "group": "state"
+  },
+  {
+    "id": "release4-media-1",
+    "family": "release4-media",
+    "split": "regression",
+    "category": "current-view",
+    "fixture": "release4-media",
+    "instruction": "Inspect Safety preview.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "setupRevision": "release-current-view-4",
+    "contractVersion": "4",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-release-label-review",
+      "reviewedAt": "2026-10-02T12:12:17.485331+00:00"
+    },
+    "expected": {
+      "outcome": "found",
+      "actions": [
+        {
+          "step": 1,
+          "action": "inspect",
+          "outcome": "found",
+          "target": {
+            "selector": "#safety-preview",
+            "frames": []
+          },
+          "state": {
+            "inViewport": true,
+            "enabled": true
+          },
+          "interactability": {
+            "status": "ready"
+          }
+        }
+      ],
+      "summary": {
+        "processingComplete": true
+      }
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "inspect",
+          "outcome": "found",
+          "label": "Safety preview",
+          "tag": "video"
+        }
+      ]
+    },
+    "labelProvenance": {
+      "kind": "controlled-authored",
+      "modelExposure": "No model inference; authored before policy-7 qualification",
+      "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
+      "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/policy7-media-check"
+    },
+    "sourceSplit": "held-out",
+    "sourceCatalogs": ["current-view-qualification-cases.json"],
+    "group": "state"
+  },
+  {
+    "id": "release4-media-2",
+    "family": "release4-media",
+    "split": "regression",
+    "category": "current-view",
+    "fixture": "release4-media",
+    "instruction": "Inspect all videos in Training previews.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "setupRevision": "release-current-view-4",
+    "contractVersion": "4",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-release-label-review",
+      "reviewedAt": "2026-10-02T12:12:17.485332+00:00"
+    },
+    "expected": {
+      "outcome": "found",
+      "actions": [
+        {
+          "step": 1,
+          "action": "inspect",
+          "outcome": "found",
+          "target": {
+            "selector": "#safety-preview",
+            "frames": []
+          },
+          "state": {
+            "inViewport": true,
+            "enabled": true
+          },
+          "interactability": {
+            "status": "ready"
+          }
+        },
+        {
+          "step": 1,
+          "action": "inspect",
+          "outcome": "found",
+          "target": {
+            "selector": "#assembly-preview",
+            "frames": []
+          },
+          "state": {
+            "inViewport": true,
+            "enabled": true
+          },
+          "interactability": {
+            "status": "ready"
+          }
+        }
+      ],
+      "summary": {
+        "processingComplete": true
+      }
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "inspect",
+          "outcome": "found",
+          "label": "Safety preview",
+          "tag": "video"
+        },
+        {
+          "step": 1,
+          "action": "inspect",
+          "outcome": "found",
+          "label": "Assembly preview",
+          "tag": "video"
+        }
+      ]
+    },
+    "labelProvenance": {
+      "kind": "controlled-authored",
+      "modelExposure": "No model inference; authored before policy-7 qualification",
+      "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
+      "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/policy7-media-check"
+    },
+    "sourceSplit": "held-out",
+    "sourceCatalogs": ["current-view-qualification-cases.json"],
+    "group": "state"
+  },
+  {
+    "id": "release4-media-3",
+    "family": "release4-media",
+    "split": "regression",
+    "category": "current-view",
+    "fixture": "release4-media",
+    "instruction": "Inspect the Maintenance preview video.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "setupRevision": "release-current-view-4",
+    "contractVersion": "4",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-release-label-review",
+      "reviewedAt": "2026-10-02T12:12:17.485332+00:00"
+    },
+    "expected": {
+      "outcome": "not_found",
+      "actions": [
+        {
+          "step": 1,
+          "action": "inspect",
+          "outcome": "not_found"
+        }
+      ],
+      "summary": {
+        "processingComplete": true
+      }
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "inspect",
+          "outcome": "not_found"
+        }
+      ]
+    },
+    "labelProvenance": {
+      "kind": "controlled-authored",
+      "modelExposure": "No model inference; authored before policy-7 qualification",
+      "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
+      "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/policy7-media-check"
+    },
+    "sourceSplit": "held-out",
+    "sourceCatalogs": ["current-view-qualification-cases.json"],
+    "group": "state"
+  },
+  {
+    "id": "control-states-1-v4",
+    "family": "states",
+    "split": "regression",
+    "category": "state",
+    "fixture": "states",
+    "instruction": "Click Save settings.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "setupRevision": "viewport-baseline-1",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-fixture-source-review",
+      "reviewedAt": "2026-10-01T14:02:32.742080+00:00"
+    },
+    "expected": {
+      "outcome": "found",
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "target": {
+            "selector": "#save-settings",
+            "frames": []
+          },
+          "state": {
+            "enabled": false
+          },
+          "interactability": {
+            "status": "blocked",
+            "reasons": ["disabled"],
+            "checks": {
+              "enabled": "fail"
+            }
+          }
+        }
+      ],
+      "summary": {
+        "processingComplete": true,
+        "semanticCompleteness": "unverified",
+        "total": 1,
+        "found": 1,
+        "notFound": 0,
+        "unsupported": 0,
+        "errors": 0,
+        "blocked": 1,
+        "readinessUnknown": 0,
+        "assessmentUnsupported": 0
+      }
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "label": "Save settings",
+          "tag": "button"
+        }
+      ]
+    },
+    "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
+    "privacySentinels": ["PRIVATE_NOTES_VALUE", "PRIVATE_OPTION_VALUE"],
+    "contractVersion": "4",
+    "labelProvenance": {
+      "kind": "controlled-authored",
+      "sourceCaseId": "control-states-1",
+      "scopeReview": "independent source review; browser observation pending"
+    },
+    "sourceSplit": "regression",
+    "sourceCatalogs": [
+      "current-view-qualification-cases.json",
+      "viewport-baseline-cases.json",
+      "cases.json"
+    ],
+    "sourceIds": ["control-states-1-v4", "current-view-control-states-1-v4"],
+    "group": "state"
+  },
+  {
+    "id": "control-states-2-v4",
+    "family": "states",
+    "split": "regression",
+    "category": "state",
+    "fixture": "states",
+    "instruction": "Fill Notes.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "setupRevision": "viewport-baseline-1",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-fixture-source-review",
+      "reviewedAt": "2026-10-01T14:02:32.742082+00:00"
+    },
+    "expected": {
+      "outcome": "found",
+      "actions": [
+        {
+          "step": 1,
+          "action": "fill",
+          "outcome": "found",
+          "target": {
+            "selector": "#notes",
+            "frames": []
+          },
+          "state": {
+            "readonly": true,
+            "editable": false
+          },
+          "interactability": {
+            "status": "blocked",
+            "reasons": ["readonly"],
+            "checks": {
+              "writable": "fail",
+              "keyboard": "unknown"
+            }
+          }
+        }
+      ],
+      "summary": {
+        "processingComplete": true,
+        "semanticCompleteness": "unverified",
+        "total": 1,
+        "found": 1,
+        "notFound": 0,
+        "unsupported": 0,
+        "errors": 0,
+        "blocked": 1,
+        "readinessUnknown": 0,
+        "assessmentUnsupported": 0
+      }
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "fill",
+          "outcome": "found",
+          "label": "Notes",
+          "tag": "textarea"
+        }
+      ]
+    },
+    "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
+    "privacySentinels": ["PRIVATE_NOTES_VALUE", "PRIVATE_OPTION_VALUE"],
+    "contractVersion": "4",
+    "labelProvenance": {
+      "kind": "controlled-authored",
+      "sourceCaseId": "control-states-2",
+      "scopeReview": "independent source review; browser observation pending"
+    },
+    "sourceSplit": "regression",
+    "sourceCatalogs": ["current-view-qualification-cases.json", "viewport-baseline-cases.json"],
+    "group": "state"
+  },
+  {
+    "id": "control-states-3-v4",
+    "family": "states",
+    "split": "regression",
+    "category": "state",
+    "fixture": "states",
+    "instruction": "Check Newsletter.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "setupRevision": "viewport-baseline-1",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-fixture-source-review",
+      "reviewedAt": "2026-10-01T14:02:32.742084+00:00"
+    },
+    "expected": {
+      "outcome": "found",
+      "actions": [
+        {
+          "step": 1,
+          "action": "check",
+          "outcome": "found",
+          "target": {
+            "selector": "#newsletter",
+            "frames": []
+          },
+          "state": {
+            "checked": true
+          },
+          "interactability": {
+            "status": "ready",
+            "reasons": [],
+            "checks": {
+              "compatibleControl": "pass",
+              "enabled": "pass",
+              "viewport": "pass",
+              "pointerReception": "pass",
+              "keyboard": "not_applicable",
+              "stability": "unknown",
+              "eventOutcome": "unknown"
+            }
+          }
+        }
+      ],
+      "summary": {
+        "processingComplete": true,
+        "semanticCompleteness": "unverified",
+        "total": 1,
+        "found": 1,
+        "notFound": 0,
+        "unsupported": 0,
+        "errors": 0,
+        "blocked": 0,
+        "readinessUnknown": 0,
+        "assessmentUnsupported": 0
+      }
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "check",
+          "outcome": "found",
+          "label": "Newsletter",
+          "tag": "input"
+        }
+      ]
+    },
+    "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
+    "privacySentinels": ["PRIVATE_NOTES_VALUE", "PRIVATE_OPTION_VALUE"],
+    "contractVersion": "4",
+    "labelProvenance": {
+      "kind": "controlled-authored",
+      "sourceCaseId": "control-states-3",
+      "scopeReview": "independent source review; browser observation pending"
+    },
+    "sourceSplit": "regression",
+    "sourceCatalogs": ["current-view-qualification-cases.json", "viewport-baseline-cases.json"],
+    "group": "state"
+  }
+]

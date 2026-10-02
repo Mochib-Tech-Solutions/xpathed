@@ -1,3 +1,4 @@
+import { loadCases } from "../evaluation/cases/load.mjs";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { appendFile, mkdir, readFile, readdir, writeFile } from "node:fs/promises";
@@ -38,7 +39,7 @@ async function identity() {
 async function browserEvidence(sha) {
   const path = `${directory}/browser`;
   const manifest = await json(`${path}/manifest.json`);
-  const suite = await json("evaluation/cases.json");
+  const suite = loadCases("evaluation/cases/index.json");
   ensure(
     manifest.mode === "deterministic" && manifest.code?.revision === sha,
     "Browser mode or source SHA mismatch",
@@ -52,7 +53,7 @@ async function browserEvidence(sha) {
       isDeepStrictEqual(manifest.cases, suite.cases),
     "Browser evidence does not cover the original full suite",
   );
-  for (const file of ["package.json", "global.json", "evaluation/cases.json"])
+  for (const file of ["package.json", "global.json", "evaluation/cases/index.json"])
     ensure(
       manifest.code.files?.[file] === hash(await readFile(file)),
       `Browser configuration fingerprint mismatch: ${file}`,

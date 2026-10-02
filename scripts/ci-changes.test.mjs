@@ -34,11 +34,11 @@ test("Browser source changes require deterministic browser evaluation", () => {
 test("deterministic evaluation selects its runtime, fixture, and runner dependencies", () => {
   for (const path of [
     "evaluation/run.mjs",
-    "evaluation/cases.json",
-    "evaluation/fixtures.mjs",
+    "evaluation/cases/index.json",
+    "evaluation/fixtures/pages.mjs",
     "scripts/evaluate.sh",
     "scripts/evaluate.test.mjs",
-    "scripts/release-evaluate.mjs",
+    "scripts/release/evaluate.mjs",
     "scripts/ci-browser.mjs",
     "tests/resolution/ready.mjs",
     "docker/compose.yaml",
@@ -61,7 +61,7 @@ for (const [path, expected] of [
   ["README.md", none],
   ["evaluation/run.mjs", { ...none, tooling: true, browser: true }],
   ["evaluation/grader.test.mjs", { ...none, tooling: true, browser: true }],
-  ["evaluation/cases.json", { ...none, tooling: true, browser: true }],
+  ["evaluation/cases/index.json", { ...none, tooling: true, browser: true }],
   ["tests/resolution/pipeline.test.mjs", { ...none, tooling: true }],
   [
     "tests/Resolver.Tests/ResolutionContractTests.cs",

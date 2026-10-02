@@ -1,16 +1,23 @@
+import { readCollection } from "./datasets/collection.mjs";
+import { loadCases } from "./cases/load.mjs";
+import { executeOffline } from "./datasets/offline.mjs";
 import { createHash, randomUUID } from "node:crypto";
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { mkdir, readFile, writeFile, rename } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { once } from "node:events";
 import { createServer } from "node:http";
+import { isDeepStrictEqual } from "node:util";
 import {
   parseOptions,
   buildPlan,
+  validateCases,
+  execute,
   fingerprints,
-  request,
-  command,
   configurationRecord,
 } from "./run.mjs";
+import { compareTrials, compareMeasurements, measuredEntry } from "./comparison.mjs";
+import { gradeTrial } from "./grader.mjs";
+import defaultPolicy from "./policy.json" with { type: "json" };
 
 const hash = (value) =>
   createHash("sha256")
@@ -19,493 +26,463 @@ const hash = (value) =>
 const json = async (path) => JSON.parse(await readFile(path, "utf8"));
 const save = (path, value) =>
   writeFile(path, JSON.stringify(value, null, 2) + "\n", { flag: "wx", mode: 0o600 });
-const ids = [
-  "basic-save",
-  "paraphrase-save",
-  "unicode-quotes",
-  "scoped-save",
-  "offscreen-help",
-  "covered-payment",
-  "transparent-control",
-  "hidden-absence",
-  "true-absence",
-  "page-injection",
-  "nested-frame",
-  "single-action-plural-confirmations",
-];
-const source = await json(new URL("./cases.json", import.meta.url));
+// Keep the completed first arm even if the second arm cannot reserve or finish.
+export async function savePairedTrial(directory, trial, runBaseline) {
+  const path = join(directory, `${trial.id}.json`);
+  await save(path, trial);
+  if (!runBaseline) return;
+  const update = async () => {
+    await writeFile(`${path}.partial`, JSON.stringify(trial, null, 2) + "\n", { mode: 0o600 });
+    await rename(`${path}.partial`, path);
+  };
+  try {
+    trial.baseline = await runBaseline(async (baseline) => {
+      trial.baseline = baseline;
+      await update();
+    });
+  } finally {
+    await update();
+  }
+}
 
-export function selectCases(caseId) {
-  if (caseId && !ids.includes(caseId)) throw new Error("Unknown comparison case");
-  return (caseId ? [caseId] : ids).map((id) => {
-    const item = structuredClone(source.cases.find((entry) => entry.id === id));
-    item.contractVersion = "3";
-    item.cardinality = id === "single-action-plural-confirmations" ? "all" : "singleton";
-    return item;
+export const profiles = await json(new URL("./profiles.json", import.meta.url));
+
+export function validateReleaseArtifact(artifact, sourceSha, profileIds) {
+  const keys = (value, expected) =>
+    value &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    isDeepStrictEqual(Object.keys(value).sort(), [...expected].sort());
+  if (
+    !keys(artifact, [
+      "version",
+      "bundleManifestSha256",
+      "sourceSha",
+      "profileId",
+      "images",
+      "platform",
+    ]) ||
+    artifact.version !== 1 ||
+    !/^[a-f\d]{64}$/.test(artifact.bundleManifestSha256 ?? "") ||
+    !/^[a-f\d]{40}$/.test(artifact.sourceSha ?? "") ||
+    artifact.sourceSha !== sourceSha ||
+    !isDeepStrictEqual(profileIds, [artifact.profileId]) ||
+    !profiles.some((profile) => profile.id === artifact.profileId) ||
+    !keys(artifact.platform, ["os", "architecture"]) ||
+    artifact.platform.os !== "linux" ||
+    !["amd64", "arm64"].includes(artifact.platform.architecture) ||
+    !Array.isArray(artifact.images) ||
+    artifact.images.length !== 2 ||
+    new Set(artifact.images.map((image) => image?.id)).size !== 2 ||
+    !artifact.images.every(
+      (image, index) =>
+        keys(image, ["component", "id", "os", "architecture", "sourceSha"]) &&
+        image.component === ["browser", "resolver"][index] &&
+        /^sha256:[a-f\d]{64}$/.test(image.id ?? "") &&
+        image.os === artifact.platform.os &&
+        image.architecture === artifact.platform.architecture &&
+        image.sourceSha === artifact.sourceSha,
+    )
+  )
+    throw new Error("Invalid release artifact identity, source or selected profile");
+  return artifact;
+}
+
+export function parseQualificationOptions(args) {
+  const extra = { profile: "deepseek", monitoring: false };
+  const rest = [],
+    seen = new Set();
+  for (let i = 0; i < args.length; i += 2) {
+    const name = args[i].slice(2);
+    if (["profile", "suite", "monitoring"].includes(name)) {
+      if (seen.has(name) || !args[i + 1] || args[i + 1].startsWith("--"))
+        throw new Error("Repeated or missing comparison option");
+      seen.add(name);
+      extra[name] = args[i + 1];
+    } else rest.push(args[i], args[i + 1]);
+  }
+  const options = { ...parseOptions(rest), ...extra };
+  if (options.replay && seen.size) throw new Error("Replay cannot be combined with run options");
+  if (options.prune || options.repetitions !== 1)
+    throw new Error("Release comparison uses one attempt per case");
+  if (![false, "true"].includes(options.monitoring)) throw new Error("Use --monitoring true");
+  options.monitoring = options.monitoring === "true";
+  options.profileIds = options.profile.split(",");
+  if (
+    new Set(options.profileIds).size !== options.profileIds.length ||
+    options.profileIds.some((id) => !profiles.some((p) => p.id === id))
+  )
+    throw new Error("Unknown or duplicate model profile");
+  return options;
+}
+
+export function selectQualificationCases(cases, options = {}) {
+  const selected = [],
+    exclusions = [];
+  for (const item of cases) {
+    const reason =
+      options.caseId && options.caseId !== item.id
+        ? "case filter"
+        : item.track !== "offline-selection" && item.contractVersion !== "4"
+          ? "legacy contract CI coverage"
+          : item.mutation
+            ? "saved-locator CI coverage"
+            : item.provider?.fault || item.deterministicOnly || item.expected?.outcome === "error"
+              ? "deterministic fault coverage"
+              : null;
+    if (reason) exclusions.push({ caseId: item.id, reason });
+    else selected.push(item);
+  }
+  if (!selected.length) throw new Error("No eligible release cases");
+  return { cases: selected, exclusions };
+}
+
+export function buildMatrixPlan(cases, selectedProfiles, options) {
+  const plan = buildPlan(cases, options);
+  return {
+    ...plan,
+    trials: plan.trials.flatMap((trial) =>
+      selectedProfiles.map((profile) => ({ ...trial, profileId: profile.id })),
+    ),
+    order: "Seeded case order; one original attempt per arm; no retries",
+  };
+}
+
+export async function readRun(directory) {
+  const manifest = await json(join(directory, "manifest.json"));
+  const { contentHash, ...body } = manifest;
+  if (hash(body) !== contentHash || manifest.kind !== "model-qualification")
+    throw new Error("Qualification manifest integrity mismatch");
+  if (Object.hasOwn(manifest.qualification ?? {}, "artifact"))
+    validateReleaseArtifact(
+      manifest.qualification.artifact,
+      manifest.code?.revision,
+      manifest.profiles?.map((p) => p.id),
+    );
+  for (const path of [
+    "evaluation/compare.mjs",
+    "evaluation/grader.mjs",
+    "evaluation/policy.mjs",
+    "evaluation/comparison.mjs",
+  ])
+    if (
+      manifest.code.files[path] !==
+      hash(await readFile(new URL(`../${path}`, import.meta.url), "utf8"))
+    )
+      throw new Error(`Replay requires the recorded revision: ${path}`);
+  validateCases({
+    version: "1",
+    cases: manifest.cases,
+    ...(manifest.baseline ? { baseline: manifest.baseline } : {}),
+  });
+  const trials = [];
+  for (const planned of manifest.plan.trials) {
+    try {
+      const trial = await json(join(directory, "trials", `${planned.id}.json`));
+      if (
+        ["id", "caseId", "profileId", "repetition", "attempt"].some(
+          (key) => trial[key] !== planned[key],
+        )
+      )
+        throw new Error("Qualification trial identity mismatch");
+      trials.push(trial);
+    } catch (error) {
+      if (error.code !== "ENOENT") throw error;
+    }
+  }
+  return { manifest, trials };
+}
+
+export function summarizeMonitoring(manifest, trials, baseline) {
+  if (manifest.monitoring !== true || manifest.mode !== "live")
+    throw new Error("Monitoring requires a frozen live run");
+  const entries = manifest.cases.map((spec) =>
+    measuredEntry(
+      spec,
+      trials.find((trial) => trial.caseId === spec.id),
+      manifest.profiles[0],
+      manifest.policy,
+    ),
+  );
+  const generations = new Set();
+  for (const entry of entries) {
+    const id = entry.generationId;
+    if (typeof id !== "string" || !id.trim() || generations.has(id)) entry.operational = true;
+    generations.add(id);
+  }
+  const report = compareMeasurements(entries, baseline);
+  if (trials.length !== entries.length) report.status = "infrastructure_failure";
+  return { ...report, entries, defaultActivated: false };
+}
+
+function printSummary(summary) {
+  for (const [profileId, report] of Object.entries(summary.profiles)) {
+    const first = report.firstAttempt;
+    console.log(
+      `${profileId}: ${first.passed}/${report.plannedTrials} checks passed; p50/p95 ${first.latencyMs.p50 ?? "n/a"}/${first.latencyMs.p95 ?? "n/a"}ms; reported USD ${first.cost.reportedUsd.total ?? "unavailable"}; ${report.qualification.status} (${report.qualification.reasons.join(", ") || "all gates passed"})`,
+    );
+  }
+  console.log(
+    `Qualified candidates: ${summary.qualifiedCandidates.join(", ") || "none"}; runtime default unchanged.`,
+  );
+}
+
+export function fixtureProxy(fixture, timeoutMs) {
+  return createServer(async (req, res) => {
+    try {
+      // Preparation must not seed the Resolver cache with synthetic endpoint prices.
+      if (req.method === "GET" && req.url?.endsWith("/endpoints")) {
+        res.writeHead(404, { "Content-Type": "application/json" });
+        res.end("{}");
+        return;
+      }
+      const chunks = [];
+      let size = 0;
+      for await (const chunk of req) {
+        size += chunk.length;
+        if (size > 2_000_000) throw new Error("Request too large");
+        chunks.push(chunk);
+      }
+      const upstream = await fetch(`${fixture}${req.url}`, {
+        method: req.method,
+        headers: { "Content-Type": "application/json" },
+        body: req.method === "POST" ? Buffer.concat(chunks) : undefined,
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+      res.writeHead(upstream.status, { "Content-Type": "application/json" });
+      res.end(await upstream.text());
+    } catch {
+      res.writeHead(502);
+      res.end();
+    }
   });
 }
 
-export function assertParity(a, b) {
-  for (const key of [
-    "viewport",
-    "userAgent",
-    "language",
-    "languages",
-    "timeZone",
-    "initialState",
-    "documentChecksum",
-  ]) {
-    if (a?.[key] == null || b?.[key] == null || JSON.stringify(a[key]) !== JSON.stringify(b[key]))
-      throw new Error(`Browser parity mismatch: ${key}`);
-  }
-  if (Math.abs(a.viewport.width - 1280) > 1 || Math.abs(a.viewport.height - 800) > 1)
-    throw new Error("Browser parity mismatch: required viewport");
-}
-
-export function normalizeStagehand(result) {
-  const names = {
-    click: "click",
-    dblclick: "double_click",
-    fill: "fill",
-    type: "type",
-    hover: "hover",
-    check: "check",
-    uncheck: "uncheck",
-    selectOption: "select",
-    press: "press",
-    focus: "focus",
-    blur: "blur",
-    setInputFiles: "upload",
-  };
-  const actions = (result.targets ?? []).map((target) => ({
-    action: names[target.method] ?? "unsupported",
-    outcome: "found",
-    target,
-  }));
-  return {
-    outcome: result.status === "empty" ? "not_found" : result.status,
-    action: actions[0]?.action ?? null,
-    actions,
-  };
-}
-
-export function summarizePairs(manifest, trials) {
-  const report = {
-    version: 1,
-    mode: manifest.mode,
-    qualification: "incomplete",
-    measurement:
-      manifest.mode === "live"
-        ? "paired first-observation comparison"
-        : "deterministic adapter compatibility, not model quality",
-    planned: manifest.plan.trials.length * 2,
-    completed: trials.length,
-    strategies: {},
-  };
-  for (const strategy of ["custom", "stagehand"]) {
-    const rows = trials.filter((trial) => trial.strategy === strategy);
-    const calls = rows.flatMap((t) => t.provider ?? []);
-    const paid = calls.filter((r) => r.forwarded);
-    const total = (cardinality) =>
-      manifest.plan.trials.filter(
-        (t) => manifest.cases.find((c) => c.id === t.caseId)?.cardinality === cardinality,
-      ).length;
-    const sumUsage = (get) =>
-      paid.every((r) => typeof get(r.usage) === "number")
-        ? paid.reduce((sum, r) => sum + get(r.usage), 0)
-        : null;
-    const quantile = (values, fraction) =>
-      values.length
-        ? [...values].sort((a, b) => a - b)[Math.ceil(values.length * fraction) - 1]
-        : null;
-    report.strategies[strategy] = {
-      attempted: rows.length,
-      missing: manifest.plan.trials.length - rows.length,
-      singleton: {
-        passed: rows.filter((t) => t.cardinality === "singleton" && t.grade.passed).length,
-        total: total("singleton"),
-      },
-      plural: {
-        passed: rows.filter((t) => t.cardinality === "all" && t.grade.passed).length,
-        total: total("all"),
-      },
-      metrics: rows.reduce((sum, t) => {
-        for (const [key, value] of Object.entries(t.grade.metrics ?? {}))
-          if (typeof value === "number") sum[key] = (sum[key] ?? 0) + value;
-        return sum;
-      }, {}),
-      errors: rows.filter((t) => t.error || t.grade.metrics.operationalError).length,
-      unsupported: rows.filter((t) => t.grade.metrics.unsupported).length,
-      latencyMs: {
-        p50: quantile(rows.map((t) => t.elapsedMs).filter(Number.isFinite), 0.5),
-        p95: quantile(rows.map((t) => t.elapsedMs).filter(Number.isFinite), 0.95),
-      },
-      calls: paid.length,
-      unreportedCharges: rows
-        .flatMap((t) => t.provider ?? [])
-        .filter((r) => (r.forwarded || r.reservedUsd != null) && r.reportedUsd == null).length,
-      usage: {
-        prompt_tokens: sumUsage((u) => u?.prompt_tokens),
-        completion_tokens: sumUsage((u) => u?.completion_tokens),
-        total_tokens: sumUsage((u) => u?.total_tokens),
-        cached_tokens: sumUsage((u) => u?.prompt_tokens_details?.cached_tokens),
-      },
-      reportedUsd: rows
-        .flatMap((t) => t.provider ?? [])
-        .some((r) => (r.forwarded || r.reservedUsd != null) && r.reportedUsd == null)
-        ? null
-        : rows.flatMap((t) => t.provider ?? []).reduce((sum, r) => sum + (r.reportedUsd ?? 0), 0),
-      knownReportedUsd: rows
-        .flatMap((t) => t.provider ?? [])
-        .reduce((sum, r) => sum + (r.reportedUsd ?? 0), 0),
-      unavailable:
-        strategy === "stagehand" ? ["xpathed readiness", "capture/model-input coverage"] : [],
-    };
-  }
-  report.commonCoverage = manifest.plan.trials.filter((p) =>
-    ["custom", "stagehand"].every((s) =>
-      trials.some(
-        (t) =>
-          t.caseId === p.caseId &&
-          t.repetition === p.repetition &&
-          t.strategy === s &&
-          !t.error &&
-          !t.grade.metrics.operationalError &&
-          !t.grade.metrics.unsupported,
-      ),
-    ),
-  ).length;
-  report.passed = trials.length === report.planned && trials.every((t) => t.grade.passed);
-  return report;
-}
-
 export async function main(args = process.argv.slice(2)) {
-  const options = parseOptions(args);
-  const { gradeComparison } = await import("./comparison-grade.mjs");
-  const runnerHash = hash(await readFile(new URL("./compare.mjs", import.meta.url), "utf8"));
-  const graderHash = hash(
-    await readFile(new URL("./comparison-grade.mjs", import.meta.url), "utf8"),
-  );
+  const options = parseQualificationOptions(args);
+  const { summarizeQualification } = await import("./policy.mjs");
   if (options.replay) {
-    const manifest = await json(join(options.replay, "manifest.json"));
-    const { contentHash, ...body } = manifest;
-    if (
-      hash(body) !== contentHash ||
-      manifest.graderHash !== graderHash ||
-      manifest.runnerHash !== runnerHash
-    )
-      throw new Error("Comparison manifest/grader integrity mismatch");
-    const trials = [];
-    for (const p of manifest.plan.trials)
-      for (const strategy of ["custom", "stagehand"]) {
-        try {
-          const t = await json(join(options.replay, "trials", `${p.id}-${strategy}.json`));
-          if (t.id !== `${p.id}-${strategy}` || t.caseId !== p.caseId || t.strategy !== strategy)
-            throw new Error("Trial identity mismatch");
-          t.mode = manifest.mode;
-          t.grade = gradeComparison(
-            manifest.cases.find((c) => c.id === t.caseId),
-            t,
-            manifest.accounting?.budgetPolicy,
-          );
-          trials.push(t);
-        } catch (error) {
-          if (error.code !== "ENOENT") throw error;
-        }
-      }
-    const report = summarizePairs(manifest, trials);
-    console.log(JSON.stringify(report, null, 2));
-    return report.passed ? 0 : 1;
+    const run = await readRun(resolve(options.replay));
+    const summary = summarizeQualification(run.manifest, run.trials, run.manifest.policy);
+    printSummary(summary);
+    return summary.qualifiedCandidates.length ? 0 : 1;
   }
-  if (options.prune) throw new Error("Use the ordinary evaluation prune command");
-  const cases = selectCases(options.caseId);
+  const selectedProfiles = options.profileIds.map((id) => profiles.find((p) => p.id === id));
+  const comparison = process.env.XPATHED_RELEASE_COMPARISON_JSON
+    ? JSON.parse(process.env.XPATHED_RELEASE_COMPARISON_JSON)
+    : undefined;
+  if (options.mode === "live" && !options.monitoring && !comparison)
+    throw new Error("Release comparison requires the approved baseline images");
+  if (comparison && (selectedProfiles.length !== 1 || options.monitoring))
+    throw new Error("Use one candidate and one baseline; monitoring runs only the approved arm");
+  if (comparison)
+    validateReleaseArtifact(comparison.artifact, comparison.artifact.sourceSha, [
+      comparison.profile.id,
+    ]);
+  const code = await fingerprints();
+  const artifact = process.env.XPATHED_RELEASE_ARTIFACT_JSON
+    ? validateReleaseArtifact(
+        JSON.parse(process.env.XPATHED_RELEASE_ARTIFACT_JSON),
+        code.revision,
+        options.profileIds,
+      )
+    : undefined;
+  const suite = loadCases(
+    options.suite ||
+      process.env.XPATHED_EVALUATION_SUITE ||
+      new URL("./cases/index.json", import.meta.url),
+  );
+  suite.cases.push(...readCollection());
+  const allCases = validateCases(suite);
+  const { cases, exclusions } = selectQualificationCases(allCases, options);
+  if (!artifact && cases.some((spec) => spec.track === "offline-selection"))
+    throw new Error(
+      "Use release:evaluate with a verified image bundle to start the offline Resolver worker",
+    );
+  if (
+    options.mode === "live" &&
+    cases.some(
+      (spec) =>
+        spec.review?.status !== "reviewed" ||
+        !spec.review.reviewer?.trim() ||
+        !Number.isFinite(Date.parse(spec.review.reviewedAt)),
+    )
+  )
+    throw new Error("Live evaluation requires independently reviewed expectations");
   const output = resolve(options.output);
   await mkdir(join(output, "trials"), { recursive: true, mode: 0o700 });
+  const now = new Date().toISOString();
   const manifest = {
     version: "1",
+    kind: "model-qualification",
     id: randomUUID(),
-    createdAt: new Date().toISOString(),
+    createdAt: now,
     mode: options.mode,
-    accounting: { version: 1, budgetPolicy: "provider-limit" },
+    ...(options.monitoring ? { monitoring: true } : {}),
     cases,
-    plan: buildPlan(cases, options),
-    code: await fingerprints(),
-    graderHash,
-    runnerHash,
+    exclusions,
+    sourceManifestHash: hash(suite),
+    profiles: selectedProfiles,
+    ...(comparison ? { comparison } : {}),
+    plan: buildMatrixPlan(cases, selectedProfiles, options),
+    code,
     browserBinarySha256: process.env.XPATHED_BROWSER_BINARY_SHA256 ?? null,
-    stagehand: {
-      version: "4.1.0",
-      packageLockHash: hash(
-        await readFile(new URL("./stagehand/package-lock.json", import.meta.url), "utf8"),
-      ),
+    policy: defaultPolicy,
+    qualification: {
+      ...(artifact ? { artifact } : {}),
+      policySha256: hash(defaultPolicy),
+      frozenAt: now,
     },
-    policy: {
-      selection: "first singleton; whole explicit plural set",
-      actionExecution: false,
-      retries: 0,
+    measurement: {
+      latencyProtocol: "resolver-http-v1",
+      latency:
+        "Browser: complete Resolver HTTP response, independent setup and grading excluded. Offline: Resolver CLI inference process, preparation excluded.",
+      serving: "standard",
       responseReuse: false,
-      comparison: "whole configurations; strategy prompts and DOM representations differ",
+      healing: false,
+      actionExecution: false,
       retentionDays: 90,
       evidenceDays: 30,
     },
   };
-  manifest.plan.trials = manifest.plan.trials.map((t) => ({ ...t, id: randomUUID() }));
-  manifest.contentHash = hash(manifest);
-  await save(join(output, "manifest.json"), manifest);
+  manifest.plan.trials = manifest.plan.trials.map((trial) => ({
+    ...trial,
+    id: randomUUID().replaceAll("-", ""),
+  }));
   const services = {
-    browser: process.env.EVALUATION_BROWSER_URL ?? "http://browser:8080",
-    resolver: process.env.EVALUATION_RESOLVER_URL ?? "http://resolver:8080",
-    fixture: process.env.EVALUATION_FIXTURE_URL ?? "http://evaluation-fixture:8090",
-    stagehand: process.env.EVALUATION_STAGEHAND_URL ?? "http://stagehand:8092",
+    browser: process.env.XPATHED_BROWSER_URL ?? "http://browser:8080",
+    fixture: process.env.XPATHED_FIXTURE_URL ?? "http://evaluation-fixture:8090",
   };
-  const trials = [];
-  let proxy;
-  let deterministicProxy;
-  async function pair(spec, planned, mode) {
-    const arms = ["custom", "stagehand"].map((strategy) => ({
-      ...planned,
-      id: `${planned.id}-${strategy}`,
-      strategy,
-      mode,
-      attemptId: hash(`${planned.id}-${strategy}`).slice(0, 32),
-      cardinality: spec.cardinality,
-      createdAt: new Date().toISOString(),
-    }));
-    let session, page;
-    try {
-      for (const arm of arms)
-        await request(
-          `${services.fixture}/trial`,
-          { id: arm.id, caseId: spec.id },
-          options.timeoutMs,
-        );
-      session = await request(`${services.browser}/sessions`, {}, options.timeoutMs);
-      page = await request(
-        `${services.browser}/pages/${session.pageId}/navigate`,
-        { url: `${services.fixture}/fixture?trial=${arms[0].id}` },
-        options.timeoutMs,
-      );
-      arms[0].environment = await command(
-        services.fixture,
-        arms[0].id,
-        { kind: "baseline", setup: spec.setup ?? {} },
-        options.timeoutMs,
-      );
-      arms[1].adapterEnvironment = await request(
-        `${services.stagehand}/prepare`,
+  const inferenceProfiles = comparison
+    ? [
+        ...selectedProfiles,
         {
-          url: `${services.fixture}/fixture?trial=${arms[1].id}`,
-          viewport: arms[0].environment.viewport,
+          ...comparison.profile,
+          id: "release-baseline",
+          resolver: "http://resolver-baseline:8080",
         },
-        options.timeoutMs,
+      ]
+    : selectedProfiles;
+  const trials = [];
+  let proxy, deterministicProxy, runError;
+  async function runTrial(spec, planned, reference = false, retain) {
+    const profile = inferenceProfiles.find((profile) => profile.id === planned.profileId);
+    const trial = {
+      ...planned,
+      mode: options.mode,
+      createdAt: new Date().toISOString(),
+      result: null,
+      evidence: null,
+    };
+    if (retain) await retain(trial);
+    if (options.mode === "live") proxy.beginAttempt(trial.id, profile.id);
+    if (spec.track === "offline-selection")
+      await executeOffline(spec, trial, output, options.timeoutMs, reference);
+    else
+      await execute(spec, trial, options, {
+        ...services,
+        ...(reference ? { browser: "http://browser-baseline:8080" } : {}),
+        resolver: profile.resolver,
+      });
+    trial.configuration = configurationRecord(trial);
+    if (options.mode === "live") {
+      await proxy.awaitIdle();
+      const calls = proxy.records.filter((record) => record.attemptId === trial.id);
+      trial.provider = calls.map(({ request, response, ...metadata }) => metadata);
+      trial.evidence = { ...trial.evidence, provider: calls };
+    }
+    trial.grade = gradeTrial(spec, trial);
+    if (!reference)
+      await savePairedTrial(
+        join(output, "trials"),
+        trial,
+        comparison
+          ? (retain) =>
+              runTrial(
+                spec,
+                {
+                  ...planned,
+                  id: hash(`${planned.id}:baseline`).slice(0, 32),
+                  profileId: "release-baseline",
+                },
+                true,
+                retain,
+              )
+          : null,
       );
-      for (const arm of arms.slice(1))
-        arm.environment = await command(
-          services.fixture,
-          arm.id,
-          { kind: "baseline", setup: spec.setup ?? {} },
-          options.timeoutMs,
-        );
-      assertParity(arms[0].environment, arms[1].environment);
-      if (
-        !process.env.XPATHED_BROWSER_BINARY_SHA256 ||
-        arms[1].adapterEnvironment.browserBinarySha256 !== process.env.XPATHED_BROWSER_BINARY_SHA256
-      )
-        throw new Error("Browser parity mismatch: Chromium binary");
-      // Alternate arm order by repetition; preparation and independent grading are not timed.
-      const order = planned.repetition % 2 ? arms : [...arms].reverse();
-      for (const arm of order) {
-        const start = performance.now();
-        try {
-          if (mode === "live") proxy.beginAttempt(arm.id);
-          if (arm.strategy === "custom") {
-            const envelope = await request(
-              `${services.resolver}/internal/pages/${session.pageId}/resolve`,
-              { instruction: spec.instruction, documentId: page.documentId, contractVersion: "3" },
-              options.timeoutMs,
-              { "X-Xpathed-Attempt-Id": arm.attemptId },
-            );
-            arm.result = envelope.result;
-            arm.evidence = envelope.evidence;
-            arm.configuration = configurationRecord(arm);
-            arm.modelCalls = arm.result.diagnostics?.modelCalls ?? null;
-            if (
-              arm.result.pageId !== session.pageId ||
-              arm.result.documentId !== page.documentId ||
-              arm.result.attemptId !== arm.attemptId
-            )
-              throw new Error("Resolution identity mismatch");
-          } else {
-            const raw = await request(
-              `${services.stagehand}/observe`,
-              {
-                instruction: spec.instruction,
-                cardinality: spec.cardinality,
-                mode,
-                deterministic:
-                  mode === "deterministic"
-                    ? {
-                        elements: spec.provider.actions
-                          .filter((a) => a.outcome === "found")
-                          .map((a) => ({
-                            ...a,
-                            role: a.tag,
-                            method: a.action,
-                            index: ["scoped-save", "nested-frame"].includes(spec.id)
-                              ? 1
-                              : (a.index ?? 0),
-                          })),
-                      }
-                    : undefined,
-              },
-              options.timeoutMs,
-            );
-            arm.result = normalizeStagehand(raw);
-            arm.evidence = { adapter: raw };
-            arm.modelCalls = raw.modelCalls ?? null;
-            arm.cache = raw.metadata?.cache ?? null;
-            arm.configuration = {
-              strategy: "stagehand",
-              version: raw.stagehandVersion,
-              prompts: (raw.modelInputs ?? []).map((input) => ({
-                promptHash: hash(input.systemPrompt ?? ""),
-                schemaHash: hash(input.responseFormat ?? {}),
-              })),
-            };
-          }
-          arm.elapsedMs = performance.now() - start;
-          arm.observation = await command(
-            services.fixture,
-            arm.id,
-            {
-              kind: "observe",
-              expected: spec.expected.actions.map((a) => a.target ?? null),
-              actions: arm.result.actions,
-            },
-            options.timeoutMs,
-          );
-          const input = JSON.stringify(arm.evidence);
-          arm.observation.oracleLeak = (spec.oracleSentinels ?? []).some((s) => input.includes(s));
-          arm.observation.privacyLeak = (spec.privacySentinels ?? []).some((s) =>
-            input.includes(s),
-          );
-        } catch (error) {
-          arm.error = { message: error.message };
-          arm.elapsedMs ??= performance.now() - start;
-        }
-        if (mode === "live") {
-          await proxy.awaitIdle();
-          const calls = proxy.records.filter((r) => r.attemptId === arm.id);
-          arm.evidence = { ...arm.evidence, provider: calls };
-          arm.provider = calls.map(({ request, response, ...metadata }) => metadata);
-        }
-      }
-    } catch (error) {
-      for (const arm of arms) arm.error ??= { message: error.message };
-    } finally {
-      try {
-        if (session) {
-          const response = await fetch(`${services.browser}/sessions/${session.sessionId}`, {
-            method: "DELETE",
-            signal: AbortSignal.timeout(options.timeoutMs),
-          });
-          if (!response.ok) throw new Error(`Browser cleanup HTTP ${response.status}`);
-        }
-      } catch (error) {
-        arms[0].error ??= { message: error.message };
-      }
-      try {
-        await request(`${services.stagehand}/reset`, {}, options.timeoutMs);
-      } catch (error) {
-        arms[1].error ??= { message: `Stagehand cleanup: ${error.message}` };
-      }
-    }
-    for (const arm of arms) {
-      arm.grade = gradeComparison(spec, arm, manifest.accounting.budgetPolicy);
-      await save(join(output, "trials", `${arm.id}.json`), arm);
-    }
-    return arms;
+    return trial;
   }
   try {
-    deterministicProxy = createServer(async (req, res) => {
-      try {
-        const chunks = [];
-        let size = 0;
-        for await (const chunk of req) {
-          size += chunk.length;
-          if (size > 2_000_000) throw new Error("Request too large");
-          chunks.push(chunk);
-        }
-        const upstream = await fetch(`${services.fixture}${req.url}`, {
-          method: req.method,
-          headers: { "Content-Type": "application/json" },
-          body: req.method === "POST" ? Buffer.concat(chunks) : undefined,
-          signal: AbortSignal.timeout(options.timeoutMs),
-        });
-        res.writeHead(upstream.status, { "Content-Type": "application/json" });
-        res.end(await upstream.text());
-      } catch {
-        res.writeHead(502);
-        res.end();
-      }
-    });
-    deterministicProxy.listen(8091, "0.0.0.0");
-    await once(deterministicProxy, "listening");
     if (options.mode === "live") {
-      const gates = [];
-      for (const caseId of ["basic-save", "single-action-plural-confirmations"]) {
-        const spec = selectCases(caseId)[0];
-        gates.push(
-          ...(await pair(
-            spec,
-            { id: `compatibility-${randomUUID()}`, caseId, repetition: 1, attempt: 1 },
-            "deterministic",
-          )),
-        );
-      }
-      await save(
-        join(output, "compatibility.json"),
-        gates.map(({ id, caseId, strategy, grade }) => ({ id, caseId, strategy, grade })),
-      );
-      if (!gates.every((t) => t.grade.passed))
-        throw new Error("Deterministic compatibility gate failed; no paid calls made");
-      await new Promise((resolve) => deterministicProxy.close(resolve));
-      deterministicProxy = undefined;
-      const { createBudgetProxy } = await import("./comparison-budget.mjs");
+      const { createBudgetProxy } = await import("./provider.mjs");
       await mkdir(join(output, "provider"));
       proxy = await createBudgetProxy({
+        profiles: inferenceProfiles,
         ledgerPath:
           process.env.XPATHED_BUDGET_PATH ?? resolve(".artifacts/datasets/experiment-budget.json"),
-        onRecord: async (record) => {
-          await writeFile(
+        onRecord: (record) =>
+          writeFile(
             join(output, "provider", `${record.id}.json`),
             JSON.stringify(record, null, 2) + "\n",
             { mode: 0o600 },
-          );
-        },
+          ),
       });
+      manifest.accounting = { version: 1, budgetPolicy: "provider-limit" };
+      manifest.pricing = Object.fromEntries(
+        proxy.profiles.map((profile) => [profile.id, profile.pricing]),
+      );
       proxy.server.listen(8091, "0.0.0.0");
       await once(proxy.server, "listening");
+    } else {
+      deterministicProxy = fixtureProxy(services.fixture, options.timeoutMs);
+      deterministicProxy.listen(8091, "0.0.0.0");
+      await once(deterministicProxy, "listening");
     }
+    manifest.contentHash = hash(manifest);
+    await save(join(output, "manifest.json"), manifest);
     for (const planned of manifest.plan.trials) {
-      trials.push(
-        ...(await pair(
-          cases.find((c) => c.id === planned.caseId),
-          planned,
-          options.mode,
-        )),
+      const trial = await runTrial(
+        cases.find((spec) => spec.id === planned.caseId),
+        planned,
       );
+      trials.push(trial);
+      console.log(
+        `${trial.grade.passed ? "PASS" : "FAIL"} ${trial.profileId} ${trial.caseId} ${Math.round(trial.elapsedMs ?? 0)}ms`,
+      );
+      if (
+        [...(trial.provider ?? []), ...(trial.baseline?.provider ?? [])].some(
+          (call) => call.identityValid === false || call.responseCacheHit,
+        )
+      )
+        throw new Error("Provider identity or response reuse invalid");
     }
-    const report = summarizePairs(manifest, trials);
-    await save(join(output, "summary.json"), report);
-    console.log(JSON.stringify(report, null, 2));
-    return report.passed ? 0 : 1;
+  } catch (error) {
+    runError = { message: error.message };
+    await save(join(output, "run-error.json"), runError);
+    if (!manifest.contentHash) {
+      manifest.contentHash = hash(manifest);
+      await save(join(output, "manifest.json"), manifest);
+    }
   } finally {
     await proxy?.close();
     if (deterministicProxy) await new Promise((resolve) => deterministicProxy.close(resolve));
   }
+  const summary = summarizeQualification(manifest, trials, defaultPolicy);
+  await save(join(output, "summary.json"), summary);
+  printSummary(summary);
+  // Monitoring compares with its saved measurements in the host, after container attestation.
+  return runError || trials.length !== manifest.plan.trials.length
+    ? 1
+    : options.monitoring
+      ? 0
+      : options.mode === "live"
+        ? summary.qualifiedCandidates.length
+          ? 0
+          : 1
+        : trials.some((trial) => !trial.grade.passed)
+          ? 1
+          : 0;
 }
-
 if (import.meta.main)
   main()
     .then((code) => {

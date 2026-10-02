@@ -6,25 +6,21 @@ mode=deterministic
 comparison=false
 qualification=false
 context=false
-phase=pilot
-split=development
-profile=luna,gemini,deepseek
-pilot=
+profile=deepseek
 repetitions=1
 seed=1
 timeout=45000
 case_id=
 output=
 suite=
-forecast_only=
-sentinels=
+monitoring=
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --) shift; continue ;;
     --comparison) comparison=true; shift; continue ;;
     --qualification) qualification=true; shift; continue ;;
     --context) context=true; shift; continue ;;
-    --mode|--repetitions|--seed|--timeout-ms|--case|--output|--suite|--phase|--split|--profile|--pilot|--forecast-only|--sentinels)
+    --mode|--repetitions|--seed|--timeout-ms|--case|--output|--suite|--profile|--monitoring)
       if [ "$#" -lt 2 ]; then echo "Missing value for $1" >&2; exit 2; fi
       case "$1" in
         --mode) mode=$2 ;;
@@ -34,33 +30,26 @@ while [ "$#" -gt 0 ]; do
         --case) case_id=$2 ;;
         --output) output=$2 ;;
         --suite) suite=$2 ;;
-        --phase) phase=$2 ;;
-        --split) split=$2 ;;
         --profile) profile=$2 ;;
-        --pilot) pilot=$2 ;;
-        --forecast-only) forecast_only=$2 ;;
-        --sentinels) sentinels=$2 ;;
+        --monitoring) monitoring=$2 ;;
       esac
       shift 2 ;;
     *) echo "Unknown evaluation option: $1" >&2; exit 2 ;;
   esac
 done
-if [ -n "$sentinels" ] && [ "$qualification" != true ]; then echo "Sentinels require the qualification runner" >&2; exit 2; fi
+if [ -n "$monitoring" ] && [ "$qualification" != true ]; then echo "Monitoring requires the comparison runner" >&2; exit 2; fi
 if [ -n "${XPATHED_RELEASE_STATE:-}" ]; then
   if [ "$qualification" != true ] || [ -z "${XPATHED_RELEASE_OVERLAY:-}" ] || [ -z "${XPATHED_RELEASE_SERVICE:-}" ]; then echo "Artifact qualification requires its verified launcher" >&2; exit 2; fi
 fi
 if { [ "$comparison" = true ] && [ "$qualification" = true ]; } || { [ "$context" = true ] && { [ "$comparison" = true ] || [ "$qualification" = true ]; }; }; then echo "Choose one evaluation mode" >&2; exit 2; fi
 if [ "$context" = true ]; then
-  if [ -n "$suite" ] || [ -n "$forecast_only" ] || [ -n "$case_id" ] || [ "$repetitions" != 1 ] || [ "$seed" != 1 ]; then echo "Context comparison uses one attempt and its reviewed current-view suite" >&2; exit 2; fi
-  suite=evaluation/viewport-baseline-cases.json
+  if [ -n "$suite" ] || [ -n "$case_id" ] || [ "$repetitions" != 1 ] || [ "$seed" != 1 ]; then echo "Context comparison uses one attempt and its reviewed current-view suite" >&2; exit 2; fi
+  suite=evaluation/research/viewport-cases.json
 fi
-if [ "$qualification" != true ] && { [ "$phase" != pilot ] || [ "$split" != development ] || [ "$profile" != luna,gemini,deepseek ] || [ -n "$pilot" ]; }; then echo "Qualification options require --qualification" >&2; exit 2; fi
+if [ "$qualification" != true ] && [ "$profile" != deepseek ]; then echo "Model profile requires qualification mode" >&2; exit 2; fi
 if [ "$qualification" = true ]; then
-  case "$suite" in
-    ''|evaluation/qualification-cases.json|evaluation/viewport-baseline-cases.json|evaluation/current-view-qualification-cases.json) ;;
-    *) echo "Qualification requires a reviewed built-in suite" >&2; exit 2 ;;
-  esac
-  suite=${suite:-evaluation/qualification-cases.json}
+  case "$suite" in ''|evaluation/cases/index.json) ;; *) echo "Release qualification uses the complete reviewed collection" >&2; exit 2 ;; esac
+  suite=${suite:-evaluation/cases/index.json}
 fi
 if [ "$comparison" = true ] && [ -n "$suite" ]; then echo "Comparison uses its reviewed fixture subset" >&2; exit 2; fi
 export XPATHED_COMPARISON_MODE=$mode
@@ -81,25 +70,12 @@ if [ "$context" = true ]; then set -- --mode "$mode" --timeout-ms "$timeout" --o
 if [ -n "$case_id" ]; then set -- "$@" --case "$case_id"; fi
 # Reuse the runner's validation before starting services or creating artifacts.
 if [ "$qualification" = true ]; then
-  set -- "$@" --phase "$phase" --split "$split" --profile "$profile"
-  if [ -n "$forecast_only" ]; then set -- "$@" --forecast-only "$forecast_only"; fi
-  if [ -n "$sentinels" ]; then set -- "$@" --sentinels "$sentinels"; fi
-  if [ -n "$pilot" ]; then
-    pilot=$(node --input-type=module -e '
-      import { realpathSync, statSync } from "node:fs";
-      import { relative, isAbsolute } from "node:path";
-      const path = realpathSync(process.argv[1]);
-      const rel = relative(realpathSync(process.cwd()), path);
-      if (!rel || rel.startsWith("..") || isAbsolute(rel) || !statSync(path).isDirectory()) throw new Error("Pilot must be an artifact directory under this checkout");
-      process.stdout.write("/workspace/" + rel);
-    ' "$pilot")
-    set -- "$@" --pilot "$pilot"
-  fi
-  node --input-type=module -e 'import { parseQualificationOptions } from "./evaluation/qualify.mjs"; parseQualificationOptions(process.argv.slice(1));' -- "$@"
+  set -- "$@" --profile "$profile"
+  if [ -n "$monitoring" ]; then set -- "$@" --monitoring "$monitoring"; fi
+  node --input-type=module -e 'import { parseQualificationOptions } from "./evaluation/compare.mjs"; parseQualificationOptions(process.argv.slice(1));' -- "$@"
 elif [ "$context" = true ]; then
-  node --input-type=module -e 'import { parseContextOptions } from "./evaluation/context-experiment.mjs"; parseContextOptions(process.argv.slice(1));' -- "$@"
+  node --input-type=module -e 'import { parseContextOptions } from "./evaluation/research/context.mjs"; parseContextOptions(process.argv.slice(1));' -- "$@"
 else
-  if [ -n "$forecast_only" ]; then echo "Forecast preparation requires qualification" >&2; exit 2; fi
   node --input-type=module -e 'import { parseOptions } from "./evaluation/run.mjs"; parseOptions(process.argv.slice(1));' -- "$@"
 fi
 
@@ -124,7 +100,7 @@ evaluation_env=${XPATHED_ENV_FILE:-/dev/null}
 if [ "$mode" = live ] && [ -z "${XPATHED_ENV_FILE:-}" ] && [ -f .env ]; then evaluation_env=.env; fi
 if [ "$mode" = live ]; then
   OPENROUTER_EVAL_API_KEY=$(node --input-type=module -e '
-    import { readEvaluationKey } from "./evaluation/comparison-budget.mjs";
+    import { readEvaluationKey } from "./evaluation/provider.mjs";
     const key = await readEvaluationKey();
     if (!key) throw new Error("Set OPENROUTER_EVAL_API_KEY for live evaluation");
     process.stdout.write(key);
@@ -193,7 +169,7 @@ release_started=false
 cleanup() {
   status=$?
   if [ "$release_started" = true ]; then
-    node scripts/release-evaluate.mjs attest "$XPATHED_RELEASE_STATE" after >/dev/null || status=1
+    node scripts/release/evaluate.mjs attest "$XPATHED_RELEASE_STATE" after >/dev/null || status=1
   fi
   compose down || status=1
   rmdir "$evaluation_lock" || status=1
@@ -221,7 +197,7 @@ if [ -n "${XPATHED_RELEASE_STATE:-}" ]; then
   else
     compose up --no-build --pull never --wait browser "$XPATHED_RELEASE_SERVICE" evaluation-fixture
   fi
-  XPATHED_RELEASE_ARTIFACT_JSON=$(node scripts/release-evaluate.mjs attest "$XPATHED_RELEASE_STATE" before)
+  XPATHED_RELEASE_ARTIFACT_JSON=$(node scripts/release/evaluate.mjs attest "$XPATHED_RELEASE_STATE" before)
   export XPATHED_RELEASE_ARTIFACT_JSON
   release_started=true
 elif [ "$context" = true ]; then
@@ -245,21 +221,21 @@ echo "Evaluation artifacts: $XPATHED_EVALUATION_OUTPUT"
 if [ "$context" = true ]; then
   compose exec -T evaluation-fixture node /checks/ready.mjs http://resolver-context:8080/health
   browser_binary_hash=$(compose exec -T browser sh -c 'sha256sum /ms-playwright/chromium-*/chrome-linux*/chrome' | awk '{print $1}')
-  compose exec -T -e "XPATHED_BROWSER_BINARY_SHA256=$browser_binary_hash" evaluation-fixture node /evaluation/context-experiment.mjs "$@"
+  compose exec -T -e "XPATHED_BROWSER_BINARY_SHA256=$browser_binary_hash" evaluation-fixture node /evaluation/research/context.mjs "$@"
 elif [ "$qualification" = true ]; then
   if [ -z "${XPATHED_RELEASE_STATE:-}" ]; then
     compose exec -T evaluation-fixture node /checks/ready.mjs http://resolver-luna:8080/health http://resolver-gemini:8080/health http://resolver-deepseek-concise:8080/health http://resolver-qwen:8080/health
   fi
   browser_binary_hash=$(compose exec -T browser sh -c 'sha256sum /ms-playwright/chromium-*/chrome-linux*/chrome' | awk '{print $1}')
   if [ -n "${XPATHED_RELEASE_STATE:-}" ]; then
-    compose exec -T -e "XPATHED_BROWSER_BINARY_SHA256=$browser_binary_hash" -e "XPATHED_RELEASE_ARTIFACT_JSON=$XPATHED_RELEASE_ARTIFACT_JSON" -e "XPATHED_RELEASE_COMPARISON_JSON=${XPATHED_RELEASE_COMPARISON_JSON:-}" evaluation-fixture node /evaluation/qualify.mjs "$@"
+    compose exec -T -e "XPATHED_BROWSER_BINARY_SHA256=$browser_binary_hash" -e "XPATHED_RELEASE_ARTIFACT_JSON=$XPATHED_RELEASE_ARTIFACT_JSON" -e "XPATHED_RELEASE_COMPARISON_JSON=${XPATHED_RELEASE_COMPARISON_JSON:-}" evaluation-fixture node /evaluation/compare.mjs "$@"
   else
-    compose exec -T -e "XPATHED_BROWSER_BINARY_SHA256=$browser_binary_hash" evaluation-fixture node /evaluation/qualify.mjs "$@"
+    compose exec -T -e "XPATHED_BROWSER_BINARY_SHA256=$browser_binary_hash" evaluation-fixture node /evaluation/compare.mjs "$@"
   fi
 elif [ "$comparison" = true ]; then
   compose exec -T evaluation-fixture node /checks/ready.mjs http://stagehand:8092/health
   browser_binary_hash=$(compose exec -T browser sh -c 'sha256sum /ms-playwright/chromium-*/chrome-linux*/chrome' | awk '{print $1}')
-  compose exec -T -e "XPATHED_BROWSER_BINARY_SHA256=$browser_binary_hash" evaluation-fixture node /evaluation/compare.mjs "$@"
+  compose exec -T -e "XPATHED_BROWSER_BINARY_SHA256=$browser_binary_hash" evaluation-fixture node /evaluation/research/compare.mjs "$@"
 else
   compose exec -T evaluation-fixture node /evaluation/run.mjs "$@"
 fi

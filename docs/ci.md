@@ -50,9 +50,9 @@ Stack checks reuse [dotnet format verification](https://learn.microsoft.com/en-u
 
 After its checks succeed, each selected job writes a receipt containing the actual checkout SHA, workflow run and attempt, job identity and workflow/package/SDK fingerprints. Each .NET matrix member has its own receipt. The final `check` job requires exactly the selected receipts and successful job results. Missing, unexpected, stale, skipped, cancelled or failed selected jobs fail the gate; unselected jobs must be skipped.
 
-The browser job runs `pnpm evaluate --mode deterministic` with a fresh output directory and isolated Compose project. It builds only Browser, Resolver and the controlled evaluation fixture. It has no OpenRouter key, reads no local `.env`, and uses the fixture model endpoint with response reuse disabled. The same job also runs the complete current-view qualification suite with deterministic responses and retains its separate evidence. Persistence remains a separate PostgreSQL-only job.
+The browser job runs `pnpm evaluate --mode deterministic` with a fresh output directory and isolated Compose project. It builds only Browser, Resolver and the controlled evaluation fixture. It has no OpenRouter key, reads no local `.env`, and uses the fixture model endpoint with response reuse disabled. The shared case catalog includes current-view, compatibility and deterministic locator coverage in one run. Persistence remains a separate PostgreSQL-only job.
 
-Both the browser receipt and aggregate replay the saved browser evidence through the existing grader. They require the complete original `evaluation/cases.json` suite, one first attempt per case, matching source/configuration identities and a saved summary equal to replay. Partial, retried, live, missing or failing results cannot pass. These are deterministic engineering checks; they do not measure model quality or qualify a release.
+Both the browser receipt and aggregate replay the saved browser evidence through the existing grader. They require the complete original `evaluation/cases/index.json` suite, one first attempt per case, matching source/configuration identities and a saved summary equal to replay. Partial, retried, live, missing or failing results cannot pass. These are deterministic engineering checks; they do not measure model quality or qualify a release.
 
 ## Evidence and reruns
 
@@ -66,7 +66,17 @@ Only these explicit paths are uploaded. Local datasets, environment files, user 
 
 Inspect the failing job and `gate.json` before rerunning. **Rerun the entire workflow**, not only failed jobs: every selected receipt must belong to the same attempt. GitHub's **Re-run all jobs** or `gh run rerun RUN_ID` creates a fresh attempt without mixing earlier results. A new commit gets its own PR check; after merge, verify the separate push run against the merged SHA.
 
-Local gate tests run through `pnpm test:tooling`; they exercise the public receipt/verification CLI, including negative status, identity, coverage and artifact cases. Use `pnpm evaluate` for the real-browser suite. Paid model testing remains separate from these automatic checks. The manually dispatched [release workflow](releases.md#manual-github-qualification) uses a dedicated secret and durable shared accounting. Provider key limits control spending; qualification has no local monetary ceiling or PR/push trigger. The separate Release Monitoring workflow runs frozen approved sentinels nightly with the evaluation key, and fails missing approval/evidence without substituting development code. Release Promotion explicitly verifies and selects an approval without deploying to a local workspace. Both use the shared evaluation concurrency group and preserve authoritative release state.
+Local gate tests run through `pnpm test:tooling`; they exercise receipt/verification boundaries, including negative status, identity, coverage and artifact cases. Use `pnpm evaluate` for the real-browser suite. Ordinary CI remains provider-free.
+
+## Release PR checks
+
+The accepted flow keeps feature PRs into `main`, then evaluates a trusted same-repository `main` → `release` PR. **Release Qualification** waits for ordinary CI to pass on the exact evaluated revision, freezes candidate and approved baseline images, and runs the complete paired live Resolver collection using `OPENROUTER_EVAL_API_KEY`. It includes reviewed offline dataset selection in the same report with its own denominator. One current policy blocks every lost baseline pass; latency and cost, including missing billing metadata, are informational. Required missing inputs, provider failures, safety violations and artifact mismatches still fail.
+
+A release PR's `github.sha` identifies the temporary merged result. **Release Promotion**, triggered by merging that PR, verifies the latest successful comparison, passing checks, unchanged PR head, equal final source tree and unchanged approved baseline before selecting the saved tested images. A changed tree or baseline requires a new run. It never rebuilds the candidate or deploys into the local workspace. A manually merged failing PR cannot bypass approval verification.
+
+Qualification, promotion and monitoring share the evaluation concurrency group. **Release Monitoring** repeats the complete frozen approved collection nightly against saved approval measurements, with one live arm and no automatic model switch or activation. Historical `v1.0.0` monitoring continues through its archived runner and original receipt until the next approval.
+
+These workflow definitions require operational validation after publication. The digest-pinned private dataset asset must also be published before hosted fetching can succeed. See [release setup and verification](releases.md) for the remaining external steps; configuration alone is not proof of a successful hosted run.
 
 ## Account controls remain separate
 

@@ -1,27 +1,9 @@
 name: Release Promotion
 
 on:
-  workflow_dispatch:
-    inputs:
-      operation:
-        description: Explicitly select a qualified release or the retained previous approval
-        type: choice
-        options: [promote, rollback]
-        required: true
-      candidate_tag:
-        description: Exact candidate tag for promotion (ignored for rollback)
-        type: string
-      candidate_sha256:
-        description: Independently retained candidate digest for promotion
-        type: string
-      expected_current:
-        description: Current approved candidate digest, or none for the first approval
-        type: string
-        required: true
-      reason:
-        description: Reason retained in the approval audit
-        type: string
-        required: true
+  pull_request:
+    branches: [release]
+    types: [closed]
 
 permissions:
   contents: read
@@ -32,11 +14,13 @@ concurrency:
 
 jobs:
   promotion:
-    if: github.ref == 'refs/heads/main' && github.event.repository.private
+    if: github.event.pull_request.merged && github.event.repository.private && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.head.ref == 'main'
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 20
     permissions:
       contents: write
+      actions: read
+      checks: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -45,17 +29,7 @@ jobs:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24.16.0
-      - name: Verify and select the explicit release
+      - name: Approve the exact tested merge
         env:
           GH_TOKEN: ${{ github.token }}
-          OPERATION: ${{ inputs.operation }}
-          CANDIDATE_TAG: ${{ inputs.candidate_tag }}
-          CANDIDATE_SHA256: ${{ inputs.candidate_sha256 }}
-          EXPECTED_CURRENT: ${{ inputs.expected_current }}
-          REASON: ${{ inputs.reason }}
-        run: |
-          if [ "$OPERATION" = promote ]; then
-            node scripts/release-control.mjs promote --tag "$CANDIDATE_TAG" --sha256 "$CANDIDATE_SHA256" --expected-current "$EXPECTED_CURRENT" --reason "$REASON"
-          else
-            node scripts/release-control.mjs rollback --expected-current "$EXPECTED_CURRENT" --reason "$REASON"
-          fi
+        run: node scripts/release/promote-pr.mjs
