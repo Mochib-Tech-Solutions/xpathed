@@ -105,12 +105,13 @@ The hosted runner uses Linux ARM64. Validate its Docker image-store identity and
 
 ## Release versions and notes
 
-The package version starts at `1.0.0`. Qualification publishes sequential SemVer candidates (`v1.0.0-rc.1`, `v1.0.0-rc.2`) with model/provider settings, policy version, both arms' correctness and median/p95 latency, reported/unknown costs, qualification status and GitHub-generated changelog. Failed and incomplete runs remain explicitly unapproved. Bump `package.json` before beginning candidates for the next stable version.
+The package version starts at `1.0.0`. Qualification publishes sequential SemVer candidates (`v1.0.0-rc.1`, `v1.0.0-rc.2`) with model/provider settings, policy version, both arms' correctness and median/p95 latency, reported/unknown costs, qualification status and [GitHub-generated changelog](https://docs.github.com/en/repositories/releasing-projects-on-github/automatically-generated-release-notes). Failed and incomplete runs remain explicitly unapproved. Bump `package.json` before beginning candidates for the next stable version.
 
 After successful qualification, retain the candidate digest, source SHA and original candidate tag. Publish the same verified assets under the stable tag before selecting that tag for approval; do not rebuild or replace files. For the first release:
 
 ```sh
-gh release edit v1.0.0-rc.1 --tag v1.0.0 --target QUALIFIED_SOURCE_SHA --prerelease
+gh api --method POST repos/Mochib-Tech-Solutions/xpathed/git/refs -f ref=refs/tags/v1.0.0 -f sha=QUALIFIED_SOURCE_SHA
+gh release edit v1.0.0-rc.1 --tag v1.0.0 --verify-tag --prerelease
 pnpm release:promote --tag v1.0.0 --sha256 CANDIDATE_DIGEST --expected-current none --reason "Reviewed exact-image qualification"
 gh release edit v1.0.0 --title "xpathed v1.0.0" --prerelease=false --latest
 ```

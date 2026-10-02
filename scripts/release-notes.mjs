@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { readFile, writeFile } from "node:fs/promises";
+import { readFile, writeFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
 
 export function nextCandidateTag(version, tags) {
@@ -35,8 +35,6 @@ export function releaseNotes({
   runUrl,
 }) {
   const lines = [
-    `# xpathed ${tag}`,
-    "",
     mode === "deterministic"
       ? "**Deterministic checks only. Live model qualification and approval are pending.**"
       : qualified
@@ -45,6 +43,7 @@ export function releaseNotes({
     "",
     "## Model and configuration",
     "",
+    `- Release version: \`${tag}\``,
     `- Model: \`${profile.model}\``,
     `- Provider: \`${profile.provider}\` through OpenRouter`,
     `- Profile: \`${profile.id}\`; prompt variant: \`${profile.variant}\``,
@@ -72,13 +71,17 @@ export function releaseNotes({
   const known = calls.filter((call) => Number.isFinite(call.reportedUsd));
   lines.push(
     "",
-    `Provider calls: **${calls.length}** across both arms. Reported cost: **$${known.reduce((sum, call) => sum + call.reportedUsd, 0).toFixed(8)} USD**; ${calls.length - known.length} calls have unknown cost.`,
+    `Retained provider calls: **${calls.length}** across both arms. Known reported subtotal: **$${known.reduce((sum, call) => sum + call.reportedUsd, 0).toFixed(8)} USD**; ${calls.length - known.length} calls have unknown cost.`,
   );
   for (const phase of phases) {
     const reasons = phase.comparison?.reasons ?? [];
     if (reasons.length)
       lines.push(`- ${phase.name}: ${reasons.map((reason) => `\`${reason}\``).join(", ")}.`);
     if (phase.error) lines.push(`- ${phase.name}: ${phase.error}`);
+    if (phase.incompleteAccounting)
+      lines.push(
+        `- ${phase.name}: accounting inventory is incomplete; the authoritative ledger retains pending attempts. The subtotal is not a complete charge total.`,
+      );
   }
   lines.push(
     "",
@@ -109,6 +112,33 @@ async function optionalJson(path) {
   }
 }
 
+export async function phaseNotes(directory, name, profileId) {
+  const manifest = await optionalJson(join(directory, "manifest.json"));
+  const summary = await optionalJson(join(directory, "summary.json"));
+  let files = [];
+  try {
+    files = await readdir(join(directory, "provider"));
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
+  }
+  const records = new Map();
+  for (const file of files.filter((file) => file.endsWith(".json"))) {
+    const record = await optionalJson(join(directory, "provider", file));
+    if (!record?.id || records.has(record.id)) throw new Error("Invalid provider record inventory");
+    records.set(record.id, record);
+  }
+  const calls = [...records.values()].filter((record) => record.forwarded);
+  return {
+    name,
+    calls,
+    comparison: summary?.profiles?.[profileId]?.qualification?.comparison,
+    error: (await optionalJson(join(directory, "run-error.json")))?.message,
+    incompleteAccounting:
+      Boolean(manifest) &&
+      calls.length !== manifest.plan.trials.length * (manifest.comparison ? 2 : 1),
+  };
+}
+
 async function main() {
   const root = process.argv[2];
   if (!root || process.argv.length !== 3) throw new Error("Use release-notes.mjs RUN_DIRECTORY");
@@ -116,33 +146,21 @@ async function main() {
     execFileSync("gh", args, { encoding: "utf8", maxBuffer: 8 * 1024 * 1024 });
   const { version } = JSON.parse(await readFile("package.json", "utf8"));
   const releases = JSON.parse(gh("release", "list", "--limit", "1000", "--json", "tagName"));
-  const tag = nextCandidateTag(
-    version,
-    releases.map((release) => release.tagName),
+  const refs = JSON.parse(
+    gh("api", `repos/${process.env.GITHUB_REPOSITORY}/git/matching-refs/tags/v${version}`),
   );
+  const tag = nextCandidateTag(version, [
+    ...releases.map((release) => release.tagName),
+    ...refs.map(({ ref }) => ref.slice("refs/tags/".length)),
+  ]);
   const preflight = JSON.parse(await readFile(join(root, "preflight.json"), "utf8"));
   const { profile } = JSON.parse(await readFile(join(root, "bundle/configuration.json"), "utf8"));
   const policy = JSON.parse(
     await readFile("evaluation/current-view-qualification-policy.json", "utf8"),
   );
   const phases = [];
-  for (const name of ["pilot", "confirmation"]) {
-    const directory = join(root, name);
-    const manifest = await optionalJson(join(directory, "manifest.json"));
-    const summary = await optionalJson(join(directory, "summary.json"));
-    const calls = [];
-    for (const planned of manifest?.plan?.trials ?? []) {
-      const trial = await optionalJson(join(directory, "trials", `${planned.id}.json`));
-      for (const arm of [trial, trial?.baseline])
-        calls.push(...(arm?.provider ?? []).filter((call) => call.forwarded));
-    }
-    phases.push({
-      name,
-      calls,
-      comparison: summary?.profiles?.[profile.id]?.qualification?.comparison,
-      error: (await optionalJson(join(directory, "run-error.json")))?.message,
-    });
-  }
+  for (const name of ["pilot", "confirmation"])
+    phases.push(await phaseNotes(join(root, name), name, profile.id));
   const generated = JSON.parse(
     gh(
       "api",

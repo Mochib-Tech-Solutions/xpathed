@@ -1,12 +1,33 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { nextCandidateTag, releaseNotes } from "./release-notes.mjs";
+import { nextCandidateTag, releaseNotes, phaseNotes } from "./release-notes.mjs";
+import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 
 test("release candidates follow the package version and never overwrite a stable release", () => {
   assert.equal(nextCandidateTag("1.0.0", ["candidate-123-1"]), "v1.0.0-rc.1");
   assert.equal(nextCandidateTag("1.0.0", ["v1.0.0-rc.2", "v1.0.0-rc.9"]), "v1.0.0-rc.10");
   assert.throws(() => nextCandidateTag("1.0.0", ["v1.0.0"]), /Bump/);
   assert.throws(() => nextCandidateTag("01.0.0", []), /MAJOR/);
+});
+
+test("interrupted trial reporting retains provider records without a completed trial", async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), "xpathed-release-notes-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  await mkdir(join(directory, "provider"));
+  await writeFile(
+    join(directory, "manifest.json"),
+    JSON.stringify({ plan: { trials: [{ id: "trial" }] }, comparison: {} }),
+  );
+  await writeFile(
+    join(directory, "provider", "paid.json"),
+    JSON.stringify({ id: "paid", forwarded: true, reportedUsd: 0.002 }),
+  );
+  const phase = await phaseNotes(directory, "pilot", "deepseek");
+  assert.equal(phase.calls.length, 1);
+  assert.equal(phase.calls[0].reportedUsd, 0.002);
+  assert.equal(phase.incompleteAccounting, true);
 });
 
 test("release notes show both arms, incomplete qualification and unknown charges honestly", () => {

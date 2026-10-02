@@ -79,7 +79,8 @@ jobs:
             if [ -f .artifacts/release-ci/release-evidence.json.gz ]; then
               evidence=(.artifacts/release-ci/release-evidence.json.gz .artifacts/release-ci/candidate-sha256.txt)
             fi
-            gh release create "$tag" --target "$GITHUB_SHA" --draft --prerelease --title "xpathed $tag" --notes-file .artifacts/release-ci/release-notes.md \
+            gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" -f "ref=refs/tags/$tag" -f "sha=$GITHUB_SHA" > /dev/null
+            gh release create "$tag" --verify-tag --target "$GITHUB_SHA" --draft --prerelease --title "xpathed $tag" --notes-file .artifacts/release-ci/release-notes.md \
               "$bundle/manifest.json" "$bundle/configuration.json" "$bundle/source.tar" .artifacts/release-ci/transport/images.tar.gz.part-* \
               .artifacts/release-ci/bundle-sha256.txt "${evidence[@]}"
             gh release edit "$tag" --draft=false
