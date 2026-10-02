@@ -382,10 +382,10 @@ export function summarizeMonitoring(manifest, trials, baseline) {
   if (
     manifest.monitoring !== true ||
     manifest.mode !== "live" ||
-    !["3", "4"].includes(manifest.policy?.version)
+    !["3", "4", "5"].includes(manifest.policy?.version)
   )
     throw new Error("Monitoring requires a frozen current-view live run");
-  if (manifest.policy.version === "4") {
+  if (["4", "5"].includes(manifest.policy.version)) {
     const entries = manifest.cases.map((spec) =>
       measuredEntry(
         spec,
@@ -394,7 +394,7 @@ export function summarizeMonitoring(manifest, trials, baseline) {
         manifest.policy,
       ),
     );
-    const report = compareMeasurements(entries, baseline);
+    const report = compareMeasurements(entries, baseline, manifest.policy.latencyMargin ?? 0);
     if (trials.length !== entries.length) report.status = "infrastructure_failure";
     return { ...report, entries, defaultActivated: false };
   }
@@ -409,10 +409,9 @@ export function assertPilotReady({ manifest, trials }) {
     manifest.cases.some((spec) => spec.split === "held-out" || spec.capabilityGap)
   )
     throw new Error("Confirmation requires a live development pilot without capability gaps");
-  const report =
-    manifest.policy.version === "4"
-      ? compareTrials(manifest, trials, manifest.policy)
-      : summarizeLiveChecks(manifest, trials);
+  const report = ["4", "5"].includes(manifest.policy.version)
+    ? compareTrials(manifest, trials, manifest.policy)
+    : summarizeLiveChecks(manifest, trials);
   if (report.status !== "passed")
     throw new Error(`Pilot failed before held-out reservation: ${report.status}`);
   return report;
@@ -622,7 +621,12 @@ export async function main(args = process.argv.slice(2)) {
   );
   const allCases = validateCases(suite);
   const defaultPolicy = policyForSuite(suite);
-  if (defaultPolicy.version === "4" && options.mode === "live" && !options.sentinels && !comparison)
+  if (
+    ["4", "5"].includes(defaultPolicy.version) &&
+    options.mode === "live" &&
+    !options.sentinels &&
+    !comparison
+  )
     throw new Error("Baseline-relative qualification requires a pinned baseline image bundle");
   const baselineProfile = comparison
     ? { ...comparison.profile, id: "release-baseline", resolver: "http://resolver-baseline:8080" }

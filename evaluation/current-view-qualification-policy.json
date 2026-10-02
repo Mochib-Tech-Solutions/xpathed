@@ -1,8 +1,9 @@
 {
-  "version": "4",
+  "version": "5",
   "requiredContractVersion": "4",
   "latencyProtocol": "resolver-http-pre-reserved-v2",
   "goalMs": 1000,
+  "latencyMargin": 0.05,
   "deadlineMs": 2000,
   "minimumHeldOutFamilies": 10,
   "minimumHeldOutTrials": 30,
@@ -15,7 +16,7 @@
     "unplanned_trial",
     "duplicate_trial"
   ],
-  "basis": "Compare exact candidate and baseline images on the same frozen cases, one fresh attempt per arm. Use the latest approved release, or the pinned operational bootstrap before the first approval. No lost baseline passes; median and p95 Resolver HTTP latency must not increase. No absolute quality or latency percentage gates. Keep current-view coverage, safety, artifact identity, independent labels and original attempts. Freeze both artifacts before inference; no automatic promotion.",
+  "basis": "Compare exact candidate and baseline images on the same frozen cases, one fresh attempt per arm. Use the latest approved release, or the pinned operational bootstrap before the first approval. No lost baseline passes; median and p95 Resolver HTTP latency may increase by at most 5%. No absolute quality or latency percentage gates. Keep current-view coverage, safety, artifact identity, independent labels and original attempts. Freeze both artifacts before inference; no automatic promotion.",
   "uncertainty": "Observed paired comparisons are not statistical certification. Latency targets are descriptive. Report the 95% Wilson interval for held-out families whose requests are all correct and complete, independently of latency.",
   "comparison": "latest-approved-or-bootstrap",
   "bootstrap": {

@@ -439,7 +439,7 @@ async function evidence(options) {
   }
   const pilot = await load(options.pilot, "pilot");
   const confirmation = await load(options.confirmation, "confirmation");
-  if (defaultPolicy.version === "4") {
+  if (["4", "5"].includes(defaultPolicy.version)) {
     ensure(
       artifact && pilot.manifest.comparison && confirmation.manifest.comparison,
       "Relative qualification requires exact candidate and baseline artifacts",
