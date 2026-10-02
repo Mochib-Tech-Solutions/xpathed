@@ -164,10 +164,11 @@ internal sealed class BrowserPageCapture(BrowserPageRuntime page, string scope) 
             throw new ApiException(409, "capture_budget_exceeded", "The capture is incomplete.");
         }
         var timer = Stopwatch.StartNew();
+        var scanBudget = 20000;
         foreach (var frame in frames)
         {
             CheckBudget(timer);
-            await frame.RefreshAsync((int)(2000 - timer.ElapsedMilliseconds));
+            scanBudget -= await frame.RefreshAsync((int)(2000 - timer.ElapsedMilliseconds), scanBudget);
             await SelectFrameAsync(frame, null, "unsupported", timer);
         }
         var validated = new List<ValidatedAction>();

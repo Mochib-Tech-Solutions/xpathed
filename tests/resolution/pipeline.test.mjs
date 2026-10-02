@@ -361,26 +361,51 @@ test("instruction resolves through client, resolver, provider and managed browse
   }
 });
 
-test("genuine absence is a semantic not_found after full capture and current-document validation", async () => {
-  await json(`${fixture}/scenario`, "POST", { name: "absent" });
-  const session = await json(`${client}/api/sessions`, "POST");
-  const run = randomUUID();
-  try {
-    const page = await json(`${client}/api/pages/${session.pageId}/navigate`, "POST", {
-      url: `${fixture}/fixture?run=${run}`,
-    });
-    const result = await json(`${client}/api/pages/${session.pageId}/resolve`, "POST", {
-      instruction: "Click the missing Contact button.",
-      documentId: page.documentId,
-    });
-    assert.equal(result.outcome, "not_found");
-    assert.equal(result.target, null);
-    assert.equal(result.diagnostics.capture.complete, true);
-    assert.equal(result.diagnostics.modelInputComplete, true);
-  } finally {
-    await fetch(`${client}/api/sessions/${session.sessionId}`, { method: "DELETE" });
-  }
-});
+for (const contractVersion of ["1", "4"])
+  test(`genuine absence preserves its inspected scope through ClientApi (version ${contractVersion})`, async () => {
+    await json(
+      `${fixture}/scenario`,
+      "POST",
+      contractVersion === "4"
+        ? {
+            name: "batch",
+            actions: [
+              { step: 1, instruction: "Click Contact", action: "click", outcome: "not_found" },
+            ],
+          }
+        : { name: "absent" },
+    );
+    const session = await json(`${client}/api/sessions`, "POST");
+    const run = randomUUID();
+    try {
+      const page = await json(`${client}/api/pages/${session.pageId}/navigate`, "POST", {
+        url: `${fixture}/fixture?run=${run}`,
+      });
+      const result = await json(`${client}/api/pages/${session.pageId}/resolve`, "POST", {
+        instruction: "Click the missing Contact button.",
+        contractVersion,
+        documentId: page.documentId,
+      });
+      assert.equal(result.outcome, "not_found");
+      assert.equal(result.target, null);
+      const message =
+        contractVersion === "4" ? result.actions[0].message : result.diagnostics.message;
+      assert.equal(
+        message,
+        contractVersion === "4"
+          ? "No matching element found in the current view."
+          : "No matching element found in the eligible current-page scope.",
+      );
+      if (contractVersion === "4") {
+        assert.equal(result.summary.notFound, 1);
+        assert.equal(result.summary.found, 0);
+      }
+      assert.equal(result.diagnostics.capture.complete, true);
+      assert.equal(result.diagnostics.modelInputComplete, true);
+    } finally {
+      await fetch(`${client}/api/sessions/${session.sessionId}`, { method: "DELETE" });
+    }
+  });
 
 test("ClientApi preserves disabled, off-screen and hover assessments and scopes hidden-only absence", async () => {
   const session = await json(`${client}/api/sessions`, "POST");

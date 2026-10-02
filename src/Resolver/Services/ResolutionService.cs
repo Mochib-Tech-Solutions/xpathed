@@ -409,6 +409,8 @@ public sealed partial class ResolutionService(
                                                 .Candidates.Single(candidate => candidate.Id == item.CandidateId)
                                                 .Frame
                                         )
+                                            || request.ContractVersion == "4"
+                                                && verified.Target?.State?.InViewport != true
                                         : verified.Target is not null
                                 )
                             )
@@ -790,9 +792,12 @@ public sealed partial class ResolutionService(
         throw new ApiException(
             (int)response.StatusCode,
             code,
-            code == "inactive_page"
-                ? "The active tab changed. Resolve the instruction again."
-                : "The browser could not validate the current page and target."
+            code switch
+            {
+                "inactive_page" => "The active tab changed. Resolve the instruction again.",
+                "stale_capture" => "The page or current view changed. Resolve the instruction again.",
+                _ => "The browser could not validate the current page and target.",
+            }
         );
     }
 }

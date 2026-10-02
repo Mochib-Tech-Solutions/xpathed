@@ -124,7 +124,8 @@ internal sealed class DeterministicServicesHandler : HttpMessageHandler
                                 .Select(item => item.GetProperty("actionId").GetString())
                                 .FirstOrDefault(),
                         }
-                    )
+                    ),
+                SelectionStatus
             );
         }
         if (path == "/pages/page-1/selection")
