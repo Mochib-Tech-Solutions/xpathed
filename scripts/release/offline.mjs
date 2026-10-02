@@ -129,6 +129,7 @@ export function startOfflineWorker(state, docker) {
     }
     if (failure) throw failure;
   })();
+  void running.catch(() => {});
   return async () => {
     stopped = true;
     await running;
