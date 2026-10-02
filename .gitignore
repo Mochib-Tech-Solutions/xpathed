@@ -9,3 +9,4 @@
 artifacts/
 .artifacts/
 .DS_Store
+/.pnpm-store/
