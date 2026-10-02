@@ -1,159 +1,91 @@
-# From an instruction to a verified XPath
+# How xpathed resolves an instruction
 
-“Hover over OK under Employee” sounds simple. A page might contain six OK buttons, two Employee sections, an open dialog and a disabled control. A useful answer has to identify the intended element, locate it in the actual browser and explain whether hovering over it is currently possible.
+“Hover over OK under Employee” requires more than matching text. Several OK buttons may exist, and the intended one may be covered or disabled. xpathed separates language interpretation, locator verification and readiness so each result explains what was established.
 
-xpathed is a local workspace for resolving natural-language instructions to XPath. Its central design decision is to give the language model one job: select targets from observed page candidates. Browser code constructs the XPath and checks it against the retained element. This makes the uncertain part of the system measurable while keeping locator verification deterministic.
+## Service ownership
 
-This walkthrough follows that command through the implemented system. The [resolution contract](resolution.md) contains exact schemas and policies; the [runtime reference](runtime.md) contains endpoints and configuration.
+![Service ownership and request paths](diagrams/system-design.svg)
 
-## The system in one picture
+Web owns chat, tabs and the noVNC viewer. ClientApi accepts requests and stores diagnostics. Resolver coordinates capture, model selection and verification. Browser owns Playwright, Chromium and live page state. PostgreSQL retains diagnostic records. `Common` defines the records exchanged between services.
 
-[![Five-service architecture showing the workspace, ClientApi, Resolver, Browser, PostgreSQL and the external model provider.](diagrams/system-design.svg)](diagrams/system-design.svg)
-
-The application runs as five Docker services:
-
-| Service        | What it owns                                                    | Why that boundary matters                                                       |
-| -------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| **Web**        | React chat, tabs, address bar and noVNC browser viewer          | The instruction and visible page share one active-page identity.                |
-| **ClientApi**  | Workspace API, request forwarding and diagnostic recording      | Persistence stays outside the resolver.                                         |
-| **Resolver**   | Capture → model selection → verification orchestration          | It carries request data without owning browser objects or a database.           |
-| **Browser**    | Playwright, Chromium, live pages, capture, XPath and highlights | The service observing an element also verifies its identity.                    |
-| **PostgreSQL** | Sanitized diagnostic records                                    | Evidence can survive a session without pretending to restore its browser state. |
-
-OpenRouter is an external dependency used by Resolver. The shared `Common` project defines serializable contracts; it is a library, not another service.
-
-Each managed session has its own Chromium process, browser context and display. noVNC lets the user interact with that browser through the workspace. The client owns the tab controls, while Browser owns the real pages. Operations are serialized within each session; separate sessions have separate locks.
+Each managed session owns a Chromium process, browser context and display. Operations are serialized within the session. Viewer and resolver share the active page ID; navigation changes its document ID, and a capture identifies one temporary element inventory. Tab switches invalidate captures.
 
 ## Follow one command
 
-[![Resolution flow from an English command through candidate capture, model selection, browser verification and a highlighted result.](diagrams/resolution-flow.svg)](diagrams/resolution-flow.svg)
+![Capture, selection, browser verification and response](diagrams/resolution-flow.svg)
 
-### 1. Establish which page the instruction means
+### 1. Capture the current view
 
-The user enters a website address, opens the Employee section manually and submits:
+Web sends the instruction, active `pageId`, `documentId` and contract version to ClientApi. After opening a diagnostic attempt, ClientApi calls Resolver, which requests a Browser capture.
 
-> Hover over OK under Employee.
+Browser retains live nodes locally and assigns temporary candidate IDs. The model-visible descriptions contain sanitized names, roles, section/row context, state, geometry, supported CSS colors and frame context. In our example, the Employee heading distinguishes its OK button from other OK buttons.
 
-Web sends the active `pageId`, its `documentId`, the instruction and contract version `4`. ClientApi starts an internal diagnostic attempt and calls Resolver. Resolver asks Browser to capture that same page.
+Hidden and accessibility-excluded elements are omitted. Partially visible, disabled and covered controls remain candidates. Fully off-screen targets are outside the current view. Budgets bound documents, visited elements, candidates, bytes and time; exceeding one fails capture rather than claiming absence from a partial inventory.
 
-The identifiers guard different kinds of change: a tab is a page; a navigation replaces its document; a capture identifies one temporary inventory of elements. Browser rejects an inactive page or outdated document. Switching tabs invalidates the old capture, even if the user switches back.
+Passwords, editable values, cookies, storage and URL attributes are excluded. Native button captions are a narrow value-attribute exception. Images are identified by accessible names, not pixels. Arbitrary page text can still contain sensitive content.
 
-The current workspace resolves **one interaction across one or more targets in the current viewport**. “Hover over all OK buttons under Employee” is supported within that view. “Open Employee, then hover over OK” requires a future page state and is rejected as a whole. Older API contracts retain their documented page-wide behavior.
+### 2. Select targets with one model call
 
-### 2. Turn the live DOM into candidates
+Resolver sends the instruction and every scoped candidate to OpenRouter. The model returns strict JSON: one shared interaction, distinct candidate IDs and per-target outcomes. It receives page text as untrusted data and has no browser tools.
 
-Browser traverses the main document and supported nested frames. It retains the actual nodes locally and gives each candidate a temporary ID. Resolver receives a compact description containing useful evidence:
+The development default is DeepSeek V4.1 Flash through Wafer. `ActionSelectionStrategy` owns prompt/schema validation; `OpenRouterGateway` owns transport, pinned provider settings and accounting. No model is trained or fine-tuned locally.
 
-- Element tag, role, accessible label and safe text.
-- Labels and headings from surrounding sections or rows.
-- State such as disabled or readonly, and geometry relative to the main viewport.
-- Supported CSS foreground, background and border colors, with explicit gaps where appearance cannot be established.
-- Frame identity and safe frame labels.
+Resolver checks IDs, action consistency, duplicates and completeness. Ambiguity, scoped absence, unsupported instructions and malformed output remain distinct. Valid JSON cannot establish whether the selected button was intended; independent evaluation supplies that check.
 
-For the example, an OK button's label identifies the control, while its Employee heading distinguishes it from an OK button under Department. The heading is context; it is not another button to return.
+### 3. Build and verify XPath
 
-Eligibility and readiness are separate. Hidden or accessibility-excluded content is outside the supported candidate set. An intersecting disabled, covered or partially visible control remains a candidate: it may be exactly what the user meant. Off-screen targets are outside contract 4's scope.
+Browser retrieves each retained target and tries explicit test attributes, meaningful section/row scope, labels and semantic attributes, then ordinary anchors and structural fallback.
 
-Capture excludes current editable values, passwords, cookies, storage and URL attributes. Accessible names use a documented, sanitized DOM policy rather than forwarding a raw accessibility snapshot. Button captions stored in native button `value` attributes are a narrow exception. Image identity comes from accessible names such as alt text; the system does not interpret image pixels.
-
-Capture has explicit limits on documents, visited elements, retained candidates, bytes and time. Exceeding a limit produces an incomplete-capture error. A truncated inventory cannot support a confident “not found.” The current bounds and naming rules live in the [capture contract](resolution.md#capture-and-validation).
-
-### 3. Ask the model to identify the target
-
-Resolver sends the original instruction and every captured candidate through one inference call. The prompt treats candidate text as untrusted page data. The model has no browser tools and returns structured JSON containing the interaction, selected candidate IDs and per-target outcomes.
-
-For our example, the expected interpretation is `hover`, with the candidate ID belonging to the OK button under Employee. The model can also report scoped absence or an unsupported instruction. Ambiguity requires a clearer name, section or position.
-
-Resolver validates the response beyond JSON syntax: selected IDs must exist in the capture, entries must obey the contract, targets must be distinct and all entries must share one interaction. A model-declared incomplete enumeration is an error. Schema compliance alone cannot establish that the model understood the instruction or found every intended target; independent evaluation measures those questions.
-
-The [selection prompt and validation](../src/Resolver/Services/ActionSelectionStrategy.cs) are ordinary versioned source. The gateway owns provider transport and settings. This keeps experiments in model choice separate from browser correctness.
-
-### 4. Construct and verify one XPath
-
-Browser receives the selected candidate ID and retrieves its retained node. It tries XPath expressions in a defined order:
-
-1. Explicit test attributes such as `data-testid`.
-2. Target semantics inside meaningful sections, rows or landmarks.
-3. Native label associations and unscoped semantic attributes or text.
-4. Ordinary IDs/names, attribute combinations and broader ancestor context.
-5. A structural path as the final fallback.
-
-For a simple illustrative page containing `<section><h2>Employee</h2><button>OK</button></section>`, the resulting expression could be:
+For suitable markup, the Employee button might resolve to:
 
 ```xpath
 //section[h2[normalize-space(.)='Employee']]//button[normalize-space(.)='OK']
 ```
 
-Every proposed expression must match **exactly one node in the target's whole document**, and that node must be the retained target. A matching string or a unique result alone is insufficient. Generated-looking IDs are avoided as literal anchors, and semantic scope helps a saved XPath remain specific when another OK button appears elsewhere.
+Every expression must match exactly one node in the target's whole document, identical to the retained node. The model can still choose the wrong button and receive a valid XPath for it.
 
-These checks establish locator identity at validation time. A model can still choose the wrong OK button and receive a perfectly valid XPath for it. That is why evaluation needs independently labelled targets, and why saved-locator tests must exercise later DOM changes separately.
+An XPath cannot cross iframe boundaries. Results therefore carry an ordered frame chain plus the XPath inside the target document. Browser checks those frame identities, including cross-origin frames it owns through Playwright. Shadow-root XPath targets and unsupported frame transforms remain limitations.
 
-### 5. Recheck the view and observe readiness
+### 4. Recheck state and return
 
-The page can change while the model is answering. Browser verifies the document, frame and capture identities, then rechecks the current-view membership. A changed viewport, scroll position or candidate membership can invalidate the capture. Absence also goes through revalidation: an old empty view must not justify a new “not found” response.
+Before returning, Browser rechecks document/frame identities and current-view membership. Changed scroll position, viewport or candidate membership can invalidate the capture. Absence is revalidated too.
 
-Browser then evaluates the observations relevant to the requested interaction. For hover, readiness checks include viewport membership and pointer reception at a sampled point in the clipped target area; rendering is reported separately. Nested frames require the point to reach the target through every containing document.
+Readiness checks depend on the interaction. Hover includes viewport membership and pointer reception at a sampled point; nested frames require that point to reach the target through each containing document. A covered target can be found with a valid XPath and blocked readiness. These observations do not dispatch events or establish a business outcome.
 
-The result keeps four questions distinct:
+Browser highlights found targets. Web shows the shared action, then each target's identity, XPath, verification, limitations and cost. Highlights persist during mouse movement and scrolling; input or invalidation clears them. Chat results stay in each tab's client memory.
 
-| Question                                                   | What establishes it                                                       |
-| ---------------------------------------------------------- | ------------------------------------------------------------------------- |
-| Did we select the intended element?                        | Independently labelled evaluation; live model selection remains fallible. |
-| Does the XPath locate the selected element?                | Unique, same-node browser verification.                                   |
-| Is the element observably ready for this action?           | Action-specific passive state and hit-point checks.                       |
-| Did the action achieve the application's intended outcome? | Outside this prototype's resolution flow; no action is executed.          |
+Estimated and provider-reported cost remain separate; missing accounting is unknown. Cancelled requests may still incur charges. Two seconds is a latency measurement, not a total-response cutoff.
 
-A covered OK button can be **found** with a verified XPath and **blocked** readiness. A passing pointer check describes the sampled point, not every point or event handler. Highlights add DOM decorations that page mutation observers can detect. Stability, dispatched events and business outcomes remain untested. Custom-control behavior can remain unsupported even when element identity is established.
+## Storage and failure investigation
 
-### 6. Show the result and retain diagnostic evidence
+ClientApi's `ResolutionRecorder` starts a pending record, calls Resolver and completes the same attempt. A retry has a new ID. `DiagnosticStore` and EF Core's `AppDbContext` own persistence; Resolver does not depend on the database.
 
-Browser highlights every found target. Web presents the interpreted action once, followed by each target's accessible identity, XPath and verification details. Mixed found/missing results retain their separate outcomes. Highlights follow manual scrolling and remain during mouse movement; browser clicks, keypresses, a new instruction or invalidation clear them.
+The sole application table, `diagnostic_records`, stores scalar identity, outcome and retention fields alongside `ResultJson`, `EvidenceJson` and `ProvenanceJson`. Page/time and expiration indexes support lookup and cleanup. Page IDs are diagnostic references, not restorable browser sessions.
 
-Each tab keeps its own chat draft and results in client memory. A historical response belongs to the document that produced it and cannot become a fresh highlight in another tab. Reset chat clears only the active tab's conversation.
+Each database write has a two-second allowance. Storage failure is logged separately without replacing the resolution outcome. Ordinary records expire after 90 days and evidence after 30 by default; retained artifacts have explicit exceptions.
 
-ClientApi records bounded, sanitized evidence in PostgreSQL: the original attempt identity, result, configuration, timings and available usage/cost. Recording failure is reported operationally and does not turn a successful resolution into a semantic failure. Records have retention limits and internal operator access; they do not recreate a browser session. See [backend diagnostics](diagnostics.md).
+Investigate by attempt/trace ID, configuration, stage and reason code. Determine whether the failure occurred during capture, provider transport, response validation or browser verification. Semantic mistakes require an independently known intended target. Expired or withheld evidence limits the conclusion. The [diagnostics guide](diagnostics.md) includes the schema, commands and a worked example.
 
-Cost estimates and provider-reported charges remain separate. Missing accounting is unknown, not zero. A cancelled provider request may still incur a charge; bounded late accounting records what becomes available without rewriting the original failed attempt. Two seconds is a speed measurement, not an end-to-end cutoff that discards otherwise valid results.
+## Extending and integrating
 
-## Why frames need more than an XPath
+| Change                      | Implementation boundary                                        |
+| --------------------------- | -------------------------------------------------------------- |
+| Model or route              | `OPENROUTER_MODEL`, `OPENROUTER_PROVIDER`, `OpenRouterGateway` |
+| Prompt or interpretation    | `ActionSelectionStrategy`                                      |
+| Model-visible context       | `CandidateSelectionStrategy.PrepareInput`                      |
+| Capture, XPath or readiness | `BrowserPageCapture`, `BrowserCaptureScript`                   |
+| Diagnostic persistence      | `ResolutionRecorder`, `DiagnosticStore`, `AppDbContext`        |
 
-An XPath is evaluated within one document. It cannot cross an iframe boundary by itself.
+These are source boundaries. `candidate-selection-v1` is the only runtime strategy; the optional context planner is evaluation-only. Changes require corresponding target, contract, privacy and browser checks.
 
-For a button inside an embedded Employee application, xpathed returns the target's XPath **and** an ordered frame chain. Each chain entry locates a frame owner in the preceding document; the final XPath runs inside the target's document. Browser retains and verifies those frame identities. A frame navigation invalidates the capture.
+A caller can resolve against an xpathed-owned page with `POST /api/pages/{pageId}/resolve`, supplying `instruction`, `documentId` and `contractVersion: "4"`. An external runner's browser needs a new adapter or an ownership change; raw HTML cannot attach it to today's API.
 
-Both same-origin and cross-origin frames can be inspected through Browser's Playwright ownership. Detected open shadow roots and unsupported frame transforms remain explicit boundaries. Closed shadow roots cannot be detected. The system cannot establish absence inside content it could not inspect. [ADR-0012](adr/0012-keep-frame-context-separate-from-xpath.md) explains the frame design.
+The consuming runner would own action-time revalidation, execution and postconditions. Browser ownership, cancellation, authentication and evidence retention need an explicit agreement. No action executor or external-runner adapter is implemented.
 
-## The trade-offs behind this design
+## Deployment limits
 
-| Decision                                   | Benefit                                                                                    | Cost or limit                                                                                     |
-| ------------------------------------------ | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
-| Select candidate IDs, then construct XPath | Browser verification is independent of model-generated locator text.                       | Selection quality depends on the captured evidence and model interpretation.                      |
-| Resolve the current view                   | The scope matches what the user can inspect; “all” has an explicit boundary.               | Off-screen and future-state targets require manual navigation and a new request.                  |
-| Inspect passively                          | Resolution preserves focus, form and scroll state without performing the requested action. | Observed readiness cannot prove successful execution.                                             |
-| Preserve complete scoped input             | Missing candidates cannot silently disappear behind a context filter.                      | Large pages can exceed an explicit resource budget and fail.                                      |
-| Keep browser state in one owner            | Nodes, frames, captures and highlights share one lifecycle.                                | Browser sessions consume processes and displays; scaling needs session-aware capacity management. |
-| Keep diagnostics separate                  | Failures can be investigated without adding persistence to Resolver.                       | Redacted evidence may be insufficient to reproduce the original page.                             |
+The local deployment preserves Chromium's sandbox, separate session contexts and origin checks. Hosted authentication and a production network-access policy are additional work.
 
-Privacy relies on restricted capture fields and additional persistence sanitization. Arbitrary page text can still contain sensitive content; this is not a guarantee that every secret in a website will be recognized. Prompt instructions and schema validation reduce the model's authority, but do not prove resistance to every malicious page instruction.
+Resolver is stateless between requests; Browser owns processes, displays and handles. Scaling needs authenticated routing to the owning worker, capacity limits and failed-worker cleanup. Measure session memory, CPU, queue time, provider limits and complete-response latency before sizing; this project has no production-throughput benchmark.
 
-The local deployment preserves Chromium's sandbox, separate session contexts and origin checks. Browser/debugging ports are not published. It is a local prototype, with no hosted tenant-authentication or production network-access policy. The [runtime security details](runtime.md) document the implemented boundary.
-
-## Integrating with a test runner
-
-The proposed integration point is between a test instruction and the platform's existing action executor. A test runner would supply the current page context and instruction; a resolver component would return target identity, frame context, XPath and readiness observations. The executor would own revalidation at execution time, action delivery and assertions about the application's response.
-
-That integration has not been implemented. The current prototype owns its browser instead of attaching to an existing test-runner session. Adapting browser ownership, authentication and evidence access would require an explicit platform contract. Executing an action would also introduce a new race between resolution and execution, so a stored XPath should never be treated as permanently verified.
-
-The immediate engineering question is measurable: **does the system select the intended elements reliably across realistic page states?** Continue with [the engineering journey](engineering-journey.md) for model choices, experiments and evaluation evidence. The [evaluation reference](evaluation.md) covers running those checks; [release operations](releases.md) explains how tested images are approved and explicitly activated.
-
-## Read the implementation
-
-| Start here                                                                                                                                              | Responsibility                                                    |
-| ------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
-| [`useWorkspace.ts`](../src/Web/src/features/workspace/useWorkspace.ts)                                                                                  | Active page, per-tab conversation and request lifecycle.          |
-| [`ResolutionService.cs`](../src/Resolver/Services/ResolutionService.cs)                                                                                 | Capture, inference, response validation and browser verification. |
-| [`CandidateSelectionStrategy.cs`](../src/Resolver/Services/CandidateSelectionStrategy.cs)                                                               | Compact model input projection.                                   |
-| [`ActionSelectionStrategy.cs`](../src/Resolver/Services/ActionSelectionStrategy.cs)                                                                     | Current-view prompt, schema and selection validation.             |
-| [`BrowserSessions.cs`](../src/Browser/Sessions/BrowserSessions.cs)                                                                                      | Serialized page operations, identity checks and highlights.       |
-| [`BrowserPageCapture.cs`](../src/Browser/Sessions/BrowserPageCapture.cs) / [`BrowserCaptureScript.cs`](../src/Browser/Sessions/BrowserCaptureScript.cs) | Frame traversal, DOM evidence, XPath ranking and passive checks.  |
-| [`ResolutionRecorder.cs`](../src/ClientApi/Diagnostics/ResolutionRecorder.cs)                                                                           | Request-owned diagnostic recording.                               |
+Use the [runtime reference](runtime.md) and [resolution contract](resolution.md) for exact fields, budgets and lifecycle rules.

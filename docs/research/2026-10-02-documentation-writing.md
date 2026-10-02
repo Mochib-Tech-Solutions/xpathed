@@ -1,63 +1,44 @@
-# Writing xpathed for a technical reviewer
+# Writing and illustrating xpathed
 
-Research date: 2026-10-02. This note records the writing approach for the project documentation. It is editorial guidance, not a change to the product contract.
+Research date: 2026-10-02. Editorial guidance for the current project documentation; product behavior remains defined by the implementation and accepted contracts.
 
-## What the reader needs
+## Write for a new technical reader
 
-The documentation should explain the natural-language-to-XPath resolver, its architecture, evaluation, deployment and trade-offs. A new reader should be able to understand the design, run the prototype and inspect the evidence without reconstructing the project from issue history.
+The README should answer what xpathed does, why its design matters and how to run it. Put detailed contracts and operating procedures in their existing guides. GitHub recommends this introductory role and relative links to longer documentation. [GitHub: About READMEs](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-readmes)
 
-The previous README already contained useful implementation details. Its opening mixed session behavior, keyboard shortcuts, highlights, costs, frame handling and historical results in one long paragraph. The core design appeared much later: a model selects targets from page evidence; application code builds and verifies their XPath expressions. Setup, contributor conventions and release operations competed for attention. These are observations from the README reviewed for this rewrite.
+Assume the reader understands software engineering but has never seen this repository. Define browser ownership, target selection and XPath verification when introduced. State each article's purpose early; organize around the reader's questions. [Google: Audience](https://developers.google.com/tech-writing/one/audience), [Google: Documents](https://developers.google.com/tech-writing/one/documents)
 
-## Principles from primary sources
+Give each document one job: introduction and setup, design explanation, contract reference or operating procedure. Explanation should include reasons and trade-offs. Describe the current approach directly; dated research preserves previous experiments without turning the main article into a change diary. [Diátaxis: Explanation](https://diataxis.fr/explanation/)
 
-### Make the README an entry point
+Use one concrete instruction to connect the stages: capture candidates, select targets, construct XPath, then verify identity. Label illustrative inputs and outputs. Netlify's authoring guidance recommends descriptive titles, practical examples and useful next steps. [Netlify: Writing a guide](https://developers.netlify.com/guides/contributing-to-the-netlify-developer-hub/#guidance-for-writing-a-guide)
 
-GitHub describes the README as the visitor's introduction: what the project does, why it is useful and how to start. It recommends moving longer documentation elsewhere and using relative links within the repository. For xpathed, the README should answer those questions first, then link to the engineering explanation and existing operating guides. A full command inventory and versioned contract belong in their reference documents. [GitHub: About READMEs](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-readmes)
+Keep sentences short and links selective. Explain the essential point where it appears; link once to its detailed treatment. Keep provenance beside measured claims. [Google: Cross-references](https://developers.google.com/style/cross-references)
 
-### Explain for someone who has never seen the repository
+## Draw what the implementation establishes
 
-Google's technical-writing guidance starts with the reader's existing knowledge and intended outcome. It recommends stating the document's scope, summarizing the main points early and organizing around the audience's questions. Assume a reviewer understands software engineering but needs an explanation of xpathed's browser ownership, target selection and verification boundary. Define unfamiliar terms when introduced. [Google: Audience](https://developers.google.com/tech-writing/one/audience), [Google: Documents](https://developers.google.com/tech-writing/one/documents)
+Give each diagram one takeaway and a useful caption. Separate service ownership, request flow and release decisions. Label arrows with the data or operation crossing the boundary. Use scalable SVG and inspect it at normal article width. [Google: Illustrations](https://developers.google.com/tech-writing/two/illustrations), [C4: Notation](https://c4model.com/diagrams/notation)
 
-### Give each document a clear job
+The diagnostic diagram must reflect the EF mapping and migration: one application table, three JSONB columns and explicit indexes. Identifiers are not automatically foreign keys; embedded objects are not child tables. JSONB supports indexing, but the project defines no JSONB query index. [PostgreSQL: JSON types](https://www.postgresql.org/docs/current/datatype-json.html)
 
-Diátaxis separates learning, task completion, reference and explanation. Its explanation guidance explicitly includes constraints, history, alternatives and reasons for decisions. Apply that distinction using the repository's existing files: the README introduces and starts the project; the engineering article explains decisions; runtime and resolution docs define behavior; evaluation and release guides explain how to operate those workflows. Link between them instead of copying entire sections. [Diátaxis: Start here](https://diataxis.fr/start-here/), [Diátaxis: Explanation](https://diataxis.fr/explanation/)
+Preserve headings, meaningful link text and image alternatives. Essential information must exist in text, and diagrams must remain understandable without color. [Google: Accessible documentation](https://developers.google.com/style/accessibility)
 
-### Give the article a concrete promise and a worked example
+## Graphify: observed fit
 
-Netlify's first-party authoring guidance recommends a descriptive title, a short introduction explaining relevance, an early summary, practical examples and useful next steps. For xpathed, open with a concrete instruction and the problem it creates: an element can have the right text while still being the wrong target. Follow that example through capture, selection, XPath construction and verification. Label illustrative HTML and outputs so readers do not mistake them for measured runs. [Netlify: Guidance for writing a guide](https://developers.netlify.com/guides/contributing-to-the-netlify-developer-hub/#guidance-for-writing-a-guide)
+Graphify builds code/document relationship graphs and distinguishes extracted from inferred edges. Code-only extraction uses local AST parsing. Its official package is `graphifyy`; its command is `graphify`. [Graphify: source and command reference](https://github.com/Graphify-Labs/graphify)
 
-### Give each diagram one takeaway
+We ran version 0.9.74 in an isolated temporary environment against tracked `src/` at `3557f552f643e01485bc96586c35b4bf498292cf`. The code-only run parsed 137 files in 3.6 seconds: 1,165 nodes, 2,172 edges and 69 communities. It skipped six non-code and two unclassified files. No project dependencies, hooks or model APIs were used.
 
-Google recommends deciding the caption first, limiting visual complexity and separating overview diagrams from subsystem detail. It also recommends SVG for scalable diagrams. Use separate views for service ownership, one resolution request and evaluation-to-release flow. Label arrows with what crosses each boundary. Keep an explanatory sentence beside each diagram. [Google: Illustrating](https://developers.google.com/tech-writing/two/illustrations)
+Inspection confirmed `PagesController` → `ResolutionRecorder` → `DiagnosticStore` references at their source locations. Of the edges, 2,049 were labelled extracted and 123 inferred. These are extraction observations, not complete runtime coverage. Native HTML was generated, but its full symbol graph and generic community labels were too dense for the overview. Keep Graphify as an inspection aid; use the reviewed architecture diagrams for explanation.
 
-### Keep the explanation accessible
+## Make evaluation figures answer a question
 
-Use real headings in order, meaningful link text, short paragraphs and image alternatives. Essential information must also exist as text. Diagrams should remain understandable without color; the banner should introduce the project without carrying facts that exist only in the image. Inspect the rendered page at a normal reading width. [Google: Write accessible documentation](https://developers.google.com/style/accessibility)
+Use at most two figures:
 
-## The narrative to use
+- **Paired outcome matrix:** baseline pass/fail against candidate pass/fail, with counts for retained passes, gains, losses and shared failures. Annotate regressions explicitly. These axes compare configurations; they are not true/predicted classifier labels.
+- **Behavior-group heatmap:** only when case-level evidence supports the groups. Print passed/eligible counts and denominators, with one shared 0–100% scale. Independently normalized rows can conceal unequal rates. [MathWorks: Heatmaps](https://www.mathworks.com/help/matlab/ref/heatmap.html)
 
-The following structure is an application of the sources, tailored to this project:
+Use text labels as well as color. Prefer a perceptually uniform sequential palette for rates; reserve a zero-centered diverging scale for signed changes. Avoid rainbow scales. [Matplotlib: Colormaps](https://matplotlib.org/stable/users/explain/colors/colormaps.html)
 
-1. **The problem:** translate an instruction into the intended element on the open page.
-2. **The central decision:** let the model interpret intent; let the browser establish identity and verify the XPath.
-3. **One request:** trace a concrete example through the actual services, including what happens when the target is ambiguous or missing.
-4. **The difficult cases:** explain changing pages, repeated labels, frames, visibility and action readiness through their consequences.
-5. **Choosing models:** explain what was compared, under which settings, what was measured and why the current configuration followed.
-6. **Establishing reliability:** explain independent labels, browser verification, mutation checks, failures and saved evidence.
-7. **Releasing changes:** distinguish source checks, live comparison, image approval, activation and monitoring.
-8. **What comes next:** describe proposed integration and expansion with clear boundaries and measurable outcomes.
+Every figure needs its run, cohort, configuration and scoring rule. Pair identical case inputs; separate browser and offline denominators. Preserve missing attempts, operational failures and unsupported cases. An aggregate gain must not hide a lost baseline pass.
 
-The story should follow decisions and their consequences. A commit-by-commit diary would make the reader do the synthesis.
-
-## Evidence rules for this project
-
-These are project-specific editorial checks:
-
-- Link implementation claims to the owning source or contract. Link historical choices to dated research or decisions.
-- Attach dataset scope, denominator, model/provider settings and date to benchmark claims. Keep offline selection accuracy separate from full browser results.
-- Explain what verification proves: uniqueness and same-node identity do not demonstrate that an interaction completed successfully.
-- Distinguish measured results, accepted design, configured workflow and verified operation. A workflow file alone does not prove a deployment happened.
-- Preserve failed attempts and unavailable cost information. Describe limitations next to the affected result.
-- Say why a choice fit this prototype. Avoid unsupported claims of universal superiority, production readiness or completed test-platform integration.
-
-Before finishing, check that a reviewer can find the demo, the design decision, model-selection evidence, evaluation limits and run commands directly from the README. Check local links, image rendering and claims against the repository. Keep detailed operational instructions in the guides that own them.
+Recorded counts describe the tested suite and attempts, not production accuracy or repeat-run stability. Do not invent intervals. If a later study estimates uncertainty, preserve case pairing and explain sampling assumptions; repeated cases from one page may need page-level grouping. SciPy supports shared-index paired resampling. Show uncertainty when it changes interpretation. [SciPy: Bootstrap](https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.bootstrap.html), [ONS: Uncertainty](https://service-manual.ons.gov.uk/data-visualisation/guidance/showing-uncertainty-in-charts)

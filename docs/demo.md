@@ -1,73 +1,51 @@
-# Presenting xpathed
+# Demo guide
 
-This guide walks through a live demonstration of xpathed, its architecture, evaluation evidence and proposed integrations.
+Present one inspectable result, then explain its implementation, evaluation and integration boundary.
 
-Start by showing the behavior, then explain the decisions and their evidence. The suggested timings can be adapted to the audience.
+## Prepare
 
-## Prepare the demo
+Follow the [README setup](../README.md#run-locally). Rehearse on an authorized website with a named control, repeated labels and a disabled or covered control. Keep targets visible. Confirm the model key works and record the effective configuration without exposing credentials.
 
-Follow [the README setup](../README.md#run-it-locally). Open a website you are authorized to use and rehearse against its actual current markup. Choose a page with a clearly named control, repeated labels in different sections, and a disabled or covered control. Keep each target visible before submitting its instruction.
+Keep a saved evaluation pass and failure ready. Label saved evidence as a previous run if the live provider is unavailable.
 
-Confirm the application key works before presenting. Record the exact model/provider configuration used; the checked-in `.env.example` is a development default, while an approved release has its own frozen configuration. Keep credentials out of screenshots and terminal output.
+## 1. Show the result · 5 minutes
 
-Have one saved evaluation report ready, including its case definition, expected target and original response. Choose a failure as well as a pass. If a live provider becomes unavailable, use the saved evidence and label it as a previous run.
+Adapt these commands to the page:
 
-## 1. Demo: make the result inspectable
+- “Click About us.”
+- “Hover over OK under Employee.”
+- “Select the dropdown next to Country.”
 
-Allow roughly five minutes. Use these as command patterns; adapt the names to the prepared page.
+Point out the interpreted action, target, XPath, same-node verification, readiness, time and cost. Show a disabled target or scoped absence. Explain that the user executes actions; xpathed selects and highlights. Switch tabs or change the page to show why previous results are historical.
 
-| Show                           | Example                                         | Explain                                                                     |
-| ------------------------------ | ----------------------------------------------- | --------------------------------------------------------------------------- |
-| A named target                 | “Click About us”                                | The instruction selects and highlights a link; the user controls execution. |
-| Context among duplicate labels | “Hover over OK under Employee”                  | Section context separates two otherwise similar controls.                   |
-| A form relationship            | “Select the dropdown next to Country”           | Naming, labels and surrounding structure help identify the control.         |
-| A limitation                   | Request a disabled control, then a missing name | Finding a target, assessing readiness and reporting absence are separate.   |
+## 2. Follow the request · 15 minutes
 
-For one result, point out the target description, interpreted action, XPath, passed checks, state, time and cost. Manually change the page or switch tabs and show why an old result is historical. If time allows, resolve several targets with the same action and show the per-target results.
+Use the diagrams in [How it works](how-it-works.md):
 
-Do not rely on the application inventing demo content: it opens your chosen website. Controlled evaluation fixtures are separate from the user workspace.
+1. Web and Resolver share the active managed page identity.
+2. Browser captures sanitized candidates and retains their live nodes.
+3. One model call selects IDs; Resolver validates the contract.
+4. Browser builds XPath, verifies identity and rechecks the current view.
+5. ClientApi stores the diagnostic attempt in PostgreSQL.
 
-## 2. Architecture: follow one request
+Explain the five local Docker services, model settings and single-table schema. Distinguish candidate selection, locator correctness and observed readiness.
 
-Use [the service diagram](diagrams/system-design.svg) and [request flow](diagrams/resolution-flow.svg) with [the walkthrough](how-it-works.md). In the indicative 15 minutes, answer:
+A test platform can call the resolve API for an xpathed-managed page. An external browser needs an adapter or ownership change; its runner would own execution and postconditions.
 
-1. **Why candidate selection?** The model maps language to an element in a bounded inventory. Browser code controls XPath construction and verification.
-2. **Which page?** The viewer and resolver share a page ID, with document/capture identities protecting against stale evidence.
-3. **What reaches the model?** Sanitized names, roles, structure, frame and relevant appearance/geometry evidence. Explain both data minimization and remaining page-content sensitivity.
-4. **What does verification prove?** One match to the selected node in its document, with current-view membership rechecked. Independent labels assess whether that selection was intended.
-5. **Why separate services?** Browser owns live state; Resolver can be evaluated without the client database; ClientApi owns persistence.
+## 3. Explain quality · 10 minutes
 
-Close with the proposed test-runner integration boundary and hosted requirements. Clearly mark these as proposed work; the implementation is a local Chromium prototype.
+Walk through a saved case: instruction, independent expected target, captured evidence, response and grade. The recorded `release3-listbox-1` failure found the correct option but changed `click` to `select`; explain why it fails despite a valid XPath.
 
-## 3. Evaluation: explain one score and one failure
+Show how attempt/trace IDs connect configuration, error stage and available evidence. Keep browser and offline scores separate, with dates and denominators.
 
-In roughly ten minutes, walk through an actual saved case:
+Describe the current release gate: exact candidate/baseline images, the complete reviewed collection, no lost baseline pass, explicit activation and nightly monitoring.
 
-- Instruction and independent expected target.
-- What Browser captured and what the model received.
-- Selected target, verified XPath and observed state.
-- The grader's result and the reason for a mismatch, if any.
+## 4. Discuss tradeoffs · 10 minutes
 
-Use [the experiment history](engineering-journey.md) to explain model comparisons. Keep the date, model/provider, case set, denominator and measurement boundary beside each score. Explain why offline selection accuracy cannot establish live XPath readiness, and why an older two-second acceptance rule is different from today's descriptive latency target.
+Be ready to explain stale pages, frames, prompt injection, capture limits, ambiguity and why a verified XPath can identify the wrong selection. Scaling requires Browser session ownership, capacity management, authentication and isolation; throughput has not been benchmarked.
 
-Finish with the current [release comparison](diagrams/evaluation-release.svg): exact candidate and approved images, the same collection, no lost baseline pass, verified approval, explicit activation and monitoring. Distinguish this implemented workflow from hosted runs actually evidenced in the release records.
+## 5. Connect to product value · 10 minutes
 
-## 4. Q&A: be ready for the awkward cases
+Explain the system plainly: a tester describes a control, the model selects a candidate, and browser code checks its locator. Independent evaluation measures whether the selection was right.
 
-| Question                               | Anchor for the answer                                                                                                                                                 |
-| -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| “Can a verified XPath still be wrong?” | Yes. It may identify the model's wrong selection exactly. Independent target labels measure that error.                                                               |
-| “What if the page changes?”            | Captures and current-view membership are revalidated; stale evidence produces a resolve-again outcome.                                                                |
-| “Why not send the whole HTML?”         | Explain sanitization, candidate coverage, context size and explicit budget failures.                                                                                  |
-| “Why not execute the click?”           | The accepted scope establishes target resolution and passive readiness. Execution adds action outcomes and recovery responsibilities.                                 |
-| “How would this scale?”                | Browser sessions own costly processes and displays. A hosted design needs session placement, capacity limits, authenticated access and isolation before more workers. |
-| “Why this model?”                      | Explain the measured quality/latency/cost tradeoff for its actual experiment, then identify the current configuration separately.                                     |
-| “How do you detect drift?”             | Re-run the frozen approved collection, retain original attempts and distinguish model errors from infrastructure failures.                                            |
-
-## 5. Strategy: connect reliability to test maintenance
-
-The proposed value is less time identifying and repairing locators while keeping test behavior reviewable. Measure time to a correct accepted target, wrong-target rate, clarification rate and maintenance time after UI changes. Business savings remain hypotheses until measured in real authoring workflows.
-
-Prioritize better failure coverage and domain-specific regression cases, then integration with test authoring. Suggest locator repair only when it preserves the intended target and assertions. Broader test generation and execution should build on measured resolution reliability and introduce their own outcome evaluation.
-
-The [engineering journey](engineering-journey.md) develops these next steps and explains which experiments supported the current design.
+Propose measuring correction rate and time to an accepted locator. Prioritize known selection failures, then test-authoring integration, then reviewed repair or triage suggestions. Those product benefits remain hypotheses until measured.

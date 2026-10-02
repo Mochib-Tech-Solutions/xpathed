@@ -1,12 +1,14 @@
 # Release workflow
 
-The release flow is **feature PR → main → release PR → live comparison → merge and verified approval → explicit activation**. [ADR-0023](adr/0023-simplify-release-evaluation.md) records the accepted decision. This runbook describes the new workflow contract and source implementation; hosted activation and paid validation must be reported separately. It does not claim that the new flow has already released or deployed a version.
+The release flow is **feature PR → main → release PR → live comparison → merge and verified approval → explicit activation**. [ADR-0023](adr/0023-simplify-release-evaluation.md) records the accepted decision. Approval and activation are separate: a passing comparison approves exact images; activation starts them in the local workspace.
 
 ## Prepare the repository
 
 Keep a persistent `release` branch for release PRs from `main`. Feature PRs continue targeting `main` and run ordinary CI. Changes to main do not replace the approved baseline.
 
-Configure the dedicated `OPENROUTER_EVAL_API_KEY` Actions secret and preserve private release state and existing approved assets. The checked-in private dataset manifest pins the required reviewed collection. The private `evaluation-data/reviewed-72d140c1.json.gz` asset is published and its downloaded bytes were verified against the pinned digest. The persistent `release` branch starts at the approved v1.0.0 source (`86d8937d`); the earlier branch is preserved as `archive/current-view-ec852f4`. See [dataset collection setup](evaluation.md#private-dataset-collection).
+Configure the dedicated `OPENROUTER_EVAL_API_KEY` Actions secret and preserve private release state and existing approved assets. The checked-in private dataset manifest pins the required reviewed collection. The private `evaluation-data/reviewed-72d140c1.json.gz` asset is published and its downloaded bytes were verified against the pinned digest. See [dataset collection setup](evaluation.md#private-dataset-collection).
+
+Release Qualification, Release Promotion and scheduled monitoring currently require a **private repository**. Making the repository public skips those jobs; release-state operations also reject public repositories. Public operation needs a separate design for private evidence and workflow access.
 
 Workflow files describe checks, not enforced branch protection. Verify the account's ability to require CI and release checks separately. Even if a PR is manually merged without passing checks, promotion must reject it rather than replacing the approval.
 

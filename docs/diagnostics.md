@@ -1,54 +1,97 @@
 # Backend diagnostics
 
-Every valid application resolution request automatically starts an internal diagnostic record before calling Resolver. Completion updates that attempt, while retries get new identities. No frontend controls are added. Reset chat, tab closure and app reload clear workspace state independently of stored records. Browser objects remain transient; records cannot restore a live session or prove that an old XPath still works.
+ClientApi records each application resolution attempt in PostgreSQL so engineers can investigate wrong targets, missing evidence and operational failures. Records survive chat reset and tab closure; they cannot restore a browser session. The standalone evaluator runs without this database.
 
-ClientApi owns EF Core/PostgreSQL storage. Resolver's internal evidence endpoint returns a result plus a bounded sanitized representation; its public resolution response remains unchanged. ClientApi returns only the ordinary result to Web. The standalone evaluator can continue without ClientApi or PostgreSQL and later import its artifacts.
+![ClientApi attempt lifecycle and the single diagnostic_records table, with column types, nullability and indexes](diagrams/diagnostic-storage.svg)
 
-## Recorded evidence
+## Storage and request lifecycle
 
-Records contain request/attempt identity, page/document/capture/frame references, ordered action results and summary, target state/readiness observations, diagnostics, model configuration and request-owned usage/cost. A multi-action request stores its shared cost once. W3C trace IDs correlate HTTP calls and structured failures across services. Operational errors, evaluation mismatches and confirmed semantic errors remain separate; `not_found` alone is not a failure.
+`diagnostic_records` combines three groups of data:
 
-The stored projection excludes form values, cookies/storage credentials and recognized secrets. Instructions requesting entered values and their content-bearing results are conservatively redacted; their model input is withheld. Ordinary model input is the existing bounded candidate representation, sanitized again for persistence. URL credentials, queries and fragments are removed. Provider raw responses and browser handles are not retained. Redaction can remove useful context: stored evidence is a sanitized diagnostic view, not byte-for-byte provider-request replay. Missing, withheld and expired evidence remains explicit.
+- **Identity and lookup:** primary key `Id`, `Kind`, `Outcome`, `TraceId`, `PageId`, timestamps and `EvidenceAvailability`.
+- **Structured snapshots:** `ResultJson`, nullable `EvidenceJson` and `ProvenanceJson`, all PostgreSQL `jsonb`. Separating evidence lets page content expire before results.
+- **Import identity:** nullable `ImportHash` recognizes identical sanitized imports without replacing originals.
 
-Database writes have a two-second deadline each. A failed write emits an operational storage error and does not change the resolver's semantic outcome. A pending record can remain if the process stops before completion. If Resolver fails before returning diagnostics, ClientApi records the known request and operational failure with unavailable evidence. If PostgreSQL is unavailable, durable recording cannot be guaranteed; health/logging exposes that failure.
+Three secondary indexes cover `ExpiresAt`, `EvidenceExpiresAt` and `(PageId, CreatedAt)`. Stable columns support retention and recent-page lookup; JSONB accommodates nested result changes. Detailed analysis requires reading JSON: there are no JSONB search indexes or separate target/model tables. Browser identities are references, not foreign keys; Browser owns the live objects in memory.
 
-## Schema and migrations
+`ResolutionRecorder` saves a sanitized `pending` request, calls Resolver with `X-Xpathed-Attempt-Id`, validates response identities, then updates that row with the result and evidence. Evidence includes available model input, prompt, schema and configuration. Web receives the ordinary result. Retries get new attempt IDs; shared usage/cost is stored once per request.
 
-`diagnostic_records` stores one record per primary-key ID. IDs, kind, trace, page, outcome and timestamps are relational; result, evidence and provenance use PostgreSQL `jsonb`. Expiry and page/time indexes support retention and bounded lookup. EF contexts are request-scoped; each save is atomic. Imports use the primary-key constraint and a canonical sanitized-content hash to handle concurrent duplicates without overwriting originals.
+Each save is atomic and has a two-second deadline. No database transaction spans the model call. Storage failure logs `Diagnostic storage unavailable` with `AttemptId`, `TraceId` and `ExceptionType`, without changing the resolution outcome. A crash can leave `pending`; a failed write can leave no durable record. Resolver transport failures record `outcome: "error"`, `diagnostics.stage: "resolver_transport"`, a failure `code` and `missingEvidence: true`, when storage is available.
 
-The local Compose database uses password authentication and explicitly disables unused GSSAPI negotiation. The checked-in initial EF migration upgrades an empty database; the model snapshot supports later migrations. Compose explicitly enables `Diagnostics__MigrateOnStartup=true` for the local single-instance application. Outside Compose it defaults off. Migration failure prevents startup rather than pretending the schema is ready. Hosted deployment remains future work and should apply reviewed migrations separately with deployment credentials.
+## Investigate a failed attempt
 
-```sh
-rtk dotnet tool restore
-rtk dotnet ef migrations add MeaningfulChange --project src/ClientApi --output-dir Data/Migrations
-rtk dotnet ef migrations has-pending-model-changes --project src/ClientApi
-```
+**Illustrative example:** “click Save in Profile” identifies Billing's Save button.
 
-Review generated migrations before applying them. Preserve existing volumes. `pnpm test:persistence` uses a supplied PostgreSQL test connection with create-database permission; its fixture creates and deletes uniquely named test databases, never the supplied database itself. CI supplies an isolated PostgreSQL service. Migration/model drift, restart persistence, concurrent writes, operational failures, sanitization, imports and expiry are checked through the API boundary.
+### 1. Export the original
 
-## Retention
-
-The defaults are 90 days for ordinary records and 30 days for page evidence. Compose accepts `DIAGNOSTIC_RECORD_DAYS` and `DIAGNOSTIC_CAPTURE_DAYS`; direct configuration uses `Diagnostics__RecordRetentionDays` and `Diagnostics__CaptureRetentionDays`. Approved sanitized regression fixtures and qualification evidence remain until explicit deletion, with review provenance required on import. The hourly worker deletes expired records and erases expired evidence in bounded batches; reads immediately hide expired data even before a cleanup batch runs. Imports cannot extend the configured maximum retention.
-
-## Operator access
-
-Run `pnpm diagnostics -- <command>` from the checkout with the local stack running. The wrapper executes the application CLI inside ClientApi; it needs no extra HTTP client or exposed port. Commands also work as `dotnet ClientApi.dll diagnostics ...` with a configured database. CLI output is JSON; errors use fixed codes and a nonzero exit.
+With the local stack running, substitute the page and attempt IDs:
 
 ```sh
-rtk pnpm diagnostics -- list
 rtk pnpm diagnostics -- list PAGE_ID
 rtk pnpm diagnostics -- export ATTEMPT_ID > /tmp/diagnostic.json
+```
+
+Check `outcome`, `evidenceAvailability`, `result.documentId` and `result.captureId`. Inspect `result.actions` and `result.summary` for individual target outcomes. `list` returns at most 100 retained records, newest first.
+
+### 2. Locate the failure
+
+Follow `result.diagnostics.stage` and `code`, correlating service logs through `TraceId`, `AttemptId` and `ConfigurationId`. Compare `evidence.modelInput` with the returned target: if Profile's button was omitted, investigate capture/context preparation; if supplied but misselected, investigate interpretation and model selection.
+
+- **Operational/contract failure:** transport, provider or invalid-response errors; establish what evidence exists before judging selection.
+- **Semantic error:** an independent review confirms the returned target or interpretation is wrong. XPath uniqueness alone cannot establish correctness.
+- **`not_found`:** normal scoped absence unless evidence proves an eligible requested target existed in the current view.
+- **`partial`:** inspect every target. **`pending`:** investigate incomplete recording rather than scoring model correctness.
+
+Useful diagnostic fields are `capture`, `modelInputComplete`, `timingsMs`, `model`, `provider` and `promptVersion`. Completeness of captured input does not prove completeness of the answer.
+
+`usage` contains received usage; `costEstimate` is separate. When `providerAccounting` is `pending`, a correlated `Late provider accounting` log may later report `GenerationId`, `ReportedUsd` and `AccountingStatus`. It does not rewrite the persisted failure. Missing charges remain unknown, and reconciliation is not restart-safe.
+
+### 3. Add a reviewed regression
+
+Preserve the original export. Reproduce the confirmed mistake in a versioned fixture, independently label the expected target, and add the reviewed case to the shared evaluation collection. Run the relevant deterministic evaluation; paid comparisons remain explicit.
+
+A corrected or imported `regression_fixture` receives a new artifact ID with provenance linking the original. Import does not grade, approve or automatically add an evaluation case. There is no dedicated semantic-error column or review dashboard.
+
+## Privacy and retention
+
+Sanitization excludes form values, recognized credentials, raw provider responses and browser handles; URL credentials, query and fragment are removed. Instructions requesting entered values and related content are redacted, and their model input is withheld. Sanitized page text can still be sensitive: keep exports private. Evidence is not byte-exact provider replay.
+
+Records expire after **90 days**; page evidence after **30 days**. Compose settings are `DIAGNOSTIC_RECORD_DAYS` and `DIAGNOSTIC_CAPTURE_DAYS`; direct settings are `Diagnostics__RecordRetentionDays` and `Diagnostics__CaptureRetentionDays` (1–3650 days).
+
+Cleanup runs at startup and hourly: up to 1,000 expired records deleted and 1,000 evidence payloads cleared per sweep. Reads hide expired data immediately. Ordinary imports cannot extend maximum retention. Reviewed `regression_fixture` and `qualification` records can be retained indefinitely, until explicit deletion.
+
+## Operator reference
+
+The CLI runs inside ClientApi. Success returns JSON; errors return a fixed code and nonzero exit. Alongside `list [PAGE_ID]` and `export ATTEMPT_ID`:
+
+```sh
 rtk pnpm diagnostics -- import < /tmp/diagnostic.json
 rtk pnpm diagnostics -- prune
 rtk pnpm diagnostics -- delete ARTIFACT_ID
 ```
 
-Equivalent internal HTTP routes are `GET /internal/diagnostics` (optional `pageId`, `traceId`, `limit` up to 100), `GET /internal/diagnostics/{id}`, `POST /internal/diagnostics/import`, `POST /internal/diagnostics/prune` and `DELETE /internal/diagnostics/{id}`. They accept local operator access only, reject browser Origin headers and remote IPs, and are explicitly unavailable through the Web proxy. These are local administrative capabilities, not a hosted authorization model.
+Internal endpoints are:
 
-## Version 1 import/export envelope
+- `GET /internal/diagnostics` — optional `pageId`, `traceId`, `limit` (1–100).
+- `GET /internal/diagnostics/{id}`
+- `POST /internal/diagnostics/import`
+- `POST /internal/diagnostics/prune`
+- `DELETE /internal/diagnostics/{id}`
 
-The JSON envelope contains `version` (`"1"`), `id`, `kind`, `traceId`, `pageId`, `outcome`, `createdAt`, nullable `expiresAt`/`evidenceExpiresAt`, `evidenceAvailability`, object `result`, nullable object `evidence` and object `provenance`. Import requests are limited to 2 MB. Identifiers are bounded; unknown envelope fields, invalid dates, unsupported versions/kinds and missing provenance are rejected.
+They reject browser `Origin` headers and non-loopback remote IPs, and are unavailable through the Web proxy. This is local operator access, without hosted authentication.
 
-Kinds are `resolution`, `evaluation`, `saved_case`, `model_configuration`, `regression_fixture` and `qualification`. Provenance requires `source`, `schemaVersion` (`"1"`), `codeVersion`, `configurationId` and `caseId`; unavailable values are explicit. Indefinite retention additionally requires `approved: true`, `reviewedBy` and `reviewedAt` for the eligible kinds. Keep reviewed corrections as distinct artifact IDs linked through provenance; they do not replace original attempts.
+### Export format
 
-Reimporting the same sanitized artifact is idempotent. A different payload with an existing ID returns `409 artifact_conflict`. Import does not run a model or grade a case. The evaluator's detailed case/run payload is defined in #6; this envelope preserves its provenance and original outcome without claiming evaluation or approval occurred here. Inspecting saved input is possible with retained evidence; full browser replay still requires a reconstructible, versioned fixture.
+The envelope contains `version: "1"`, `id`, `kind`, `traceId`, `pageId`, `outcome`, `createdAt`, nullable `expiresAt`/`evidenceExpiresAt`, `evidenceAvailability`, object `result`, nullable object `evidence`, and object `provenance`. Imports are limited to 2 MB and validated; page/model payloads belong only in `evidence`.
+
+Kinds: `resolution`, `evaluation`, `saved_case`, `model_configuration`, `regression_fixture`, `qualification`. Required provenance: `source`, `schemaVersion: "1"`, `codeVersion`, `configurationId`, `caseId`; unavailable values must be explicit. Indefinite retention additionally requires `approved: true`, `reviewedBy`, `reviewedAt` for eligible kinds.
+
+Identical sanitized imports are idempotent. A different payload using an existing ID returns `409 artifact_conflict`.
+
+## Schema changes
+
+EF migrations and the model snapshot live under `src/ClientApi/Data/Migrations`. Local Compose enables `Diagnostics__MigrateOnStartup`; otherwise it defaults off. Migration failure prevents startup. Review migrations and preserve volumes.
+
+`pnpm test:persistence` uses a disposable PostgreSQL server with create-database permission, creating/deleting isolated test databases. It checks schema agreement, persistence, concurrent writes, failures, sanitization, import conflicts and expiry.
+
+Source: [ClientApi diagnostics](../src/ClientApi/Diagnostics/). Related guide: [independent evaluation](evaluation.md).

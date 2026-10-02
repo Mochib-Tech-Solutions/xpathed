@@ -23,7 +23,8 @@
       "size": [
         160,
         60
-      ]
+      ],
+      "brand": "react"
     },
     {
       "id": "client",
@@ -37,7 +38,8 @@
       "size": [
         160,
         60
-      ]
+      ],
+      "brand": "dotnet"
     },
     {
       "id": "resolver",
@@ -51,7 +53,8 @@
       "size": [
         160,
         60
-      ]
+      ],
+      "brand": "dotnet"
     },
     {
       "id": "browser",
@@ -79,7 +82,8 @@
       "size": [
         160,
         60
-      ]
+      ],
+      "brand": "openrouter"
     },
     {
       "id": "db",
@@ -93,7 +97,8 @@
       "size": [
         160,
         60
-      ]
+      ],
+      "brand": "postgresql"
     }
   ],
   "connections": [

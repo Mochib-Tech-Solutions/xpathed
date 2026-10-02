@@ -7,14 +7,14 @@
       "name": "system-design",
       "diagram_type": "architecture",
       "specification": {
-        "sha256": "1c9ddc718dafd96440054eb1a6830035c2dff67b0c7cdf40418e1434e9724d8f",
-        "bytes": 2534
+        "sha256": "9e3ddff70fe1f0dd1398693138733ad4578afac1c87ef9e6687578f8d88eecf0",
+        "bytes": 2666
       },
       "artifact": {
-        "sha256": "c59ee3920390c84138d29a544640dd2f4cd8a853fc7e67a9546d86ae8c7be5c2",
-        "bytes": 802989
+        "sha256": "3270209e6c9bfe33a1449b2de289bf9b1f6dd948ffd63d6dcfc015b7ba6fd3b1",
+        "bytes": 815962
       },
-      "svg_sha256": "d4e670a42a1a7c7c797402f7b22957e6eb4dffdd698b29a2d24b1712ede167be",
+      "svg_sha256": "999495537867a4af009d567cdffac6213f4d27c0fdf15384eb885c9787049e25",
       "validation": {
         "checksPassed": 9,
         "checkCount": 9,
@@ -54,18 +54,12 @@
           "overflowY": false
         }
       ],
-      "captured_themes": [
-        "light",
-        "dark"
-      ],
+      "captured_themes": ["light", "dark"],
       "visual_review": "passed",
-      "correction_rounds": 2,
+      "correction_rounds": 0,
       "embedded_svg_review": {
         "image_width_px": 900,
-        "themes": [
-          "light",
-          "dark"
-        ],
+        "themes": ["light", "dark"],
         "status": "passed",
         "primary_text_px": 12.375,
         "secondary_text_px": 10.125
@@ -122,18 +116,12 @@
           "overflowY": false
         }
       ],
-      "captured_themes": [
-        "light",
-        "dark"
-      ],
+      "captured_themes": ["light", "dark"],
       "visual_review": "passed",
       "correction_rounds": 2,
       "embedded_svg_review": {
         "image_width_px": 900,
-        "themes": [
-          "light",
-          "dark"
-        ],
+        "themes": ["light", "dark"],
         "status": "passed",
         "primary_text_px": 12.375,
         "secondary_text_px": 10.125
@@ -190,18 +178,12 @@
           "overflowY": false
         }
       ],
-      "captured_themes": [
-        "light",
-        "dark"
-      ],
+      "captured_themes": ["light", "dark"],
       "visual_review": "passed",
       "correction_rounds": 2,
       "embedded_svg_review": {
         "image_width_px": 900,
-        "themes": [
-          "light",
-          "dark"
-        ],
+        "themes": ["light", "dark"],
         "status": "passed",
         "primary_text_px": 13.75,
         "secondary_text_px": 11.25

@@ -1,0 +1,1981 @@
+{
+  "schemaVersion": 1,
+  "title": "First approved release: paired confirmation outcomes",
+  "date": "2026-10-02",
+  "scope": "Historical policy-7 browser confirmation snapshot; excludes pilot, deterministic setup checks, offline datasets and later runs.",
+  "provenance": {
+    "report": "docs/research/2026-10-01-release-monitoring-setup.md#first-approved-release--2026-10-02",
+    "workflowUrl": "https://github.com/Mochib-Tech-Solutions/xpathed/actions/runs/37007941576",
+    "releaseUrl": "https://github.com/Mochib-Tech-Solutions/xpathed/releases/tag/v1.0.0",
+    "assetName": "release-evidence.json.gz",
+    "assetId": 605661655,
+    "archiveSha256": "29ca5867ede541f98998fd37b68969627244fb3c969641f223ca4b5d2ada2446",
+    "manifestPath": ".artifacts/release-ci/confirmation/manifest.json",
+    "manifestSha256": "db9180a118ceb769aef0681533d807362630ae0bb9eb4b3be17bd88db5ebc0a5",
+    "summaryPath": ".artifacts/release-ci/confirmation/summary.json",
+    "summarySha256": "2ea3d36f8f5fda3e8d15d6395370170c6206cbd5474b83b0e13cc6a4501b6a1a",
+    "runId": "faebc1b3-a538-4bea-8b53-1d9a9ef887b5",
+    "selection": "Exact manifest.plan.trials IDs; read trials/{id}.json grade.passed and baseline.grade.passed; join caseId to manifest.cases for original family/category/split.",
+    "verification": "All 316 archive entry lengths and SHA-256 values verified; paired counts and gain/loss IDs match archived summary. Saved grades were read, not rerun.",
+    "excludedDeterministicConfirmationTrials": 148
+  },
+  "design": {
+    "track": "authored-browser-fixtures",
+    "unit": "case with one original attempt per arm",
+    "repetitionsPerArm": 1,
+    "automaticRetries": 0,
+    "concurrency": 1,
+    "totalPairedCases": 135,
+    "totalLiveCalls": 270,
+    "historicalPolicyVersion": "7",
+    "correctnessAcceptanceAtTheTime": "overall-no-regression",
+    "currentPolicyWarning": "A later policy requires no lost baseline pass. This historical comparison contains one loss.",
+    "families": 53,
+    "generalizationLimit": "Repeated and authored fixtures; neither production accuracy nor statistical certification. Historical held-out cases are now exposed.",
+    "latencyLimit": "Provider warmth uncontrolled; one observation per case per arm. No statistical speed claim."
+  },
+  "arms": {
+    "baseline": {
+      "label": "Bootstrap baseline",
+      "sourceSha": "d533377945f67f99dbb2d23ab9b2ea04eef61569",
+      "model": "deepseek/deepseek-v4.1-flash",
+      "provider": "wafer",
+      "configurationId": "5ab28d31cd6387718465f5701c8fe8cc334151079ec4426661eb36219ece575e",
+      "promptVersion": "8",
+      "captureVersion": "5",
+      "xpathVersion": "4",
+      "contractVersion": "4",
+      "reasoningEnabled": false,
+      "maxOutputTokens": 4096,
+      "providerFallbacks": false
+    },
+    "candidate": {
+      "label": "Candidate",
+      "sourceSha": "86d8937d97e312be83fca5c626111dacd58225c4",
+      "model": "deepseek/deepseek-v4.1-flash",
+      "provider": "wafer",
+      "configurationId": "e997ab1d8d3a5245991a32cee7c68bbca7a992eebd2b8ff786f3133adfa45349",
+      "promptVersion": "10",
+      "captureVersion": "5",
+      "xpathVersion": "4",
+      "contractVersion": "4",
+      "reasoningEnabled": false,
+      "maxOutputTokens": 4096,
+      "providerFallbacks": false
+    }
+  },
+  "totals": {
+    "total": 135,
+    "baselinePassed": 105,
+    "candidatePassed": 119,
+    "bothPassed": 104,
+    "gains": 15,
+    "losses": 1,
+    "bothFailed": 15
+  },
+  "pairedMatrix": {
+    "rows": ["baseline pass", "baseline fail"],
+    "columns": ["candidate pass", "candidate fail"],
+    "counts": [
+      [104, 1],
+      [15, 15]
+    ]
+  },
+  "latencyMs": {
+    "definition": "Resolver HTTP end-to-end, including capture/model/verification; independent fixture setup and grading excluded; durable budget reservation before execution, reconciliation after provider response and before next trial",
+    "denominatorPerArm": 135,
+    "baseline": {
+      "p50": 856.7893199999817,
+      "p95": 1894.4060889999382
+    },
+    "candidate": {
+      "p50": 1116.9341359999962,
+      "p95": 1710.2071719999658
+    }
+  },
+  "groups": {
+    "family": [
+      {
+        "id": "batch",
+        "total": 1,
+        "baselinePassed": 0,
+        "candidatePassed": 0,
+        "bothPassed": 0,
+        "gains": 0,
+        "losses": 0,
+        "bothFailed": 1
+      },
+      {
+        "id": "clipped-frame",
+        "total": 1,
+        "baselinePassed": 0,
+        "candidatePassed": 1,
+        "bothPassed": 0,
+        "gains": 1,
+        "losses": 0,
+        "bothFailed": 0
+      },
+      {
+        "id": "color-layout",
+        "total": 1,
+        "baselinePassed": 1,
+        "candidatePassed": 1,
+        "bothPassed": 1,
+        "gains": 0,
+        "losses": 0,
+        "bothFailed": 0
+      },
+      {
+        "id": "context",
+        "total": 1,
+        "baselinePassed": 1,
+        "candidatePassed": 1,
+        "bothPassed": 1,
+        "gains": 0,
+        "losses": 0,
+        "bothFailed": 0
+      },
+      {
+        "id": "frames",
+        "total": 1,
+        "baselinePassed": 1,
+        "candidatePassed": 1,
+        "bothPassed": 1,
+        "gains": 0,
+        "losses": 0,
+        "bothFailed": 0
+      },
+      {
+        "id": "geometry",
+        "total": 1,
+        "baselinePassed": 0,
+        "candidatePassed": 1,
+        "bothPassed": 0,
+        "gains": 1,
+        "losses": 0,
+        "bothFailed": 0
+      },
+      {
+        "id": "injection",
+        "total": 1,
+        "baselinePassed": 1,
+        "candidatePassed": 1,
+        "bothPassed": 1,
+        "gains": 0,
+        "losses": 0,
+        "bothFailed": 0
+      },
+      {
+        "id": "large",
+        "total": 1,
+        "baselinePassed": 1,
+        "candidatePassed": 1,
+        "bothPassed": 1,
+        "gains": 0,
+        "losses": 0,
+        "bothFailed": 0
+      },
+      {
+        "id": "plural-visible-scope",
+        "total": 1,
+        "baselinePassed": 1,
+        "candidatePassed": 1,
+        "bothPassed": 1,
+        "gains": 0,
+        "losses": 0,
+        "bothFailed": 0
+      },
+      {
+        "id": "release-holdout-clinic",
+        "total": 3,
+        "baselinePassed": 2,
+        "candidatePassed": 3,
+        "bothPassed": 2,
+        "gains": 1,
+        "losses": 0,
+        "bothFailed": 0
+      },
+      {
+        "id": "release-holdout-editor",
+        "total": 3,
+        "baselinePassed": 3,
+        "candidatePassed": 3,
+        "bothPassed": 3,
+        "gains": 0,
+        "losses": 0,
+        "bothFailed": 0
+      },
+      {
+        "id": "release-holdout-inventory",
+        "total": 3,
+        "baselinePassed": 3,
+        "candidatePassed": 3,
+        "bothPassed": 3,
+        "gains": 0,
+        "losses": 0,
+        "bothFailed": 0
+      },
+      {
+        "id": "release-holdout-ledger",
+        "total": 3,
+        "baselinePassed": 3,
+        "candidatePassed": 3,
+        "bothPassed": 3,
+        "gains": 0,
+        "losses": 0,
+        "bothFailed": 0
+      },
+      {
+        "id": "release-holdout-library",
+        "total": 3,
+        "baselinePassed": 3,
+        "candidatePassed": 3,
+        "bothPassed": 3,
+        "gains": 0,
+        "losses": 0,
+        "bothFailed": 0
+      },
+      {
+        "id": "release-holdout-museum",
+        "total": 3,
+        "baselinePassed": 3,
+        "candidatePassed": 3,
+        "bothPassed": 3,
+        "gains": 0,
+        "losses": 0,
+        "bothFailed": 0
+      },
+      {
+        "id": "release-holdout-timetable",
+        "total": 3,
+        "baselinePassed": 3,
+        "candidatePassed": 3,
+        "bothPassed": 3,
+        "gains": 0,
+        "losses": 0,
+        "bothFailed": 0
+      },
+      {
+        "id": "release-holdout-travel",
+        "total": 3,
+        "baselinePassed": 3,
+        "candidatePassed": 3,
+        "bothPassed": 3,
+        "gains": 0,
+        "losses": 0,
+        "bothFailed": 0
+      },
+      {
+        "id": "release-holdout-warehouse",
+        "total": 3,
+        "baselinePassed": 2,
+        "candidatePassed": 2,
+        "bothPassed": 2,
+        "gains": 0,
+        "losses": 0,
+        "bothFailed": 1
+      },
+      {
+        "id": "release-holdout-window",
+        "total": 3,
+        "baselinePassed": 1,
+        "candidatePassed": 2,
+        "bothPassed": 1,
+        "gains": 1,
+        "losses": 0,
+        "bothFailed": 1
+      },
+      {
+        "id": "release2-accordion",
+        "total": 3,
+        "baselinePassed": 3,
+        "candidatePassed": 3,
+        "bothPassed": 3,
+        "gains": 0,
+        "losses": 0,
+        "bothFailed": 0
+      },
+      {
+        "id": "release2-breadcrumbs",
+        "total": 3,
+        "baselinePassed": 2,
+        "candidatePassed": 3,
+        "bothPassed": 2,
+        "gains": 1,
+        "losses": 0,
+        "bothFailed": 0
+      },
+      {
+        "id": "release2-dialog",
+        "total": 3,
+        "baselinePassed": 3,
+        "candidatePassed": 3,
+        "bothPassed": 3,
+        "gains": 0,
+        "losses": 0,
+        "bothFailed": 0
+      },
+      {
+        "id": "release2-fieldset",
+        "total": 3,
+        "baselinePassed": 3,
+        "candidatePassed": 3,
+        "bothPassed": 3,
+        "gains": 0,
+        "losses": 0,
+        "bothFailed": 0
+      },
+      {
+        "id": "release2-figures",
+        "total": 3,
+        "baselinePassed": 1,
+        "candidatePassed": 2,
+        "bothPassed": 1,
+        "gains": 1,
+        "losses": 0,
+        "bothFailed": 1
+      },
+      {
+        "id": "release2-linked-form",
+        "total": 3,
+        "baselinePassed": 3,
+        "candidatePassed": 3,
+        "bothPassed": 3,
+        "gains": 0,
+        "losses": 0,
+        "bothFailed": 0
+      },
+      {
+        "id": "release2-palette",
+        "total": 3,
+        "baselinePassed": 3,
+        "candidatePassed": 3,
+        "bothPassed": 3,
+        "gains": 0,
+        "losses": 0,
+        "bothFailed": 0
+      },
+      {
+        "id": "release2-tabs",
+        "total": 3,
+        "baselinePassed": 2,
+        "candidatePassed": 2,
+        "bothPassed": 2,
+        "gains": 0,
+        "losses": 0,
+        "bothFailed": 1
+      },
+      {
+        "id": "release2-timeline",
+        "total": 3,
+        "baselinePassed": 3,
+        "candidatePassed": 3,
+        "bothPassed": 3,
+        "gains": 0,
+        "losses": 0,
+        "bothFailed": 0
+      },
+      {
+        "id": "release2-tree",
+        "total": 3,
+        "baselinePassed": 3,
+        "candidatePassed": 3,
+        "bothPassed": 3,
+        "gains": 0,
+        "losses": 0,
+        "bothFailed": 0
+      },
+      {
+        "id": "release3-grid",
+        "total": 3,
+        "baselinePassed": 2,
+        "candidatePassed": 2,
+        "bothPassed": 2,
+        "gains": 0,
+        "losses": 0,
+        "bothFailed": 1
+      },
+      {
+        "id": "release3-listbox",
+        "total": 3,
+        "baselinePassed": 1,
+        "candidatePassed": 1,
+        "bothPassed": 0,
+        "gains": 1,
+        "losses": 1,
+        "bothFailed": 1
+      },
+      {
+        "id": "release3-menu",
+        "total": 3,
+        "baselinePassed": 3,
+        "candidatePassed": 3,
+        "bothPassed": 3,
+        "gains": 0,
+        "losses": 0,
+        "bothFailed": 0
+      },
+      {
+        "id": "release3-radio",
+        "total": 3,
+        "baselinePassed": 3,
+        "candidatePassed": 3,
+        "bothPassed": 3,
+        "gains": 0,
+        "losses": 0,
+        "bothFailed": 0
+      },
+      {
+        "id": "release3-richtext",
+        "total": 3,
+        "baselinePassed": 3,
+        "candidatePassed": 3,
+        "bothPassed": 3,
+        "gains": 0,
+        "losses": 0,
+        "bothFailed": 0
+      },
+      {
+        "id": "release3-search",
+        "total": 3,
+        "baselinePassed": 2,
+        "candidatePassed": 3,
+        "bothPassed": 2,
+        "gains": 1,
+        "losses": 0,
+        "bothFailed": 0
+      },
+      {
+        "id": "release3-slider",
+        "total": 3,
+        "baselinePassed": 2,
+        "candidatePassed": 2,
+        "bothPassed": 2,
+        "gains": 0,
+        "losses": 0,
+        "bothFailed": 1
+      },
+      {
+        "id": "release3-spin",
+        "total": 3,
+        "baselinePassed": 2,
+        "candidatePassed": 3,
+        "bothPassed": 2,
+        "gains": 1,
+        "losses": 0,
+        "bothFailed": 0
+      },
+      {
+        "id": "release3-status",
+        "total": 3,
+        "baselinePassed": 3,
+        "candidatePassed": 3,
+        "bothPassed": 3,
+        "gains": 0,
+        "losses": 0,
+        "bothFailed": 0
+      },
+      {
+        "id": "release3-switch",
+        "total": 3,
+        "baselinePassed": 2,
+        "candidatePassed": 2,
+        "bothPassed": 2,
+        "gains": 0,
+        "losses": 0,
+        "bothFailed": 1
+      },
+      {
+        "id": "release4-annotations",
+        "total": 3,
+        "baselinePassed": 1,
+        "candidatePassed": 1,
+        "bothPassed": 1,
+        "gains": 0,
+        "losses": 0,
+        "bothFailed": 2
+      },
+      {
+        "id": "release4-bidi",
+        "total": 3,
+        "baselinePassed": 2,
+        "candidatePassed": 2,
+        "bothPassed": 2,
+        "gains": 0,
+        "losses": 0,
+        "bothFailed": 1
+      },
+      {
+        "id": "release4-contacts",
+        "total": 3,
+        "baselinePassed": 2,
+        "candidatePassed": 2,
+        "bothPassed": 2,
+        "gains": 0,
+        "losses": 0,
+        "bothFailed": 1
+      },
+      {
+        "id": "release4-horizontal-window",
+        "total": 3,
+        "baselinePassed": 2,
+        "candidatePassed": 3,
+        "bothPassed": 2,
+        "gains": 1,
+        "losses": 0,
+        "bothFailed": 0
+      },
+      {
+        "id": "release4-image-links",
+        "total": 3,
+        "baselinePassed": 2,
+        "candidatePassed": 2,
+        "bothPassed": 2,
+        "gains": 0,
+        "losses": 0,
+        "bothFailed": 1
+      },
+      {
+        "id": "release4-inert-preview",
+        "total": 3,
+        "baselinePassed": 2,
+        "candidatePassed": 3,
+        "bothPassed": 2,
+        "gains": 1,
+        "losses": 0,
+        "bothFailed": 0
+      },
+      {
+        "id": "release4-media",
+        "total": 3,
+        "baselinePassed": 1,
+        "candidatePassed": 2,
+        "bothPassed": 1,
+        "gains": 1,
+        "losses": 0,
+        "bothFailed": 1
+      },
+      {
+        "id": "release4-native-radios",
+        "total": 3,
+        "baselinePassed": 3,
+        "candidatePassed": 3,
+        "bothPassed": 3,
+        "gains": 0,
+        "losses": 0,
+        "bothFailed": 0
+      },
+      {
+        "id": "release4-optgroups",
+        "total": 3,
+        "baselinePassed": 2,
+        "candidatePassed": 3,
+        "bothPassed": 2,
+        "gains": 1,
+        "losses": 0,
+        "bothFailed": 0
+      },
+      {
+        "id": "release4-popover",
+        "total": 3,
+        "baselinePassed": 2,
+        "candidatePassed": 3,
+        "bothPassed": 2,
+        "gains": 1,
+        "losses": 0,
+        "bothFailed": 0
+      },
+      {
+        "id": "semantics",
+        "total": 1,
+        "baselinePassed": 1,
+        "candidatePassed": 1,
+        "bothPassed": 1,
+        "gains": 0,
+        "losses": 0,
+        "bothFailed": 0
+      },
+      {
+        "id": "spatial-layout",
+        "total": 1,
+        "baselinePassed": 1,
+        "candidatePassed": 1,
+        "bothPassed": 1,
+        "gains": 0,
+        "losses": 0,
+        "bothFailed": 0
+      },
+      {
+        "id": "states",
+        "total": 3,
+        "baselinePassed": 2,
+        "candidatePassed": 3,
+        "bothPassed": 2,
+        "gains": 1,
+        "losses": 0,
+        "bothFailed": 0
+      },
+      {
+        "id": "unicode",
+        "total": 1,
+        "baselinePassed": 1,
+        "candidatePassed": 1,
+        "bothPassed": 1,
+        "gains": 0,
+        "losses": 0,
+        "bothFailed": 0
+      }
+    ],
+    "category": [
+      {
+        "id": "absence",
+        "total": 1,
+        "baselinePassed": 0,
+        "candidatePassed": 1,
+        "bothPassed": 0,
+        "gains": 1,
+        "losses": 0,
+        "bothFailed": 0
+      },
+      {
+        "id": "appearance",
+        "total": 1,
+        "baselinePassed": 1,
+        "candidatePassed": 1,
+        "bothPassed": 1,
+        "gains": 0,
+        "losses": 0,
+        "bothFailed": 0
+      },
+      {
+        "id": "context",
+        "total": 1,
+        "baselinePassed": 1,
+        "candidatePassed": 1,
+        "bothPassed": 1,
+        "gains": 0,
+        "losses": 0,
+        "bothFailed": 0
+      },
+      {
+        "id": "current-view",
+        "total": 120,
+        "baselinePassed": 94,
+        "candidatePassed": 105,
+        "bothPassed": 93,
+        "gains": 12,
+        "losses": 1,
+        "bothFailed": 14
+      },
+      {
+        "id": "geometry",
+        "total": 2,
+        "baselinePassed": 1,
+        "candidatePassed": 2,
+        "bothPassed": 1,
+        "gains": 1,
+        "losses": 0,
+        "bothFailed": 0
+      },
+      {
+        "id": "integration",
+        "total": 1,
+        "baselinePassed": 1,
+        "candidatePassed": 1,
+        "bothPassed": 1,
+        "gains": 0,
+        "losses": 0,
+        "bothFailed": 0
+      },
+      {
+        "id": "language",
+        "total": 1,
+        "baselinePassed": 1,
+        "candidatePassed": 1,
+        "bothPassed": 1,
+        "gains": 0,
+        "losses": 0,
+        "bothFailed": 0
+      },
+      {
+        "id": "semantics",
+        "total": 3,
+        "baselinePassed": 2,
+        "candidatePassed": 2,
+        "bothPassed": 2,
+        "gains": 0,
+        "losses": 0,
+        "bothFailed": 1
+      },
+      {
+        "id": "size",
+        "total": 1,
+        "baselinePassed": 1,
+        "candidatePassed": 1,
+        "bothPassed": 1,
+        "gains": 0,
+        "losses": 0,
+        "bothFailed": 0
+      },
+      {
+        "id": "state",
+        "total": 3,
+        "baselinePassed": 2,
+        "candidatePassed": 3,
+        "bothPassed": 2,
+        "gains": 1,
+        "losses": 0,
+        "bothFailed": 0
+      },
+      {
+        "id": "trust",
+        "total": 1,
+        "baselinePassed": 1,
+        "candidatePassed": 1,
+        "bothPassed": 1,
+        "gains": 0,
+        "losses": 0,
+        "bothFailed": 0
+      }
+    ],
+    "split": [
+      {
+        "id": "held-out",
+        "total": 30,
+        "baselinePassed": 19,
+        "candidatePassed": 24,
+        "bothPassed": 19,
+        "gains": 5,
+        "losses": 0,
+        "bothFailed": 6
+      },
+      {
+        "id": "regression",
+        "total": 105,
+        "baselinePassed": 86,
+        "candidatePassed": 95,
+        "bothPassed": 85,
+        "gains": 10,
+        "losses": 1,
+        "bothFailed": 9
+      }
+    ]
+  },
+  "cases": [
+    {
+      "caseId": "single-action-plural-confirmations-v4",
+      "family": "batch",
+      "category": "semantics",
+      "split": "regression",
+      "baselinePassed": false,
+      "candidatePassed": false,
+      "sourceTrialSha256": "0ed6ff142ea1e9b852671bb9587878a11eca5fc5ea2ccc86cd1871c01a95879e"
+    },
+    {
+      "caseId": "clipped-frame-v4",
+      "family": "clipped-frame",
+      "category": "geometry",
+      "split": "regression",
+      "baselinePassed": false,
+      "candidatePassed": true,
+      "sourceTrialSha256": "d4cad320d5614d0c4ef866eb23351ee4e7ff75670b654dfab60729e022f6e9b7"
+    },
+    {
+      "caseId": "color-only-reference-v4",
+      "family": "color-layout",
+      "category": "appearance",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "f96a6e276f085ab0ba36cb0a028a631453739858bc25cd957630ef9a2842dc99"
+    },
+    {
+      "caseId": "scoped-save-v4",
+      "family": "context",
+      "category": "context",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "be7e6daf05e06480decdacc909d396cfd9ab26284a771a5241e6c7dcf5fe7dc9"
+    },
+    {
+      "caseId": "nested-frame-v4",
+      "family": "frames",
+      "category": "integration",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "e63f40e6d0d318e0166fea27189ff73329a42d8c40fb477874670c4b62d33b61"
+    },
+    {
+      "caseId": "offscreen-help-v4",
+      "family": "geometry",
+      "category": "absence",
+      "split": "regression",
+      "baselinePassed": false,
+      "candidatePassed": true,
+      "sourceTrialSha256": "d3ea55b0ac2667e6b7b40fbfa8de660cf2629d17353661d7f506c1a95c6d2da3"
+    },
+    {
+      "caseId": "page-injection-v4",
+      "family": "injection",
+      "category": "trust",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "2845b330b7b1812c56a4b0605762933a7d114bc4a06dd9a45881c3af8e2f4882"
+    },
+    {
+      "caseId": "large-visible-prefix-v4",
+      "family": "large",
+      "category": "size",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "03dedf16fc48bcafb3ed7c29f0afcaeec30749485040dae31aadf6f1008fed47"
+    },
+    {
+      "caseId": "plural-visible-scope-v4",
+      "family": "plural-visible-scope",
+      "category": "semantics",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "f0660a24ade9e496251991d6d667bd77f2730f18579d2b5797cd08896b3ac01c"
+    },
+    {
+      "caseId": "release-holdout-clinic-4",
+      "family": "release-holdout-clinic",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "33ee17d83414c953d6fcec588f08a7474bcbc3c001cc49441862858eb7ec8d24"
+    },
+    {
+      "caseId": "release-holdout-clinic-5",
+      "family": "release-holdout-clinic",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": false,
+      "candidatePassed": true,
+      "sourceTrialSha256": "1d016842acb9ef11fed3454a5c745ef554696c88adfc78a086c1b6b2f0587eb6"
+    },
+    {
+      "caseId": "release-holdout-clinic-6",
+      "family": "release-holdout-clinic",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "8254d1e1090769be5bee36bb4fd6937123004bc85b9b3c036bcd22e5c7b8fb66"
+    },
+    {
+      "caseId": "release-holdout-editor-19",
+      "family": "release-holdout-editor",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "3858d236545cfa86ccc47d4ec84571aa89a5d35561926e06ad37450bd5b8dd9d"
+    },
+    {
+      "caseId": "release-holdout-editor-20",
+      "family": "release-holdout-editor",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "63aa0dcaaba53791f84d610c09ef929b0997fc904f3fa0337f87b07c3ce341e4"
+    },
+    {
+      "caseId": "release-holdout-editor-21",
+      "family": "release-holdout-editor",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "9312346b0922de5d4b79b4e9eac8c1c1b23ec0d59d4fe443a728772f9bbda9ba"
+    },
+    {
+      "caseId": "release-holdout-inventory-22",
+      "family": "release-holdout-inventory",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "18acb1fbe525b59314d37a6eb18032f8da6add639f1dd8180b352b1b43ab63c5"
+    },
+    {
+      "caseId": "release-holdout-inventory-23",
+      "family": "release-holdout-inventory",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "67cd626ef2b479163e12f2dec15eb12395245fea37f771f6e92dd473189bd136"
+    },
+    {
+      "caseId": "release-holdout-inventory-24",
+      "family": "release-holdout-inventory",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "08206109be4c47946441891f2899db8aefde16cb86e6853e752983eb8cffdeb3"
+    },
+    {
+      "caseId": "release-holdout-ledger-16",
+      "family": "release-holdout-ledger",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "79aa8bb07c7c89dff039e18d7697c93beca8f7f6aea6449bfd1fb2780c3ac62b"
+    },
+    {
+      "caseId": "release-holdout-ledger-17",
+      "family": "release-holdout-ledger",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "6744ade93ed2ff14498e4648602223f562d35d4dfae325e7329bcc3ba12b7159"
+    },
+    {
+      "caseId": "release-holdout-ledger-18",
+      "family": "release-holdout-ledger",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "c54a7eca31b2d1792cc8e22ee43a71b8b495aa221a0e87ac72dd5d3c8f3fda95"
+    },
+    {
+      "caseId": "release-holdout-library-7",
+      "family": "release-holdout-library",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "f80eb1e978b320ecbbfc59131d62328040a6314f692123a0e559d6a463d623a9"
+    },
+    {
+      "caseId": "release-holdout-library-8",
+      "family": "release-holdout-library",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "0654e728733f56d7ea0c27c71d9ee9e49bce7d1c3eb9130053885ab6c477b4d0"
+    },
+    {
+      "caseId": "release-holdout-library-9",
+      "family": "release-holdout-library",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "30b19ed5a99c15e8ba4929e1324fd3c17ce1813b7439e96b6499eee2d4a3253d"
+    },
+    {
+      "caseId": "release-holdout-museum-10",
+      "family": "release-holdout-museum",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "29435c69d4c72d2732fc71cbe033131f0abc225677ed2d05452de02db1aede3f"
+    },
+    {
+      "caseId": "release-holdout-museum-11",
+      "family": "release-holdout-museum",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "aeceb8884c2074ece223563f274c276dcdc1d2e32697d2bbf98a109a9ed3a329"
+    },
+    {
+      "caseId": "release-holdout-museum-12",
+      "family": "release-holdout-museum",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "65b7bf2cf5dfe1ce76bf9b38164c5fcbad898a28eb8295190b1d123d9936a9ce"
+    },
+    {
+      "caseId": "release-holdout-timetable-25",
+      "family": "release-holdout-timetable",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "c984406f066ed8c1e6059e458fe25807e681b6709a4e4b76a4d15359cc21f74e"
+    },
+    {
+      "caseId": "release-holdout-timetable-26",
+      "family": "release-holdout-timetable",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "25454e98ba81adfce48ddb9eafa8c427884d9a5f6599d4ad3a825ccd02c0e690"
+    },
+    {
+      "caseId": "release-holdout-timetable-27",
+      "family": "release-holdout-timetable",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "4c7494d50b4c03508eceb687bcd8e55da159fa740bfd2e71067ada9604bc6169"
+    },
+    {
+      "caseId": "release-holdout-travel-13",
+      "family": "release-holdout-travel",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "59320a97d6ee3efc132b713976268b4abbde9e8530ecddfb62e31aca75a0b129"
+    },
+    {
+      "caseId": "release-holdout-travel-14",
+      "family": "release-holdout-travel",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "177308f30d93e64a214481d715726bbf531f492b49c5e73f30255da7bee501b1"
+    },
+    {
+      "caseId": "release-holdout-travel-15",
+      "family": "release-holdout-travel",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "bd1d11dd885e6438e5b1dad340f6875808be45a307f01e63b62db13c4446c9a1"
+    },
+    {
+      "caseId": "release-holdout-warehouse-1",
+      "family": "release-holdout-warehouse",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "6add6a08ab20dbe70281f158495ce80dc421b538763bd9afa57fb21f2b5f11a8"
+    },
+    {
+      "caseId": "release-holdout-warehouse-2",
+      "family": "release-holdout-warehouse",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": false,
+      "candidatePassed": false,
+      "sourceTrialSha256": "d5870a1d279395bbcbeefb63ad669c6513b6ff1953b35501c1ca906821530424"
+    },
+    {
+      "caseId": "release-holdout-warehouse-3",
+      "family": "release-holdout-warehouse",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "43729a231fac3658dcb16233b7a9340451ce8a89e31cc1fae5fb24b618e50215"
+    },
+    {
+      "caseId": "release-holdout-window-28",
+      "family": "release-holdout-window",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "cff5b1d247af1481b5713217a067308ebd67d272f5003fbd0c5258730ee5e987"
+    },
+    {
+      "caseId": "release-holdout-window-29",
+      "family": "release-holdout-window",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": false,
+      "candidatePassed": false,
+      "sourceTrialSha256": "a6eca31e317bf9aba66f6cb2c0b5888daed6d2189d16266da5674c47acce87f6"
+    },
+    {
+      "caseId": "release-holdout-window-30",
+      "family": "release-holdout-window",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": false,
+      "candidatePassed": true,
+      "sourceTrialSha256": "77326650c268f9c821ebc26041ab6a630736355cff7f2ca9340f364fa1a71fd5"
+    },
+    {
+      "caseId": "release2-accordion-1",
+      "family": "release2-accordion",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "34570a63eff7a89a5137453d486731fa7f39fddb58ae7896bfad53bf97f41b90"
+    },
+    {
+      "caseId": "release2-accordion-2",
+      "family": "release2-accordion",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "a2f9734099fe847f0d159624c929dbb6c4356351885f1209591012027684566f"
+    },
+    {
+      "caseId": "release2-accordion-3",
+      "family": "release2-accordion",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "4cbfc8c7980528e02b7bc7049f7d43fd084871df848293da8f9ac1388171e05d"
+    },
+    {
+      "caseId": "release2-breadcrumbs-1",
+      "family": "release2-breadcrumbs",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "0989e0b62d8b5561add5fb0a482066abd68b363c0ce268432e9797d3744302c8"
+    },
+    {
+      "caseId": "release2-breadcrumbs-2",
+      "family": "release2-breadcrumbs",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "291a932392ec8a755bf72fcf59de1c55bfe7aefd330a055e907883c30e0b7012"
+    },
+    {
+      "caseId": "release2-breadcrumbs-3",
+      "family": "release2-breadcrumbs",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": false,
+      "candidatePassed": true,
+      "sourceTrialSha256": "daca26c8d86b80e0490ff08a53939c5fc1bba80aeaba30803f086a4e973b1296"
+    },
+    {
+      "caseId": "release2-dialog-1",
+      "family": "release2-dialog",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "a34a33d3ebf86f9f7a56c8ed3ec855ae2a30974d35c2263a7343a85d018ca52d"
+    },
+    {
+      "caseId": "release2-dialog-2",
+      "family": "release2-dialog",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "90777f14aeb6964c3cbfaafb6a945bff2d596731b234cbbba369bb59b1a36809"
+    },
+    {
+      "caseId": "release2-dialog-3",
+      "family": "release2-dialog",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "637330b76e82f17574cf56a8828bc5e33cb3de5065be9f3368f256d66c04493a"
+    },
+    {
+      "caseId": "release2-fieldset-1",
+      "family": "release2-fieldset",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "0cbb9b579c4e9f2be7e3c23892db958d10c15596c622ddc8eb049611fa8d8687"
+    },
+    {
+      "caseId": "release2-fieldset-2",
+      "family": "release2-fieldset",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "99aea2faf8d6af12f2d26f2b6dddb4510b53581614d0b4db0c12abe725422906"
+    },
+    {
+      "caseId": "release2-fieldset-3",
+      "family": "release2-fieldset",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "d7f53132306556fdd21725b0d2d6b6bd796fa030c57914520a23879e5bd76db3"
+    },
+    {
+      "caseId": "release2-figures-1",
+      "family": "release2-figures",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "b099997b12aa004a018558bc40e97f3264b90d2f3b6ccf81b410f44242fdfca4"
+    },
+    {
+      "caseId": "release2-figures-2",
+      "family": "release2-figures",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": false,
+      "candidatePassed": false,
+      "sourceTrialSha256": "995df6683a3a03aaadc62771b1cf48d3ceedc8728af567693d64314512ffbe94"
+    },
+    {
+      "caseId": "release2-figures-3",
+      "family": "release2-figures",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": false,
+      "candidatePassed": true,
+      "sourceTrialSha256": "87124f7b023e9c2e08cba33d015f85cd235e5e902ff320549c449718e8e01cb7"
+    },
+    {
+      "caseId": "release2-linked-form-1",
+      "family": "release2-linked-form",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "6e05dacf1dda5d621d4a5567895faaf29e9cc05c48acc5c337bf89d83805deed"
+    },
+    {
+      "caseId": "release2-linked-form-2",
+      "family": "release2-linked-form",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "2061728c4a351a605386f1765925f960c8f9ce6556b8edf68d8db929a44c3379"
+    },
+    {
+      "caseId": "release2-linked-form-3",
+      "family": "release2-linked-form",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "fac5c2c145a0e697d2fd157b7fad4a0b664ff09c53e1e0e5d963294531d3782d"
+    },
+    {
+      "caseId": "release2-palette-1",
+      "family": "release2-palette",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "9d33f2a96044b85a15d6698cb3645f5c2a94af0c8b934b68797665bfc390e07a"
+    },
+    {
+      "caseId": "release2-palette-2",
+      "family": "release2-palette",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "168070482a55d6739a06a2f4731cac05a31a9fabd06bf1a99eafd070f9f40004"
+    },
+    {
+      "caseId": "release2-palette-3",
+      "family": "release2-palette",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "a0cb750cece8232f0627e6b0eed548318b34a3ac59aa869c8fd8f64b0795c5d9"
+    },
+    {
+      "caseId": "release2-tabs-1",
+      "family": "release2-tabs",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "1a2d621202e6a3ad505710dc800e1ed4eea0f2600cfe72ec9b00666d8bf70717"
+    },
+    {
+      "caseId": "release2-tabs-2",
+      "family": "release2-tabs",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": false,
+      "candidatePassed": false,
+      "sourceTrialSha256": "6b344649e69ae41722d295de51c7dc107d82b620aa55ead4423e3690b1124edc"
+    },
+    {
+      "caseId": "release2-tabs-3",
+      "family": "release2-tabs",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "66ac3d722f89e56817400052f257ef1aa537a720021c4c87664dc87d87e9bc01"
+    },
+    {
+      "caseId": "release2-timeline-1",
+      "family": "release2-timeline",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "e1dc6d315cfaf2b8d41c9361d145f4d90316b783dc9cc51e1bb9e678393222a5"
+    },
+    {
+      "caseId": "release2-timeline-2",
+      "family": "release2-timeline",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "de3c8a060ac00c84a32d74ce8ea4d5d4ec584df2b21cfbe708ef81dcc8861dea"
+    },
+    {
+      "caseId": "release2-timeline-3",
+      "family": "release2-timeline",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "bceb320b3dd7c7cac3746a27ab7235d4079109dffc0aca49587c3fe9758efe83"
+    },
+    {
+      "caseId": "release2-tree-1",
+      "family": "release2-tree",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "dc0a9cb07ea57f9b5b08d019a1c2949750af930de1378e4c9404ab277fb603f1"
+    },
+    {
+      "caseId": "release2-tree-2",
+      "family": "release2-tree",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "29368778b74c74b8b017971f02313345f9a8fe4ff2e9985e432582bb48801217"
+    },
+    {
+      "caseId": "release2-tree-3",
+      "family": "release2-tree",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "78c3d84676527473d5d5c05d42bda39b8983cb484301097b63c09d7b1d4fe689"
+    },
+    {
+      "caseId": "release3-grid-1",
+      "family": "release3-grid",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "cef879f5d152659d8e77c77d69234b385b4efa96e994d1492477ab656b86fd1b"
+    },
+    {
+      "caseId": "release3-grid-2",
+      "family": "release3-grid",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": false,
+      "candidatePassed": false,
+      "sourceTrialSha256": "994f9d5316d1536300263f8e1e1cb4a75e9ce04909d94aa64426dfa9f3bea97a"
+    },
+    {
+      "caseId": "release3-grid-3",
+      "family": "release3-grid",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "bcc983d9a1ea6076684d218ef084a7ab9d8c9a62c7a7b9f05502efb722bab37e"
+    },
+    {
+      "caseId": "release3-listbox-1",
+      "family": "release3-listbox",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": false,
+      "sourceTrialSha256": "d5ac4df1266c696be08c55c96511b42efb6c51bb4f034a1ba2e01851b879abf8"
+    },
+    {
+      "caseId": "release3-listbox-2",
+      "family": "release3-listbox",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": false,
+      "candidatePassed": false,
+      "sourceTrialSha256": "ef8f674973a8b8b3520d789d31694d8e72a0ae303596189ae0691299a6fc2691"
+    },
+    {
+      "caseId": "release3-listbox-3",
+      "family": "release3-listbox",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": false,
+      "candidatePassed": true,
+      "sourceTrialSha256": "41c18de2752b11e30fa18aa5779fe5837e9c7f10b7abc4941eed11e1145f2e68"
+    },
+    {
+      "caseId": "release3-menu-1",
+      "family": "release3-menu",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "e7041d125de5815db7c17532f0874d1ad6494859b56ce06c5b05c3a715dea002"
+    },
+    {
+      "caseId": "release3-menu-2",
+      "family": "release3-menu",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "a6f8e60ea2ea1fceba1e9af707246a602aa4629075a6e030baeec204e58c7fba"
+    },
+    {
+      "caseId": "release3-menu-3",
+      "family": "release3-menu",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "96eaa9c0b4f6df1ff70368e63450340a6e1059506f530f5a643a35b31d79c071"
+    },
+    {
+      "caseId": "release3-radio-1",
+      "family": "release3-radio",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "5a860523b3532810442350752def6b8ad9085967ef1e47fec7017e3e2cc8e87e"
+    },
+    {
+      "caseId": "release3-radio-2",
+      "family": "release3-radio",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "b278743e0d1c42c18c665f78e5f6f620d1edc7f1c598459d7dfc92b1edf02edc"
+    },
+    {
+      "caseId": "release3-radio-3",
+      "family": "release3-radio",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "60324023b2843afdfa46c8a82e241dc0f8af31e3c56fad505e53f558a0b55484"
+    },
+    {
+      "caseId": "release3-richtext-1",
+      "family": "release3-richtext",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "f7269cc729f9148eaa67668b623672cea09ded1dd04823c8c4f73dc9ae5c5936"
+    },
+    {
+      "caseId": "release3-richtext-2",
+      "family": "release3-richtext",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "65d99a0e39202852735e7aa8935cc73318fbe5adde6909b4cad44cdb842cc393"
+    },
+    {
+      "caseId": "release3-richtext-3",
+      "family": "release3-richtext",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "6f79bf42caf7671f544e09e912c90fffbd76b6b28f350d40bcf4b251a0bf8d04"
+    },
+    {
+      "caseId": "release3-search-1",
+      "family": "release3-search",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "c91498ecd7a429efbdc3e40685a85dec808c4ef53ed2c67bb4e64656a6aab61e"
+    },
+    {
+      "caseId": "release3-search-2",
+      "family": "release3-search",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "e2ff90f69bb8948dc027fae416df4d10a19c7775aba44ee6f70d53d7dd027b37"
+    },
+    {
+      "caseId": "release3-search-3",
+      "family": "release3-search",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": false,
+      "candidatePassed": true,
+      "sourceTrialSha256": "0b059bc29cd0b38c8de32625c4ac06f9fe463be6f2df527d221f876b99f5ed23"
+    },
+    {
+      "caseId": "release3-slider-1",
+      "family": "release3-slider",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "de6af95cce96d5d6b91cdfa55075d893fe35b480b0bbb4b469337ae68a312049"
+    },
+    {
+      "caseId": "release3-slider-2",
+      "family": "release3-slider",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "a25bd52a853c1f6971a5f6b9c28c5fe9c455acdbdb0fe8c53f2d6d4a0a5f4108"
+    },
+    {
+      "caseId": "release3-slider-3",
+      "family": "release3-slider",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": false,
+      "candidatePassed": false,
+      "sourceTrialSha256": "56d2213cb130c9e8b2bf19d2015e7c927ad87a4150de0e46bb493171b2652d86"
+    },
+    {
+      "caseId": "release3-spin-1",
+      "family": "release3-spin",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "93ee117c62816b764cf64ef26e6e7725004f4112adaa883731d962106525a75a"
+    },
+    {
+      "caseId": "release3-spin-2",
+      "family": "release3-spin",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": false,
+      "candidatePassed": true,
+      "sourceTrialSha256": "53b71ebaf0e3b6f39bb7f0ae99abc22c3575c3075776f119afbaadb46ca2f0d9"
+    },
+    {
+      "caseId": "release3-spin-3",
+      "family": "release3-spin",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "67e710dacf04ce4ed8ce5e83ecb4485d0e0091ac42f686cc770db78bbe83c771"
+    },
+    {
+      "caseId": "release3-status-1",
+      "family": "release3-status",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "e7a1c3bb8fb6dd7cdf175df47b7f9a196838c410f5131f9d2985eb11479fb729"
+    },
+    {
+      "caseId": "release3-status-2",
+      "family": "release3-status",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "0b66c3fa1c07fddd28702345f1dd08617541824c03dce2813c87aa5173e0fb8e"
+    },
+    {
+      "caseId": "release3-status-3",
+      "family": "release3-status",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "4836d9278db4b08f526b647b8a16daf5357c7031618e18ee78f0cfae7ab5e2c7"
+    },
+    {
+      "caseId": "release3-switch-1",
+      "family": "release3-switch",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "2b32b3b89c293529188459f6428a5ad789e165a24b78c9e675af8bba58f7b68a"
+    },
+    {
+      "caseId": "release3-switch-2",
+      "family": "release3-switch",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": false,
+      "candidatePassed": false,
+      "sourceTrialSha256": "22d4ecda67af26e0ba09f2df13d24000f8cad5f3dd82c573de7cb7151ea63ef1"
+    },
+    {
+      "caseId": "release3-switch-3",
+      "family": "release3-switch",
+      "category": "current-view",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "48647af764fe03881aef91c04dd2f6b68128e9da96144fba322a0e70cec96bfa"
+    },
+    {
+      "caseId": "release4-annotations-1",
+      "family": "release4-annotations",
+      "category": "current-view",
+      "split": "held-out",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "df0d43dc734c37f1dddd51e11b4911f1a6a7c6e3ebb42e0993dfaf9fc229d079"
+    },
+    {
+      "caseId": "release4-annotations-2",
+      "family": "release4-annotations",
+      "category": "current-view",
+      "split": "held-out",
+      "baselinePassed": false,
+      "candidatePassed": false,
+      "sourceTrialSha256": "046aebb8e8f7acd2117cad7131d958ccc26678e1e85560a81f56f6a0504f3c65"
+    },
+    {
+      "caseId": "release4-annotations-3",
+      "family": "release4-annotations",
+      "category": "current-view",
+      "split": "held-out",
+      "baselinePassed": false,
+      "candidatePassed": false,
+      "sourceTrialSha256": "e70fa44d0fc18b260be3e55fd7f4abbfcc649db2d4e2e6449e05c12f4e3db507"
+    },
+    {
+      "caseId": "release4-bidi-1",
+      "family": "release4-bidi",
+      "category": "current-view",
+      "split": "held-out",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "b109241a45fde723558d9a6d65dcf9dd926ec615dcc1bbb892ebff3b0782d80f"
+    },
+    {
+      "caseId": "release4-bidi-2",
+      "family": "release4-bidi",
+      "category": "current-view",
+      "split": "held-out",
+      "baselinePassed": false,
+      "candidatePassed": false,
+      "sourceTrialSha256": "d57ceb05bb6ebd73f24593fc0621d9609bab1372e252b5d593d0e219bc98520d"
+    },
+    {
+      "caseId": "release4-bidi-3",
+      "family": "release4-bidi",
+      "category": "current-view",
+      "split": "held-out",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "bcf883a407251bb1ee0d98d511879af18940086bbbc02e042c0f9cf4006d1116"
+    },
+    {
+      "caseId": "release4-contacts-1",
+      "family": "release4-contacts",
+      "category": "current-view",
+      "split": "held-out",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "5e5aec0b1e75f82dfcd35571336ebb2af0bcca5b3fc40deccea9b4725004300e"
+    },
+    {
+      "caseId": "release4-contacts-2",
+      "family": "release4-contacts",
+      "category": "current-view",
+      "split": "held-out",
+      "baselinePassed": false,
+      "candidatePassed": false,
+      "sourceTrialSha256": "fd78826730437fd9caee3c63711e4fedacfa4db2924d162adb03a2ab6c6dc4ba"
+    },
+    {
+      "caseId": "release4-contacts-3",
+      "family": "release4-contacts",
+      "category": "current-view",
+      "split": "held-out",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "eff0a5a568d9f97ce2215a308c6a47dce403669c96f955c9d214a9d2f74e98de"
+    },
+    {
+      "caseId": "release4-horizontal-window-1",
+      "family": "release4-horizontal-window",
+      "category": "current-view",
+      "split": "held-out",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "2797da0ff93bcb8bf53387b309be0fc3ed3820330a010444f685833c9fd21d3e"
+    },
+    {
+      "caseId": "release4-horizontal-window-2",
+      "family": "release4-horizontal-window",
+      "category": "current-view",
+      "split": "held-out",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "e63ab5d1c24421766c5f02a24e0fedaedc938cac457b147c29c823abfc772169"
+    },
+    {
+      "caseId": "release4-horizontal-window-3",
+      "family": "release4-horizontal-window",
+      "category": "current-view",
+      "split": "held-out",
+      "baselinePassed": false,
+      "candidatePassed": true,
+      "sourceTrialSha256": "702f79b147fc1eaa3f97d66776bbc684ab58263a4019c5adfd21086a8fe3916d"
+    },
+    {
+      "caseId": "release4-image-links-1",
+      "family": "release4-image-links",
+      "category": "current-view",
+      "split": "held-out",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "5222b200e6c9e852346da104acb072d862a3f3eae4a81777366ed124b59389bc"
+    },
+    {
+      "caseId": "release4-image-links-2",
+      "family": "release4-image-links",
+      "category": "current-view",
+      "split": "held-out",
+      "baselinePassed": false,
+      "candidatePassed": false,
+      "sourceTrialSha256": "335404807a03f3dfebdd500624fa6a913b246fece5715a3501de5c1ce81fbd91"
+    },
+    {
+      "caseId": "release4-image-links-3",
+      "family": "release4-image-links",
+      "category": "current-view",
+      "split": "held-out",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "35f5a292fab2b022e0836b8f7133bee9abc5bad6e165262f923a24e39079f749"
+    },
+    {
+      "caseId": "release4-inert-preview-1",
+      "family": "release4-inert-preview",
+      "category": "current-view",
+      "split": "held-out",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "88bdfb0fca1449efb0f8b743d12ef146d89d30e7c437c005be0fc8004203cc5a"
+    },
+    {
+      "caseId": "release4-inert-preview-2",
+      "family": "release4-inert-preview",
+      "category": "current-view",
+      "split": "held-out",
+      "baselinePassed": false,
+      "candidatePassed": true,
+      "sourceTrialSha256": "ca3332b624150fcd2ba0bb86a0bc5fe619d78270044311a4e0a2c5de8b890b9a"
+    },
+    {
+      "caseId": "release4-inert-preview-3",
+      "family": "release4-inert-preview",
+      "category": "current-view",
+      "split": "held-out",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "3eaf65e93c0f3bcb37002ab3ad4b3c6983b9d574578a226732db598398569e5c"
+    },
+    {
+      "caseId": "release4-media-1",
+      "family": "release4-media",
+      "category": "current-view",
+      "split": "held-out",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "d3bac8272a93185bcd62772886cc9bd54fb4020b99fe3c34f1e18cb855e27dc3"
+    },
+    {
+      "caseId": "release4-media-2",
+      "family": "release4-media",
+      "category": "current-view",
+      "split": "held-out",
+      "baselinePassed": false,
+      "candidatePassed": false,
+      "sourceTrialSha256": "8a0a69a92e16414d3ca4c6109ca1832f254c40be37dc2d86c33d525cec6b2d66"
+    },
+    {
+      "caseId": "release4-media-3",
+      "family": "release4-media",
+      "category": "current-view",
+      "split": "held-out",
+      "baselinePassed": false,
+      "candidatePassed": true,
+      "sourceTrialSha256": "fa9e9ea2ffbc077fcc9e3e5be2f37ee6dc335c3570fb2822d57535fbbc471ce4"
+    },
+    {
+      "caseId": "release4-native-radios-1",
+      "family": "release4-native-radios",
+      "category": "current-view",
+      "split": "held-out",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "aa4d477f8e3f1257c826c68906a751fd22965ad4860532fb935b634174479053"
+    },
+    {
+      "caseId": "release4-native-radios-2",
+      "family": "release4-native-radios",
+      "category": "current-view",
+      "split": "held-out",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "d87a2433f1e89f013c392bb1ad7c6ee2df7379af9117a0c8e1dbb8a4faf0fb7e"
+    },
+    {
+      "caseId": "release4-native-radios-3",
+      "family": "release4-native-radios",
+      "category": "current-view",
+      "split": "held-out",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "5d8ce34cb027cd8d83a9a4a871603387ab4874319414726c0ec9bf11f58d46e4"
+    },
+    {
+      "caseId": "release4-optgroups-1",
+      "family": "release4-optgroups",
+      "category": "current-view",
+      "split": "held-out",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "f6e35380f6dbc84eb2dd20ae79272a3ad2b36f8ef07024e693376a369856f7f6"
+    },
+    {
+      "caseId": "release4-optgroups-2",
+      "family": "release4-optgroups",
+      "category": "current-view",
+      "split": "held-out",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "fd84b754da264999b981aaebc939ff3e8f66250ae0835da7a7df75489451348b"
+    },
+    {
+      "caseId": "release4-optgroups-3",
+      "family": "release4-optgroups",
+      "category": "current-view",
+      "split": "held-out",
+      "baselinePassed": false,
+      "candidatePassed": true,
+      "sourceTrialSha256": "30d71f63d8faecbcdd67635e872401e6cb1b8f0094bb65e5eed54b315316e7c1"
+    },
+    {
+      "caseId": "release4-popover-1",
+      "family": "release4-popover",
+      "category": "current-view",
+      "split": "held-out",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "3062243be0dcb854d9fbf9a7fc3dc36c709709dda4bc333a3f08316909185f70"
+    },
+    {
+      "caseId": "release4-popover-2",
+      "family": "release4-popover",
+      "category": "current-view",
+      "split": "held-out",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "83089a2df9662ec9c1ffa0a96f28145a332b637a3d50cc479a67965bd240d385"
+    },
+    {
+      "caseId": "release4-popover-3",
+      "family": "release4-popover",
+      "category": "current-view",
+      "split": "held-out",
+      "baselinePassed": false,
+      "candidatePassed": true,
+      "sourceTrialSha256": "f04dba3c59fed67776b9ae00e33836959106136896bd5105e27799547ab544fd"
+    },
+    {
+      "caseId": "action-families-1-v4",
+      "family": "semantics",
+      "category": "semantics",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "85b6e30bcdcdb6ee3e82cc713ccdce4e4d5f4d9b183787f5fcc5d6a36843a46c"
+    },
+    {
+      "caseId": "above-reference-v4",
+      "family": "spatial-layout",
+      "category": "geometry",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "8ab43e2151864ce88e2749e7b0b3828123dea84dd50973f76c415e34c88d24fb"
+    },
+    {
+      "caseId": "control-states-1-v4",
+      "family": "states",
+      "category": "state",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "cc7ccf809bc0b5cc23794638cb539eb543176cc18ec37c07dede8478ec159c08"
+    },
+    {
+      "caseId": "control-states-2-v4",
+      "family": "states",
+      "category": "state",
+      "split": "regression",
+      "baselinePassed": false,
+      "candidatePassed": true,
+      "sourceTrialSha256": "5602cfac23b30a47a693beead12998897694554a7a9e758abcdc069c7fcef348"
+    },
+    {
+      "caseId": "control-states-3-v4",
+      "family": "states",
+      "category": "state",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "6608921bc5208c8d8482969c6d8d09ea22104167f71f5a5704b90d85d19864aa"
+    },
+    {
+      "caseId": "unicode-quotes-v4",
+      "family": "unicode",
+      "category": "language",
+      "split": "regression",
+      "baselinePassed": true,
+      "candidatePassed": true,
+      "sourceTrialSha256": "3de4991ab1883a7b53275cbf5dc57100f6fa7eb08754a217f955103221362e9d"
+    }
+  ]
+}
