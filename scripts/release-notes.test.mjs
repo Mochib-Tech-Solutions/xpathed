@@ -31,7 +31,7 @@ test("interrupted trial reporting retains provider records without a completed t
 });
 
 test("release notes show both arms, incomplete qualification and unknown charges honestly", () => {
-  const notes = releaseNotes({
+  const input = {
     tag: "v1.0.0-rc.1",
     qualified: false,
     profile: {
@@ -59,7 +59,8 @@ test("release notes show both arms, incomplete qualification and unknown charges
     sourceSha: "a".repeat(40),
     bundleSha: "b".repeat(64),
     runUrl: "https://example.test/run",
-  });
+  };
+  const notes = releaseNotes(input);
   for (const text of [
     "not approved",
     "deepseek/deepseek-v4.1-flash",
@@ -74,4 +75,7 @@ test("release notes show both arms, incomplete qualification and unknown charges
     "#67",
   ])
     assert.ok(notes.includes(text), text);
+  const reportOnly = releaseNotes({ ...input, policy: { version: "6" } });
+  assert.ok(reportOnly.includes("latency is reported and does not gate approval"));
+  assert.ok(!reportOnly.includes("latency margin"));
 });
