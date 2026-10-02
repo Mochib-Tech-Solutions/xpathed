@@ -58,7 +58,7 @@ function fresh(value) {
     "Evidence timestamp is invalid or expired",
   );
 }
-function configuration(trial, profile, policy) {
+function configuration(trial, profile, policy, currentViewPromptVersion = "9") {
   fresh(trial.createdAt);
   const recorded = configurationRecord(trial);
   ensure(
@@ -82,7 +82,7 @@ function configuration(trial, profile, policy) {
     1: "5",
     2: "6",
     3: profile.variant === "concise" ? "7-concise-1" : "7",
-    4: "8",
+    4: currentViewPromptVersion,
   }[trial.result?.contractVersion];
   ensure(typeof promptVersion === "string", "Unsupported release qualification contract");
   if (trial.result?.contractVersion === "4")
@@ -402,7 +402,12 @@ async function evidence(options) {
           trial.baseline?.caseId === trial.caseId && trial.baseline?.mode === trial.mode,
           "Baseline trial identity differs",
         );
-        const baselineRecord = configuration(trial.baseline, m.comparison.profile, defaultPolicy);
+        const baselineRecord = configuration(
+          trial.baseline,
+          m.comparison.profile,
+          defaultPolicy,
+          m.comparison.artifact.sourceSha === defaultPolicy.bootstrap.sourceSha ? "8" : "9",
+        );
         const baselineKey = `release-baseline:${trial.result.contractVersion}`;
         ensure(
           !configurations[baselineKey] ||

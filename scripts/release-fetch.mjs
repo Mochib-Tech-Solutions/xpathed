@@ -104,7 +104,7 @@ async function fetch(repo, tag, candidateSha256, destination, approved = null) {
       candidate.version === 2 &&
         candidate.status === "artifact-bound-evidence-verified" &&
         candidate.artifact?.sourceSha === candidate.sourceSha &&
-        candidate.configurations?.[`${candidate.profile}:4`]?.promptVersion === "8",
+        ["8", "9"].includes(candidate.configurations?.[`${candidate.profile}:4`]?.promptVersion),
       "Candidate is not a compatible current-view artifact",
     );
   }

@@ -26,11 +26,14 @@ internal static class ActionSelectionStrategy
         Mixed interactions, targetless navigation/keys, pauses and drag-and-drop: reject the whole command with one unsupported/unsupported entry and unsupported_action.
         Any scrolling/opening/reveal requirement, sequential workflow or future-state dependency: reject the whole command with one unsupported entry, shared action and current_state_dependency.
         Otherwise missing references are not_found in the current view; do not search off-screen or assume that a missing target requires scrolling.
+        If no supplied candidate matches the requested target, return not_found, including when candidates is empty. Missing evidence of a target is not ambiguity.
         Ambiguity means one unsupported/unsupported entry with ambiguous. Never return alternative guesses for one intended target.
         Found entries use exact candidateId and limitation none even for disabled/incompatible controls. Missing entries use shared action, null candidateId and limitation none.
         Include explicitly named missing targets beside found targets. Deduplicate candidate IDs. Plural expansion shares step 1 in capture order unless visual order is explicitly requested.
         Explicitly ordered/named targets use consecutive steps in instruction order. Frame identity is part of target identity.
-        Every entry includes a brief target instruction (1-300 characters). Return complete true only when all targets are represented, including missing/unsupported outcomes.
+        Every entry includes a brief target instruction (1-300 characters).
+        complete describes target enumeration, not whether targets exist or are ready. A missing or unsupported target is fully represented by its own entry.
+        Never set complete false merely because candidates is empty or an entry is not_found or unsupported; include the entry and return complete true.
         Maximum 16 entries; if enumeration cannot finish, return complete false and actions []. No form values or per-target usage/cost.
         """;
     public const string ConciseSingleInteractionPrompt = """
