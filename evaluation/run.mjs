@@ -733,7 +733,7 @@ export async function main(args = process.argv.slice(2)) {
     mode: options.mode,
     configurations: {},
     cases: cases.map((item) =>
-      item.fixture?.kind === "derived-static-dom"
+      item.fixture?.kind === "derived-static-dom" && item.fixture.sha256
         ? { ...item, fixture: { kind: item.fixture.kind, sha256: item.fixture.sha256 } }
         : item,
     ),

@@ -242,6 +242,16 @@ async function runWithServices(
   return { attempts, trial: JSON.parse(await readFile(trialPath, "utf8")), output, trialPath };
 }
 
+test("authored static DOM fixtures retain their complete identity in CI evidence", async (t) => {
+  const { output } = await runWithServices(t, "above-reference-v4", {
+    contractVersion: "4",
+    captureScope: "viewport",
+  });
+  const manifest = JSON.parse(await readFile(join(output, "manifest.json"), "utf8"));
+  assert.ok(manifest.cases[0].fixture.tree);
+  assert.equal(manifest.cases[0].fixture.sha256, undefined);
+});
+
 test("a failed coverage capture still records the resolver's capture-budget result", async (t) => {
   const { trial, attempts } = await runWithServices(t, "capture-budget", { captureFailure: true });
   assert.equal(attempts.length, 1);
