@@ -21,6 +21,7 @@ import {
   fixtureProxy,
   summarizeMonitoring,
   assertPilotReady,
+  savePairedTrial,
 } from "./qualify.mjs";
 import currentPolicy from "./current-view-qualification-policy.json" with { type: "json" };
 import { fingerprints } from "./run.mjs";
@@ -145,6 +146,10 @@ test("frozen sentinel monitoring separates semantic drift, latency and infrastru
   });
   trial.baseline = structuredClone(trial);
   trial.baseline.profileId = "release-baseline";
+  trial.baseline.id = createHash("sha256")
+    .update(`${trial.id}:baseline`)
+    .digest("hex")
+    .slice(0, 32);
   trial.baseline.elapsedMs = 3500;
   trial.baseline.provider[0].observedIdentity.generationId = "baseline";
   assert.equal(assertPilotReady({ manifest: relative, trials: [trial] }).status, "passed");
@@ -528,4 +533,23 @@ test("paired baselines keep each pair adjacent and alternate which contract runs
     assert.equal(pair[0].pairId, pair[1].pairId);
     assert.equal(pair[0].contractVersion, index % 4 === 0 ? "3" : "4");
   }
+});
+
+test("a baseline reservation failure retains the completed candidate and partial baseline", async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), "xpathed-paired-evidence-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const trial = { id: "candidate", result: { outcome: "found" }, observation: { preserved: true } };
+  await assert.rejects(
+    () =>
+      savePairedTrial(directory, trial, async (retain) => {
+        const first = JSON.parse(await readFile(join(directory, "candidate.json"), "utf8"));
+        assert.deepEqual(first, trial);
+        await retain({ id: "baseline", result: null });
+        throw new Error("reservation unavailable");
+      }),
+    /reservation unavailable/,
+  );
+  const saved = JSON.parse(await readFile(join(directory, "candidate.json"), "utf8"));
+  assert.deepEqual(saved.observation, { preserved: true });
+  assert.deepEqual(saved.baseline, { id: "baseline", result: null });
 });

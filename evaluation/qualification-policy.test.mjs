@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import test from "node:test";
 import policy from "./qualification-policy.json" with { type: "json" };
-import { compareTrials, compareMeasurements } from "./release-comparison.mjs";
+import { compareTrials, compareMeasurements, measuredEntry } from "./release-comparison.mjs";
 import { summarizeQualification } from "./qualification-policy.mjs";
 import currentViewPolicy from "./current-view-qualification-policy.json" with { type: "json" };
 
@@ -143,6 +143,10 @@ test("current-view release qualification requires its own coverage and measured 
   for (const trial of trials) {
     trial.baseline = structuredClone(trial);
     trial.baseline.profileId = "release-baseline";
+    trial.baseline.id = createHash("sha256")
+      .update(`${trial.id}:baseline`)
+      .digest("hex")
+      .slice(0, 32);
     trial.baseline.provider[0].observedIdentity.generationId += "-baseline";
     trial.baseline.elapsedMs = 4000;
     trial.elapsedMs = 3500;
@@ -650,4 +654,38 @@ test("relative comparisons accept ties and retained failures but reject lost pas
     [baseline[0], { ...baseline[1], elapsedMs: null }],
   ])
     assert.equal(compareMeasurements(baseline, invalid).status, "infrastructure_failure");
+});
+
+test("paid provider evidence cannot turn infrastructure failures into baseline semantic failures", () => {
+  const { manifest, trials } = evidence();
+  const trial = trials[0],
+    spec = manifest.cases[0],
+    profile = manifest.profiles[0];
+  for (const failed of [
+    { ...trial, error: "observation failed" },
+    { ...trial, cleanupError: "session cleanup failed" },
+    {
+      ...trial,
+      result: {
+        contractVersion: "3",
+        outcome: "error",
+        actions: [],
+        diagnostics: { code: "verification_failed" },
+      },
+    },
+  ])
+    assert.equal(measuredEntry(spec, failed, profile, currentViewPolicy).operational, true);
+  const malformed = {
+    ...trial,
+    result: {
+      contractVersion: "3",
+      outcome: "error",
+      actions: [],
+      diagnostics: { code: "provider_malformed_response" },
+    },
+  };
+  const entry = measuredEntry(spec, malformed, profile, currentViewPolicy);
+  assert.equal(entry.passed, false);
+  assert.equal(entry.operational, false);
+  assert.equal(compareMeasurements([entry], [entry]).status, "passed");
 });

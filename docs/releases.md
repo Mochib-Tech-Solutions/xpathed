@@ -35,7 +35,7 @@ Approval, activation and monitoring follow [ADR-0021](adr/0021-monitor-explicitl
 
 ## Baseline-relative acceptance
 
-Policy 4 replaces fixed accuracy and deadline percentages. Preserve every baseline pass; median and p95 Resolver HTTP latency over all original cases must be no worse. Equal results pass. Existing semantic failures are retained and reported; safety, valid API contracts, provider accounting, completeness of evidence and artifact identity remain required. The one- and two-second metrics describe speed without blocking qualification. Exact ties need no invented improvement claim.
+Policy 4 replaces fixed accuracy and deadline percentages. Preserve every baseline pass; median and p95 Resolver HTTP latency over all original cases must be no worse. Equal results pass. Existing semantic failures, including accounted malformed model output, are retained and reported; safety, valid API contracts, provider accounting, completeness of evidence and artifact identity remain required. The one- and two-second metrics describe speed without blocking qualification. Exact ties need no invented improvement claim.
 
 The hosted workflow pins the latest approved release before the pilot, or builds the explicitly pinned DeepSeek/Wafer bootstrap source before the first approval. It compares both exact image sets on the same cases, with one inference per arm and independent page resets, and retains both original responses. This doubles inference attempts compared with a candidate-only run. Promotion rejects a result compared with a superseded approval. The comparison baseline is fixed through pilot and confirmation; the current approval is checked again at promotion.
 
@@ -148,3 +148,4 @@ Run `pnpm release:monitor` locally for the same live check. Use the workflow's `
 GitHub schedules can be delayed or dropped, and email follows the account's notification preferences and schedule actor. The recorded last-completed time exposes a missed run; native Actions email cannot alert for a run that never started. The [research note](research/2026-10-01-release-monitoring-setup.md) links the official notification and scheduling behavior. Do not claim scheduled delivery before observing it.
 
 Sentinels use only development/regression families. The shared evaluator rejects held-out sentinel membership, so an early local monitoring run cannot consume fresh qualification families.
+

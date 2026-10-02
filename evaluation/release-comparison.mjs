@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { gradeTrial } from "./grader.mjs";
 
 const finite = (value) => Number.isFinite(value) && value >= 0;
@@ -14,6 +15,10 @@ export function measuredEntry(spec, trial, profile, policy) {
     ),
     operational:
       !trial ||
+      Boolean(trial.error) ||
+      Boolean(trial.cleanupError) ||
+      (grade.metrics.operationalError &&
+        trial.result?.diagnostics?.code !== "provider_malformed_response") ||
       Boolean(trial.accountingError) ||
       !finite(trial.elapsedMs) ||
       calls.length !== 1 ||
@@ -96,6 +101,9 @@ export function compareTrials(manifest, trials, policy) {
     const previous = measuredEntry(spec, trial?.baseline, baselineProfile, policy);
     if (
       trial?.baseline?.caseId !== spec.id ||
+      trial?.baseline?.id !==
+        createHash("sha256").update(`${trial?.id}:baseline`).digest("hex").slice(0, 32) ||
+      trial?.baseline?.repetition !== trial?.repetition ||
       trial?.baseline?.attempt !== 1 ||
       trial?.baseline?.profileId !== "release-baseline"
     )

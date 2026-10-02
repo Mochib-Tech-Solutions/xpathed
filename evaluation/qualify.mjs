@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile, rename } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { once } from "node:events";
 import { createServer } from "node:http";
@@ -23,6 +23,25 @@ const hash = (value) =>
 const json = async (path) => JSON.parse(await readFile(path, "utf8"));
 const save = (path, value) =>
   writeFile(path, JSON.stringify(value, null, 2) + "\n", { flag: "wx", mode: 0o600 });
+// Keep the completed first arm even if the second arm cannot reserve or finish.
+export async function savePairedTrial(directory, trial, runBaseline) {
+  const path = join(directory, `${trial.id}.json`);
+  await save(path, trial);
+  if (!runBaseline) return;
+  const update = async () => {
+    await writeFile(`${path}.partial`, JSON.stringify(trial, null, 2) + "\n", { mode: 0o600 });
+    await rename(`${path}.partial`, path);
+  };
+  try {
+    trial.baseline = await runBaseline(async (baseline) => {
+      trial.baseline = baseline;
+      await update();
+    });
+  } finally {
+    await update();
+  }
+}
+
 export const profiles = await json(new URL("./qualification-profiles.json", import.meta.url));
 
 export function validateReleaseArtifact(artifact, sourceSha, profileIds) {
@@ -734,7 +753,7 @@ export async function main(args = process.argv.slice(2)) {
   const trials = [];
   let proxy, deterministicProxy, runError;
   const preparedRequests = new Map();
-  async function runTrial(spec, planned, mode, reference = false) {
+  async function runTrial(spec, planned, mode, reference = false, retain) {
     const profile = inferenceProfiles.find((p) => p.id === planned.profileId);
     const trial = {
       ...planned,
@@ -743,6 +762,7 @@ export async function main(args = process.argv.slice(2)) {
       result: null,
       evidence: null,
     };
+    if (retain) await retain(trial);
     if (mode === "live") {
       if (preparedAccounting)
         await proxy.reserveAttempt(
@@ -779,22 +799,28 @@ export async function main(args = process.argv.slice(2)) {
     }
     trial.grade = gradeTrial(spec, trial);
     if (!reference) {
-      if (
+      const compare =
         comparison &&
         !trial.accountingError &&
-        !trial.provider?.some((p) => p.identityValid === false || p.responseCacheHit)
-      )
-        trial.baseline = await runTrial(
-          spec,
-          {
-            ...planned,
-            id: hash(`${planned.id}:baseline`).slice(0, 32),
-            profileId: "release-baseline",
-          },
-          mode,
-          true,
-        );
-      await save(join(output, "trials", `${trial.id}.json`), trial);
+        !trial.provider?.some((p) => p.identityValid === false || p.responseCacheHit);
+      await savePairedTrial(
+        join(output, "trials"),
+        trial,
+        compare
+          ? (retain) =>
+              runTrial(
+                spec,
+                {
+                  ...planned,
+                  id: hash(`${planned.id}:baseline`).slice(0, 32),
+                  profileId: "release-baseline",
+                },
+                mode,
+                true,
+                retain,
+              )
+          : null,
+      );
     }
     return trial;
   }
@@ -946,7 +972,8 @@ export async function main(args = process.argv.slice(2)) {
   // A completed live measurement may truthfully find no qualifying model.
   return runError ||
     trials.length !== manifest.plan.trials.length ||
-    (options.mode === "deterministic" && trials.some((t) => !t.grade.passed))
+    (options.mode === "deterministic" &&
+      trials.some((t) => !t.grade.passed || (comparison && !t.baseline?.grade.passed)))
     ? 1
     : 0;
 }
