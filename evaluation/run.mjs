@@ -677,11 +677,19 @@ export async function prune(path, now = new Date()) {
       if (error.code === "ENOENT") return [];
       throw error;
     })) {
+      if (file.endsWith(".json.partial")) {
+        await rm(join(path, sub, file));
+        continue;
+      }
       if (!file.endsWith(".json")) continue;
       const name = join(path, sub, file),
         value = await readJson(name);
       value.evidence = null;
       value.evidenceAvailability = "expired";
+      if (value.baseline) {
+        value.baseline.evidence = null;
+        value.baseline.evidenceAvailability = "expired";
+      }
       if (value.mutation?.fresh) value.mutation.fresh.evidence = null;
       await writeFile(name, JSON.stringify(value, null, 2) + "\n");
     }

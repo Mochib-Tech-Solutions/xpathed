@@ -21,7 +21,9 @@ import {
   fixtureProxy,
   summarizeMonitoring,
   assertPilotReady,
+  savePairedTrial,
 } from "./qualify.mjs";
+import currentPolicy from "./current-view-qualification-policy.json" with { type: "json" };
 import { fingerprints } from "./run.mjs";
 
 const releaseArtifact = (sourceSha) => ({
@@ -129,6 +131,36 @@ test("frozen sentinel monitoring separates semantic drift, latency and infrastru
   for (const trials of [[], [wrong], [{ ...trial, elapsedMs: 2500 }]])
     assert.throws(() => assertPilotReady({ manifest: pilot, trials }), /Pilot failed/);
   assert.throws(() => assertPilotReady({ manifest, trials: [trial] }), /development pilot/);
+  const profile = profiles.find((p) => p.id === "deepseek");
+  const relative = {
+    ...pilot,
+    policy: currentPolicy,
+    profiles: [profile],
+    comparison: { profile },
+  };
+  trial.elapsedMs = 3000;
+  Object.assign(trial.provider[0], {
+    responseReuseDisabled: true,
+    observedIdentity: { generationId: "candidate" },
+    requestedIdentity: { model: profile.model, provider: profile.provider },
+  });
+  trial.baseline = structuredClone(trial);
+  trial.baseline.profileId = "release-baseline";
+  trial.baseline.id = createHash("sha256")
+    .update(`${trial.id}:baseline`)
+    .digest("hex")
+    .slice(0, 32);
+  trial.baseline.elapsedMs = 3500;
+  trial.baseline.provider[0].observedIdentity.generationId = "baseline";
+  assert.equal(assertPilotReady({ manifest: relative, trials: [trial] }).status, "passed");
+  const monitoring = { ...relative, monitoring: true };
+  const baseline = [{ caseId: spec.id, passed: true, elapsedMs: 3500 }];
+  assert.equal(summarizeMonitoring(monitoring, [trial], baseline).status, "passed");
+  assert.equal(
+    summarizeMonitoring(monitoring, [{ ...trial, elapsedMs: 4000 }], baseline).status,
+    "latency_regression",
+  );
+  assert.equal(summarizeMonitoring(monitoring, [trial]).status, "infrastructure_failure");
 });
 
 test("qualification interleaves every profile per case and rotates first position", () => {
@@ -295,6 +327,7 @@ test("replay preserves absent planned attempts and rejects swapped trial identit
     "evaluation/qualify.mjs",
     "evaluation/grader.mjs",
     "evaluation/qualification-policy.mjs",
+    "evaluation/release-comparison.mjs",
   ])
     files[path] = digest(await readFile(new URL(`../${path}`, import.meta.url), "utf8"));
   const spec = JSON.parse(await readFile(new URL("./cases.json", import.meta.url), "utf8"))
@@ -500,4 +533,23 @@ test("paired baselines keep each pair adjacent and alternate which contract runs
     assert.equal(pair[0].pairId, pair[1].pairId);
     assert.equal(pair[0].contractVersion, index % 4 === 0 ? "3" : "4");
   }
+});
+
+test("a baseline reservation failure retains the completed candidate and partial baseline", async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), "xpathed-paired-evidence-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const trial = { id: "candidate", result: { outcome: "found" }, observation: { preserved: true } };
+  await assert.rejects(
+    () =>
+      savePairedTrial(directory, trial, async (retain) => {
+        const first = JSON.parse(await readFile(join(directory, "candidate.json"), "utf8"));
+        assert.deepEqual(first, trial);
+        await retain({ id: "baseline", result: null });
+        throw new Error("reservation unavailable");
+      }),
+    /reservation unavailable/,
+  );
+  const saved = JSON.parse(await readFile(join(directory, "candidate.json"), "utf8"));
+  assert.deepEqual(saved.observation, { preserved: true });
+  assert.deepEqual(saved.baseline, { id: "baseline", result: null });
 });

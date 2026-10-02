@@ -1,3 +1,5 @@
+import { assertLatestBaseline } from "./release-baseline.mjs";
+import policy from "../evaluation/current-view-qualification-policy.json" with { type: "json" };
 import { execFileSync } from "node:child_process";
 import { mkdir, writeFile, readFile, mkdtemp } from "node:fs/promises";
 import { resolve, join } from "node:path";
@@ -74,6 +76,8 @@ async function main() {
   const directory = await mkdtemp(join(parent, `${operation}-`));
   const staged = await fetchRelease(snapshot.repo, target.tag, target.candidateSha256, directory);
   verifyExposure(snapshot, staged.release);
+  if (operation === "promote")
+    assertLatestBaseline(staged.release.comparison, snapshot.state.current, policy);
   if (operation !== "activate") {
     const next = transition(snapshot.state, operation, staged.release, {
       expectedCurrent: options["--expected-current"],

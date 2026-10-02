@@ -108,6 +108,7 @@ async function workspace(
       ...selected,
       sourceManifestHash: hash(suite),
       profiles: [profile],
+      ...(qualificationPolicy ? { comparison: { profile } } : {}),
       baselineEvidence: pilot ? baselineEvidence(pilot) : null,
       plan: {
         repetitions: 1,
@@ -131,7 +132,7 @@ async function workspace(
         frozenAt: time(-3000),
         heldOutStartedAt: phase === "pilot" ? null : time(-2000),
         baselineRunIds: pilot ? [pilot.manifest.id] : [],
-        ...(defaultPolicy.version === "3" && phase === "confirmation"
+        ...(defaultPolicy.version === "4" && phase === "confirmation"
           ? {
               exposure: {
                 repository: "example/private",
@@ -221,7 +222,16 @@ async function workspace(
           }),
         },
       };
+      if (qualificationPolicy && mode === "live" && spec.id === "case-31")
+        trial.observation.actions[0].matches[0].intended = false;
       trial.configuration = configurationRecord(trial);
+      if (qualificationPolicy) {
+        trial.baseline = structuredClone(trial);
+        trial.baseline.profileId = "release-baseline";
+        trial.baseline.id = hash(`${trial.id}:baseline`).slice(0, 32);
+        trial.baseline.provider[0].observedIdentity.generationId = trial.baseline.id;
+        trial.baseline.elapsedMs = 3500;
+      }
       write(`${path}/trials/${trial.id}.json`, trial);
       return trial;
     };
@@ -343,16 +353,28 @@ async function workspace(
     }));
     for (const run of [pilot, confirmation]) {
       run.manifest.qualification.artifact = structuredClone(artifact);
+      const comparison = qualificationPolicy ? { artifact, profile, approval: "none" } : undefined;
+      if (comparison) run.manifest.comparison = comparison;
       if (run === confirmation) run.manifest.baselineEvidence = baselineEvidence(pilot);
       delete run.manifest.contentHash;
       run.manifest.contentHash = hash(run.manifest);
       write(`${run.path}/manifest.json`, run.manifest);
-      write(`${run.path}/artifact-before.json`, { version: 1, artifact, observed });
+      write(
+        `${run.path}/summary.json`,
+        summarizeQualification(run.manifest, run.trials, defaultPolicy),
+      );
+      write(`${run.path}/artifact-before.json`, {
+        version: 1,
+        artifact,
+        observed,
+        ...(comparison ? { comparison, baselineObserved: observed } : {}),
+      });
       write(`${run.path}/artifact-receipt.json`, {
         version: 1,
         artifact,
         before: observed,
         after: observed,
+        ...(comparison ? { comparison, baselineBefore: observed, baselineAfter: observed } : {}),
       });
     }
     return {
@@ -423,7 +445,7 @@ test("published candidates require a pinned digest and restore the exact source,
   const work = await workspace(t, {
     contractVersion: "4",
     promptVersion: "8",
-    qualificationPolicy: "3",
+    qualificationPolicy: "4",
   });
   const bound = work.bindArtifact();
   assert.equal(bound.seal().status, 0);
@@ -745,9 +767,10 @@ test("current-view evidence seals only under its frozen policy and actual scope"
   const work = await workspace(t, {
     contractVersion: "4",
     promptVersion: "8",
-    qualificationPolicy: "3",
+    qualificationPolicy: "4",
   });
-  const sealed = work.seal();
+  const bound = work.bindArtifact();
+  const sealed = bound.seal();
   assert.equal(sealed.status, 0, sealed.stderr);
   const file = join(work.cwd, ".artifacts/candidate.json");
   assert.equal(work.run("verify", file, "--sha256", hash(readFileSync(file))).status, 0);
@@ -759,7 +782,7 @@ test("current-view evidence seals only under its frozen policy and actual scope"
   const { configurationRecord } = await import(`file://${work.cwd}/evaluation/run.mjs`);
   trial.configuration = configurationRecord(trial);
   work.write(`${work.confirmation.path}/trials/${trial.id}.json`, trial);
-  assert.match(work.seal().stderr, /Current-view configuration mismatch/);
+  assert.match(bound.seal().stderr, /Current-view configuration mismatch/);
 });
 
 test("live runner compatibility evidence is regraded and included without becoming qualification attempts", async (t) => {
