@@ -1,6 +1,6 @@
 {
   "version": "1",
-  "qualificationPolicy": "5",
+  "qualificationPolicy": "6",
   "description": "Current-view release suite: exposed legacy/current-view regression and development plus 30 fresh cases from ten authored held-out fixture families. Independent label/template review and deterministic browser checks completed before model inference. Authored families are not a random production sample.",
   "cases": [
     {

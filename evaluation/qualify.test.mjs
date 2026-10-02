@@ -170,7 +170,24 @@ test("frozen sentinel monitoring separates semantic drift, latency and infrastru
   );
   assert.equal(
     summarizeMonitoring(monitoring, [{ ...trial, elapsedMs: 4000 }], baseline).status,
+    "passed",
+  );
+  const policy5 = { ...currentPolicy, version: "5", latencyMargin: 0.05 };
+  assert.equal(
+    summarizeMonitoring({ ...monitoring, policy: policy5 }, [boundary], baseline).status,
+    "passed",
+  );
+  assert.equal(
+    summarizeMonitoring(
+      { ...monitoring, policy: policy5 },
+      [{ ...trial, elapsedMs: 4000 }],
+      baseline,
+    ).status,
     "latency_regression",
+  );
+  assert.equal(
+    assertPilotReady({ manifest: relative, trials: [{ ...trial, elapsedMs: 40000 }] }).status,
+    "passed",
   );
   assert.equal(summarizeMonitoring(monitoring, [trial]).status, "infrastructure_failure");
 });
