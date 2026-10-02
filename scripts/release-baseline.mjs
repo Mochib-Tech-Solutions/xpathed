@@ -23,6 +23,7 @@ export async function prepareBaseline(snapshot, destination, policy) {
     ["-C", source, "checkout", "--quiet", "--detach", policy.bootstrap.sourceSha],
     { stdio: "inherit" },
   );
+  await mkdir(join(source, ".artifacts"), { mode: 0o700 });
   const bundle = join(source, ".artifacts/baseline");
   execFileSync(
     process.execPath,

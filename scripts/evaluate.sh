@@ -238,6 +238,9 @@ if [ -n "${XPATHED_RELEASE_STATE:-}" ]; then
 else
   compose exec -T evaluation-fixture node /checks/ready.mjs http://browser:8080/health http://resolver:8080/health http://evaluation-fixture:8090/health
 fi
+if [ -n "${XPATHED_RELEASE_COMPARISON_JSON:-}" ]; then
+  compose exec -T evaluation-fixture node /checks/ready.mjs http://browser-baseline:8080/health http://resolver-baseline:8080/health
+fi
 echo "Evaluation artifacts: $XPATHED_EVALUATION_OUTPUT"
 if [ "$context" = true ]; then
   compose exec -T evaluation-fixture node /checks/ready.mjs http://resolver-context:8080/health
