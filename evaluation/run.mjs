@@ -677,6 +677,10 @@ export async function prune(path, now = new Date()) {
       if (error.code === "ENOENT") return [];
       throw error;
     })) {
+      if (file.endsWith(".json.partial")) {
+        await rm(join(path, sub, file));
+        continue;
+      }
       if (!file.endsWith(".json")) continue;
       const name = join(path, sub, file),
         value = await readJson(name);
