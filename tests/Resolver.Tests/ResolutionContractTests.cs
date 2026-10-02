@@ -1177,6 +1177,103 @@ public sealed class ResolutionContractTests
         Assert.Equal(1, handler.SelectionRequestCount);
     }
 
+    [Theory]
+    [InlineData("3", "found")]
+    [InlineData("4", "error")]
+    public async Task CurrentViewRejectsAnOffscreenVerifiedTargetWhileLegacyRetainsIt(string version, string outcome)
+    {
+        var handler = new DeterministicServicesHandler
+        {
+            CaptureBody = version == "4" ? CurrentViewCapture() : new DeterministicServicesHandler().CaptureBody,
+            ProviderBody = BilledSelection(),
+            SelectionBody = """
+                {"actions":[{"actionId":"a1","target":{"candidateId":"button-save","tag":"button","label":"Save",
+                "xpaths":["//button"],"state":{"rendered":true,"inViewport":false,"enabled":true,"editable":false,"checked":null},
+                "geometry":{"x":20,"y":2000,"width":90,"height":30}}}],"inspectedActionId":"a1"}
+                """,
+        };
+        await using var application = CreateApplication(handler);
+        using var client = application.CreateClient();
+        using var response = await client.PostAsJsonAsync(
+            "/pages/page-1/resolve",
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                contractVersion = version,
+            }
+        );
+        var result = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(outcome, result.GetProperty("outcome").GetString());
+        if (version == "4")
+        {
+            Assert.Equal(
+                "invalid_browser_selection",
+                result.GetProperty("diagnostics").GetProperty("code").GetString()
+            );
+            Assert.Empty(result.GetProperty("actions").EnumerateArray());
+        }
+        Assert.Equal(1, handler.ProviderRequestCount);
+        Assert.Equal(1, handler.SelectionRequestCount);
+        Assert.Equal(
+            0.0000215m,
+            result.GetProperty("diagnostics").GetProperty("usage").GetProperty("cost").GetDecimal()
+        );
+    }
+
+    [Theory]
+    [InlineData("found")]
+    [InlineData("not_found")]
+    public async Task ChangedCurrentViewIsAnErrorInsteadOfAFoundOrMissingTarget(string outcome)
+    {
+        var handler = new DeterministicServicesHandler
+        {
+            CaptureBody = CurrentViewCapture(),
+            ProviderBody = ProviderSelection(
+                JsonSerializer.Serialize(
+                    new
+                    {
+                        complete = true,
+                        actions = new[]
+                        {
+                            new
+                            {
+                                step = 1,
+                                instruction = "Click Save",
+                                action = "click",
+                                outcome,
+                                candidateId = outcome == "found" ? "button-save" : null,
+                                limitation = "none",
+                            },
+                        },
+                    }
+                )
+            ),
+            SelectionStatus = HttpStatusCode.Conflict,
+            SelectionBody = """{"code":"stale_capture"}""",
+        };
+        await using var application = CreateApplication(handler);
+        using var client = application.CreateClient();
+        using var response = await client.PostAsJsonAsync(
+            "/pages/page-1/resolve",
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                contractVersion = "4",
+            }
+        );
+        var result = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("error", result.GetProperty("outcome").GetString());
+        Assert.Empty(result.GetProperty("actions").EnumerateArray());
+        Assert.Equal("stale_capture", result.GetProperty("diagnostics").GetProperty("code").GetString());
+        Assert.Equal(
+            "The page or current view changed. Resolve the instruction again.",
+            result.GetProperty("diagnostics").GetProperty("message").GetString()
+        );
+        Assert.Equal(1, handler.SelectionRequestCount);
+    }
+
     private static string CurrentViewCapture()
     {
         var capture = JsonNode.Parse(new DeterministicServicesHandler().CaptureBody)!;

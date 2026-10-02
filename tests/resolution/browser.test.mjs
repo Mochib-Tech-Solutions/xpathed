@@ -663,6 +663,152 @@ test("Current-view selection rejects a changed nested scroll container", async (
   );
 });
 
+for (const change of ["leave", "enter", "insert"])
+  test(`Current-view absence rejects changed target membership (${change})`, async () => {
+    await withFixture(
+      `<style>body{min-height:3000px}</style><button id="expected-target" style="position:absolute;top:${change === "leave" ? 10 : 2000}px">Approval</button>
+      <script>window.mutateXpathFixture = () => {
+        ${change === "insert" ? 'const node = document.createElement("button"); node.textContent = "New approval"; document.body.append(node);' : `document.querySelector('#expected-target').style.top = '${change === "leave" ? 2000 : 10}px';`}
+      };</script>`,
+      async (session, page) => {
+        const capture = await request(`/pages/${page.pageId}/capture`, {
+          documentId: page.documentId,
+          scope: "current_view",
+        });
+        assert.equal(capture.coverage.complete, true);
+        assert.equal(capture.candidates.length, change === "leave" ? 1 : 0);
+        const before = await observe();
+        await observe({ mutateXpath: true });
+        await expectError(
+          `/pages/${page.pageId}/selection`,
+          {
+            documentId: page.documentId,
+            captureId: capture.captureId,
+            candidateId: null,
+            action: "click",
+          },
+          409,
+          "stale_capture",
+        );
+        const after = await observe();
+        assert.equal(after.scrollY, before.scrollY);
+        assert.equal(after.activeElement, before.activeElement);
+      },
+    );
+  });
+
+test("Current-view XPath remains unique across offscreen duplicates and ignores offscreen-only changes", async () => {
+  await withFixture(
+    `<style>body{min-height:3000px}</style>
+    <section aria-label="Profile"><button id="expected-target">Save</button></section>
+    <section aria-label="Other" style="position:absolute;top:2000px"><button>Save</button></section>
+    <script>window.mutateXpathFixture = () => {
+      const other = document.querySelector('[aria-label="Other"]');
+      other.className = 'new-style'; other.append(other.firstElementChild.cloneNode(true));
+    };</script>`,
+    async (session, page) => {
+      const capture = await request(`/pages/${page.pageId}/capture`, {
+        documentId: page.documentId,
+        scope: "current_view",
+      });
+      const candidate = capture.candidates.find((c) => c.label === "Save");
+      assert.equal(capture.candidates.filter((c) => c.label === "Save").length, 1);
+      const selection = {
+        documentId: page.documentId,
+        captureId: capture.captureId,
+        candidateId: candidate.id,
+        action: "click",
+      };
+      const { target } = await request(`/pages/${page.pageId}/selection`, selection);
+      assert.equal(target.state.inViewport, true);
+      assert.deepEqual((await verify(target.xpaths)).matches, [["expected-target"]]);
+      const after = await observe({ mutateXpath: true, xpaths: target.xpaths });
+      assert.deepEqual(after.matches, [["expected-target"]]);
+      assert.equal(after.scrollY, 0);
+      const revalidated = await request(`/pages/${page.pageId}/selection`, selection);
+      assert.equal(revalidated.target.state.inViewport, true);
+    },
+  );
+});
+
+for (const location of ["main", "scroll-container", "frame"])
+  test(`Current-view selection rejects a target moved outside its clipped viewport (${location})`, async () => {
+    const content = `<style>body{margin:0;min-height:3000px}</style>
+      ${location === "scroll-container" ? '<div style="height:80px;overflow:hidden">' : ""}
+      <input id="expected-target" aria-label="Notes" style="display:block;margin-top:10px" value="UNCHANGED">
+      ${location === "scroll-container" ? "</div>" : ""}
+      <script>window.mutateXpathFixture = () => document.querySelector('input').style.marginTop = '2000px';</script>`;
+    await withFixture(
+      (path) =>
+        location === "frame" && path === "/fixture"
+          ? `<iframe title="Editor" src="/editor" style="height:100px"></iframe>`
+          : content,
+      async (session, page) => {
+        const path = location === "frame" ? "/editor" : "/fixture";
+        await observe({}, path);
+        const capture = await request(`/pages/${page.pageId}/capture`, {
+          documentId: page.documentId,
+          scope: "current_view",
+        });
+        const candidate = capture.candidates.find((c) => c.label === "Notes");
+        assert.ok(candidate);
+        const body = {
+          documentId: page.documentId,
+          captureId: capture.captureId,
+          candidateId: candidate.id,
+          action: "fill",
+        };
+        const { target } = await request(`/pages/${page.pageId}/selection`, body);
+        assert.equal(target.state.inViewport, true);
+        assert.deepEqual((await observe({ xpaths: target.xpaths }, path)).matches, [
+          ["expected-target"],
+        ]);
+        await observe({ mutateXpath: true }, path);
+        await expectError(`/pages/${page.pageId}/selection`, body, 409, "stale_capture");
+        const fresh = await request(`/pages/${page.pageId}/capture`, {
+          documentId: page.documentId,
+          scope: "current_view",
+        });
+        assert.ok(!fresh.candidates.some((c) => c.label === "Notes"));
+        assert.equal((await observe({}, path)).scrollY, 0);
+      },
+    );
+  });
+
+test("Current-view revalidation shares its DOM scan budget across frames", async () => {
+  await withFixture(
+    (path) =>
+      path === "/fixture"
+        ? '<iframe title="First" src="/first"></iframe><iframe title="Second" src="/second"></iframe>'
+        : `<style>body{min-height:3000px}</style><button>Approval</button><div id="outside" style="position:absolute;top:2000px"></div>
+         <script>window.mutateXpathFixture = () => document.querySelector('#outside').innerHTML = '<i></i>'.repeat(10500);</script>`,
+    async (session, page) => {
+      await observe({}, "/first");
+      await observe({}, "/second");
+      const capture = await request(`/pages/${page.pageId}/capture`, {
+        documentId: page.documentId,
+        scope: "current_view",
+      });
+      assert.equal(capture.coverage.complete, true);
+      await observe({ mutateXpath: true }, "/first");
+      const selection = {
+        documentId: page.documentId,
+        captureId: capture.captureId,
+        candidateId: null,
+        action: "click",
+      };
+      assert.equal((await request(`/pages/${page.pageId}/selection`, selection)).target, null);
+      await observe({ mutateXpath: true }, "/second");
+      await expectError(
+        `/pages/${page.pageId}/selection`,
+        selection,
+        409,
+        "validation_budget_exceeded",
+      );
+    },
+  );
+});
+
 test("Current-view capture skips offscreen frame contents and preserves ancestor appearance uncertainty", async () => {
   await withFixture(
     (path) =>
@@ -1439,63 +1585,70 @@ test("Capture preserves control labels, Unicode, scope and observed state withou
   );
 });
 
-test("The single preferred XPath escapes both quote types and uses meaningful context for duplicate attributes", async () => {
-  await withFixture(
-    `<section aria-label="Employee"><button data-oracle="expected-target" data-testid="shared">OK</button></section>
+for (const scope of ["page", "current_view"])
+  test(`The single preferred XPath escapes both quote types and uses meaningful context for duplicate attributes (${scope})`, async () => {
+    await withFixture(
+      `<section aria-label="Employee"><button data-oracle="expected-target" data-testid="shared">OK</button></section>
     <section aria-label="Other"><button data-testid="shared">OK</button></section>
     <button data-oracle="quoted-target" data-testid="He said &quot;don't&quot;">Quoted</button>
     <div id="app"><a href="#unique" data-oracle="unique-target">Unique gallery</a></div>`,
-    async (session, page) => {
-      const capture = await request(`/pages/${session.pageId}/capture`, {
-        documentId: page.documentId,
-      });
-      const employee = capture.candidates.find(
-        (candidate) => candidate.tag === "button" && candidate.scope.includes("Employee"),
-      );
-      const selection = await request(`/pages/${session.pageId}/selection`, {
-        documentId: page.documentId,
-        captureId: capture.captureId,
-        candidateId: employee.id,
-        action: "click",
-      });
-      assert.ok(selection.target.xpaths[0].includes("Employee"));
-      assert.equal(selection.target.xpaths.length, 1);
-      assert.ok(
-        selection.target.xpaths.every((xpath) => !xpath.includes("[@data-testid='shared'][1]")),
-      );
-      assert.deepEqual(
-        (await verify(selection.target.xpaths)).matches,
-        selection.target.xpaths.map(() => ["expected-target"]),
-      );
-      const quoted = capture.candidates.find((candidate) => candidate.text === "Quoted");
-      const quotedSelection = await request(`/pages/${session.pageId}/selection`, {
-        documentId: page.documentId,
-        captureId: capture.captureId,
-        candidateId: quoted.id,
-        action: "click",
-      });
-      assert.ok(quotedSelection.target.xpaths[0].includes("concat("));
-      assert.equal(quotedSelection.target.xpaths.length, 1);
-      assert.deepEqual(
-        (await verify(quotedSelection.target.xpaths)).matches,
-        quotedSelection.target.xpaths.map(() => ["quoted-target"]),
-      );
-      const unique = capture.candidates.find((candidate) => candidate.tag === "a");
-      const uniqueSelection = await request(`/pages/${session.pageId}/selection`, {
-        documentId: page.documentId,
-        captureId: capture.captureId,
-        candidateId: unique.id,
-        action: "click",
-      });
-      assert.deepEqual(uniqueSelection.target.xpaths, ["//a[normalize-space(.)='Unique gallery']"]);
-      assert.deepEqual((await verify(uniqueSelection.target.xpaths)).matches, [["unique-target"]]);
-    },
-  );
-});
+      async (session, page) => {
+        const capture = await request(`/pages/${session.pageId}/capture`, {
+          scope,
+          documentId: page.documentId,
+        });
+        const employee = capture.candidates.find(
+          (candidate) => candidate.tag === "button" && candidate.scope.includes("Employee"),
+        );
+        const selection = await request(`/pages/${session.pageId}/selection`, {
+          documentId: page.documentId,
+          captureId: capture.captureId,
+          candidateId: employee.id,
+          action: "click",
+        });
+        assert.ok(selection.target.xpaths[0].includes("Employee"));
+        assert.equal(selection.target.xpaths.length, 1);
+        assert.ok(
+          selection.target.xpaths.every((xpath) => !xpath.includes("[@data-testid='shared'][1]")),
+        );
+        assert.deepEqual(
+          (await verify(selection.target.xpaths)).matches,
+          selection.target.xpaths.map(() => ["expected-target"]),
+        );
+        const quoted = capture.candidates.find((candidate) => candidate.text === "Quoted");
+        const quotedSelection = await request(`/pages/${session.pageId}/selection`, {
+          documentId: page.documentId,
+          captureId: capture.captureId,
+          candidateId: quoted.id,
+          action: "click",
+        });
+        assert.ok(quotedSelection.target.xpaths[0].includes("concat("));
+        assert.equal(quotedSelection.target.xpaths.length, 1);
+        assert.deepEqual(
+          (await verify(quotedSelection.target.xpaths)).matches,
+          quotedSelection.target.xpaths.map(() => ["quoted-target"]),
+        );
+        const unique = capture.candidates.find((candidate) => candidate.tag === "a");
+        const uniqueSelection = await request(`/pages/${session.pageId}/selection`, {
+          documentId: page.documentId,
+          captureId: capture.captureId,
+          candidateId: unique.id,
+          action: "click",
+        });
+        assert.deepEqual(uniqueSelection.target.xpaths, [
+          "//a[normalize-space(.)='Unique gallery']",
+        ]);
+        assert.deepEqual((await verify(uniqueSelection.target.xpaths)).matches, [
+          ["unique-target"],
+        ]);
+      },
+    );
+  });
 
-test("Saved semantic XPaths survive generated IDs, wrappers and reordered duplicate controls", async () => {
-  await withFixture(
-    `<label for="a1b2c3d4-e5f6-47a8-b9c0-d1e2f3a4b5c6">Country</label><input id="a1b2c3d4-e5f6-47a8-b9c0-d1e2f3a4b5c6" data-oracle="country">
+for (const scope of ["page", "current_view"])
+  test(`Saved semantic XPaths survive generated IDs, wrappers and reordered duplicate controls (${scope})`, async () => {
+    await withFixture(
+      `<label for="a1b2c3d4-e5f6-47a8-b9c0-d1e2f3a4b5c6">Country</label><input id="a1b2c3d4-e5f6-47a8-b9c0-d1e2f3a4b5c6" data-oracle="country">
     <div id="contacts"><input name="contact" placeholder="Email" data-oracle="email"><input name="contact" placeholder="Phone"><input name="backup" placeholder="Email"></div>
     <table><tr><td>Alice</td><td><button data-oracle="alice">Approve</button></td></tr><tr><td>Bob</td><td><button>Approve</button></td></tr></table>
     <header><button>Help</button></header><footer><button data-oracle="footer">Help</button></footer>
@@ -1512,44 +1665,50 @@ test("Saved semantic XPaths survive generated IDs, wrappers and reordered duplic
       const extra = document.createElement('button'); extra.textContent = 'Help'; document.querySelector('header').prepend(extra);
       document.querySelector('[data-oracle="save"]').textContent = 'Save changes';
     };</script>`,
-    async (session, page) => {
-      const capture = await request(`/pages/${page.pageId}/capture`, {
-        documentId: page.documentId,
-      });
-      const cases = [
-        ["country", (candidate) => candidate.label === "Country"],
-        ["email", (candidate) => candidate.tag === "input" && candidate.placeholder === "Email"],
-        [
-          "alice",
-          (candidate) =>
-            candidate.tag === "button" && candidate.scope.some((scope) => scope.includes("Alice")),
-        ],
-        ["footer", (candidate) => candidate.label === "Help" && candidate.scope.includes("footer")],
-        ["save", (candidate) => candidate.label === "Save"],
-      ];
-      const paths = [];
-      for (const [expected, matches] of cases) {
-        const candidate = capture.candidates.find(matches);
-        assert.ok(candidate, expected);
-        const { target } = await request(`/pages/${page.pageId}/selection`, {
+      async (session, page) => {
+        const capture = await request(`/pages/${page.pageId}/capture`, {
+          scope,
           documentId: page.documentId,
-          captureId: capture.captureId,
-          candidateId: candidate.id,
-          action: "inspect",
         });
-        assert.equal(target.xpaths.length, 1);
-        paths.push(target.xpaths[0]);
-      }
-      const expected = cases.map(([id]) => [id]);
-      assert.deepEqual((await verify(paths)).matches, expected);
-      assert.deepEqual((await observe({ xpaths: paths, mutateXpath: true })).matches, expected);
-    },
-  );
-});
+        const cases = [
+          ["country", (candidate) => candidate.label === "Country"],
+          ["email", (candidate) => candidate.tag === "input" && candidate.placeholder === "Email"],
+          [
+            "alice",
+            (candidate) =>
+              candidate.tag === "button" &&
+              candidate.scope.some((scope) => scope.includes("Alice")),
+          ],
+          [
+            "footer",
+            (candidate) => candidate.label === "Help" && candidate.scope.includes("footer"),
+          ],
+          ["save", (candidate) => candidate.label === "Save"],
+        ];
+        const paths = [];
+        for (const [expected, matches] of cases) {
+          const candidate = capture.candidates.find(matches);
+          assert.ok(candidate, expected);
+          const { target } = await request(`/pages/${page.pageId}/selection`, {
+            documentId: page.documentId,
+            captureId: capture.captureId,
+            candidateId: candidate.id,
+            action: "inspect",
+          });
+          assert.equal(target.xpaths.length, 1);
+          paths.push(target.xpaths[0]);
+        }
+        const expected = cases.map(([id]) => [id]);
+        assert.deepEqual((await verify(paths)).matches, expected);
+        assert.deepEqual((await observe({ xpaths: paths, mutateXpath: true })).matches, expected);
+      },
+    );
+  });
 
-test("Saved user-facing XPaths survive ID changes and scoped duplicates but reject changed meaning", async () => {
-  await withFixture(
-    `<section aria-label="Profile"><button id="save-profile" data-oracle="save">Save changes</button>
+for (const scope of ["page", "current_view"])
+  test(`Saved user-facing XPaths survive ID changes and scoped duplicates but reject changed meaning (${scope})`, async () => {
+    await withFixture(
+      `<section aria-label="Profile"><button id="save-profile" data-oracle="save">Save changes</button>
     <label for="country">Country</label><input id="country" data-oracle="country"></section>
     <script>let mutation = 0; window.mutateXpathFixture = () => {
       const save = document.querySelector('[data-oracle="save"]');
@@ -1565,56 +1724,59 @@ test("Saved user-facing XPaths survive ID changes and scoped duplicates but reje
         replacement.setAttribute('data-oracle', 'replacement'); save.replaceWith(replacement);
       }
     };</script>`,
-    async (session, page) => {
-      const capture = await request(`/pages/${page.pageId}/capture`, {
-        documentId: page.documentId,
-      });
-      const paths = [];
-      for (const label of ["Save changes", "Country"]) {
-        const candidate = capture.candidates.find((entry) => entry.label === label);
-        assert.ok(candidate, label);
-        const { target } = await request(`/pages/${page.pageId}/selection`, {
+      async (session, page) => {
+        const capture = await request(`/pages/${page.pageId}/capture`, {
+          scope,
+          documentId: page.documentId,
+        });
+        const paths = [];
+        for (const label of ["Save changes", "Country"]) {
+          const candidate = capture.candidates.find((entry) => entry.label === label);
+          assert.ok(candidate, label);
+          const { target } = await request(`/pages/${page.pageId}/selection`, {
+            documentId: page.documentId,
+            captureId: capture.captureId,
+            candidateId: candidate.id,
+            action: "inspect",
+          });
+          assert.equal(target.xpaths.length, 1);
+          paths.push(target.xpaths[0]);
+        }
+        assert.deepEqual((await verify(paths)).matches, [["save"], ["country"]]);
+        assert.deepEqual((await observe({ xpaths: paths, mutateXpath: true })).matches, [
+          ["save"],
+          ["country"],
+        ]);
+        assert.deepEqual((await observe({ xpaths: paths, mutateXpath: true })).matches, [
+          [],
+          ["country"],
+        ]);
+      },
+    );
+  });
+
+for (const scope of ["page", "current_view"])
+  test(`Positional XPath is a verified last fallback when identical elements have no distinguishing context (${scope})`, async () => {
+    await withFixture(
+      `<div><span data-oracle="expected-target">Same</span><span>Same</span></div>`,
+      async (session, page) => {
+        const capture = await request(`/pages/${session.pageId}/capture`, {
+          scope,
+          documentId: page.documentId,
+        });
+        const candidate = capture.candidates.find((entry) => entry.tag === "span");
+        const selection = await request(`/pages/${session.pageId}/selection`, {
           documentId: page.documentId,
           captureId: capture.captureId,
           candidateId: candidate.id,
-          action: "inspect",
+          action: "hover",
         });
-        assert.equal(target.xpaths.length, 1);
-        paths.push(target.xpaths[0]);
-      }
-      assert.deepEqual((await verify(paths)).matches, [["save"], ["country"]]);
-      assert.deepEqual((await observe({ xpaths: paths, mutateXpath: true })).matches, [
-        ["save"],
-        ["country"],
-      ]);
-      assert.deepEqual((await observe({ xpaths: paths, mutateXpath: true })).matches, [
-        [],
-        ["country"],
-      ]);
-    },
-  );
-});
-
-test("Positional XPath is a verified last fallback when identical elements have no distinguishing context", async () => {
-  await withFixture(
-    `<div><span data-oracle="expected-target">Same</span><span>Same</span></div>`,
-    async (session, page) => {
-      const capture = await request(`/pages/${session.pageId}/capture`, {
-        documentId: page.documentId,
-      });
-      const candidate = capture.candidates.find((entry) => entry.tag === "span");
-      const selection = await request(`/pages/${session.pageId}/selection`, {
-        documentId: page.documentId,
-        captureId: capture.captureId,
-        candidateId: candidate.id,
-        action: "hover",
-      });
-      assert.equal(selection.target.xpaths.length, 1);
-      assert.ok(selection.target.xpaths[0].startsWith("/html/"));
-      assert.deepEqual((await verify(selection.target.xpaths)).matches, [["expected-target"]]);
-    },
-  );
-});
+        assert.equal(selection.target.xpaths.length, 1);
+        assert.ok(selection.target.xpaths[0].startsWith("/html/"));
+        assert.deepEqual((await verify(selection.target.xpaths)).matches, [["expected-target"]]);
+      },
+    );
+  });
 
 test("Hundreds of multilingual controls retain complete capture and a verified target", async () => {
   await withFixture(
