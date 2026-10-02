@@ -48,7 +48,7 @@ Current-view filtering uses native intersection observations and containing-fram
 
 Only contract 4 sends `appearance`: nullable `backgroundColor`, `textColor` and `borderColor`, plus bounded `limitations`. Supported colors are computed opaque sRGB `rgb(r, g, b)` values. Background, text and border are distinct; transparent backgrounds do not inherit an invented ancestor color. A uniform painted border may supply its color. Mixed border colors, unsupported color spaces/alpha, gradients/background images, replaced media, pseudo-element appearance, opacity, filters, masks and blend effects carry limitations instead of inferred pixel appearance. Missing appearance is unknown, never evidence of a color. The model must return `appearance_unavailable` when the requested distinction needs unavailable evidence. Geometry, rather than DOM order, supports spatial references. CSS evidence does not interpret image/canvas pixels or establish readiness.
 
-Contract 4 retains the original instruction and all eligible candidate identities in compact input, with scope `current_view` and prompt version 9. Its compact state omits invariant viewport membership and the defaults rendered/enabled=true, editable/readonly=false; exceptions remain explicit. Prompt 9 clarifies that a missing candidate, including an empty capture, is scoped absence rather than ambiguity, and that complete describes enumeration rather than target existence. Legacy prompts and prepared input remain separate. [ADR-0018](adr/0018-scope-resolution-to-the-current-view.md) records the migration.
+Contract 4 retains the original instruction and all eligible candidate identities in compact input, with scope `current_view` and prompt version 10. Its compact state omits invariant viewport membership and the defaults rendered/enabled=true, editable/readonly=false; exceptions remain explicit. Prompt 10 distinguishes requested controls from surrounding scope containers and repeated descendant text. It also clarifies that a missing candidate, including an empty capture, is scoped absence rather than ambiguity, and that complete describes enumeration rather than target existence. Legacy prompts and prepared input remain separate. [ADR-0018](adr/0018-scope-resolution-to-the-current-view.md) records the migration.
 
 ### Legacy multi-action version 2
 
@@ -192,20 +192,20 @@ Ambiguous instructions retain `outcome: "unsupported"` with `code: "ambiguous"` 
 
 Client response labels follow the resolver outcome and reason code:
 
-| Resolver result | Client response |
-| --- | --- |
-| `found` | Element identity, XPath and reported readiness |
-| `not_found` | Target not found, with the applicable page/view scope |
-| `unsupported` / `ambiguous` | Ambiguous target |
-| `unsupported` / `unsupported_action` | Unsupported interaction |
-| `unsupported` / `current_state_dependency` | Page change required |
-| `unsupported` / `appearance_unavailable` | Appearance unavailable |
-| `unsupported` / `unsupported_scope` | Unsupported page content |
-| Other `unsupported` reasons | Unsupported instruction, retaining the resolver's explanation |
-| `partial` | Partial result with separate target outcomes |
-| `error` / `decomposition_incomplete` | Incomplete response |
-| Other `error` codes | Resolution failed with the resolver's explanation |
-| Request/transport failure without a result | Request failed |
+| Resolver result                            | Client response                                               |
+| ------------------------------------------ | ------------------------------------------------------------- |
+| `found`                                    | Element identity, XPath and reported readiness                |
+| `not_found`                                | Target not found, with the applicable page/view scope         |
+| `unsupported` / `ambiguous`                | Ambiguous target                                              |
+| `unsupported` / `unsupported_action`       | Unsupported interaction                                       |
+| `unsupported` / `current_state_dependency` | Page change required                                          |
+| `unsupported` / `appearance_unavailable`   | Appearance unavailable                                        |
+| `unsupported` / `unsupported_scope`        | Unsupported page content                                      |
+| Other `unsupported` reasons                | Unsupported instruction, retaining the resolver's explanation |
+| `partial`                                  | Partial result with separate target outcomes                  |
+| `error` / `decomposition_incomplete`       | Incomplete response                                           |
+| Other `error` codes                        | Resolution failed with the resolver's explanation             |
+| Request/transport failure without a result | Request failed                                                |
 
 Semantic limitations are not technical-error alerts. Per-target failures retain their own messages without a duplicate generic request error; successful targets remain visible beside failures. Unknown, blocked or unsupported readiness stays separate from target discovery.
 
