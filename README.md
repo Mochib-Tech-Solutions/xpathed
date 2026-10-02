@@ -1,152 +1,116 @@
+![xpathed — a golden thread finds one illuminated doorway in a branching, painted library](docs/assets/banner.svg)
+
 # xpathed
 
-A local browser workspace for turning English instructions into verified XPath expressions for the page you are viewing.
+**Describe an element. Get a verified XPath for the page in front of you.**
 
-## Current scope
+xpathed is a local browser workspace built for the the test platform internship case study: turn natural-language testing instructions into XPath expressions, explain the design, and evaluate whether it finds the right elements.
 
-The managed browser foundation ([#2](https://github.com/Mochib-Tech-Solutions/xpathed/issues/2)) is implemented. Open your own website, interact with Chromium tabs, and close all tabs when you are done. The full-page workspace keeps each tab’s chat beside the selected page; noVNC displays page content without Chromium's tabs or address bar. The workspace starts in dark mode. The header toggle switches directly between light and dark and remembers your choice.
+The central decision is simple: **the model selects an element; browser code builds and verifies its XPath.** A valid XPath can still point to the wrong button, so evaluation checks the intended target independently.
 
-Enter one English action command to resolve its targets in the current viewport through OpenRouter, such as “click all confirmation buttons in the list.” Press Enter to send or Ctrl+Enter for a new line. Chat uses separate sent and response messages with local timestamps. Responses show the element’s role/type and accessible name (including image alt text), followed by the interpreted action once, the verified XPath, then verification and state details, with no alternative paths. Multiple targets have separate numbered cards beneath one shared action and a compact partial-result summary. Commands mixing interactions or depending on sequential page changes are unsupported. Resolution time and cost appear together. Every found target is highlighted automatically with a thick black-and-white outline. Small targets also receive a brief locator spotlight; the outline remains after it fades. Highlights follow manual scrolling and remain during mouse movement; clicking or pressing a key in the browser, submitting a new instruction, navigation or switching tabs clears them. “All” means matching targets in the current view; fully off-screen targets are outside scope. Partially visible, disabled and covered targets remain eligible. Hover or focus the cost to see model/provider identity, token counts, input/output rates and subtotals, and OpenRouter’s reported charge separately from the estimate. Resolution covers ordinary controls in the main document and nested same-origin or cross-origin iframes. Frame results show the containing frame chain separately from the target’s document XPath. Chat separates target discovery from action readiness, names the checks that passed, and explains disabled, readonly, off-screen, pointer-blocked and incompatible controls. It keeps unknown keyboard readiness explicit without repeating generic execution disclaimers. Positive viewport intersection is required; passing passive checks are reported separately from blocked, unsupported or unknown readiness. Ordinary opaque CSS colors and geometry support color and spatial references; image pixels and complex effects remain unsupported. Two seconds is an aspirational latency target, not a cutoff: a valid slower response is still returned. Provider, transport and browser resource timeouts remain bounded, with separate late provider accounting. Each tab keeps its instructions, results, timestamps and resolution durations for the current workspace session. Navigation retains that history and marks older page results as historical. **Reset chat** clears the active tab’s draft and results without closing its page or changing other tabs. Closing a tab clears its chat; closing all tabs or reloading the app clears all local history. Sanitized diagnostic records are stored automatically in the backend, with no history or capture controls in the UI; see [backend diagnostics](docs/diagnostics.md). See the [versioned resolution contract](docs/resolution.md) for supported scope and error handling.
+[How it works](docs/how-it-works.md) · [Experiments and decisions](docs/engineering-journey.md) · [Demo guide](docs/demo.md)
 
-Unresolved responses distinguish ambiguity, missing targets, unsupported interactions, scope limits and technical failures. Ambiguous instructions ask for a name, section or position; partial results retain each target’s outcome.
+## From an instruction to an element
 
-Cost details fetch provider rates for the returned OpenRouter model across all request versions and cache successful rates for five minutes. Estimates use each request’s token counts; the reported charge stays separate. Missing or ambiguous provider rates remain unavailable.
+Imagine a page with an **OK** button in both an Employee section and an Account section:
 
-## Setup and run
+> Hover over OK under Employee.
 
-Install these prerequisites:
+xpathed captures the current view, sends the model a sanitized list of candidates and their context, and checks the selected element in the live browser. For a page with suitable markup, an illustrative result is:
 
-- Node **24.16.0** and pnpm **12.8.1**, as pinned in the repository. Run `corepack enable` if your Node installation includes Corepack.
-- Docker with Compose **5.5.1** and Buildx. The browser requires a Docker host that supports Chromium's Linux sandbox; the [runtime guide](docs/runtime.md#sandbox-and-supported-environment) records the validated setup.
+```text
+Button · OK
+Action: hover
+XPath: //*[@aria-label='Employee']//button[normalize-space(.)='OK']
+Verification: one match, same captured node, still in the current view
+```
 
-From the repository root:
+The actual XPath comes from that page's DOM. The workspace highlights the element and reports observed readiness, elapsed time and cost. You interact with the page manually.
+
+It also handles the less convenient answers: an ambiguous instruction, a missing target, a disabled or covered control, an unsupported workflow, or a page that changed while the request was running. These remain distinct results.
+
+## Run it locally
+
+You need **Node 24.16.0**, **pnpm 12.8.1**, and **Docker with Compose and Buildx**. The browser container needs Linux sandbox support; see the [validated environment](docs/runtime.md#sandbox-and-supported-environment). A host .NET SDK is only needed for local .NET development checks.
 
 ```sh
+git clone https://github.com/Mochib-Tech-Solutions/xpathed.git
+cd xpathed
 pnpm run setup
+```
+
+Setup creates an ignored `.env` with a database password. Add your application key to that file:
+
+```dotenv
+OPENROUTER_API_KEY=your-key-here
+```
+
+Then start the workspace:
+
+```sh
 pnpm dev
 ```
 
-All five services run in Docker: the web app, client API, resolver, browser and PostgreSQL. A host .NET SDK is not needed to run them. Compose watches source files; Vite refreshes React and `dotnet watch` reloads the APIs. Dependency changes rebuild the affected image.
+Open **[localhost:8080](http://localhost:8080)**, enter a website address, and submit an instruction in chat. Manual browsing works without a model key. Live resolution uses your OpenRouter account.
 
-Open [localhost:8080](http://localhost:8080), enter a website address in the initial **New tab** and press Enter. The tab strip is present from the start, so opening a page keeps the address bar in place. This starts the browser and opens your website. Click, type and scroll directly in the managed page. Use the + button immediately after the tabs to add a page, or select and close existing tabs. Links and popup windows that open another page appear there, while noVNC continues to show only the active page without Chromium controls. Tabs share login state within their session. Separate localhost windows use isolated sessions with globally unique UUIDs shown in the header; closing one leaves the others running. Closing the last tab opens a blank replacement; up to eight tabs can be open. **Close all tabs** in the tab strip asks for confirmation before discarding every tab, chat and browsing state. It returns to the address field; entering a website starts a fresh session.
+All five services run in Docker. Ctrl+C removes development containers while preserving configuration and database data. `pnpm docker:down` also provides explicit cleanup. For another checkout, set a distinct `COMPOSE_PROJECT_NAME` and `XPATHED_PORT`; keep its `.env` separate.
 
-Setup creates an ignored `.env` with a random database password. Dependency installation also enables Git hooks for this worktree; see [commit checks and message policy](docs/ci.md#local-commit-checks). Add `OPENROUTER_API_KEY` to that file for instruction resolution; manual browsing works without a model key. Set `XPATHED_PORT` in your shell to choose another loopback port. Running `pnpm dev` again replaces the existing development runner for this checkout and Compose project, including an older attached Compose watcher. It prepares configuration, stops the previous project containers, then starts source watching. Ctrl+C stops the development services; configuration and PostgreSQL data are preserved. `pnpm docker:down` removes their containers while preserving PostgreSQL data.
+[Runtime configuration](docs/runtime.md) · [Presentation walkthrough](docs/demo.md)
 
-For explicitly requested live evaluations, add the separate `OPENROUTER_EVAL_API_KEY` to `.env`; evaluation does not fall back to the application key stored in that file. See [evaluation setup](docs/evaluation.md) for key precedence and shared cost accounting.
+## The system
 
-The Compose project defaults to `xpathed`. Use a different `COMPOSE_PROJECT_NAME` and `XPATHED_PORT` for a separate checkout; development startup refuses containers labelled as belonging to another checkout. Unrelated Compose projects are left running.
+[![Service architecture: Web sends requests through ClientApi to Resolver; Browser owns Chromium, Resolver calls OpenRouter, and ClientApi records diagnostics in PostgreSQL](docs/diagrams/system-design.svg)](docs/diagrams/system-design.svg)
 
-### Production images locally
+| Part                                  | Owns                                                                       |
+| ------------------------------------- | -------------------------------------------------------------------------- |
+| **Web** — React and TypeScript        | Chat, managed tabs, the noVNC page viewer and the web entry point          |
+| **ClientApi** — ASP.NET Core          | Client requests and automatic sanitized diagnostics                        |
+| **Resolver** — ASP.NET Core           | Candidate context, model selection and resolution orchestration            |
+| **Browser** — Playwright and Chromium | Live pages, DOM capture, XPath construction and verification, highlighting |
+| **PostgreSQL** — EF Core persistence  | Diagnostic records and retained evidence                                   |
 
-Stop development mode before switching:
+The viewer and resolver use the same managed page ID. Browser objects stay inside Browser; Resolver has no database dependency. OpenRouter is the external model gateway.
 
-```sh
-pnpm docker:down
-pnpm docker:up
-```
+The [system walkthrough](docs/how-it-works.md) follows one request through those boundaries, including frames, stale captures, privacy and failure handling. [Diagram sources and interactive versions](docs/diagrams/README.md) are kept alongside the SVGs.
 
-This builds and starts the runtime images at the same address. Use `pnpm docker:logs` for service logs and `pnpm docker:down` to stop them. The database, browser debugging and raw VNC ports remain internal in both modes.
+## What the prototype covers
 
-## How it works
+- One English action across one or more distinct targets in the **current viewport**; each found target gets its own verified XPath.
+- Main-document and nested iframe targets, with frame context kept separate from XPath.
+- Accessibility-aware candidates and explicit disabled, readonly, covered or unknown readiness states.
+- Per-tab chat, manual browsing, target highlights, timings, usage and separate estimated/reported costs.
 
-| Service        | Responsibility                                                             |
-| -------------- | -------------------------------------------------------------------------- |
-| **Web**        | React interface and the HTTP/WebSocket entry point                         |
-| **ClientApi**  | Client-facing endpoints and ownership of the EF Core/PostgreSQL connection |
-| **Resolver**   | Stateless page inspection and instruction resolution                       |
-| **Browser**    | Live Chromium sessions, page operations and the noVNC stream               |
-| **PostgreSQL** | Internal diagnostic records, evidence and evaluation artifacts             |
+The current view is a deliberate boundary. Fully off-screen targets require manual scrolling and a new request. Mixed actions and sequential workflows are unsupported. Shadow-root XPath targets, image-pixel interpretation and autonomous action execution are outside this prototype. A passing readiness check does not prove a business action succeeded.
 
-The browser creates a fresh context and returns opaque session and page IDs. Navigation retains the page ID; closing the session or restarting the browser invalidates it. The client API and resolver pass these IDs to the browser service, so inspection refers to the exact page shown in the viewer. Live browser objects never leave their owning service.
+The app is designed for local use. Hosted access needs authentication and network isolation; opaque session IDs do not provide user authentication. See the [resolution contract](docs/resolution.md) for exact limits.
 
-Resolution asks a model to select an element from sanitized DOM context, then constructs and verifies XPath expressions in ordinary code. It reports and highlights the target; users perform browser actions manually. See the [specification](https://github.com/Mochib-Tech-Solutions/xpathed/issues/1) and [architecture decisions](docs/adr/) for the accepted boundaries.
+## How quality is measured
 
-## Working in the repository
+The evaluator asks separate questions: **was the intended element captured, did the model select it, does the XPath identify it, and is the reported state correct?** Controlled browser cases use independent target labels. Imported datasets broaden selection coverage, with their narrower offline results reported separately.
 
-```text
-docker/                  Compose files, service Dockerfiles and runtime configuration
-src/Common/              Shared request/response contracts and API error handling
-src/Browser/             Controllers, session lifetime and noVNC transport
-src/ClientApi/           Controllers, upstream forwarding, diagnostics and EF Core migrations
-src/Resolver/            Controllers and stateless resolution service
-src/Web/src/
-  components/ui/         Shared shadcn/ui primitives
-  features/workspace/    Browser/chat UI, API contracts and session state
-  features/theme/        Theme preference and controls
-  lib/                   Shared frontend helpers
-docs/                    Runtime contracts, decisions and research
-scripts/                 Workspace commands and CI change selection
-evaluation/              Independent fixtures, case manifest, runner and grading
-```
+Model experiments compare correctness, time to a correct complete result and cost on the same inputs. The checked-in development route is `deepseek/deepseek-v4.1-flash` through `wafer`; that setting is separate from a release approval. Historical comparisons have different case sets and policies, so their scores are presented with their dates and limits in [the engineering journey](docs/engineering-journey.md).
 
-Each .NET API uses controller classes with attribute routes and constructor injection. `Program.cs` composes services and middleware. Keep one named C# type per matching file, namespaces aligned with folders, and service behavior in the owning project. `Common` contains only code shared across services. New projects belong in `Xpathed.slnx` and the affected-path rules in `scripts/ci-changes.mjs`.
+| Check                                          | Command                              |
+| ---------------------------------------------- | ------------------------------------ |
+| Local formatting, analysis, tests and builds   | `pnpm check`                         |
+| Deterministic independent browser evaluation   | `pnpm evaluate`                      |
+| Regrade an existing run without provider calls | `pnpm evaluate:replay RUN_DIRECTORY` |
+| Explicit live evaluation                       | `pnpm evaluate:live`                 |
 
-The frontend uses React, strict TypeScript, Tailwind CSS and shadcn/ui. Reuse semantic theme tokens and shared controls; keep workspace state in its feature hook and clean up connections, timers and listeners in effects. Preserve accessible names, keyboard behavior and visible focus. Keep the product focused on chat and one browser page.
+Live evaluation requires the separate `OPENROUTER_EVAL_API_KEY` and incurs provider charges. The [evaluation guide](docs/evaluation.md) explains setup, grading, cases, datasets and artifacts; [package.json](package.json) lists all commands.
 
-Every C# project inherits the .NET recommended analyzers, nullable checks, warnings as errors and shared style rules from `Directory.Build.props` and `.editorconfig`. Pinned CSharpier formats C# with a 120-column target, including positional records; native `dotnet format style` and build analyzers check the remaining style rules. Restore local tools with `dotnet tool restore`; `pnpm format` and CI use the same formatter. Frontend formatting, typed lint rules and Tailwind class sorting are configured centrally. The [repository guidance](AGENTS.md) explains how implementation work follows live issues and keeps these docs current.
+Ordinary CI uses deterministic responses. The release workflow compares exact candidate and approved images on the same complete reviewed collection, allows no lost baseline pass, and keeps activation explicit. Nightly monitoring records drift without changing the running app. [Release operations](docs/releases.md) documents the workflow and the remaining hosted setup; configured workflows alone are not evidence of deployment.
 
-### Commands
+## Read the case study
 
-Root commands are defined in `package.json`. Host C# build and formatting commands need the .NET SDK pinned in `global.json`; `pnpm restore` installs their locked inputs alongside workspace dependencies.
+| If you want to understand…                         | Start here                                                               |
+| -------------------------------------------------- | ------------------------------------------------------------------------ |
+| The design, request flow and technical tradeoffs   | [How xpathed resolves an instruction](docs/how-it-works.md)              |
+| Model choices, experiments, evaluation and lessons | [The engineering journey](docs/engineering-journey.md)                   |
+| The demo and assignment presentation               | [Demo guide](docs/demo.md)                                               |
+| API, configuration and browser lifecycle           | [Runtime](docs/runtime.md) and [resolution contract](docs/resolution.md) |
+| Diagnostics, privacy and retention                 | [Backend diagnostics](docs/diagnostics.md)                               |
+| CI, release approval, activation and monitoring    | [CI](docs/ci.md) and [releases](docs/releases.md)                        |
+| Why a consequential decision was made              | [Architecture decisions](docs/adr/)                                      |
 
-| Command                                                                | Purpose                                                                        |
-| ---------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| `pnpm run setup`                                                       | Create local configuration and install locked workspace dependencies           |
-| `pnpm dev`                                                             | Run all services in Docker with source watching                                |
-| `pnpm build`                                                           | Build the .NET solution and production frontend                                |
-| `pnpm check`                                                           | Run the repository's formatting, lint, build and validation gates              |
-| `pnpm check:dotnet` / `pnpm check:web` / `pnpm check:tooling`          | Validate one part of the repository                                            |
-| `pnpm lint`                                                            | Run analyzers, frontend lint and script syntax checks                          |
-| `pnpm format` / `pnpm format:check`                                    | Apply or verify shared formatting                                              |
-| `pnpm test`                                                            | Run the configured automated checks                                            |
-| `pnpm test:persistence`                                                | Test migrations and recording against a supplied PostgreSQL test connection    |
-| `pnpm diagnostics -- <command>`                                        | Inspect/export/import internal records; see [diagnostics](docs/diagnostics.md) |
-| `pnpm test:resolution`                                                 | Run the explicit deterministic Docker resolution checks                        |
-| `pnpm test:resolution:live`                                            | Check the actual OpenRouter route with a configured API key                    |
-| `pnpm evaluate` / `pnpm evaluate:live`                                 | Run independent deterministic or explicitly paid resolution evaluation         |
-| `pnpm evaluate:replay RUN_DIRECTORY`                                   | Regrade saved evaluation evidence without a browser or provider                |
-| `pnpm evaluate:compare` / `pnpm evaluate:compare:replay RUN_DIRECTORY` | Compare the custom resolver with pinned Stagehand or regrade saved evidence    |
-| `pnpm release:evaluate` / `pnpm evaluate:qualify:replay RUN_DIRECTORY` | Compare verified resolver bundles and replay saved evidence                    |
-| `pnpm docker:up` / `pnpm docker:down`                                  | Start runtime images or stop project containers                                |
-| `pnpm docker:build` / `pnpm docker:check`                              | Build runtime images or validate Docker definitions                            |
-| `pnpm docker:logs` / `pnpm docker:status`                              | Inspect running services                                                       |
-| `pnpm clean`                                                           | Remove generated .NET output and the frontend build                            |
-
-`clean` preserves source, `.env`, installed dependencies and database volumes. Each service has its own Dockerfile under `docker/<service>/`; `docker/compose.sh` resolves paths from the repository root.
-
-Preferred XPaths use explicit test contracts and meaningful target semantics before ordinary IDs, with live singleton same-node verification. Current-view results revalidate clipped viewport membership, including absence; changes to the captured target set require a new resolution. XPath uniqueness still covers the target's entire document. See the [selection policy](docs/resolution.md#preferred-xpath) and [research](docs/research/2026-10-01-semantic-xpath-reuse.md) for scope and reuse limits.
-
-## CI and releases
-
-Ordinary feature PRs target `main`. CI selects the affected .NET, Web, tooling, PostgreSQL, Docker and deterministic browser checks, then verifies receipts for the exact revision. Unit, integration and UI tests keep their existing ownership. These checks use controlled responses and make no paid provider calls; see the [CI runbook](docs/ci.md).
-
-The accepted release flow is **main → release PR → complete live comparison → merge and verified approval → explicit activation**. The persistent `release` branch is the release destination. Main carries the current implementation; the approved release remains the baseline until a verified replacement is selected.
-
-Release evaluation runs the candidate and exact approved images on the same growing collection: behavior-grouped browser cases plus every reviewed eligible imported dataset case. Browser cases cover the complete Resolver request, including live XPath verification. Offline dataset cases measure target selection and retain their narrower limitations. Every baseline pass must remain a candidate pass. Latency and cost are reported, including missing billing metadata, without blocking acceptance. There is one current policy and no required pilot or fresh held-out phase.
-
-Merging the release PR requests approval of its saved tested images. Promotion verifies passing checks, the same source tree and an unchanged baseline before replacing the approval. Local activation remains explicit. Nightly monitoring repeats the approved live collection against saved measurements; it never switches models or deploys automatically. See [release operations](docs/releases.md) and [ADR-0023](docs/adr/0023-simplify-release-evaluation.md).
-
-The [evaluation guide](docs/evaluation.md) explains cases, datasets, independent grading, artifacts, replay and cost accounting. Live cases share `evaluation/cases/`; fixtures, dataset adapters and research have separate modules. Stagehand, model and context comparisons remain available research work without adding mandatory release stages. Dated results remain in `docs/research/` with their original scope and limitations.
-
-This describes the accepted workflow and source changes, not a claim of hosted rollout. The reviewed private dataset archive is prepared locally and digest-pinned, but its intended private release asset still needs publication. Existing `v1.0.0` monitoring continues through its archived runner and original cases until a new approval replaces it. Hosted comparison, approval and activation require their own observed verification.
-
-## Roadmap
-
-GitHub Issues hold the live requirements, dependencies and progress. The next capabilities are:
-
-- [Complete release qualification and operational verification (#11)](https://github.com/Mochib-Tech-Solutions/xpathed/issues/11).
-- [Enable eligible branch protection and verify actual Copilot review (#41)](https://github.com/Mochib-Tech-Solutions/xpathed/issues/41).
-
-These links describe planned work, not available features. Hosting and presentation work are deferred. Consult the live tickets before starting a slice; research notes may describe alternatives that were not adopted.
-
-## Reference
-
-The [completed source baseline and provider comparison](docs/research/deepinfra-labelled-baseline-report.md) records the expanded labelled measurement and dated standard-route recommendations. It is separate from browser latency measurement and release qualification.
-
-- [Runtime, API contracts and configuration](docs/runtime.md)
-- [Independent evaluation, artifacts and replay](docs/evaluation.md)
-- [Domain vocabulary](CONTEXT.md) and [architecture decisions](docs/adr/)
-- [Controller and Docker conventions](docs/research/2026-09-29-controllers-and-docker-layout.md)
-- [UI and repository guidance sources](docs/research/2026-09-29-ui-and-repository-guidance.md)
-
-The first approved release is [v1.0.0](https://github.com/Mochib-Tech-Solutions/xpathed/releases/tag/v1.0.0); its [qualification and operational evidence](docs/research/2026-10-01-release-monitoring-setup.md#first-approved-release--2026-10-02) records measured correctness, retained failures and deployment limits. Release candidates use the package version (`v1.0.0-rc.1`) and publish model settings, measured qualification results and a changelog. Publication and approval follow the [release runbook](docs/releases.md#release-versions-and-notes).
+Source is organized under [`src/`](src/), the independent evaluator under [`evaluation/`](evaluation/), and Compose definitions under [`docker/`](docker/). The [assignment specification](https://github.com/Mochib-Tech-Solutions/xpathed/issues/1) and its accepted follow-ups record the project requirements.

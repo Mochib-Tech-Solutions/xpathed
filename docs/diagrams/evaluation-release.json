@@ -1,0 +1,170 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "From source checks to an approved release",
+    "locale": "en",
+    "quality_profile": "showcase",
+    "legend": {
+      "mode": "auto",
+      "entries": {
+        "frontend": {
+          "label": "Source"
+        },
+        "backend": {
+          "label": "Checks"
+        },
+        "security": {
+          "label": "Gate"
+        },
+        "cloud": {
+          "label": "Local activation"
+        }
+      }
+    },
+    "viewBox": [
+      720,
+      410
+    ]
+  },
+  "components": [
+    {
+      "id": "ci",
+      "type": "backend",
+      "label": "Ordinary CI",
+      "sublabel": "Provider-free checks",
+      "pos": [
+        30,
+        30
+      ],
+      "size": [
+        150,
+        60
+      ]
+    },
+    {
+      "id": "pr",
+      "type": "frontend",
+      "label": "Release PR",
+      "sublabel": "main \u2192 release",
+      "pos": [
+        285,
+        30
+      ],
+      "size": [
+        150,
+        60
+      ]
+    },
+    {
+      "id": "compare",
+      "type": "backend",
+      "label": "Live comparison",
+      "sublabel": "Candidate + approved",
+      "pos": [
+        540,
+        30
+      ],
+      "size": [
+        150,
+        60
+      ]
+    },
+    {
+      "id": "gate",
+      "type": "security",
+      "label": "Acceptance",
+      "sublabel": "No lost baseline pass",
+      "pos": [
+        540,
+        160
+      ],
+      "size": [
+        150,
+        60
+      ]
+    },
+    {
+      "id": "approve",
+      "type": "security",
+      "label": "Merge + verify",
+      "sublabel": "Approve tested images",
+      "pos": [
+        285,
+        160
+      ],
+      "size": [
+        150,
+        60
+      ]
+    },
+    {
+      "id": "activate",
+      "type": "cloud",
+      "label": "Explicit activation",
+      "sublabel": "Local workspace",
+      "pos": [
+        30,
+        160
+      ],
+      "size": [
+        150,
+        60
+      ]
+    },
+    {
+      "id": "monitor",
+      "type": "backend",
+      "label": "Nightly monitoring",
+      "sublabel": "Approved cases + images",
+      "pos": [
+        285,
+        290
+      ],
+      "size": [
+        150,
+        60
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "from": "ci",
+      "to": "pr",
+      "label": "Pass",
+      "id": "ci-pr"
+    },
+    {
+      "from": "pr",
+      "to": "compare",
+      "label": "Freeze inputs",
+      "id": "pr-compare"
+    },
+    {
+      "from": "compare",
+      "to": "gate",
+      "label": "Grade both arms",
+      "id": "compare-gate",
+      "labelDy": 45
+    },
+    {
+      "from": "gate",
+      "to": "approve",
+      "label": "Pass + merge",
+      "id": "gate-approve"
+    },
+    {
+      "from": "approve",
+      "to": "activate",
+      "label": "Maintainer",
+      "id": "approve-activate"
+    },
+    {
+      "from": "approve",
+      "to": "monitor",
+      "label": "Schedule nightly",
+      "id": "approve-monitor",
+      "labelDy": 45
+    }
+  ]
+}

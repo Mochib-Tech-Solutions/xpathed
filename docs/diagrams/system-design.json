@@ -1,0 +1,147 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "xpathed: service ownership",
+    "locale": "en",
+    "quality_profile": "showcase",
+    "viewBox": [
+      800,
+      400
+    ]
+  },
+  "components": [
+    {
+      "id": "web",
+      "type": "frontend",
+      "label": "Web",
+      "sublabel": "React workspace + proxy",
+      "pos": [
+        25,
+        150
+      ],
+      "size": [
+        160,
+        60
+      ]
+    },
+    {
+      "id": "client",
+      "type": "backend",
+      "label": "ClientApi",
+      "sublabel": "Requests + diagnostics",
+      "pos": [
+        320,
+        150
+      ],
+      "size": [
+        160,
+        60
+      ]
+    },
+    {
+      "id": "resolver",
+      "type": "backend",
+      "label": "Resolver",
+      "sublabel": "Stateless orchestration",
+      "pos": [
+        615,
+        150
+      ],
+      "size": [
+        160,
+        60
+      ]
+    },
+    {
+      "id": "browser",
+      "type": "backend",
+      "label": "Browser",
+      "sublabel": "Playwright + Chromium",
+      "pos": [
+        320,
+        20
+      ],
+      "size": [
+        160,
+        60
+      ]
+    },
+    {
+      "id": "model",
+      "type": "external",
+      "label": "OpenRouter",
+      "sublabel": "Model selects candidate IDs",
+      "pos": [
+        615,
+        280
+      ],
+      "size": [
+        160,
+        60
+      ]
+    },
+    {
+      "id": "db",
+      "type": "database",
+      "label": "PostgreSQL",
+      "sublabel": "Sanitized diagnostic records",
+      "pos": [
+        320,
+        280
+      ],
+      "size": [
+        160,
+        60
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "request",
+      "from": "web",
+      "to": "client",
+      "label": "HTTP requests"
+    },
+    {
+      "id": "resolve",
+      "from": "client",
+      "to": "resolver",
+      "label": "Instruction + page ID"
+    },
+    {
+      "id": "session",
+      "from": "client",
+      "to": "browser",
+      "label": "Page lifecycle"
+    },
+    {
+      "id": "capture",
+      "from": "resolver",
+      "to": "browser",
+      "label": "Capture + verify",
+      "fromSide": "top"
+    },
+    {
+      "id": "viewer",
+      "from": "web",
+      "to": "browser",
+      "label": "noVNC WebSocket",
+      "fromSide": "top"
+    },
+    {
+      "id": "inference",
+      "from": "resolver",
+      "to": "model",
+      "label": "Sanitized candidates",
+      "labelDy": 45
+    },
+    {
+      "id": "store",
+      "from": "client",
+      "to": "db",
+      "label": "EF Core",
+      "labelDy": 45
+    }
+  ]
+}
