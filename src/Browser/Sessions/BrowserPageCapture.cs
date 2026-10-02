@@ -6,7 +6,7 @@ using Xpathed.Common.Http;
 
 namespace Xpathed.Browser.Sessions;
 
-internal sealed class BrowserPageCapture(BrowserPageRuntime page, string scope) : IAsyncDisposable
+internal sealed class BrowserPageCapture(BrowserPageRuntime page) : IAsyncDisposable
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly List<BrowserFrameCapture> frames = [];
@@ -40,7 +40,7 @@ internal sealed class BrowserPageCapture(BrowserPageRuntime page, string scope) 
             complete ? [.. candidates] : [],
             new CaptureCoverage(scanned, eligible, complete ? candidates.Count : 0, complete, error, excludedOffscreen),
             unsupported,
-            scope
+            "current_view"
         );
 
         async Task VisitAsync(
@@ -68,7 +68,7 @@ internal sealed class BrowserPageCapture(BrowserPageRuntime page, string scope) 
                     pageId = page.Id,
                     documentId,
                     captureId,
-                    scope,
+                    scope = "current_view",
                     frame = JsonSerializer.Serialize(identity, JsonOptions),
                     environment = environment.GetRawText(),
                     budgetMs = 2000 - timer.ElapsedMilliseconds,
@@ -87,7 +87,7 @@ internal sealed class BrowserPageCapture(BrowserPageRuntime page, string scope) 
             if (
                 !result.Coverage.Complete
                 || scanned > 20000
-                || (scope == "current_view" ? candidates.Count : eligible) > 2000
+                || candidates.Count > 2000
                 || JsonSerializer.SerializeToUtf8Bytes(candidates, JsonOptions).Length > 512000
                 || timer.ElapsedMilliseconds >= 2000
             )

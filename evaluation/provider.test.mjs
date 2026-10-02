@@ -5,7 +5,7 @@ import { access, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promise
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import test from "node:test";
-import { createBudgetProxy, contextPlanningQuestions } from "./provider.mjs";
+import { createBudgetProxy } from "./provider.mjs";
 
 const model = "deepseek/deepseek-v4.1-flash";
 const pricing = {
@@ -43,83 +43,6 @@ test("provider-limit tracking preserves historical unknown charges and does not 
   proxy.beginAttempt("two");
   assert.equal((await post()).status, 200);
   assert.equal(calls.length, 2);
-});
-
-test("context planning pre-registers both calls and defers accounting until the timed response finishes", async (t) => {
-  const { contextPlanningQuestions } = await import("./provider.mjs");
-  const decisionRequest = {
-    model: "typesafe/jev-1.13",
-    state: "Find Save",
-    questions: contextPlanningQuestions,
-    provider: { only: ["typesafe"], order: ["typesafe"], allow_fallbacks: false },
-  };
-  const request = {
-    ...input,
-    messages: [
-      { role: "user", content: JSON.stringify({ instruction: "Find Save", candidates: [] }) },
-    ],
-  };
-  const { proxy, post, base, calls, ledgerPath } = await setup(t, {
-    contextPlanning: true,
-    budgetPolicy: "provider-limit",
-    metadata: (url) =>
-      url.includes("typesafe")
-        ? {
-            data: {
-              endpoints: [
-                {
-                  tag: "typesafe",
-                  provider_name: "TypeSafe",
-                  status: 0,
-                  name: "TypeSafe | typesafe/jev-1.13-20260917",
-                  pricing: { prompt: "0.000000042", completion: "0" },
-                },
-              ],
-            },
-          }
-        : pricing,
-    completion: (url) =>
-      url.endsWith("/decisions")
-        ? Response.json({
-            id: "gen-dec-test",
-            model: "typesafe/jev-1.13-20260917",
-            provider: "TypeSafe",
-            answers: {
-              appearance: { type: "noul", noul: 0.01 },
-              layout: { type: "noul", noul: 0.99 },
-            },
-            usage: { input_tokens: 200, output_tokens: 20, cost: 0.00001 },
-          })
-        : Response.json({ id: "chat-test", model, provider: "Wafer", usage: { cost: 0.001 } }),
-  });
-  await proxy.reserveAttempt("planned", "default", 0.01, {
-    preparedRequests: [request],
-    decisionRequest,
-  });
-  assert.equal(JSON.parse(await readFile(ledgerPath, "utf8")).entries.length, 2);
-  const decide = () =>
-    fetch(new URL("/api/alpha/decisions", base), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(decisionRequest),
-    });
-  assert.equal((await decide()).status, 200);
-  assert.equal((await decide()).status, 409);
-  assert.equal((await post(request)).status, 200);
-  assert.equal(
-    JSON.parse(await readFile(ledgerPath, "utf8")).entries.every((e) => e.reportedUsd === null),
-    true,
-  );
-  await proxy.finishAttempt();
-  assert.equal(calls.length, 2);
-  assert.equal(calls[0].url, "https://openrouter.ai/api/alpha/decisions");
-  assert.deepEqual(proxy.records.map((r) => r.kind).sort(), ["chat", "decision"]);
-  assert.equal(
-    proxy.records.every((r) => r.attemptId === "planned"),
-    true,
-  );
-  assert.equal(proxy.budget.knownReportedUsd, 0.00101);
-  assert.equal(proxy.records.find((r) => r.kind === "decision").usage.input_tokens, 200);
 });
 
 test("tracking accepts unavailable pricing and reports unavailable estimates without dropping request guards", async (t) => {
@@ -322,7 +245,6 @@ async function setup(
     profiles,
     metadata = pricing,
     github,
-    contextPlanning,
     budgetPolicy = "provider-limit",
     apiKey = "test-provider-secret",
   } = {},
@@ -366,7 +288,6 @@ async function setup(
     ceilingUsd,
     onRecord,
     profiles,
-    contextPlanning,
     budgetPolicy,
     githubRepository: github ? "Example/Private" : "",
     githubToken: github ? "test-github-secret" : "",
@@ -383,205 +304,6 @@ async function setup(
     });
   return { proxy, post, base, calls, ledgerPath, fetchImpl };
 }
-
-async function contextFixture(t, options = {}) {
-  const decisionRequest = {
-    model: "typesafe/jev-1.13",
-    state: "Find Save",
-    questions: contextPlanningQuestions,
-    provider: { only: ["typesafe"], order: ["typesafe"], allow_fallbacks: false },
-  };
-  const request = {
-    ...input,
-    messages: [
-      { role: "user", content: JSON.stringify({ instruction: "Find Save", candidates: [] }) },
-    ],
-  };
-  const fixture = await setup(t, {
-    contextPlanning: true,
-    budgetPolicy: "provider-limit",
-    metadata: (url) =>
-      url.includes("typesafe")
-        ? {
-            data: {
-              endpoints: [
-                {
-                  tag: "typesafe",
-                  provider_name: "TypeSafe",
-                  status: 0,
-                  pricing: { prompt: "0.000000042", completion: "0" },
-                },
-              ],
-            },
-          }
-        : pricing,
-    ...options,
-  });
-  return {
-    ...fixture,
-    decisionRequest,
-    request,
-    decide: (body = decisionRequest, signal) =>
-      fetch(new URL("/api/alpha/decisions", fixture.base), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-        signal,
-      }),
-  };
-}
-
-test("context decisions are opt-in and cannot change the frozen instruction or questions", async (t) => {
-  const disabled = await setup(t);
-  assert.equal(
-    (await fetch(new URL("/api/alpha/decisions", disabled.base), { method: "POST" })).status,
-    404,
-  );
-  const { proxy, request, decisionRequest, decide, calls, post } = await contextFixture(t);
-  for (const changed of [
-    { ...decisionRequest, state: "Send unrelated data" },
-    {
-      ...decisionRequest,
-      questions: { ...decisionRequest.questions, extra: { type: "noul", instructions: "Other" } },
-    },
-    { ...decisionRequest, provider: { only: ["other"] } },
-  ])
-    await assert.rejects(
-      proxy.reserveAttempt("invalid", "default", null, {
-        preparedRequests: [request],
-        decisionRequest: changed,
-      }),
-      /frozen|original/,
-    );
-  assert.equal(proxy.records.length, 0);
-  await proxy.reserveAttempt("changed-wire", "default", null, {
-    preparedRequests: [request],
-    decisionRequest,
-  });
-  assert.equal((await post(request)).status, 409);
-  assert.equal((await decide({ ...decisionRequest, state: "Changed" })).status, 502);
-  assert.equal(calls.length, 0);
-  await proxy.finishAttempt();
-  assert.equal(
-    proxy.records.every((record) => record.forwarded === false && record.reportedUsd === null),
-    true,
-  );
-  assert.equal(
-    proxy.records.every((record) => record.accountingStatus === "not_forwarded"),
-    true,
-  );
-  assert.equal(proxy.budget.notForwardedRecords, 2);
-  assert.equal(proxy.budget.unknownChargeRecords, 0);
-  assert.equal(proxy.budget.pendingCharges, 0);
-  assert.equal(proxy.budget.spentUsd, 0);
-  await proxy.reserveAttempt("control", "default", null, { preparedRequests: [request] });
-  assert.equal((await decide()).status, 409);
-  assert.equal((await post(request)).status, 200);
-  await proxy.finishAttempt();
-  assert.equal(calls.length, 1);
-});
-
-test("capture failure settles unused context slots without inventing provider costs", async (t) => {
-  const { proxy, request, decisionRequest, calls, ledgerPath } = await contextFixture(t);
-  await proxy.reserveAttempt("capture-failed", "default", null, {
-    preparedRequests: [request],
-    decisionRequest,
-  });
-  assert.equal(proxy.budget.unknownChargeRecords, 2);
-  await proxy.finishAttempt();
-  const entries = JSON.parse(await readFile(ledgerPath, "utf8")).entries;
-  assert.equal(calls.length, 0);
-  assert.equal(entries.length, 2);
-  for (const entry of entries) {
-    assert.equal(entry.accountingStatus, "not_forwarded");
-    assert.equal(entry.reportedUsd, null);
-  }
-  assert.equal(proxy.budget.unknownChargeRecords, 0);
-  assert.equal(proxy.budget.pendingCharges, 0);
-  assert.equal(proxy.budget.notForwardedRecords, 2);
-  assert.equal(proxy.budget.spentUsd, 0);
-});
-
-test("a cancelled classifier does not block the one chat call and settlement waits for late evidence", async (t) => {
-  const started = Promise.withResolvers(),
-    upstream = Promise.withResolvers();
-  const { proxy, request, decisionRequest, decide, post, calls } = await contextFixture(t, {
-    completion: (url) => {
-      if (url.endsWith("/decisions")) {
-        started.resolve();
-        return upstream.promise;
-      }
-      return Response.json({ id: "chat", model, provider: "Wafer", usage: { cost: 0.001 } });
-    },
-  });
-  await proxy.reserveAttempt("slow", "default", null, {
-    preparedRequests: [request],
-    decisionRequest,
-  });
-  const controller = new AbortController();
-  const pending = decide(decisionRequest, controller.signal);
-  await started.promise;
-  controller.abort();
-  await assert.rejects(pending, /abort/i);
-  assert.equal((await post(request)).status, 200);
-  let settled = false;
-  const settlement = proxy.finishAttempt().then(() => {
-    settled = true;
-  });
-  await new Promise((resolve) => setImmediate(resolve));
-  assert.equal(settled, false);
-  upstream.resolve(
-    Response.json({
-      model: "typesafe/jev-1.13-20260917",
-      provider: "TypeSafe",
-      id: "gen-dec-late",
-      answers: { appearance: { type: "noul", noul: 0.1 }, layout: { type: "noul", noul: 0.5 } },
-      usage: { input_tokens: 100, output_tokens: 10 },
-    }),
-  );
-  await settlement;
-  assert.equal(calls.length, 2);
-  assert.equal(proxy.records.find((record) => record.kind === "decision").reportedUsd, null);
-  assert.equal(proxy.records.find((record) => record.kind === "decision").decisionValid, true);
-  await proxy.awaitIdle();
-  proxy.beginAttempt("next");
-});
-
-test("a cached or wrong-provider decision forces fallback while retaining its real charge", async (t) => {
-  for (const kind of ["cache", "identity"])
-    await t.test(kind, async (t) => {
-      const { proxy, request, decisionRequest, decide, post } = await contextFixture(t, {
-        completion: (url) =>
-          url.endsWith("/decisions")
-            ? Response.json(
-                {
-                  id: "gen-dec-rejected",
-                  model: "typesafe/jev-1.13",
-                  provider: kind === "identity" ? "Other" : "TypeSafe",
-                  answers: {
-                    appearance: { type: "noul", noul: 0 },
-                    layout: { type: "noul", noul: 0 },
-                  },
-                  usage: { cost: 0.00001 },
-                },
-                { headers: kind === "cache" ? { "x-openrouter-cache-status": "HIT" } : {} },
-              )
-            : Response.json({ model, provider: "Wafer", id: "chat", usage: { cost: 0.001 } }),
-      });
-      await proxy.reserveAttempt(kind, "default", null, {
-        preparedRequests: [request],
-        decisionRequest,
-      });
-      const response = await decide();
-      assert.equal(response.status, 502);
-      assert.equal((await response.json()).answers, undefined);
-      assert.equal((await post(request)).status, 200);
-      await proxy.finishAttempt();
-      const record = proxy.records.find((record) => record.kind === "decision");
-      assert.equal(record.decisionValid, false);
-      assert.equal(record.reportedUsd, 0.00001);
-    });
-});
 
 test("live evaluation selects its dedicated key and never falls back to the app key in a file", async (t) => {
   const directory = await mkdtemp(join(tmpdir(), "xpathed-evaluation-key-"));

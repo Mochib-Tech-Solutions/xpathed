@@ -3,7 +3,7 @@ import { readFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { gzipSync, gunzipSync } from "node:zlib";
 import { execFileSync } from "node:child_process";
-import { makeCase } from "./run.mjs";
+import { makeCase } from "./offline.mjs";
 
 const hash = (bytes) => createHash("sha256").update(bytes).digest("hex");
 const json = (path) => JSON.parse(readFileSync(path, "utf8"));

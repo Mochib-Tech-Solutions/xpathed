@@ -540,11 +540,6 @@ test("Current-view budgets exclude large offscreen lists but never silently trun
       assert.equal(capture.coverage.excludedOffscreenCount, 2200);
       assert.equal(capture.coverage.capturedCount, 1);
       assert.equal(capture.candidates[0].label, "Visible approval");
-      const legacy = await request(`/pages/${page.pageId}/capture`, {
-        documentId: page.documentId,
-      });
-      assert.equal(legacy.scope, "page");
-      assert.equal(legacy.coverage.complete, false);
     },
   );
   await withFixture(
@@ -558,19 +553,6 @@ test("Current-view budgets exclude large offscreen lists but never silently trun
       assert.equal(capture.coverage.errorCode, "capture_budget_exceeded");
       assert.equal(capture.coverage.capturedCount, 0);
       assert.deepEqual(capture.candidates, []);
-    },
-  );
-});
-
-test("Legacy incomplete captures preserve scanned shadow-boundary counts", async () => {
-  await withFixture(
-    `<div id="shadow"></div><script>document.querySelector('#shadow').attachShadow({mode:'open'}).innerHTML='<button>Unsupported</button>'</script>${"<button>Entry</button>".repeat(2001)}`,
-    async (session, page) => {
-      const capture = await request(`/pages/${page.pageId}/capture`, {
-        documentId: page.documentId,
-      });
-      assert.equal(capture.coverage.complete, false);
-      assert.equal(capture.unsupportedBoundaryCount, 1);
     },
   );
 });
@@ -605,10 +587,11 @@ test("Current-view CSS evidence reports uncertainty without image pixels, resour
         assert.equal(candidate.appearance.backgroundColor, null, label);
         assert.ok(candidate.appearance.limitations.includes(reason), label);
       }
-      const legacy = await request(`/pages/${page.pageId}/capture`, {
+      const defaultCapture = await request(`/pages/${page.pageId}/capture`, {
         documentId: page.documentId,
       });
-      assert.ok(legacy.candidates.every((c) => !("appearance" in c)));
+      assert.equal(defaultCapture.scope, "current_view");
+      assert.ok(defaultCapture.candidates.every((c) => c.appearance));
     },
   );
 });
@@ -867,42 +850,38 @@ test("Disabled click and hover keep the same target with different action readin
   );
 });
 
-test("An offscreen target retains one verified path without moving the page and becomes ready after user scrolling", async () => {
+test("An offscreen target becomes eligible only after manual scrolling and recapture", async () => {
   await withFixture(
-    '<button id="expected-target" style="position:absolute;top:2200px;width:240px;height:100px">Footer gallery</button>',
+    '<style>body{height:3200px}</style><button id="expected-target" style="position:absolute;top:2200px;width:240px;height:100px">Footer gallery</button>',
     async (session, page) => {
+      const initial = await request(`/pages/${page.pageId}/capture`, {
+        documentId: page.documentId,
+      });
+      assert.ok(!initial.candidates.some((candidate) => candidate.label === "Footer gallery"));
+      assert.equal((await observe()).scrollY, 0);
+      await observe({ scrollToY: 2100 });
       const capture = await request(`/pages/${page.pageId}/capture`, {
         documentId: page.documentId,
       });
-      const candidate = capture.candidates.find((entry) => entry.label === "Footer gallery");
-      const selection = {
+      const candidate = capture.candidates.find(
+        (candidate) => candidate.label === "Footer gallery",
+      );
+      const { target } = await request(`/pages/${page.pageId}/selection`, {
         documentId: page.documentId,
         captureId: capture.captureId,
         candidateId: candidate.id,
         action: "click",
-      };
-      const before = await observe();
-      const { target } = await request(`/pages/${page.pageId}/selection`, selection);
-      assert.equal(target.xpaths.length, 1);
-      assert.equal(target.state.inViewport, false);
-      assert.equal(target.interactability.status, "blocked");
-      assert.ok(target.interactability.reasons.includes("off_screen"));
-      assert.equal((await observe()).scrollY, before.scrollY);
-      const scrolled = await observe({ scrollToY: 2100, xpaths: target.xpaths });
-      assert.ok(scrolled.scrollY > before.scrollY);
-      assert.deepEqual(scrolled.matches, [["expected-target"]]);
-      assert.equal(scrolled.nodeCount, before.nodeCount + 1);
-      const current = await request(`/pages/${page.pageId}/selection`, selection);
-      assert.equal(current.target.state.inViewport, true);
-      assert.equal(current.target.interactability.status, "ready");
-      assert.equal((await observe()).scrollY, scrolled.scrollY);
+      });
+      assert.equal(target.interactability.status, "ready");
+      assert.deepEqual((await observe({ xpaths: target.xpaths })).matches, [["expected-target"]]);
+      assert.equal((await observe()).scrollY, 2100);
     },
   );
 });
 
-test("The public viewer paints an offscreen target highlight after scrolling and clears it on a new capture", async () => {
+test("The public viewer keeps a target highlight through scrolling and clears it on a new capture", async () => {
   await withFixture(
-    '<style>body { margin:0; background:white; height:3200px; } button { position:absolute; top:2200px; left:100px; width:240px; height:100px; background:white; border:0; }</style><button id="expected-target">Footer gallery</button>',
+    '<style>body { margin:0; background:white; height:3200px; } button { position:absolute; top:100px; left:100px; width:240px; height:100px; background:white; border:0; }</style><button id="expected-target">Footer gallery</button>',
     async (session, page) => {
       const capture = await request(`/pages/${page.pageId}/capture`, {
         documentId: page.documentId,
@@ -916,12 +895,14 @@ test("The public viewer paints an offscreen target highlight after scrolling and
       });
       assert.equal((await observe()).scrollY, 0);
       await withFramebuffer(session, async (frame) => {
-        await expectHighlights(frame, [[100, 100]], false);
+        await expectHighlights(frame, [[100, 100]], true);
         await observe({ scrollToY: 2100 });
+        await expectHighlights(frame, [[100, 100]], false);
+        await observe({ scrollToY: 0 });
         await expectHighlights(frame, [[100, 100]], true);
         await request(`/pages/${page.pageId}/capture`, { documentId: page.documentId });
         await expectHighlights(frame, [[100, 100]], false);
-        assert.equal((await observe()).scrollY, 2100);
+        assert.equal((await observe()).scrollY, 0);
       });
     },
   );
@@ -966,7 +947,7 @@ const highlightFixture = `<style>body {margin:0;background:white} button {positi
 <button id="expected-target">First approval</button><button id="second-target">Second approval</button>
 <script>window.observedEvents = {}; for (const type of ['pointermove','pointerdown','keydown']) addEventListener(type, event => { if(event.isTrusted) window.observedEvents[type] = (window.observedEvents[type] ?? 0) + 1; });</script>`;
 
-async function selectHighlights(page, plural = false, scope = "page") {
+async function selectHighlights(page, plural = false, scope = "current_view") {
   const capture = await request(`/pages/${page.pageId}/capture`, {
     documentId: page.documentId,
     scope,
@@ -1339,14 +1320,9 @@ test("Accessibility eligibility keeps exposed visual limitations and computes sa
         "aria-labelledby precedes aria-label and includes safe hidden reference text",
       );
       assert.ok(capture.candidates.some((entry) => entry.label === "Native hidden label"));
-      for (const name of [
-        "Visibility override",
-        "Hidden override",
-        "Transparent",
-        "Screen reader",
-        "Zero area",
-        "Offscreen exposed",
-      ]) {
+      for (const name of ["Screen reader", "Zero area", "Offscreen exposed"])
+        assert.ok(!capture.candidates.some((entry) => entry.text === name), name);
+      for (const name of ["Visibility override", "Hidden override", "Transparent"]) {
         const candidate = capture.candidates.find((entry) => entry.text === name);
         assert.ok(candidate, name);
         assert.equal(candidate.state.accessibilityExposed, true);
@@ -1357,10 +1333,7 @@ test("Accessibility eligibility keeps exposed visual limitations and computes sa
           action: "hover",
         });
         assert.ok(target.xpaths.length > 0, name);
-        if (name === "Transparent" || name === "Zero area")
-          assert.equal(target.state.rendered, false);
-        if (name === "Zero area" || name === "Offscreen exposed")
-          assert.equal(target.interactability.status, "blocked");
+        if (name === "Transparent") assert.equal(target.state.rendered, false);
       }
       const selected = await request(`/pages/${session.pageId}/selection`, {
         documentId: page.documentId,
@@ -1382,7 +1355,7 @@ test("Action readiness explains readonly, incompatible, covered, pointer and cus
     <input type="checkbox" aria-label="Check choice"><input type="radio" aria-label="Radio choice">
     <select aria-label="Select country"><option>PRIVATE_OPTION</option></select>
     <div role="combobox" aria-label="Custom select" tabindex="0">Custom</div>
-    <div role="textbox" aria-label="Custom editor" aria-readonly="true" tabindex="0"></div>
+    <div role="textbox" aria-label="Custom editor" aria-readonly="true" tabindex="0" style="height:30px"></div>
     <button aria-label="Blocked pointer" style="pointer-events:none">Pointer</button>
     <div style="position:relative;width:160px;height:40px"><button aria-label="Covered" style="width:160px;height:40px">Covered</button><div style="position:absolute;inset:0;background:black"></div></div>
     <button aria-label="Plain button">Plain</button>
@@ -1431,7 +1404,7 @@ test("Action readiness explains readonly, incompatible, covered, pointer and cus
 test("Chromium exposure exceptions preserve focus, modal controls and supported role fallback", async () => {
   await withFixture(
     `<div id="focused-parent"><button id="expected-target">Focused hidden exception</button></div>
-    <input type="search" aria-label="Search"><div role="invalid textbox" aria-label="Role fallback" aria-readonly="true" tabindex="0"></div>
+    <input type="search" aria-label="Search"><div role="invalid textbox" aria-label="Role fallback" aria-readonly="true" tabindex="0" style="height:30px"></div>
     <script>document.querySelector('#expected-target').focus();document.querySelector('#focused-parent').setAttribute('aria-hidden','true');</script>`,
     async (session, page) => {
       const before = await observe();
@@ -1581,10 +1554,7 @@ test("Capture preserves control labels, Unicode, scope and observed state withou
         capture.candidates.find((candidate) => candidate.text === "Disabled").state.enabled,
         false,
       );
-      assert.equal(
-        capture.candidates.find((candidate) => candidate.text === "Offscreen").state.inViewport,
-        false,
-      );
+      assert.ok(!capture.candidates.some((candidate) => candidate.text === "Offscreen"));
       assert.ok(capture.candidates.some((candidate) => candidate.text === "Hover text"));
       assert.ok(capture.candidates.every((candidate) => !candidate.text.startsWith("Hidden")));
       assert.equal(
@@ -1598,7 +1568,7 @@ test("Capture preserves control labels, Unicode, scope and observed state withou
   );
 });
 
-for (const scope of ["page", "current_view"])
+for (const scope of ["current_view"])
   test(`The single preferred XPath escapes both quote types and uses meaningful context for duplicate attributes (${scope})`, async () => {
     await withFixture(
       `<section aria-label="Employee"><button data-oracle="expected-target" data-testid="shared">OK</button></section>
@@ -1658,7 +1628,7 @@ for (const scope of ["page", "current_view"])
     );
   });
 
-for (const scope of ["page", "current_view"])
+for (const scope of ["current_view"])
   test(`Saved semantic XPaths survive generated IDs, wrappers and reordered duplicate controls (${scope})`, async () => {
     await withFixture(
       `<label for="a1b2c3d4-e5f6-47a8-b9c0-d1e2f3a4b5c6">Country</label><input id="a1b2c3d4-e5f6-47a8-b9c0-d1e2f3a4b5c6" data-oracle="country">
@@ -1718,7 +1688,7 @@ for (const scope of ["page", "current_view"])
     );
   });
 
-for (const scope of ["page", "current_view"])
+for (const scope of ["current_view"])
   test(`Saved user-facing XPaths survive ID changes and scoped duplicates but reject changed meaning (${scope})`, async () => {
     await withFixture(
       `<section aria-label="Profile"><button id="save-profile" data-oracle="save">Save changes</button>
@@ -1768,7 +1738,7 @@ for (const scope of ["page", "current_view"])
     );
   });
 
-for (const scope of ["page", "current_view"])
+for (const scope of ["current_view"])
   test(`Positional XPath is a verified last fallback when identical elements have no distinguishing context (${scope})`, async () => {
     await withFixture(
       `<div><span data-oracle="expected-target">Same</span><span>Same</span></div>`,
@@ -1795,7 +1765,8 @@ test("Hundreds of multilingual controls retain complete capture and a verified t
   await withFixture(
     Array.from(
       { length: 500 },
-      (_, index) => `<button data-oracle="control-${index}">حالة الطقس ${index}</button>`,
+      (_, index) =>
+        `<button style="position:absolute;left:${(index % 20) * 60}px;top:${Math.floor(index / 20) * 28}px;width:60px;height:28px" data-oracle="control-${index}">حالة الطقس ${index}</button>`,
     ).join(""),
     async (session, page) => {
       const capture = await request(`/pages/${session.pageId}/capture`, {
@@ -1820,10 +1791,12 @@ test("Hundreds of multilingual controls retain complete capture and a verified t
 
 test("Incomplete captures report operating-budget errors instead of returning truncated candidates", async () => {
   for (const markup of [
-    "<button>Target</button>".repeat(2001),
+    "<style>button{position:fixed;left:0;top:0}</style>" + "<button>Target</button>".repeat(2001),
     "<div></div>".repeat(20001),
     `<button>${"長".repeat(65000)}</button>`,
-    `<button>${"長".repeat(15000)}</button>`.repeat(6),
+    `<button style="position:fixed;left:0;top:0;width:100px;height:40px;overflow:hidden">${"長".repeat(15000)}</button>`.repeat(
+      6,
+    ),
   ]) {
     await withFixture(markup, async (session, page) => {
       const capture = await request(`/pages/${session.pageId}/capture`, {
@@ -1966,7 +1939,7 @@ for (const framed of [false, true])
     const markup = `<input id="expected-target" aria-label="Notes" readonly value="PRIVATE_VALUE">
      <input type="file" aria-label="Upload document"><input type="file" hidden aria-label="Hidden upload">
      <select aria-label="Countries" multiple><option selected>PRIVATE_SELECTION</option><option selected>PRIVATE_OTHER</option></select>
-     <div role="tab" tabindex="0" aria-selected="true" aria-label="Overview"></div>
+     <div role="tab" tabindex="0" aria-selected="true" aria-label="Overview" style="height:30px"></div>
      <button disabled aria-label="Disabled"><span>Inside button</span></button>
      <p id="help">Text help</p><svg><circle aria-label="Diagram node" cx="20" cy="20" r="10"/></svg>`;
     await withFixture(
@@ -2069,10 +2042,27 @@ test("Nested frame targets retain document XPath identity and main viewport geom
       });
       await observe({ scrollToY: 20 }, "/inner");
       await observe({ scrollToY: 50 }, "/fixture");
+      await expectError(
+        `/pages/${page.pageId}/selection`,
+        {
+          documentId: page.documentId,
+          captureId: capture.captureId,
+          candidateId: candidate.id,
+          action: "hover",
+        },
+        409,
+        "stale_capture",
+      );
+      const refreshed = await request(`/pages/${page.pageId}/capture`, {
+        documentId: page.documentId,
+      });
+      const recaptured = refreshed.candidates.find(
+        (entry) => entry.frame?.chain.length === 2 && entry.tag === "button",
+      );
       const moved = await request(`/pages/${page.pageId}/selection`, {
         documentId: page.documentId,
-        captureId: capture.captureId,
-        candidateId: candidate.id,
+        captureId: refreshed.captureId,
+        candidateId: recaptured.id,
         action: "hover",
       });
       assert.equal(moved.target.geometry.y, 80);
@@ -2097,7 +2087,7 @@ test("Cross-origin frame clipping and ancestor obstruction remain passive and fr
       const covered = capture.candidates.find((candidate) => candidate.label === "Covered child");
       const clipped = capture.candidates.find((candidate) => candidate.label === "Clipped child");
       assert.ok(covered);
-      assert.ok(clipped);
+      assert.equal(clipped, undefined);
       const body = {
         documentId: page.documentId,
         captureId: capture.captureId,
@@ -2108,13 +2098,6 @@ test("Cross-origin frame clipping and ancestor obstruction remain passive and fr
       assert.equal(target.state.inViewport, true);
       assert.equal(target.interactability.status, "blocked");
       assert.ok(target.interactability.reasons.includes("ancestor_frame_obstructed"));
-      const other = await request(`/pages/${page.pageId}/selection`, {
-        ...body,
-        candidateId: clipped.id,
-      });
-      assert.equal(other.target.state.accessibilityExposed, true);
-      assert.equal(other.target.state.inViewport, false);
-      assert.equal(other.target.interactability.status, "blocked");
       assert.deepEqual((await observe({ xpaths: target.xpaths }, "/external")).matches, [
         ["expected-target"],
       ]);
@@ -2244,8 +2227,12 @@ for (const [name, ancestorStyle, position, modal, visible] of [
         });
         assert.equal(capture.coverage.complete, true);
         const candidate = capture.candidates.find((candidate) => candidate.label === "Search");
-        assert.ok(candidate);
-        assert.equal(candidate.state.inViewport, visible);
+        assert.equal(Boolean(candidate), visible);
+        if (!visible) {
+          assert.deepEqual((await observe()).events, before.events);
+          return;
+        }
+        assert.equal(candidate.state.inViewport, true);
         const { target } = await request(`/pages/${page.pageId}/selection`, {
           documentId: page.documentId,
           captureId: capture.captureId,
@@ -2256,16 +2243,6 @@ for (const [name, ancestorStyle, position, modal, visible] of [
         assert.equal(target.interactability.status, visible ? "ready" : "blocked");
         assert.equal(target.interactability.checks.pointerReception, visible ? "pass" : "unknown");
         assert.deepEqual(target.interactability.reasons, visible ? [] : ["off_screen"]);
-        const current = await request(`/pages/${page.pageId}/capture`, {
-          documentId: page.documentId,
-          scope: "current_view",
-        });
-        assert.equal(current.coverage.complete, true);
-        assert.equal(
-          current.candidates.some((entry) => entry.label === "Search"),
-          visible,
-        );
-
         const after = await verify(target.xpaths);
         assert.deepEqual(after.matches, [["expected-target"]]);
         assert.deepEqual(after.events, before.events);
@@ -2332,7 +2309,7 @@ test("Frame exposure, unsupported transforms and aggregate budgets preserve hone
     (path) =>
       path === "/fixture"
         ? '<iframe src="/large-one"></iframe><iframe src="/large-two"></iframe><iframe src="/large-three"></iframe>'
-        : "<button>Ordinary target</button>".repeat(750),
+        : '<button style="position:fixed;left:0;top:0">Ordinary target</button>'.repeat(750),
     async (session, page) => {
       await observe({}, "/large-three");
       const capture = await request(`/pages/${page.pageId}/capture`, {
@@ -2348,7 +2325,7 @@ test("Frame exposure, unsupported transforms and aggregate budgets preserve hone
 
 test("Relational scope distinguishes table rows and header/footer duplicates without values", async () => {
   await withFixture(
-    '<header><button>Help</button></header><table><tr><td>Employee Alice</td><td><button>Approve</button><input value="ROW_SECRET"></td></tr><tr><td>Employee Bob</td><td><button>Approve</button></td></tr></table><footer style="margin-top:2000px"><button>Help</button></footer>',
+    '<header><button>Help</button></header><table><tr><td>Employee Alice</td><td><button>Approve</button><input value="ROW_SECRET"></td></tr><tr><td>Employee Bob</td><td><button>Approve</button></td></tr></table><footer><button>Help</button></footer>',
     async (session, page) => {
       const capture = await request(`/pages/${page.pageId}/capture`, {
         documentId: page.documentId,
@@ -2358,7 +2335,7 @@ test("Relational scope distinguishes table rows and header/footer duplicates wit
       assert.ok(buttons[1].scope.some((scope) => scope.includes("Employee Alice")));
       assert.ok(buttons[2].scope.some((scope) => scope.includes("Employee Bob")));
       assert.ok(buttons[3].scope.includes("footer"));
-      assert.equal(buttons[3].state.inViewport, false);
+      assert.equal(buttons[3].state.inViewport, true);
       assert.doesNotMatch(JSON.stringify(capture), /ROW_SECRET/);
     },
   );

@@ -101,3 +101,33 @@ export async function executeOffline(spec, trial, output, timeoutMs, baseline, w
     trial.elapsedMs = performance.now() - started;
   }
 }
+
+export function makeCase(item) {
+  return {
+    id: item.id,
+    dataset: item.dataset,
+    split: item.split,
+    family: `${item.dataset}/${item.family}`,
+    track: "offline-selection",
+    category: "external-target",
+    instruction: item.instruction,
+    setupRevision: item.transformationVersion ?? "external-targets-v1",
+    review: item.provenance.adaptation ?? {
+      status: "source-annotation",
+      actionLabel: "unavailable",
+    },
+    provenance: item.provenance,
+    inputKey: item.inputKey,
+    expected: {
+      outcome: "found",
+      actions: [
+        {
+          step: 1,
+          ...(item.action ? { action: item.action } : {}),
+          outcome: "found",
+          target: { candidateId: item.oracle.candidateId },
+        },
+      ],
+    },
+  };
+}

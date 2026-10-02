@@ -2,18 +2,14 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace Xpathed.Resolver.Tests;
 
 internal sealed class DeterministicServicesHandler : HttpMessageHandler
 {
-    private static readonly string[] SaveXpaths = ["//*[@data-testid='save-profile']"];
     public Func<string, CancellationToken, Task>? BeforeRespondAsync { get; init; }
     public string? ProviderBody { get; set; }
-    public string DecisionBody { get; init; } =
-        """{"model":"typesafe/jev-1.13-20260917","provider":"TypeSafe","answers":{"appearance":{"type":"noul","noul":0.01},"layout":{"type":"noul","noul":0.02}}}""";
-    public JsonElement DecisionRequest { get; private set; }
-    public int DecisionRequestCount { get; private set; }
     public HttpStatusCode ProviderStatus { get; init; } = HttpStatusCode.OK;
     public string PricingBody { get; set; } =
         """
@@ -25,8 +21,8 @@ internal sealed class DeterministicServicesHandler : HttpMessageHandler
         """
             {"sessionId":"session-1","pageId":"page-1","documentId":"document-1","captureId":"capture-1","frameId":"main",
              "candidates":[{"id":"button-save","tag":"button","role":"button","text":"Save","label":"Save","placeholder":"","scope":["Profile"],
-              "state":{"rendered":true,"inViewport":true,"enabled":true,"editable":false,"checked":null},"geometry":{"x":20,"y":40,"width":90,"height":30}}],
-             "capturedAt":"2026-09-29T00:00:00Z","coverage":{"scannedCount":4,"eligibleCount":1,"capturedCount":1,"complete":true,"errorCode":null},"unsupportedBoundaryCount":0}
+              "state":{"rendered":true,"inViewport":true,"enabled":true,"editable":false,"checked":null},"geometry":{"x":20,"y":40,"width":90,"height":30},"appearance":{"backgroundColor":null,"textColor":null,"borderColor":null,"limitations":[]}}],
+             "capturedAt":"2026-09-29T00:00:00Z","coverage":{"scannedCount":4,"eligibleCount":1,"capturedCount":1,"complete":true,"errorCode":null},"unsupportedBoundaryCount":0,"scope":"current_view"}
             """;
     public HttpStatusCode SelectionStatus { get; init; } = HttpStatusCode.OK;
     public string? SelectionBody { get; init; }
@@ -50,23 +46,13 @@ internal sealed class DeterministicServicesHandler : HttpMessageHandler
             CaptureRequest = await request.Content!.ReadFromJsonAsync<JsonElement>(cancellationToken);
             return Json(CaptureBody);
         }
-        if (path == "/api/alpha/decisions")
-        {
-            DecisionRequestCount++;
-            DecisionRequest = await request.Content!.ReadFromJsonAsync<JsonElement>(cancellationToken);
-            return Json(DecisionBody);
-        }
         if (path == "/api/v1/chat/completions")
         {
             ProviderRequestCount++;
             ModelRequest = await request.Content!.ReadFromJsonAsync<JsonElement>(cancellationToken);
             return Json(
                 ProviderBody
-                    ?? """
-                    {"id":"generation-1","model":"deepseek/deepseek-v4.1-flash","provider":"Wafer","service_tier":"default",
-                     "choices":[{"finish_reason":"stop","message":{"content":"{\"outcome\":\"found\",\"action\":\"click\",\"candidateId\":\"button-save\"}"}}],
-                     "usage":{"prompt_tokens":140,"completion_tokens":15,"total_tokens":155,"cost":0.0000215,"completion_tokens_details":{"reasoning_tokens":0}}}
-                    """,
+                    ?? """{"id":"generation-1","model":"deepseek/deepseek-v4.1-flash","provider":"Wafer","service_tier":"default","choices":[{"finish_reason":"stop","message":{"content":"{\"complete\":true,\"actions\":[{\"step\":1,\"instruction\":\"Click Save\",\"outcome\":\"found\",\"action\":\"click\",\"candidateId\":\"button-save\",\"limitation\":\"none\"}]}"}}],"usage":{"prompt_tokens":140,"completion_tokens":15,"total_tokens":155,"cost":2.15e-05,"completion_tokens_details":{"reasoning_tokens":0}}}""",
                 ProviderStatus
             );
         }
@@ -93,29 +79,8 @@ internal sealed class DeterministicServicesHandler : HttpMessageHandler
                                 {
                                     actionId = item.GetProperty("actionId").GetString(),
                                     target = item.GetProperty("candidateId").ValueKind == JsonValueKind.Null
-                                        ? (object?)null
-                                        : new
-                                        {
-                                            candidateId = "button-save",
-                                            tag = "button",
-                                            label = "Save",
-                                            xpaths = SaveXpaths,
-                                            state = new
-                                            {
-                                                rendered = true,
-                                                inViewport = true,
-                                                enabled = true,
-                                                editable = false,
-                                                @checked = (bool?)null,
-                                            },
-                                            geometry = new
-                                            {
-                                                x = 20,
-                                                y = 40,
-                                                width = 90,
-                                                height = 30,
-                                            },
-                                        },
+                                        ? null
+                                        : VerifiedTarget(item.GetProperty("action").GetString()!),
                                 }),
                             inspectedActionId = batch
                                 .GetProperty("actions")
@@ -128,35 +93,23 @@ internal sealed class DeterministicServicesHandler : HttpMessageHandler
                 SelectionStatus
             );
         }
-        if (path == "/pages/page-1/selection")
-        {
-            SelectionRequestCount++;
-            if (SelectionStatus != HttpStatusCode.OK)
-            {
-                return Json(
-                    SelectionBody
-                        ?? """{"code":"stale_document","message":"The page changed.","traceId":"browser-trace"}""",
-                    SelectionStatus
-                );
-            }
-            var selection = await request.Content!.ReadFromJsonAsync<JsonElement>(cancellationToken);
-            if (selection.GetProperty("candidateId").ValueKind == JsonValueKind.Null)
-            {
-                return Json("""{"target":null}""");
-            }
-            Assert.Equal("button-save", selection.GetProperty("candidateId").GetString());
-            Assert.Equal("capture-1", selection.GetProperty("captureId").GetString());
-            Assert.Equal("document-1", selection.GetProperty("documentId").GetString());
-            Assert.Equal("click", selection.GetProperty("action").GetString());
-            return Json(
-                SelectionBody
-                    ?? """
-                    {"target":{"candidateId":"button-save","tag":"button","label":"Save","xpaths":["//*[@data-testid='save-profile']"],
-                     "state":{"rendered":true,"inViewport":true,"enabled":true,"editable":false,"checked":null},"geometry":{"x":20,"y":40,"width":90,"height":30}}}
-                    """
-            );
-        }
         return new HttpResponseMessage(HttpStatusCode.NotFound);
+    }
+
+    internal static JsonObject VerifiedTarget(string action = "click")
+    {
+        var target = JsonNode
+            .Parse(
+                """
+                {"candidateId":"button-save","tag":"button","label":"Save","xpaths":["//*[@data-testid='save-profile']"],
+                 "state":{"version":"2","accessibilityExposed":true,"rendered":true,"inViewport":true,"enabled":true,"editable":false,"readonly":false,"checked":null},
+                 "geometry":{"x":20,"y":40,"width":90,"height":30},
+                 "interactability":{"version":"2","action":"click","status":"ready","reasons":[],"checks":{"compatibleControl":"pass","enabled":"pass","writable":"not_applicable","viewport":"pass","pointerReception":"pass","keyboard":"not_applicable","stability":"unknown","eventOutcome":"unknown"}}}
+                """
+            )!
+            .AsObject();
+        target["interactability"]!["action"] = action;
+        return target;
     }
 
     private static HttpResponseMessage Json(string json, HttpStatusCode status = HttpStatusCode.OK) =>

@@ -80,7 +80,8 @@
     },
     "sourceSplit": "development",
     "sourceCatalogs": ["current-view-qualification-cases.json", "viewport-baseline-cases.json"],
-    "group": "targeting"
+    "group": "targeting",
+    "sourceIds": ["basic-save-v4", "basic-save-v3", "basic-save", "basic-save-contract-1"]
   },
   {
     "id": "unicode-quotes-v4",
@@ -88,7 +89,7 @@
     "split": "regression",
     "category": "language",
     "fixture": "unicode",
-    "instruction": "Click the button labelled L'\u00e9t\u00e9 \"ready\".",
+    "instruction": "Click the button labelled L'été \"ready\".",
     "viewport": {
       "width": 1280,
       "height": 800,
@@ -145,7 +146,7 @@
           "step": 1,
           "action": "click",
           "outcome": "found",
-          "label": "L'\u00e9t\u00e9 \"ready\"",
+          "label": "L'été \"ready\"",
           "tag": "button"
         }
       ]
@@ -159,7 +160,13 @@
     },
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json", "viewport-baseline-cases.json"],
-    "group": "targeting"
+    "group": "targeting",
+    "sourceIds": [
+      "unicode-quotes-v4",
+      "unicode-quotes-v3",
+      "unicode-quotes",
+      "unicode-quotes-contract-1"
+    ]
   },
   {
     "id": "action-families-1-v4",
@@ -232,7 +239,8 @@
     },
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json", "viewport-baseline-cases.json"],
-    "group": "targeting"
+    "group": "targeting",
+    "sourceIds": ["action-families-1-v4", "action-families-1-v3", "action-families-1"]
   },
   {
     "id": "release-holdout-editor-19",
@@ -590,7 +598,8 @@
     "exposedAt": "2026-10-02T10:26:06.108Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "targeting"
+    "group": "targeting",
+    "cardinality": "all"
   },
   {
     "id": "release2-figures-3",
@@ -1586,7 +1595,8 @@
     },
     "sourceSplit": "held-out",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "targeting"
+    "group": "targeting",
+    "cardinality": "all"
   },
   {
     "id": "release4-image-links-3",
@@ -1788,7 +1798,8 @@
     },
     "sourceSplit": "held-out",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "targeting"
+    "group": "targeting",
+    "cardinality": "all"
   },
   {
     "id": "release4-bidi-3",
@@ -1840,5 +1851,734 @@
     "sourceSplit": "held-out",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
     "group": "targeting"
+  },
+  {
+    "id": "paraphrase-save",
+    "family": "profile",
+    "split": "regression",
+    "category": "language",
+    "fixture": "form",
+    "instruction": "Please press the Save changes button in Profile.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "setupRevision": "qualification-1",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-contract-review",
+      "reviewedAt": "2026-09-30T20:59:55.247Z"
+    },
+    "expected": {
+      "outcome": "found",
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "target": {
+            "selector": "#save-profile",
+            "frames": []
+          },
+          "interactability": {
+            "status": "ready",
+            "reasons": [],
+            "checks": {
+              "compatibleControl": "pass",
+              "enabled": "pass",
+              "viewport": "pass",
+              "pointerReception": "pass",
+              "keyboard": "not_applicable",
+              "stability": "unknown",
+              "eventOutcome": "unknown"
+            }
+          }
+        }
+      ],
+      "summary": {
+        "processingComplete": true,
+        "semanticCompleteness": "unverified",
+        "total": 1,
+        "found": 1,
+        "notFound": 0,
+        "unsupported": 0,
+        "errors": 0,
+        "blocked": 0,
+        "readinessUnknown": 0,
+        "assessmentUnsupported": 0
+      }
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "label": "Save changes",
+          "tag": "button",
+          "scope": "Profile"
+        }
+      ]
+    },
+    "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
+    "contractVersion": "4",
+    "sourceSplit": "development",
+    "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
+    "group": "targeting",
+    "sourceIds": ["paraphrase-save", "paraphrase-save-contract-1"]
+  },
+  {
+    "id": "typo-save",
+    "family": "profile",
+    "split": "regression",
+    "category": "language",
+    "fixture": "form",
+    "instruction": "clik on teh save chagnes buton",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "expected": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "target": {
+            "selector": "#save-profile",
+            "frames": []
+          },
+          "state": {
+            "enabled": true,
+            "inViewport": true
+          },
+          "interactability": {
+            "status": "ready",
+            "reasons": [],
+            "checks": {
+              "compatibleControl": "pass",
+              "enabled": "pass",
+              "viewport": "pass",
+              "pointerReception": "pass",
+              "eventOutcome": "unknown"
+            }
+          }
+        }
+      ],
+      "outcome": "found",
+      "summary": {
+        "processingComplete": true,
+        "semanticCompleteness": "unverified",
+        "total": 1,
+        "found": 1,
+        "notFound": 0,
+        "unsupported": 0,
+        "errors": 0,
+        "blocked": 0,
+        "readinessUnknown": 0,
+        "assessmentUnsupported": 0
+      }
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "label": "Save changes",
+          "tag": "button"
+        }
+      ]
+    },
+    "oracleSentinels": ["QUALIFICATION_ORACLE_PRIVATE_37e2"],
+    "contractVersion": "4",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-contract-review",
+      "reviewedAt": "2026-09-30T20:59:55.247Z"
+    },
+    "setupRevision": "qualification-1",
+    "sourceSplit": "development",
+    "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
+    "group": "targeting",
+    "sourceIds": ["typo-save"]
+  },
+  {
+    "id": "named-save-cancel",
+    "family": "profile",
+    "split": "regression",
+    "category": "language",
+    "fixture": "form",
+    "instruction": "Click Save changes and Cancel.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "expected": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "target": {
+            "selector": "#save-profile",
+            "frames": []
+          },
+          "state": {
+            "enabled": true,
+            "inViewport": true
+          },
+          "interactability": {
+            "status": "ready",
+            "reasons": [],
+            "checks": {
+              "compatibleControl": "pass",
+              "enabled": "pass",
+              "viewport": "pass",
+              "pointerReception": "pass",
+              "eventOutcome": "unknown"
+            }
+          }
+        },
+        {
+          "step": 2,
+          "action": "click",
+          "outcome": "found",
+          "target": {
+            "selector": "#cancel-profile",
+            "frames": []
+          },
+          "state": {
+            "enabled": true,
+            "inViewport": true
+          },
+          "interactability": {
+            "status": "ready",
+            "reasons": [],
+            "checks": {
+              "compatibleControl": "pass",
+              "enabled": "pass",
+              "viewport": "pass",
+              "pointerReception": "pass",
+              "eventOutcome": "unknown"
+            }
+          }
+        }
+      ],
+      "outcome": "found",
+      "summary": {
+        "processingComplete": true,
+        "semanticCompleteness": "unverified",
+        "total": 2,
+        "found": 2,
+        "notFound": 0,
+        "unsupported": 0,
+        "errors": 0,
+        "blocked": 0,
+        "readinessUnknown": 0,
+        "assessmentUnsupported": 0
+      }
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "label": "Save changes",
+          "tag": "button"
+        },
+        {
+          "step": 2,
+          "action": "click",
+          "outcome": "found",
+          "label": "Cancel",
+          "tag": "button"
+        }
+      ]
+    },
+    "oracleSentinels": ["QUALIFICATION_ORACLE_PRIVATE_37e2"],
+    "contractVersion": "4",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-contract-review",
+      "reviewedAt": "2026-09-30T20:59:55.247Z"
+    },
+    "setupRevision": "qualification-1",
+    "sourceSplit": "development",
+    "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
+    "group": "targeting",
+    "sourceIds": ["named-save-cancel"],
+    "cardinality": "all"
+  },
+  {
+    "id": "duplicate-mentioned-target",
+    "family": "profile",
+    "split": "regression",
+    "category": "language",
+    "fixture": "form",
+    "instruction": "Click Save changes and the Save changes button.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "expected": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "target": {
+            "selector": "#save-profile",
+            "frames": []
+          },
+          "state": {
+            "enabled": true,
+            "inViewport": true
+          },
+          "interactability": {
+            "status": "ready",
+            "reasons": [],
+            "checks": {
+              "compatibleControl": "pass",
+              "enabled": "pass",
+              "viewport": "pass",
+              "pointerReception": "pass",
+              "eventOutcome": "unknown"
+            }
+          }
+        }
+      ],
+      "outcome": "found",
+      "summary": {
+        "processingComplete": true,
+        "semanticCompleteness": "unverified",
+        "total": 1,
+        "found": 1,
+        "notFound": 0,
+        "unsupported": 0,
+        "errors": 0,
+        "blocked": 0,
+        "readinessUnknown": 0,
+        "assessmentUnsupported": 0
+      }
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "label": "Save changes",
+          "tag": "button"
+        }
+      ]
+    },
+    "oracleSentinels": ["QUALIFICATION_ORACLE_PRIVATE_37e2"],
+    "contractVersion": "4",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-contract-review",
+      "reviewedAt": "2026-09-30T20:59:55.247Z"
+    },
+    "setupRevision": "qualification-1",
+    "sourceSplit": "development",
+    "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
+    "group": "targeting",
+    "sourceIds": ["duplicate-mentioned-target"]
+  },
+  {
+    "id": "library-borrow",
+    "family": "library-catalog",
+    "split": "regression",
+    "category": "language",
+    "fixture": {
+      "kind": "derived-static-dom",
+      "tree": {
+        "tag": "main",
+        "children": [
+          {
+            "tag": "h1",
+            "text": "Reading room"
+          },
+          {
+            "tag": "ul",
+            "children": [
+              {
+                "tag": "li",
+                "children": [
+                  {
+                    "tag": "span",
+                    "text": "Atlas of clouds"
+                  },
+                  {
+                    "tag": "button",
+                    "text": "Borrow Atlas of clouds",
+                    "attributes": {
+                      "id": "borrow-clouds"
+                    }
+                  }
+                ]
+              },
+              {
+                "tag": "li",
+                "children": [
+                  {
+                    "tag": "span",
+                    "text": "Bird migration"
+                  },
+                  {
+                    "tag": "button",
+                    "text": "Borrow Bird migration",
+                    "attributes": {
+                      "id": "borrow-birds"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "instruction": "Please borrow the book about bird migration.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "expected": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "target": {
+            "selector": "#borrow-birds",
+            "frames": []
+          },
+          "state": {
+            "enabled": true,
+            "inViewport": true
+          },
+          "interactability": {
+            "status": "ready",
+            "reasons": [],
+            "checks": {
+              "compatibleControl": "pass",
+              "enabled": "pass",
+              "viewport": "pass",
+              "pointerReception": "pass",
+              "eventOutcome": "unknown"
+            }
+          }
+        }
+      ],
+      "outcome": "found",
+      "summary": {
+        "processingComplete": true,
+        "semanticCompleteness": "unverified",
+        "total": 1,
+        "found": 1,
+        "notFound": 0,
+        "unsupported": 0,
+        "errors": 0,
+        "blocked": 0,
+        "readinessUnknown": 0,
+        "assessmentUnsupported": 0
+      }
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "label": "Borrow Bird migration",
+          "tag": "button"
+        }
+      ]
+    },
+    "oracleSentinels": ["QUALIFICATION_ORACLE_PRIVATE_37e2"],
+    "contractVersion": "4",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-contract-review",
+      "reviewedAt": "2026-09-30T20:59:55.247Z"
+    },
+    "setupRevision": "qualification-1",
+    "previousSplit": "held-out",
+    "exposedAt": "2026-09-30",
+    "exposureRunId": "312713e2-f4ba-4e35-b28b-6df3e3e78fce",
+    "sourceSplit": "regression",
+    "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
+    "group": "targeting",
+    "sourceIds": ["library-borrow"]
+  },
+  {
+    "id": "museum-about-link",
+    "family": "museum-navigation",
+    "split": "regression",
+    "category": "language",
+    "fixture": {
+      "kind": "derived-static-dom",
+      "tree": {
+        "tag": "nav",
+        "attributes": {
+          "aria-label": "Museum visitor information"
+        },
+        "children": [
+          {
+            "tag": "h2",
+            "text": "Plan a visit"
+          },
+          {
+            "tag": "ol",
+            "children": [
+              {
+                "tag": "li",
+                "children": [
+                  {
+                    "tag": "a",
+                    "text": "Opening hours",
+                    "attributes": {
+                      "id": "museum-hours",
+                      "href": "#"
+                    }
+                  }
+                ]
+              },
+              {
+                "tag": "li",
+                "children": [
+                  {
+                    "tag": "a",
+                    "text": "À propos du musée",
+                    "attributes": {
+                      "id": "museum-about",
+                      "href": "#"
+                    }
+                  }
+                ]
+              },
+              {
+                "tag": "li",
+                "children": [
+                  {
+                    "tag": "a",
+                    "text": "Accessibility",
+                    "attributes": {
+                      "id": "museum-access",
+                      "href": "#"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "instruction": "Click the À propos du musée link.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "expected": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "target": {
+            "selector": "#museum-about",
+            "frames": []
+          },
+          "state": {
+            "enabled": true,
+            "inViewport": true
+          },
+          "interactability": {
+            "status": "ready",
+            "reasons": [],
+            "checks": {
+              "compatibleControl": "pass",
+              "enabled": "pass",
+              "viewport": "pass",
+              "pointerReception": "pass",
+              "eventOutcome": "unknown"
+            }
+          }
+        }
+      ],
+      "outcome": "found",
+      "summary": {
+        "processingComplete": true,
+        "semanticCompleteness": "unverified",
+        "total": 1,
+        "found": 1,
+        "notFound": 0,
+        "unsupported": 0,
+        "errors": 0,
+        "blocked": 0,
+        "readinessUnknown": 0,
+        "assessmentUnsupported": 0
+      }
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "label": "À propos du musée",
+          "tag": "a"
+        }
+      ]
+    },
+    "oracleSentinels": ["QUALIFICATION_ORACLE_PRIVATE_37e2"],
+    "contractVersion": "4",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-contract-review",
+      "reviewedAt": "2026-09-30T20:59:55.247Z"
+    },
+    "setupRevision": "qualification-1",
+    "previousSplit": "held-out",
+    "exposedAt": "2026-09-30",
+    "exposureRunId": "312713e2-f4ba-4e35-b28b-6df3e3e78fce",
+    "sourceSplit": "regression",
+    "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
+    "group": "targeting",
+    "sourceIds": ["museum-about-link"]
+  },
+  {
+    "id": "recipe-typo",
+    "family": "recipe-planning",
+    "split": "regression",
+    "category": "language",
+    "fixture": {
+      "kind": "derived-static-dom",
+      "tree": {
+        "tag": "article",
+        "attributes": {
+          "aria-label": "Couscous recipe"
+        },
+        "children": [
+          {
+            "tag": "h1",
+            "text": "Vegetable couscous"
+          },
+          {
+            "tag": "blockquote",
+            "text": "Allow the broth to simmer gently."
+          },
+          {
+            "tag": "div",
+            "children": [
+              {
+                "tag": "button",
+                "text": "Print recipe",
+                "attributes": {
+                  "id": "recipe-print"
+                }
+              },
+              {
+                "tag": "button",
+                "text": "Add to meal plan",
+                "attributes": {
+                  "id": "recipe-plan"
+                }
+              }
+            ]
+          },
+          {
+            "tag": "hr"
+          },
+          {
+            "tag": "p",
+            "text": "Serves four."
+          }
+        ]
+      }
+    },
+    "instruction": "clik teh Print recipe buton",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "expected": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "target": {
+            "selector": "#recipe-print",
+            "frames": []
+          },
+          "state": {
+            "enabled": true,
+            "inViewport": true
+          },
+          "interactability": {
+            "status": "ready",
+            "reasons": [],
+            "checks": {
+              "compatibleControl": "pass",
+              "enabled": "pass",
+              "viewport": "pass",
+              "pointerReception": "pass",
+              "eventOutcome": "unknown"
+            }
+          }
+        }
+      ],
+      "outcome": "found",
+      "summary": {
+        "processingComplete": true,
+        "semanticCompleteness": "unverified",
+        "total": 1,
+        "found": 1,
+        "notFound": 0,
+        "unsupported": 0,
+        "errors": 0,
+        "blocked": 0,
+        "readinessUnknown": 0,
+        "assessmentUnsupported": 0
+      }
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "label": "Print recipe",
+          "tag": "button"
+        }
+      ]
+    },
+    "oracleSentinels": ["QUALIFICATION_ORACLE_PRIVATE_37e2"],
+    "contractVersion": "4",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-contract-review",
+      "reviewedAt": "2026-09-30T20:59:55.247Z"
+    },
+    "setupRevision": "qualification-1",
+    "previousSplit": "held-out",
+    "exposedAt": "2026-09-30",
+    "exposureRunId": "312713e2-f4ba-4e35-b28b-6df3e3e78fce",
+    "sourceSplit": "regression",
+    "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
+    "group": "targeting",
+    "sourceIds": ["recipe-typo"]
   }
 ]

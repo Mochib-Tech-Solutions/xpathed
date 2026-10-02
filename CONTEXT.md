@@ -15,13 +15,10 @@ The requested interaction, such as clicking, hovering, or selecting an option.
 The result of identifying one action's target in a particular page state, including absence or an unsupported scope. A found action resolution concerns one target and has one preferred verified XPath expression for that target.
 
 **Target set**:
-The distinct elements intended by one action within its declared scope: the current view for workspace requests, the current page for legacy requests. Finding only some of those elements does not establish that the target set is complete.
+The distinct elements intended by one action within the current view. Finding only some of those elements does not establish that the target set is complete.
 
 **Multi-target result**:
 One shared action with independent outcomes for its intended targets. Its partial-result summary separates found targets from missing, unsupported, failed or non-interactable targets.
-
-**Multi-action result**:
-The ordered resolutions of several interactions requested together. This legacy scope is distinct from one action concerning several targets.
 
 **Instruction step**:
 An ordered part of a test instruction. An unordered plural step expands into multiple action resolutions, one for each intended eligible target.
@@ -126,7 +123,7 @@ A diagnostic signal that a resolution attempt needs investigation because of a d
 An identified version of the resolver's code, strategy, prompt, model/provider configuration, and page processing settings that is assessed as a unit.
 
 **Approved default**:
-The qualified resolver release selected for clients that do not request another approved release.
+The qualified resolver release selected for deployment through the release process.
 
 **Qualification**:
 The evaluation of a resolver release against the agreed acceptance criteria before it can become an approved default.

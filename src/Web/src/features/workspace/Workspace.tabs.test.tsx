@@ -52,7 +52,7 @@ function browserApi() {
     return page;
   };
   const result = (page: PageState, instruction: string) => ({
-    contractVersion: "1",
+    contractVersion: "4",
     outcome: "found",
     sessionId: session.sessionId,
     pageId: page.pageId,
@@ -63,14 +63,30 @@ function browserApi() {
     attemptId: instruction,
     configurationId: "test",
     action: "click",
-    target: {
-      candidateId: "button",
-      tag: "button",
-      label: `${page.title} target`,
-      xpaths: ["//button"],
-      state: { rendered: true, inViewport: true, enabled: true, editable: false, checked: null },
-      geometry: { x: 10, y: 20, width: 50, height: 30 },
-    },
+    target: null,
+    actions: [
+      {
+        actionId: "a1",
+        order: 1,
+        instruction,
+        action: "click",
+        outcome: "found",
+        target: {
+          candidateId: "button",
+          tag: "button",
+          label: `${page.title} target`,
+          xpaths: ["//button"],
+          state: {
+            rendered: true,
+            inViewport: true,
+            enabled: true,
+            editable: false,
+            checked: null,
+          },
+          geometry: { x: 10, y: 20, width: 50, height: 30 },
+        },
+      },
+    ],
     diagnostics: { code: null, message: null, timingsMs: { total: 123 } },
   });
   let resolveRequest = (page: PageState, instruction: string) =>

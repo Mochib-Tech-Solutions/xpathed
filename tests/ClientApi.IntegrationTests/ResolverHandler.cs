@@ -42,7 +42,7 @@ public sealed class ResolverHandler : HttpMessageHandler
             traceId = "trace-1",
             attemptId = attempt,
             configurationId = "configuration-1",
-            action = body.GetProperty("contractVersion").GetString() == "3" ? "click" : (string?)null,
+            action = "click",
             target = (object?)null,
             diagnostics = MissingDiagnostics
                 ? null

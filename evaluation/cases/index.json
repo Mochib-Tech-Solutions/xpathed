@@ -1,7 +1,6 @@
 {
   "version": "1",
   "groups": [
-    "compatibility.json",
     "targeting.json",
     "cardinality.json",
     "appearance.json",

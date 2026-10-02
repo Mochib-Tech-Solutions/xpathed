@@ -155,7 +155,8 @@
     "exposedAt": "2026-10-02T09:25:27Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "context"
+    "group": "context",
+    "cardinality": "all"
   },
   {
     "id": "release-holdout-warehouse-3",
@@ -1786,7 +1787,8 @@
     "exposedAt": "2026-10-02T10:26:06.108Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "context"
+    "group": "context",
+    "cardinality": "all"
   },
   {
     "id": "release2-breadcrumbs-3",
@@ -2221,7 +2223,8 @@
     "exposedAt": "2026-10-02T10:26:06.108Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "context"
+    "group": "context",
+    "cardinality": "all"
   },
   {
     "id": "release2-tabs-3",
@@ -2432,7 +2435,8 @@
     "exposedAt": "2026-10-02T10:26:06.108Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "context"
+    "group": "context",
+    "cardinality": "all"
   },
   {
     "id": "release2-tree-3",
@@ -2710,7 +2714,8 @@
     "exposedAt": "2026-10-02T10:26:06.108Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "context"
+    "group": "context",
+    "cardinality": "all"
   },
   {
     "id": "release2-timeline-1",
@@ -3068,7 +3073,8 @@
     "exposedAt": "2026-10-02T11:36:32.165Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "context"
+    "group": "context",
+    "cardinality": "all"
   },
   {
     "viewport": {
@@ -3273,7 +3279,8 @@
     },
     "sourceSplit": "held-out",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "context"
+    "group": "context",
+    "cardinality": "all"
   },
   {
     "id": "release4-annotations-3",
@@ -3475,7 +3482,8 @@
     },
     "sourceSplit": "held-out",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "context"
+    "group": "context",
+    "cardinality": "all"
   },
   {
     "id": "release4-contacts-3",
@@ -3540,5 +3548,273 @@
     "sourceSplit": "held-out",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
     "group": "context"
+  },
+  {
+    "id": "plural-scoped-save",
+    "family": "context",
+    "split": "regression",
+    "category": "context",
+    "fixture": "context",
+    "instruction": "Click all Save buttons in Shipping.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "expected": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "target": {
+            "selector": "#save-shipping",
+            "frames": []
+          },
+          "state": {
+            "enabled": true,
+            "inViewport": true
+          },
+          "interactability": {
+            "status": "ready",
+            "reasons": [],
+            "checks": {
+              "compatibleControl": "pass",
+              "enabled": "pass",
+              "viewport": "pass",
+              "pointerReception": "pass",
+              "eventOutcome": "unknown"
+            }
+          }
+        }
+      ],
+      "outcome": "found",
+      "summary": {
+        "processingComplete": true,
+        "semanticCompleteness": "unverified",
+        "total": 1,
+        "found": 1,
+        "notFound": 0,
+        "unsupported": 0,
+        "errors": 0,
+        "blocked": 0,
+        "readinessUnknown": 0,
+        "assessmentUnsupported": 0
+      }
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "label": "Save",
+          "tag": "button",
+          "scope": "Shipping"
+        }
+      ]
+    },
+    "oracleSentinels": ["QUALIFICATION_ORACLE_PRIVATE_37e2"],
+    "contractVersion": "4",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-contract-review",
+      "reviewedAt": "2026-09-30T20:59:55.247Z"
+    },
+    "setupRevision": "qualification-1",
+    "sourceSplit": "regression",
+    "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
+    "group": "context",
+    "sourceIds": ["plural-scoped-save"],
+    "cardinality": "all"
+  },
+  {
+    "id": "warehouse-scoped-plural",
+    "family": "warehouse-dispatch",
+    "split": "regression",
+    "category": "context",
+    "fixture": {
+      "kind": "derived-static-dom",
+      "tree": {
+        "tag": "main",
+        "children": [
+          {
+            "tag": "section",
+            "attributes": {
+              "aria-label": "Cold storage"
+            },
+            "children": [
+              {
+                "tag": "h2",
+                "text": "Cold storage"
+              },
+              {
+                "tag": "ul",
+                "children": [
+                  {
+                    "tag": "li",
+                    "children": [
+                      {
+                        "tag": "strong",
+                        "text": "Crate 41"
+                      },
+                      {
+                        "tag": "button",
+                        "text": "Release",
+                        "attributes": {
+                          "id": "release-41"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "tag": "li",
+                    "children": [
+                      {
+                        "tag": "strong",
+                        "text": "Crate 42"
+                      },
+                      {
+                        "tag": "button",
+                        "text": "Release",
+                        "attributes": {
+                          "id": "release-42"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "tag": "section",
+            "attributes": {
+              "aria-label": "Dry storage"
+            },
+            "children": [
+              {
+                "tag": "h2",
+                "text": "Dry storage"
+              },
+              {
+                "tag": "button",
+                "text": "Release",
+                "attributes": {
+                  "id": "release-90"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "instruction": "Click every Release button in Cold storage.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "expected": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "target": {
+            "selector": "#release-41",
+            "frames": []
+          },
+          "state": {
+            "enabled": true,
+            "inViewport": true
+          },
+          "interactability": {
+            "status": "ready",
+            "reasons": [],
+            "checks": {
+              "compatibleControl": "pass",
+              "enabled": "pass",
+              "viewport": "pass",
+              "pointerReception": "pass",
+              "eventOutcome": "unknown"
+            }
+          }
+        },
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "target": {
+            "selector": "#release-42",
+            "frames": []
+          },
+          "state": {
+            "enabled": true,
+            "inViewport": true
+          },
+          "interactability": {
+            "status": "ready",
+            "reasons": [],
+            "checks": {
+              "compatibleControl": "pass",
+              "enabled": "pass",
+              "viewport": "pass",
+              "pointerReception": "pass",
+              "eventOutcome": "unknown"
+            }
+          }
+        }
+      ],
+      "outcome": "found",
+      "summary": {
+        "processingComplete": true,
+        "semanticCompleteness": "unverified",
+        "total": 2,
+        "found": 2,
+        "notFound": 0,
+        "unsupported": 0,
+        "errors": 0,
+        "blocked": 0,
+        "readinessUnknown": 0,
+        "assessmentUnsupported": 0
+      }
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "label": "Release",
+          "tag": "button",
+          "index": 0
+        },
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "label": "Release",
+          "tag": "button",
+          "index": 1
+        }
+      ]
+    },
+    "oracleSentinels": ["QUALIFICATION_ORACLE_PRIVATE_37e2"],
+    "contractVersion": "4",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-contract-review",
+      "reviewedAt": "2026-09-30T20:59:55.247Z"
+    },
+    "setupRevision": "qualification-1",
+    "previousSplit": "held-out",
+    "exposedAt": "2026-09-30",
+    "exposureRunId": "312713e2-f4ba-4e35-b28b-6df3e3e78fce",
+    "sourceSplit": "regression",
+    "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
+    "group": "context",
+    "sourceIds": ["warehouse-scoped-plural"],
+    "cardinality": "all"
   }
 ]

@@ -18,7 +18,7 @@ export type SessionState = {
 };
 
 export type ResolutionResult = {
-  contractVersion: "1" | "2" | "3" | "4";
+  contractVersion: "4";
   outcome: "found" | "not_found" | "unsupported" | "error" | "partial";
   sessionId: string | null;
   pageId: string;
