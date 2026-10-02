@@ -178,14 +178,8 @@ jobs:
           install: false
       - name: Install locked dependencies
         run: pnpm install --frozen-lockfile
-      - name: Check formatting
-        run: pnpm --filter xpathed format:check
-      - name: Lint React and TypeScript
-        run: pnpm --filter xpathed lint
-      - name: Build and check types
-        run: pnpm build:web
-      - name: Run frontend tests
-        run: pnpm test:web
+      - name: Check formatting, lint, build and tests in parallel
+        run: pnpm check:web
       - uses: ./.github/actions/ci-receipt
         with:
           job: web
@@ -208,12 +202,8 @@ jobs:
           install: false
       - name: Install locked dependencies
         run: pnpm install --frozen-lockfile
-      - name: Check configuration formatting
-        run: pnpm format:check:tooling
-      - name: Check script syntax
-        run: pnpm lint:scripts
-      - name: Test repository tooling and change selection
-        run: pnpm test:tooling
+      - name: Check tooling in parallel
+        run: pnpm check:tooling
       - uses: ./.github/actions/ci-receipt
         with:
           job: tooling
@@ -269,7 +259,7 @@ jobs:
           OPENROUTER_API_KEY: ""
         run: |
           mkdir -p .artifacts/ci
-          pnpm evaluate --mode deterministic --output .artifacts/ci/browser 2>&1 | tee .artifacts/ci/browser.log
+          pnpm evaluate --mode deterministic --concurrency 4 --output .artifacts/ci/browser 2>&1 | tee .artifacts/ci/browser.log
       - uses: ./.github/actions/ci-receipt
         with:
           job: browser

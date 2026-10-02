@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   buildPlan,
+  runTrials,
   validateCases,
   parseOptions,
   toArtifact,
@@ -118,12 +119,14 @@ async function runWithServices(
     freshIdentityMismatch = false,
     freshOracleLeak = false,
     viewport = { width: 1280, height: 800 },
+    concurrency = 4,
   } = {},
 ) {
   t.mock.method(console, "log", () => {});
   const output = await mkdtemp(join(tmpdir(), "evaluation-run-"));
   let observation = null;
   const attempts = [];
+  let traceId;
   const server = createServer(async (request, response) => {
     const chunks = [];
     for await (const chunk of request) chunks.push(chunk);
@@ -133,7 +136,12 @@ async function runWithServices(
       response.writeHead(status, { "Content-Type": "application/json" });
       response.end(JSON.stringify(value));
     };
-    if (path === "/fixture/trial") return send({});
+    if (path === "/fixture/trial") {
+      traceId = body.traceId;
+      if (concurrency > 1) assert.match(traceId, /^[a-f0-9]{32}$/);
+      else assert.equal(traceId, undefined);
+      return send({});
+    }
     if (path === "/browser/sessions") return send({ sessionId: "session", pageId: "page" });
     if (path === "/browser/sessions/session" && request.method === "DELETE") return send({});
     if (path === "/browser/pages/page/navigate")
@@ -176,6 +184,8 @@ async function runWithServices(
           : null,
       );
     if (path === "/resolver/internal/pages/page/resolve") {
+      if (concurrency > 1) assert.equal(request.headers.traceparent?.split("-")[1], traceId);
+      else assert.equal(request.headers.traceparent, undefined);
       const attemptId = request.headers["x-xpathed-attempt-id"];
       attempts.push(attemptId);
       if (freshFailure && attempts.length === 2) return send({ code: "service_unavailable" }, 503);
@@ -236,7 +246,7 @@ async function runWithServices(
     await new Promise((resolve) => server.close(resolve));
     await rm(output, { recursive: true, force: true });
   });
-  await main(["--case", caseId, "--output", output]);
+  await main(["--case", caseId, "--output", output, "--concurrency", String(concurrency)]);
   const manifest = JSON.parse(await readFile(join(output, "manifest.json"), "utf8"));
   const trialPath = join(output, "trials", `${manifest.plan.trials[0].id}.json`);
   return { attempts, trial: JSON.parse(await readFile(trialPath, "utf8")), output, trialPath };
@@ -474,4 +484,55 @@ test("current-view runs request scoped capture and reject a legacy-scope respons
   });
   assert.match(trial.captureObservation.error.message, /wrong scope/);
   assert.equal(trial.error.code, "capture_scope_unverified");
+});
+
+test("browser workers overlap, respect the cap, retain plan order and never retry", async () => {
+  let active = 0,
+    peak = 0;
+  const started = [],
+    completed = [];
+  const trials = Array.from({ length: 9 }, (_, id) => ({ id }));
+  const result = await runTrials({ trials, concurrency: 3 }, async (trial) => {
+    started.push(trial.id);
+    peak = Math.max(peak, ++active);
+    await new Promise((resolve) => setTimeout(resolve, trial.id === 0 ? 40 : 5));
+    active--;
+    completed.push(trial.id);
+    return trial.id;
+  });
+  assert.equal(peak, 3);
+  assert.equal(active, 0);
+  assert.deepEqual(
+    started,
+    trials.map((t) => t.id),
+  );
+  assert.notDeepEqual(completed, result);
+  assert.deepEqual(
+    result,
+    trials.map((t) => t.id),
+  );
+  assert.equal(buildPlan([example], { seed: 1, repetitions: 1, concurrency: 3 }).concurrency, 3);
+});
+
+test("workers finish pending cleanup before reporting an infrastructure failure", async () => {
+  let finished = false;
+  await assert.rejects(
+    runTrials({ trials: [0, 1], concurrency: 2 }, async (trial) => {
+      if (trial === 0) throw new Error("disk full");
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      finished = true;
+    }),
+    /Evaluation worker failed/,
+  );
+  assert.equal(finished, true);
+  for (const value of ["0", "5", "1.5", "NaN"])
+    assert.throws(() => parseOptions(["--concurrency", value]), /concurrency/);
+  assert.throws(() => parseOptions(["--mode", "live", "--concurrency", "2"]), /Live evaluation/);
+});
+
+test("serial execution preserves the unbound fixture protocol used by comparison proxies", async (t) => {
+  const { trial, attempts } = await runWithServices(t, "mutation-wrapper", { concurrency: 1 });
+  assert.equal(attempts.length, 2);
+  assert.equal(trial.error, undefined);
+  assert.equal(trial.mutation.fresh.error, undefined);
 });

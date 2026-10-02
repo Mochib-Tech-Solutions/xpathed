@@ -15,7 +15,7 @@ import test from "node:test";
 import { classifyChanges } from "./ci-changes.mjs";
 import { validateEvent, validateMessage } from "./commit-policy.mjs";
 import { installHooks } from "./install-hooks.mjs";
-import { checkCommands, checkStaged } from "./pre-commit.mjs";
+import { checkCommands, checkStaged, runCheckGroups } from "./pre-commit.mjs";
 
 function repository(t) {
   const cwd = mkdtempSync(join(tmpdir(), "xpathed-hooks-"));
@@ -190,7 +190,32 @@ test("real Git hooks block invalid commits, failed checks and partial staging wi
   ]);
 });
 
-test("empty index needs no build tools", (t) => {
+test("empty index needs no build tools", async (t) => {
   const { cwd } = repository(t);
-  assert.doesNotThrow(() => checkStaged(cwd));
+  await assert.doesNotReject(() => checkStaged(cwd));
+});
+
+test("independent check groups overlap, preserve dependency order and report failures after completion", async (t) => {
+  const { cwd } = repository(t);
+  const cmd = (body) => [process.execPath, "--input-type=module", "-e", body];
+  await assert.rejects(
+    runCheckGroups(
+      [
+        [
+          cmd(
+            'import { writeFileSync, existsSync } from "node:fs"; writeFileSync("a", ""); while (!existsSync("b")) { await new Promise(r => setTimeout(r, 10)); }',
+          ),
+          cmd("process.exit(7)"),
+        ],
+        [
+          cmd(
+            'import { writeFileSync, existsSync } from "node:fs"; writeFileSync("b", ""); while (!existsSync("a")) { await new Promise(r => setTimeout(r, 10)); } writeFileSync("completed", "");',
+          ),
+        ],
+      ],
+      { cwd, timeout: 5000 },
+    ),
+    /failed/,
+  );
+  assert.equal(readFileSync(join(cwd, "completed"), "utf8"), "");
 });

@@ -211,7 +211,9 @@ function browserEvidence(work) {
 test("browser receipts and the aggregate replay the complete deterministic suite and retain its identities", (t) => {
   const work = workspace(t);
   const { run, needs, cwd } = work;
-  browserEvidence(work);
+  const evidence = browserEvidence(work);
+  evidence.manifest.plan.concurrency = 4;
+  evidence.saveManifest();
   needs.browser.result = "success";
   needs.changes.outputs.browser = "true";
   assert.equal(run("record", "changes").status, 0);
@@ -293,6 +295,12 @@ test("browser evidence rejects partial, altered, live, retried and failing runs"
     },
     (m) => {
       m.plan.trials = [];
+    },
+    (m) => {
+      m.plan.concurrency = 5;
+    },
+    (m) => {
+      m.plan.concurrency = 0;
     },
     (m) => {
       m.plan.repetitions = 2;

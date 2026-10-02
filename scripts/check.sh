@@ -3,6 +3,4 @@ set -eu
 cd "$(dirname "$0")/.."
 
 pnpm install --frozen-lockfile
-pnpm check:dotnet
-pnpm check:web
-pnpm check:tooling
+pnpm run --no-bail --aggregate-output '/^check:(dotnet|web|tooling)$/'

@@ -62,7 +62,9 @@ async function browserEvidence(sha) {
   const plan = manifest.plan;
   ensure(
     plan?.repetitions === 1 &&
-      plan.concurrency === 1 &&
+      Number.isInteger(plan.concurrency) &&
+      plan.concurrency >= 1 &&
+      plan.concurrency <= 4 &&
       plan.retries === 0 &&
       isDeepStrictEqual([...plan.caseOrder].sort(), ids) &&
       plan.trials?.length === ids.length,

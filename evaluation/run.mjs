@@ -4,6 +4,7 @@ import { resolve, join } from "node:path";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { isDeepStrictEqual } from "node:util";
+import { availableParallelism } from "node:os";
 import { setTimeout as delay } from "node:timers/promises";
 
 import { loadCases } from "./cases/load.mjs";
@@ -21,6 +22,7 @@ export function parseOptions(args) {
   const options = {
     mode: "deterministic",
     repetitions: 1,
+    concurrency: 1,
     seed: 1,
     timeoutMs: 45000,
     output: resolve(".artifacts/evaluation", randomUUID()),
@@ -29,6 +31,7 @@ export function parseOptions(args) {
     "--mode": "mode",
     "--repetitions": "repetitions",
     "--seed": "seed",
+    "--concurrency": "concurrency",
     "--timeout-ms": "timeoutMs",
     "--case": "caseId",
     "--output": "output",
@@ -47,6 +50,7 @@ export function parseOptions(args) {
     throw new Error("Mode must be deterministic or live");
   for (const [name, min, max] of [
     ["repetitions", 1, 100],
+    ["concurrency", 1, 4],
     ["seed", 0, 4294967295],
     ["timeoutMs", 1000, 300000],
   ]) {
@@ -54,6 +58,8 @@ export function parseOptions(args) {
     if (!Number.isInteger(options[name]) || options[name] < min || options[name] > max)
       throw new Error(`Invalid ${name}`);
   }
+  if (options.mode === "live" && options.concurrency !== 1)
+    throw new Error("Live evaluation requires concurrency 1");
   if ((options.replay || options.prune) && seen.size !== 1)
     throw new Error("Replay/prune cannot be combined with run options");
   return options;
@@ -158,7 +164,7 @@ export function buildPlan(cases, options) {
     seed: options.seed,
     repetitions: options.repetitions,
     timeoutMs: options.timeoutMs,
-    concurrency: 1,
+    concurrency: options.concurrency ?? 1,
     retries: 0,
     caseOrder,
     trials: Array.from({ length: options.repetitions }, (_, i) =>
@@ -369,7 +375,14 @@ async function resolveTrial(spec, trial, session, page, options, services, chann
         contractVersion: spec.contractVersion ?? "2",
       },
       options.timeoutMs,
-      { "X-Xpathed-Attempt-Id": trial.id },
+      {
+        "X-Xpathed-Attempt-Id": trial.id,
+        ...(options.concurrency > 1
+          ? {
+              traceparent: `00-${hash(channelId).slice(0, 32)}-${randomUUID().replaceAll("-", "").slice(0, 16)}-01`,
+            }
+          : {}),
+      },
     );
     trial.result = envelope.result;
     trial.evidence = envelope.evidence;
@@ -419,7 +432,11 @@ export async function execute(spec, trial, options, services) {
   try {
     await request(
       `${services.fixture}/trial`,
-      { id: trial.id, caseId: spec.id },
+      {
+        id: trial.id,
+        caseId: spec.id,
+        ...(options.concurrency > 1 ? { traceId: hash(trial.id).slice(0, 32) } : {}),
+      },
       options.timeoutMs,
     );
     session = await request(`${services.browser}/sessions`, {}, options.timeoutMs);
@@ -700,8 +717,27 @@ export async function prune(path, now = new Date()) {
   return "evidence_deleted";
 }
 
+export async function runTrials(plan, executeTrial) {
+  const pending = plan.trials.entries();
+  const trials = [];
+  const results = await Promise.allSettled(
+    Array.from({ length: Math.min(plan.concurrency, plan.trials.length) }, async () => {
+      for (const [index, trial] of pending) trials[index] = await executeTrial(trial);
+    }),
+  );
+  const failures = results.filter((result) => result.status === "rejected");
+  if (failures.length)
+    throw new AggregateError(
+      failures.map((result) => result.reason),
+      "Evaluation worker failed",
+    );
+  return trials;
+}
+
 export async function main(args = process.argv.slice(2)) {
   const options = parseOptions(args);
+  if (!args.includes("--concurrency") && options.mode === "deterministic")
+    options.concurrency = Math.min(4, availableParallelism());
   if (options.prune) {
     console.log(await prune(resolve(options.prune)));
     return 0;
@@ -756,8 +792,8 @@ export async function main(args = process.argv.slice(2)) {
     resolver: process.env.XPATHED_RESOLVER_URL ?? "http://resolver:8080",
     fixture: process.env.XPATHED_FIXTURE_URL ?? "http://evaluation-fixture:8090",
   };
-  const trials = [];
-  for (const planned of plan.trials) {
+  let configurations = Promise.resolve();
+  const trials = await runTrials(plan, async (planned) => {
     const spec = cases.find((c) => c.id === planned.caseId);
     const trial = { ...planned, createdAt: new Date().toISOString(), result: null, evidence: null };
     await execute(spec, trial, options, services);
@@ -767,12 +803,16 @@ export async function main(args = process.argv.slice(2)) {
       join(options.output, "imports", `${trial.id}.json`),
       toArtifact(manifest, trial, grade),
     );
-    await retainConfigurations(options.output, manifest, trial);
-    trials.push(trial);
+    // Only manifest writes share a path; trial and import files have unique identities.
+    configurations = configurations.then(() =>
+      retainConfigurations(options.output, manifest, trial),
+    );
+    await configurations;
     console.log(
       `${grade.passed ? "PASS" : "FAIL"} ${trial.caseId} #${trial.repetition}: ${grade.failures.map((f) => f.category).join(", ") || "declared checks passed"}`,
     );
-  }
+    return trial;
+  });
   const summary = summarize(manifest, trials);
   await saveJson(join(options.output, "summary.json"), summary);
   const first = summary.firstAttempt;

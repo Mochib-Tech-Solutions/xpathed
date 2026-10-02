@@ -134,3 +134,7 @@ test("adapter methods are normalized without inventing an action or successful u
     "unsupported",
   );
 });
+
+test("direct strategy comparison rejects parallel execution before starting services", async () => {
+  await assert.rejects(() => main(["--concurrency", "2"]), /Comparison requires concurrency 1/);
+});

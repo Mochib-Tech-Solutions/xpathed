@@ -97,6 +97,8 @@ Model experiments compare correctness, time to a correct complete result and cos
 | Regrade an existing run without provider calls | `pnpm evaluate:replay RUN_DIRECTORY` |
 | Explicit live evaluation                       | `pnpm evaluate:live`                 |
 
+Local checks run independent groups concurrently. Deterministic browser evaluation runs individual cases in isolated sessions with up to four workers; use `pnpm evaluate -- --concurrency 1` for serial execution. See [CI execution](docs/ci.md#parallel-execution) for shared-resource limits.
+
 Live evaluation requires the separate `OPENROUTER_EVAL_API_KEY` and incurs provider charges. The [evaluation guide](docs/evaluation.md) explains setup, grading, cases, datasets and artifacts; [package.json](package.json) lists all commands.
 
 Ordinary CI uses deterministic responses. The release workflow compares exact candidate and approved images on the same complete reviewed collection, allows no lost baseline pass, and keeps activation explicit. Nightly monitoring records drift without changing the running app. [Release operations](docs/releases.md) documents the workflow and the remaining hosted setup; configured workflows alone are not evidence of deployment.

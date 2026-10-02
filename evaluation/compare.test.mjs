@@ -233,3 +233,10 @@ test("nightly requires independent live generation IDs without matching the save
     assert.equal(result.defaultActivated, false);
   }
 });
+
+test("direct release comparison rejects parallel execution metadata", () => {
+  assert.throws(
+    () => parseQualificationOptions(["--concurrency", "2"]),
+    /Comparison requires concurrency 1/,
+  );
+});

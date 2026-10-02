@@ -13,6 +13,7 @@ timeout=45000
 case_id=
 output=
 suite=
+concurrency=
 monitoring=
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -20,9 +21,10 @@ while [ "$#" -gt 0 ]; do
     --comparison) comparison=true; shift; continue ;;
     --qualification) qualification=true; shift; continue ;;
     --context) context=true; shift; continue ;;
-    --mode|--repetitions|--seed|--timeout-ms|--case|--output|--suite|--profile|--monitoring)
+    --mode|--repetitions|--seed|--timeout-ms|--case|--output|--suite|--profile|--monitoring|--concurrency)
       if [ "$#" -lt 2 ]; then echo "Missing value for $1" >&2; exit 2; fi
       case "$1" in
+        --concurrency) concurrency=$2 ;;
         --mode) mode=$2 ;;
         --repetitions) repetitions=$2 ;;
         --seed) seed=$2 ;;
@@ -65,9 +67,11 @@ if [ -n "$suite" ]; then
     process.stdout.write("/workspace/" + rel);
   ' "$suite")
 fi
+if [ -n "$concurrency" ] && { [ "$qualification" = true ] || [ "$comparison" = true ] || [ "$context" = true ]; }; then echo "Concurrency is supported only by the direct browser evaluation runner" >&2; exit 2; fi
 set -- --mode "$mode" --repetitions "$repetitions" --seed "$seed" --timeout-ms "$timeout" --output /artifacts
 if [ "$context" = true ]; then set -- --mode "$mode" --timeout-ms "$timeout" --output /artifacts; fi
 if [ -n "$case_id" ]; then set -- "$@" --case "$case_id"; fi
+if [ -n "$concurrency" ]; then set -- "$@" --concurrency "$concurrency"; fi
 # Reuse the runner's validation before starting services or creating artifacts.
 if [ "$qualification" = true ]; then
   set -- "$@" --profile "$profile"
