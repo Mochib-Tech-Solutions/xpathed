@@ -7,9 +7,7 @@ namespace Xpathed.ClientApi.IntegrationTests;
 public sealed class PersistenceTests(PersistenceFixture database) : IClassFixture<PersistenceFixture>
 {
     [Theory]
-    [InlineData("1")]
-    [InlineData("2")]
-    [InlineData("3")]
+    [InlineData("4")]
     public async Task ResolutionIsAutomaticallyRecordedAndSurvivesApplicationRestart(string version)
     {
         string attempt;
@@ -39,7 +37,7 @@ public sealed class PersistenceTests(PersistenceFixture database) : IClassFixtur
         Assert.Equal("resolution", record.GetProperty("kind").GetString());
         Assert.Equal("not_found", record.GetProperty("result").GetProperty("outcome").GetString());
         Assert.Equal(version, record.GetProperty("result").GetProperty("contractVersion").GetString());
-        if (version == "3")
+        if (version == "4")
         {
             Assert.Equal("click", record.GetProperty("result").GetProperty("action").GetString());
             Assert.Single(record.GetProperty("result").GetProperty("actions").EnumerateArray());
@@ -68,7 +66,7 @@ public sealed class PersistenceTests(PersistenceFixture database) : IClassFixtur
             {
                 instruction = "Click Save",
                 documentId = "document-1",
-                contractVersion = "2",
+                contractVersion = "4",
             }
         );
         Assert.Equal(HttpStatusCode.BadGateway, response.StatusCode);
@@ -96,7 +94,7 @@ public sealed class PersistenceTests(PersistenceFixture database) : IClassFixtur
             {
                 instruction = "Click Save",
                 documentId = "document-1",
-                contractVersion = "2",
+                contractVersion = "4",
             }
         );
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -123,7 +121,7 @@ public sealed class PersistenceTests(PersistenceFixture database) : IClassFixtur
                         {
                             instruction = "Click Save",
                             documentId = $"document-{index}",
-                            contractVersion = "2",
+                            contractVersion = "4",
                         }
                     );
                     response.EnsureSuccessStatusCode();
@@ -152,7 +150,7 @@ public sealed class PersistenceTests(PersistenceFixture database) : IClassFixtur
             {
                 instruction = "Click Save",
                 documentId = "document-1",
-                contractVersion = "2",
+                contractVersion = "4",
             }
         );
         Assert.Equal(HttpStatusCode.BadGateway, response.StatusCode);
@@ -178,7 +176,7 @@ public sealed class PersistenceTests(PersistenceFixture database) : IClassFixtur
             {
                 instruction = "Click Save",
                 documentId = "document-1",
-                contractVersion = "2",
+                contractVersion = "4",
             },
             cancellation.Token
         );
@@ -207,7 +205,7 @@ public sealed class PersistenceTests(PersistenceFixture database) : IClassFixtur
             {
                 instruction,
                 documentId = "document-1",
-                contractVersion = "2",
+                contractVersion = "4",
             }
         );
         response.EnsureSuccessStatusCode();
@@ -229,7 +227,7 @@ public sealed class PersistenceTests(PersistenceFixture database) : IClassFixtur
             {
                 instruction = "Click Save",
                 documentId = "document-1",
-                contractVersion = "2",
+                contractVersion = "4",
             }
         );
         Assert.Equal(HttpStatusCode.BadGateway, response.StatusCode);
@@ -241,18 +239,18 @@ public sealed class PersistenceTests(PersistenceFixture database) : IClassFixtur
     }
 
     [Fact]
-    public async Task OriginalInstructionOutlivesPageEvidenceForLegacyResults()
+    public async Task OriginalInstructionOutlivesPageEvidence()
     {
         var clock = new TestClock(DateTimeOffset.UtcNow);
         await using var app = database.Create(new ResolverHandler(), clock);
         using var client = app.CreateClient();
         using var response = await client.PostAsJsonAsync(
-            "/api/pages/page-legacy/resolve",
+            "/api/pages/page-retained/resolve",
             new
             {
                 instruction = "Click the Save button in Profile",
                 documentId = "document-1",
-                contractVersion = "1",
+                contractVersion = "4",
             }
         );
         response.EnsureSuccessStatusCode();

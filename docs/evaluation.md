@@ -11,18 +11,18 @@ evaluation/
   cases/          # Shared browser cases grouped by behavior, with one loader
   fixtures/       # Controlled pages and independent target oracles
   datasets/       # Source adapters and the reviewed private collection manifest
-  research/       # Stagehand, model and context comparisons
+  research/       # Engineering comparison and archived research continuation
   accounting/     # Shared charge records
   run.mjs         # Browser trials and replay
   compare.mjs     # Candidate/baseline and monitoring orchestration
   grader.mjs      # Independent grading
   policy.json     # One current release acceptance policy
-  profiles.json   # Explicit model/provider configurations
+  profiles.json   # Selected model/provider configuration
   provider.mjs    # Shared provider integration
 scripts/release/  # Images, evidence, approval, activation and rollback
 ```
 
-Cases are organized by the behavior they check, rather than by the version that introduced them. The shared loader also serves deterministic CI. Legacy compatibility, injected-provider failures and saved-locator mutation cases remain engineering checks; selection records why they are excluded from live release inference. Unit, integration and UI tests keep their existing locations and ordinary CI ownership.
+Cases are organized by the behavior they check, rather than by the version that introduced them. The shared loader also serves deterministic CI. Injected-provider failures and saved-locator mutation cases remain engineering checks; selection records why they are excluded from live release inference. Unit, integration and UI tests keep their existing locations and ordinary CI ownership.
 
 Each release comparison freezes the complete eligible browser collection and every reviewed eligible imported case. Both candidate and approved baseline receive the same case inputs and current grading rules, with one original attempt per arm. Browser state resets independently. New cases and improved checks are welcome: apply the same updated expectations to both arms. Changing the collection or grader after a run requires another comparison.
 
@@ -32,7 +32,7 @@ Name each arm by its configuration: source/image identity, model, provider, prom
 
 Freeze one case collection and grader for both arms. Give each arm the same cases, one original attempt per case, with no automatic retries or replacements after failures. Report planned, completed and failed counts for each track. Missing results stay visible and fail release completeness.
 
-Use the group files listed in `evaluation/cases/index.json` for browser categories: targeting, cardinality, appearance, context, scope, state, robustness and frames. Compatibility and saved-locator cases remain deterministic checks. Historical `family` values identify related fixtures; they are not the current behavior categories. Offline source labels do not establish these browser capabilities.
+Use the group files listed in `evaluation/cases/index.json` for browser categories: targeting, cardinality, appearance, context, scope, state, robustness and frames. Provider-failure and saved-locator cases remain deterministic checks. Historical `family` values identify related fixtures; they are not the current behavior categories. Offline source labels do not establish these browser capabilities.
 
 Show paired gains and losses, plus passing cases over the full denominator, for every group and arm. Keep browser and offline results separate. Provider routes, cache conditions and execution settings belong beside the scores. An unchanged approved configuration rerun measures repeatability, not a new implementation improvement.
 
@@ -104,7 +104,7 @@ pnpm datasets:collection fetch
 
 The private `evaluation-data/reviewed-72d140c1.json.gz` asset is published. A fresh download was checked against the pinned digest; the workflow performs the same verification before reading the collection. A missing or changed required dataset fails completeness checks; it must not silently reduce the release denominator.
 
-The source acquisition and adaptation commands remain `pnpm datasets:fetch`, `pnpm datasets:import`, and `pnpm evaluate:dataset`. Use the checked-in source manifests and each command's options for a research cohort. Keep imported, excluded, unsupported, ambiguous and unreconstructible records visible with reasons. Dataset terms and submission review remain required even when cost is unrestricted.
+Use `pnpm datasets:fetch` and `pnpm datasets:import` with the checked-in source manifests to prepare collection inputs. Reviewed offline cases run through the release evaluator. Keep imported, excluded, unsupported, ambiguous and unreconstructible records visible with reasons. Dataset terms and submission review remain required even when cost is unrestricted.
 
 ## Cost and provider evidence
 
@@ -114,15 +114,33 @@ Authentication, transport failures, provider rejection and missing resolution re
 
 ## Research comparisons
 
-Research remains part of the interview assignment. It uses shared fixtures, provider integration, grading and evidence while keeping source-specific limitations explicit. It is not an additional sequence required on every release PR.
+`main` contains the selected resolver, release evaluation and the engineering comparison below. Retired model, dataset and context experiment runners are available at their recorded Git revisions. New alternatives belong on branches; accepted changes replace the selected implementation and prompt. See [ADR-0024](adr/0024-keep-one-resolution-implementation.md).
 
-### Compare the custom resolver and Stagehand
+### Engineering comparison
 
-`pnpm evaluate:compare` compares the resolver with the pinned Stagehand adapter. A browser-parity check establishes equivalent Chromium, page state and fixture documents. Singleton commands grade the first suggestion; plural commands grade the whole set. Stagehand uses observation only and does not execute actions. Replay uses `pnpm evaluate:compare:replay RUN_DIRECTORY`.
+Use **Basic resolver**, **Improved resolver** and **Stagehand** in reports and charts. Prompt versions belong in provenance. Basic is a verified archived bundle; Improved is built from the current checkout, with its source fingerprint and exact image IDs recorded. The application keeps one implementation.
 
-### Compare and qualify models
+```sh
+pnpm evaluate:compare -- \
+  --basic-bundle BASIC_BUNDLE_DIRECTORY --basic-sha256 MANIFEST_SHA256 \
+  --case basic-save --output .artifacts/engineering-check
 
-Model profiles permit controlled comparisons of explicit routes and settings. Record prompt or provider changes so a whole-configuration comparison is not mistaken for a model-only result.
+# Explicit paid comparison of every eligible shared browser case.
+pnpm evaluate:compare -- --mode live \
+  --basic-bundle BASIC_BUNDLE_DIRECTORY --basic-sha256 MANIFEST_SHA256 \
+  --output .artifacts/engineering-live
+
+pnpm evaluate:compare:replay .artifacts/engineering-live
+uv run docs/assets/evaluation/engineering-plot.py .artifacts/engineering-live
+```
+
+The launcher verifies and restores the archived bundle, builds the current resolver and pinned Stagehand adapter, and starts an isolated evaluation stack. `--resume` with the original output directory continues only unattempted arms using the original image IDs; it rejects changed cases, evaluation code, plan, timeout settings or runtime images and unrecorded provider attempts. Replay verifies both graders and recomputes the shared and full resolver scores from original observations. Provider identity or response-cache violations retain the affected attempt and stop further calls. A fresh run gives its images unique local retention tags recorded in `image-tags.json`; keep those tags available for continuation. Set `XPATHED_EVALUATION_PROJECT=xpathed-evaluation-UNIQUE_NAME` for concurrent checkouts. A live run uses `OPENROUTER_EVAL_API_KEY`; scripted singleton and plural compatibility checks must pass before any paid calls.
+
+All arms use the same case inputs and independent node labels. Browser binary, viewport, document checksum, initial state, language and time zone must match. Stagehand uses stock `observe` with a current-view instruction, one model call, no response reuse and no self-healing. The first singleton suggestion or complete plural set is graded; later suggestions cannot rescue an incorrect singleton. Explicit plural labels live with the shared cases.
+
+The common score measures action and target-set correctness, passive behavior and privacy. Correct absence can pass without an action when Stagehand returns no suggestions; partially absent requests compare the found set. Full resolver-contract scores separately include readiness, capture coverage and outcome details. Adapter selector errors are failures, including on unsupported-instruction cases. Unsupported capabilities and provider errors stay in the denominator.
+
+One worker runs each arm, so three isolated streams run concurrently. Each stream processes its frozen case order serially. Stagehand waits for the matching Basic browser observation before checking parity. There are no retries. Provider caching and host contention can affect latency; serial and parallel timing cohorts are reported separately. Retain every original request, response, charge and unknown charge locally. The export contains aggregate metrics, per-case outcomes and evidence hashes; it excludes page/provider payloads. Category charts use the shared behavior groups. Live browser results remain separate from imported offline selection and release approval.
 
 ### Continue a research comparison in parallel
 
@@ -138,14 +156,6 @@ node evaluation/research/parallel-comparison.mjs \
 The runner copies the frozen plan and evidence, retains completed successes and failures, and executes only missing arms. An unfinished attempted arm blocks continuation; it is never silently retried. Identity, response-reuse or evidence-integrity failures stop new work while active attempts drain.
 
 Keep the phase manifest, per-arm claims, worker charge ledgers and before/after image receipts. Report serial and parallel latency cohorts separately because contention and cache conditions differ. This path produces research evidence; ordinary release comparison and approval remain unchanged.
-
-### External datasets
-
-Dataset experiments retain original source/split denominators and explicit prompt variants. Preparation and forecasts are informational; reviewed exact input identities remain binding.
-
-### Context-planning experiment
-
-The context-planning experiment, `pnpm evaluate -- --context`, tests optional CSS/layout evidence with a fixed final model and preserved candidates. It remains evaluation-only; findings do not automatically change runtime settings.
 
 Dated reports in `docs/research/` preserve their original scores, policies, limits and commands. See the [external dataset pilot](research/external-dataset-pilot-report.md), [labelled baseline](research/deepinfra-labelled-baseline-report.md), [Stagehand evidence](research/stagehand-v4-compatibility.md), [current-view comparison](research/viewport-baseline-report.md) and [context experiment](research/jev-context-comparison-report.md). Replay historical experiments from their recorded revision.
 

@@ -32,27 +32,6 @@ const example = {
   },
 };
 
-test("paired viewport suites require complete equivalent pairs and separate changed-scope labels", () => {
-  const cases = ["3", "4"].map((contractVersion) => ({
-    ...structuredClone(example),
-    id: `save-${contractVersion}`,
-    contractVersion,
-    baselineStratum: "paired",
-    pairId: "save",
-    split: "development",
-  }));
-  const suite = { version: "1", baseline: { version: 1, kind: "viewport-paired" }, cases };
-  assert.equal(validateCases(suite).length, 2);
-  assert.throws(() => validateCases({ ...suite, cases: cases.slice(0, 1) }), /pair/);
-  const altered = structuredClone(suite);
-  altered.cases[1].expected.actions[0].target.selector = "#another";
-  assert.throws(() => validateCases(altered), /pair/);
-  assert.throws(
-    () => validateCases({ ...suite, cases: cases.map((c) => ({ ...c, split: "held-out" })) }),
-    /development|regression/,
-  );
-});
-
 test("durable run configuration keeps effective settings but excludes page content and credentials", () => {
   const record = configurationRecord({
     result: {
@@ -113,8 +92,8 @@ async function runWithServices(
   caseId,
   {
     captureFailure = false,
-    contractVersion = "2",
-    captureScope = "page",
+    contractVersion = "4",
+    captureScope = "current_view",
     freshFailure = false,
     freshIdentityMismatch = false,
     freshOracleLeak = false,
@@ -267,7 +246,7 @@ test("a failed coverage capture still records the resolver's capture-budget resu
   assert.equal(attempts.length, 1);
   assert.equal(trial.captureObservation.error.code, "http_502");
   assert.equal(trial.result.diagnostics.code, "capture_incomplete");
-  assert.equal(trial.error, undefined);
+  assert.equal(trial.error.code, "capture_scope_unverified");
 });
 
 test("a failed fresh resolution persists its own attempt without replacing the original result", async (t) => {
@@ -294,8 +273,7 @@ test("the fresh mutation provider input is checked for oracle labels independent
 });
 
 test("viewport observations retain tolerated geometry and reject larger drift", async (t) => {
-  const { trial } = await runWithServices(t, "capture-budget", {
-    captureFailure: true,
+  const { trial } = await runWithServices(t, "basic-save-v4", {
     viewport: { width: 1279, height: 799 },
   });
   assert.equal(trial.error, undefined);
@@ -303,8 +281,7 @@ test("viewport observations retain tolerated geometry and reject larger drift", 
 });
 
 test("viewport drift beyond the declared tolerance fails the trial", async (t) => {
-  const { trial } = await runWithServices(t, "capture-budget", {
-    captureFailure: true,
+  const { trial } = await runWithServices(t, "basic-save-v4", {
     viewport: { width: 1278, height: 800 },
   });
   assert.match(trial.error?.message ?? "", /viewport/i);
@@ -480,7 +457,7 @@ test("context retention expires prepared requests and preflight evidence, then r
 
 test("current-view runs request scoped capture and reject a legacy-scope response", async (t) => {
   const { trial } = await runWithServices(t, "control-states-1-v4", {
-    contractVersion: "4",
+    captureScope: "page",
   });
   assert.match(trial.captureObservation.error.message, /wrong scope/);
   assert.equal(trial.error.code, "capture_scope_unverified");

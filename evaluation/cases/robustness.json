@@ -76,7 +76,13 @@
     },
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json", "viewport-baseline-cases.json"],
-    "group": "robustness"
+    "group": "robustness",
+    "sourceIds": [
+      "page-injection-v4",
+      "page-injection-v3",
+      "page-injection",
+      "page-injection-contract-1"
+    ]
   },
   {
     "id": "large-visible-prefix-v4",
@@ -133,7 +139,476 @@
       "viewport-baseline-cases.json",
       "cases.json"
     ],
-    "sourceIds": ["large-visible-prefix-v4", "current-view-large-visible-prefix-v4"],
+    "sourceIds": [
+      "large-visible-prefix-v4",
+      "current-view-large-visible-prefix-v4",
+      "large-visible-prefix-v3"
+    ],
     "group": "robustness"
+  },
+  {
+    "id": "private-values",
+    "family": "privacy",
+    "split": "regression",
+    "category": "trust",
+    "fixture": "privacy",
+    "instruction": "Click Save contact.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "setupRevision": "qualification-1",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-contract-review",
+      "reviewedAt": "2026-09-30T20:59:55.247Z"
+    },
+    "expected": {
+      "outcome": "found",
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "target": {
+            "selector": "#save-contact",
+            "frames": []
+          },
+          "interactability": {
+            "status": "ready",
+            "reasons": [],
+            "checks": {
+              "compatibleControl": "pass",
+              "enabled": "pass",
+              "viewport": "pass",
+              "pointerReception": "pass",
+              "keyboard": "not_applicable",
+              "stability": "unknown",
+              "eventOutcome": "unknown"
+            }
+          }
+        }
+      ],
+      "summary": {
+        "processingComplete": true,
+        "semanticCompleteness": "unverified",
+        "total": 1,
+        "found": 1,
+        "notFound": 0,
+        "unsupported": 0,
+        "errors": 0,
+        "blocked": 0,
+        "readinessUnknown": 0,
+        "assessmentUnsupported": 0
+      }
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "label": "Save contact"
+        }
+      ]
+    },
+    "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
+    "privacySentinels": [
+      "PRIVATE_NAME_VALUE",
+      "PRIVATE_PASSWORD_VALUE",
+      "PRIVATE_TEXTAREA_VALUE",
+      "PRIVATE_EDITOR_VALUE",
+      "PRIVATE_COOKIE_VALUE",
+      "PRIVATE_STORAGE_VALUE"
+    ],
+    "contractVersion": "4",
+    "critical": true,
+    "sourceSplit": "regression",
+    "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
+    "group": "robustness",
+    "sourceIds": ["private-values", "private-values-contract-1"]
+  },
+  {
+    "id": "provider-malformed",
+    "family": "profile",
+    "split": "regression",
+    "category": "provider-failure",
+    "fixture": "form",
+    "instruction": "Click Save changes.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "setupRevision": "qualification-1",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-contract-review",
+      "reviewedAt": "2026-09-30T20:59:55.247Z"
+    },
+    "expected": {
+      "outcome": "error",
+      "code": "provider_malformed_response",
+      "actions": []
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "label": "Save changes",
+          "tag": "button"
+        }
+      ],
+      "fault": "malformed"
+    },
+    "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
+    "contractVersion": "4",
+    "deterministicOnly": true,
+    "sourceSplit": "development",
+    "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
+    "group": "robustness",
+    "sourceIds": ["provider-malformed", "provider-malformed-contract-1"]
+  },
+  {
+    "id": "provider-unknown",
+    "family": "profile",
+    "split": "regression",
+    "category": "provider-failure",
+    "fixture": "form",
+    "instruction": "Click Save changes.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "setupRevision": "qualification-1",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-contract-review",
+      "reviewedAt": "2026-09-30T20:59:55.247Z"
+    },
+    "expected": {
+      "outcome": "error",
+      "code": "provider_unknown_candidate",
+      "actions": []
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "label": "Save changes",
+          "tag": "button"
+        }
+      ],
+      "fault": "unknown"
+    },
+    "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
+    "contractVersion": "4",
+    "deterministicOnly": true,
+    "sourceSplit": "development",
+    "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
+    "group": "robustness",
+    "sourceIds": ["provider-unknown", "provider-unknown-contract-1"]
+  },
+  {
+    "id": "provider-rate_limit",
+    "family": "profile",
+    "split": "regression",
+    "category": "provider-failure",
+    "fixture": "form",
+    "instruction": "Click Save changes.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "setupRevision": "qualification-1",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-contract-review",
+      "reviewedAt": "2026-09-30T20:59:55.247Z"
+    },
+    "expected": {
+      "outcome": "error",
+      "code": "provider_rate_limited",
+      "actions": []
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "label": "Save changes",
+          "tag": "button"
+        }
+      ],
+      "fault": "rate_limit"
+    },
+    "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
+    "contractVersion": "4",
+    "deterministicOnly": true,
+    "sourceSplit": "development",
+    "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
+    "group": "robustness",
+    "sourceIds": ["provider-rate_limit", "provider-rate_limit-contract-1"]
+  },
+  {
+    "id": "provider-timeout",
+    "family": "profile",
+    "split": "regression",
+    "category": "provider-failure",
+    "fixture": "form",
+    "instruction": "Click Save changes.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "setupRevision": "qualification-1",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-contract-review",
+      "reviewedAt": "2026-09-30T20:59:55.247Z"
+    },
+    "expected": {
+      "outcome": "error",
+      "code": "provider_timeout",
+      "actions": []
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "label": "Save changes",
+          "tag": "button"
+        }
+      ],
+      "fault": "timeout"
+    },
+    "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
+    "contractVersion": "4",
+    "deterministicOnly": true,
+    "sourceSplit": "development",
+    "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
+    "group": "robustness",
+    "sourceIds": ["provider-timeout", "provider-timeout-contract-1"]
+  },
+  {
+    "id": "provider-refusal",
+    "family": "profile",
+    "split": "regression",
+    "category": "provider-failure",
+    "fixture": "form",
+    "instruction": "Click Save changes.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "setupRevision": "qualification-1",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-contract-review",
+      "reviewedAt": "2026-09-30T20:59:55.247Z"
+    },
+    "expected": {
+      "outcome": "error",
+      "code": "provider_refused",
+      "actions": []
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "label": "Save changes",
+          "tag": "button"
+        }
+      ],
+      "fault": "refusal"
+    },
+    "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
+    "contractVersion": "4",
+    "deterministicOnly": true,
+    "sourceSplit": "development",
+    "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
+    "group": "robustness",
+    "sourceIds": ["provider-refusal"]
+  },
+  {
+    "id": "provider-empty",
+    "family": "profile",
+    "split": "regression",
+    "category": "provider-failure",
+    "fixture": "form",
+    "instruction": "Click Save changes.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "setupRevision": "qualification-1",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-contract-review",
+      "reviewedAt": "2026-09-30T20:59:55.247Z"
+    },
+    "expected": {
+      "outcome": "error",
+      "code": "provider_empty_response",
+      "actions": []
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "label": "Save changes",
+          "tag": "button"
+        }
+      ],
+      "fault": "empty"
+    },
+    "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
+    "contractVersion": "4",
+    "deterministicOnly": true,
+    "sourceSplit": "development",
+    "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
+    "group": "robustness",
+    "sourceIds": ["provider-empty"]
+  },
+  {
+    "id": "provider-truncated",
+    "family": "profile",
+    "split": "regression",
+    "category": "provider-failure",
+    "fixture": "form",
+    "instruction": "Click Save changes.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "setupRevision": "qualification-1",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-contract-review",
+      "reviewedAt": "2026-09-30T20:59:55.247Z"
+    },
+    "expected": {
+      "outcome": "error",
+      "code": "provider_truncated_response",
+      "actions": []
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "label": "Save changes",
+          "tag": "button"
+        }
+      ],
+      "fault": "truncated"
+    },
+    "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
+    "contractVersion": "4",
+    "deterministicOnly": true,
+    "sourceSplit": "development",
+    "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
+    "group": "robustness",
+    "sourceIds": ["provider-truncated"]
+  },
+  {
+    "id": "provider-missing-usage",
+    "family": "profile",
+    "split": "regression",
+    "category": "provider-failure",
+    "fixture": "form",
+    "instruction": "Click Save changes.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "setupRevision": "qualification-1",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-contract-review",
+      "reviewedAt": "2026-09-30T20:59:55.247Z"
+    },
+    "expected": {
+      "outcome": "found",
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "target": {
+            "selector": "#save-profile",
+            "frames": []
+          },
+          "state": {
+            "enabled": true,
+            "inViewport": true
+          },
+          "interactability": {
+            "status": "ready",
+            "reasons": [],
+            "checks": {
+              "compatibleControl": "pass",
+              "enabled": "pass",
+              "viewport": "pass",
+              "pointerReception": "pass",
+              "keyboard": "not_applicable",
+              "stability": "unknown",
+              "eventOutcome": "unknown"
+            }
+          }
+        }
+      ],
+      "summary": {
+        "processingComplete": true,
+        "semanticCompleteness": "unverified",
+        "total": 1,
+        "found": 1,
+        "notFound": 0,
+        "unsupported": 0,
+        "errors": 0,
+        "blocked": 0,
+        "readinessUnknown": 0,
+        "assessmentUnsupported": 0
+      }
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "label": "Save changes",
+          "tag": "button"
+        }
+      ],
+      "fault": "missing_usage"
+    },
+    "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
+    "contractVersion": "4",
+    "deterministicOnly": true,
+    "sourceSplit": "development",
+    "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
+    "group": "robustness",
+    "sourceIds": ["provider-missing-usage"]
   }
 ]

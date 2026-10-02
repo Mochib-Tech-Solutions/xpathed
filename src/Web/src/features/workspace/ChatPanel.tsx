@@ -186,24 +186,7 @@ export default function ChatPanel({
         )}
         {history.map((resolution) => {
           const result = resolution.result;
-          const currentView = result?.contractVersion === "4";
-          const sharedAction = result?.contractVersion === "3" || currentView;
-          const actions = !result
-            ? []
-            : result.contractVersion !== "1"
-              ? (result.actions ?? [])
-              : [
-                  {
-                    actionId: "legacy",
-                    order: 1,
-                    instruction: "",
-                    action: result.action,
-                    outcome: result.outcome,
-                    target: result.target,
-                    code: result.diagnostics.code,
-                    message: result.diagnostics.message,
-                  },
-                ];
+          const actions = result?.actions ?? [];
           const totalMs = result?.diagnostics.timingsMs?.total;
           const duration =
             typeof totalMs === "number" && Number.isFinite(totalMs) && totalMs >= 0
@@ -282,33 +265,29 @@ export default function ChatPanel({
                           : "",
                         result.summary.errors ? `${result.summary.errors} failed` : "",
                         result.summary.blocked ? `${result.summary.blocked} blocked` : "",
-                        currentView ? "current view" : "",
+                        "current view",
                       ]
                         .filter(Boolean)
                         .join(" · ")}
                     </p>
                   )}
-                  {sharedAction &&
-                    actions.length > 1 &&
-                    result.action &&
-                    result.action !== "unsupported" && (
-                      <p className="w-fit rounded-md bg-accent px-2 py-1 text-xs font-medium">
-                        Action: {result.action.replaceAll("_", "-")}
+                  {actions.length > 1 && result?.action && result?.action !== "unsupported" && (
+                    <p className="w-fit rounded-md bg-accent px-2 py-1 text-xs font-medium">
+                      Action: {result?.action.replaceAll("_", "-")}
+                    </p>
+                  )}
+                  {result?.outcome === "error" && !actions.length && (
+                    <div role="alert" className="text-destructive">
+                      <h2 className="text-base font-semibold">
+                        {result.diagnostics.code === "decomposition_incomplete"
+                          ? "Incomplete response"
+                          : "Resolution failed"}
+                      </h2>
+                      <p>
+                        {result.diagnostics.message || "The instruction could not be resolved."}
                       </p>
-                    )}
-                  {result?.outcome === "error" &&
-                    (result.contractVersion === "1" || !actions.length) && (
-                      <div role="alert" className="text-destructive">
-                        <h2 className="text-base font-semibold">
-                          {result.diagnostics.code === "decomposition_incomplete"
-                            ? "Incomplete response"
-                            : "Resolution failed"}
-                        </h2>
-                        <p>
-                          {result.diagnostics.message || "The instruction could not be resolved."}
-                        </p>
-                      </div>
-                    )}
+                    </div>
+                  )}
                   {actions.map((action) => {
                     const target = action.target;
                     const checks = target?.interactability?.checks;
@@ -333,14 +312,14 @@ export default function ChatPanel({
                             ? "space-y-3 rounded-xl border border-border bg-muted/20 p-3"
                             : "space-y-3"
                         }
-                        aria-label={`${sharedAction ? "Target" : "Action"} ${action.order}`}
+                        aria-label={`Target ${action.order}`}
                       >
                         {actions.length > 1 && (
                           <p className="text-xs font-medium text-muted-foreground">
                             Target {action.order}
                           </p>
                         )}
-                        {actions.length > 1 && (!sharedAction || !target) && (
+                        {actions.length > 1 && !target && (
                           <p className="text-xs font-medium text-muted-foreground">
                             {action.order}. {action.instruction}
                           </p>
@@ -361,20 +340,15 @@ export default function ChatPanel({
                         )}
                         {action.action &&
                           action.action !== "unsupported" &&
-                          (!sharedAction || actions.length === 1) && (
+                          actions.length === 1 && (
                             <p className="w-fit rounded-md bg-accent px-2 py-1 text-xs font-medium">
-                              Action:{" "}
-                              {(sharedAction ? result.action : action.action)?.replaceAll("_", "-")}
+                              Action: {result?.action?.replaceAll("_", "-")}
                             </p>
                           )}
                         {action.outcome === "not_found" && (
                           <>
                             <h2 className="text-base font-semibold">Target not found</h2>
-                            <p>
-                              {currentView
-                                ? "I couldn’t find that element in the current view."
-                                : "I couldn’t find that element on this page."}
-                            </p>
+                            <p>I couldn’t find that element in the current view.</p>
                           </>
                         )}
                         {action.outcome === "unsupported" && (
@@ -392,7 +366,7 @@ export default function ChatPanel({
                             </p>
                           </>
                         )}
-                        {action.outcome === "error" && result?.contractVersion !== "1" && (
+                        {action.outcome === "error" && (
                           <div role="alert" className="text-destructive">
                             <h2 className="text-base font-semibold">Resolution failed</h2>
                             <p>{action.message || "This target could not be resolved."}</p>

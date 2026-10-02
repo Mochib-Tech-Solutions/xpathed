@@ -1,7 +1,3 @@
-x-qualification-resolver: &qualification-resolver
-  build: { context: ., dockerfile: docker/resolver/Dockerfile, target: runtime }
-  depends_on: [browser]
-
 x-qualification-environment: &qualification-environment
   BrowserUrl: http://browser:8080
   OpenRouter__BaseUrl: http://evaluation-fixture:8091/api/v1/
@@ -14,34 +10,6 @@ services:
       <<: *qualification-environment
       OpenRouter__Model: deepseek/deepseek-v4.1-flash
       OpenRouter__Provider: wafer
-  resolver-luna:
-    <<: *qualification-resolver
-    environment:
-      <<: *qualification-environment
-      OpenRouter__Model: openai/gpt-6-luna
-      OpenRouter__Provider: openai
-      OpenRouter__ReasoningEffort: none
-      OpenRouter__PromptCacheMode: explicit
-  resolver-gemini:
-    <<: *qualification-resolver
-    environment:
-      <<: *qualification-environment
-      OpenRouter__Model: google/gemini-3.8-flash
-      OpenRouter__Provider: google-ai-studio
-      OpenRouter__ReasoningEffort: low
-  resolver-deepseek-concise:
-    <<: *qualification-resolver
-    environment:
-      <<: *qualification-environment
-      OpenRouter__Model: deepseek/deepseek-v4.1-flash
-      OpenRouter__Provider: wafer
-      Resolution__PromptVariant: concise
-  resolver-qwen:
-    <<: *qualification-resolver
-    environment:
-      <<: *qualification-environment
-      OpenRouter__Model: qwen/qwen3.8-flash
-      OpenRouter__Provider: alibaba
   evaluation-fixture:
     environment:
       OPENROUTER_EVAL_API_KEY: ${OPENROUTER_EVAL_API_KEY:-}

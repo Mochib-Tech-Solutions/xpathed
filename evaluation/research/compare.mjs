@@ -1,6 +1,6 @@
 import { loadCases } from "../cases/load.mjs";
 import { createHash, randomUUID } from "node:crypto";
-import { readFile, writeFile, mkdir } from "node:fs/promises";
+import { readFile, writeFile, mkdir, readdir } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { once } from "node:events";
 import { createServer } from "node:http";
@@ -11,6 +11,7 @@ import {
   request,
   command,
   configurationRecord,
+  execute,
 } from "../run.mjs";
 
 const hash = (value) =>
@@ -20,38 +21,26 @@ const hash = (value) =>
 const json = async (path) => JSON.parse(await readFile(path, "utf8"));
 const save = (path, value) =>
   writeFile(path, JSON.stringify(value, null, 2) + "\n", { flag: "wx", mode: 0o600 });
-const ids = [
-  "basic-save",
-  "paraphrase-save",
-  "unicode-quotes",
-  "scoped-save",
-  "offscreen-help",
-  "covered-payment",
-  "transparent-control",
-  "hidden-absence",
-  "true-absence",
-  "page-injection",
-  "nested-frame",
-  "single-action-plural-confirmations",
-];
-const source = loadCases(new URL("./stagehand-cases.json", import.meta.url));
+import { selectQualificationCases } from "../compare.mjs";
+import { gradeTrial } from "../grader.mjs";
+import { gradeComparison } from "./grade.mjs";
+import { workerRouter } from "./parallel-comparison.mjs";
+
+export const arms = ["basic", "improved", "stagehand"];
+export const labels = {
+  basic: "Basic resolver",
+  improved: "Improved resolver",
+  stagehand: "Stagehand",
+};
 
 export function selectCases(caseId) {
-  if (caseId && !ids.includes(caseId)) throw new Error("Unknown comparison case");
-  return (caseId ? [caseId] : ids).map((id) => {
-    const item = structuredClone(
-      source.cases.find(
-        (entry) =>
-          entry.id === id ||
-          entry.id.startsWith(`${id}-contract-`) ||
-          entry.sourceIds?.includes(id),
-      ),
-    );
-    item.id = id;
-    item.contractVersion = "3";
-    item.cardinality = id === "single-action-plural-confirmations" ? "all" : "singleton";
-    return item;
-  });
+  const all = loadCases().cases;
+  const selectedId =
+    caseId && (all.find((c) => c.id === caseId || c.sourceIds?.includes(caseId))?.id ?? caseId);
+  return selectQualificationCases(all, { caseId: selectedId }).cases.map((c) => ({
+    ...c,
+    cardinality: c.cardinality ?? "singleton",
+  }));
 }
 
 export function assertParity(a, b) {
@@ -98,341 +87,396 @@ export function normalizeStagehand(result) {
   };
 }
 
-export function summarizePairs(manifest, trials) {
-  const report = {
-    version: 1,
+export function summarize(manifest, trials) {
+  const total = manifest.cases.length;
+  const summary = {
     mode: manifest.mode,
-    qualification: "incomplete",
     measurement:
       manifest.mode === "live"
-        ? "paired first-observation comparison"
-        : "deterministic adapter compatibility, not model quality",
-    planned: manifest.plan.trials.length * 2,
+        ? "one original attempt per case and arm"
+        : "scripted adapter checks; not model accuracy",
+    planned: total * arms.length,
     completed: trials.length,
-    strategies: {},
+    arms: {},
+    categories: {},
+    changes: { gained: [], lost: [] },
   };
-  for (const strategy of ["custom", "stagehand"]) {
-    const rows = trials.filter((trial) => trial.strategy === strategy);
-    const calls = rows.flatMap((t) => t.provider ?? []);
-    const paid = calls.filter((r) => r.forwarded);
-    const total = (cardinality) =>
-      manifest.plan.trials.filter(
-        (t) => manifest.cases.find((c) => c.id === t.caseId)?.cardinality === cardinality,
-      ).length;
-    const sumUsage = (get) =>
-      paid.every((r) => typeof get(r.usage) === "number")
-        ? paid.reduce((sum, r) => sum + get(r.usage), 0)
-        : null;
-    const quantile = (values, fraction) =>
-      values.length
-        ? [...values].sort((a, b) => a - b)[Math.ceil(values.length * fraction) - 1]
-        : null;
-    report.strategies[strategy] = {
+  for (const arm of arms) {
+    const rows = trials.filter((t) => t.arm === arm);
+    const calls = rows.flatMap((t) => t.provider ?? []).filter((r) => r.forwarded);
+    const times = rows
+      .map((t) => t.elapsedMs)
+      .filter(Number.isFinite)
+      .sort((a, b) => a - b);
+    summary.arms[arm] = {
+      label: labels[arm],
+      total,
       attempted: rows.length,
-      missing: manifest.plan.trials.length - rows.length,
-      singleton: {
-        passed: rows.filter((t) => t.cardinality === "singleton" && t.grade.passed).length,
-        total: total("singleton"),
-      },
-      plural: {
-        passed: rows.filter((t) => t.cardinality === "all" && t.grade.passed).length,
-        total: total("all"),
-      },
-      metrics: rows.reduce((sum, t) => {
-        for (const [key, value] of Object.entries(t.grade.metrics ?? {}))
-          if (typeof value === "number") sum[key] = (sum[key] ?? 0) + value;
-        return sum;
-      }, {}),
-      errors: rows.filter((t) => t.error || t.grade.metrics.operationalError).length,
-      unsupported: rows.filter((t) => t.grade.metrics.unsupported).length,
-      latencyMs: {
-        p50: quantile(rows.map((t) => t.elapsedMs).filter(Number.isFinite), 0.5),
-        p95: quantile(rows.map((t) => t.elapsedMs).filter(Number.isFinite), 0.95),
-      },
-      calls: paid.length,
-      unreportedCharges: rows
-        .flatMap((t) => t.provider ?? [])
-        .filter((r) => (r.forwarded || r.reservedUsd != null) && r.reportedUsd == null).length,
-      usage: {
-        prompt_tokens: sumUsage((u) => u?.prompt_tokens),
-        completion_tokens: sumUsage((u) => u?.completion_tokens),
-        total_tokens: sumUsage((u) => u?.total_tokens),
-        cached_tokens: sumUsage((u) => u?.prompt_tokens_details?.cached_tokens),
-      },
-      reportedUsd: rows
-        .flatMap((t) => t.provider ?? [])
-        .some((r) => (r.forwarded || r.reservedUsd != null) && r.reportedUsd == null)
-        ? null
-        : rows.flatMap((t) => t.provider ?? []).reduce((sum, r) => sum + (r.reportedUsd ?? 0), 0),
-      knownReportedUsd: rows
-        .flatMap((t) => t.provider ?? [])
-        .reduce((sum, r) => sum + (r.reportedUsd ?? 0), 0),
-      unavailable:
-        strategy === "stagehand" ? ["xpathed readiness", "capture/model-input coverage"] : [],
-    };
-  }
-  report.commonCoverage = manifest.plan.trials.filter((p) =>
-    ["custom", "stagehand"].every((s) =>
-      trials.some(
-        (t) =>
-          t.caseId === p.caseId &&
-          t.repetition === p.repetition &&
-          t.strategy === s &&
-          !t.error &&
-          !t.grade.metrics.operationalError &&
-          !t.grade.metrics.unsupported,
+      passed: rows.filter((t) => t.grade.passed).length,
+      errors: rows.filter((t) => t.grade.metrics.operationalError).length,
+      fullContractPassed:
+        arm === "stagehand" ? null : rows.filter((t) => t.contractGrade?.passed).length,
+      calls: calls.length,
+      knownReportedUsd: calls.reduce((sum, r) => sum + (r.reportedUsd ?? 0), 0),
+      unreportedCharges: calls.filter((r) => r.reportedUsd == null).length,
+      latencyCohorts: Object.fromEntries(
+        [...new Set(rows.map((t) => t.execution?.cohort ?? "serial"))].map((cohort) => {
+          const values = rows
+            .filter((t) => (t.execution?.cohort ?? "serial") === cohort)
+            .map((t) => t.elapsedMs)
+            .filter(Number.isFinite)
+            .sort((a, b) => a - b);
+          return [
+            cohort,
+            {
+              attempts: values.length,
+              p50: values[Math.ceil(values.length * 0.5) - 1] ?? null,
+              p95: values[Math.ceil(values.length * 0.95) - 1] ?? null,
+            },
+          ];
+        }),
       ),
-    ),
-  ).length;
-  report.passed = trials.length === report.planned && trials.every((t) => t.grade.passed);
-  return report;
+      latencyMs: {
+        p50: times[Math.ceil(times.length * 0.5) - 1] ?? null,
+        p95: times[Math.ceil(times.length * 0.95) - 1] ?? null,
+      },
+    };
+    for (const group of new Set(Object.values(manifest.groups))) {
+      const ids = manifest.cases.filter((c) => manifest.groups[c.id] === group).map((c) => c.id);
+      summary.categories[group] ??= {};
+      summary.categories[group][arm] = {
+        total: ids.length,
+        passed: rows.filter((t) => ids.includes(t.caseId) && t.grade.passed).length,
+      };
+    }
+  }
+  for (const spec of manifest.cases) {
+    const basic = trials.find((t) => t.arm === "basic" && t.caseId === spec.id);
+    const improved = trials.find((t) => t.arm === "improved" && t.caseId === spec.id);
+    if (!basic || !improved) continue;
+    if (!basic.grade.passed && improved.grade.passed) summary.changes.gained.push(spec.id);
+    if (basic.grade.passed && !improved.grade.passed) summary.changes.lost.push(spec.id);
+  }
+  summary.complete = summary.completed === summary.planned;
+  return summary;
+}
+
+async function stagehandTrial(spec, trial, options, services, environment) {
+  try {
+    await request(
+      `${services.fixture}/trial`,
+      { id: trial.id, caseId: spec.id },
+      options.timeoutMs,
+    );
+    trial.adapterEnvironment = await request(
+      `${services.stagehand}/prepare`,
+      {
+        url: `${services.fixture}/fixture?trial=${trial.id}`,
+        viewport: environment.viewport,
+      },
+      options.timeoutMs,
+    );
+    trial.environment = await command(
+      services.fixture,
+      trial.id,
+      { kind: "baseline", setup: spec.setup ?? {} },
+      options.timeoutMs,
+    );
+    assertParity(environment, trial.environment);
+    if (trial.adapterEnvironment.browserBinarySha256 !== process.env.XPATHED_BROWSER_BINARY_SHA256)
+      throw new Error("Browser parity mismatch: Chromium binary");
+    const started = performance.now();
+    const raw = await request(
+      `${services.stagehand}/observe`,
+      {
+        instruction: `Within the current viewport, resolve this instruction without executing it: ${spec.instruction}`,
+        cardinality: spec.cardinality,
+        mode: options.mode,
+        deterministic:
+          options.mode === "deterministic"
+            ? {
+                elements: spec.provider.actions
+                  .filter((a) => a.outcome === "found")
+                  .map((a) => ({ ...a, role: a.tag, method: a.action })),
+              }
+            : undefined,
+      },
+      options.timeoutMs,
+    );
+    trial.elapsedMs = performance.now() - started;
+    trial.result = normalizeStagehand(raw);
+    trial.evidence = { adapter: raw };
+    trial.modelCalls = raw.modelCalls;
+    trial.cache = raw.metadata?.cache;
+    trial.configuration = {
+      version: raw.stagehandVersion,
+      prompts: (raw.modelInputs ?? []).map((p) => ({
+        promptHash: hash(p.systemPrompt ?? ""),
+        schemaHash: hash(p.responseFormat ?? {}),
+      })),
+    };
+    trial.observation = await command(
+      services.fixture,
+      trial.id,
+      {
+        kind: "observe",
+        expected: spec.expected.actions.map((a) => a.target ?? null),
+        actions: trial.result.actions,
+      },
+      options.timeoutMs,
+    );
+    const input = JSON.stringify(trial.evidence);
+    trial.observation.oracleLeak = (spec.oracleSentinels ?? []).some((s) => input.includes(s));
+    trial.observation.privacyLeak = (spec.privacySentinels ?? []).some((s) => input.includes(s));
+  } catch (error) {
+    trial.error = { message: error.message };
+  } finally {
+    try {
+      await request(`${services.stagehand}/reset`, {}, options.timeoutMs);
+    } catch (error) {
+      trial.error ??= { message: `Stagehand cleanup: ${error.message}` };
+    }
+  }
+}
+
+export function trialId(planned, arm) {
+  return hash(`${planned.id ?? `${planned.caseId}:${planned.repetition}`}-${arm}`).slice(0, 32);
+}
+
+export function assertProviderIntegrity(trial) {
+  for (const record of trial.provider ?? []) {
+    if (
+      record.forwarded &&
+      (record.responseCacheHit === true ||
+        (record.status >= 200 && record.status < 300 && record.identityValid !== true))
+    )
+      throw new Error("Provider identity mismatch or response cache hit; comparison stopped");
+  }
+}
+
+export function assertCodeIdentity(recorded, current, continuation = false) {
+  const required = continuation
+    ? Object.keys(current.files).filter((path) => path.startsWith("evaluation/"))
+    : ["evaluation/grader.mjs", "evaluation/research/grade.mjs"];
+  const paths = new Set([
+    ...required,
+    ...Object.keys(recorded.files).filter((path) => continuation && path.startsWith("evaluation/")),
+  ]);
+  for (const path of paths)
+    if (!recorded.files[path] || recorded.files[path] !== current.files[path])
+      throw new Error(`Comparison code identity mismatch: ${path}`);
+}
+
+export async function readTrials(directory, manifest) {
+  const trials = [];
+  const keys = new Set();
+  for (const file of await readdir(join(directory, "trials"))) {
+    const trial = await json(join(directory, "trials", file));
+    if (trial.mode !== manifest.mode) continue;
+    const planned = manifest.plan.trials.find(
+      (p) => p.caseId === trial.caseId && p.repetition === trial.repetition,
+    );
+    const originalFirst =
+      manifest.version === 2 &&
+      planned === manifest.plan.trials[0] &&
+      trial.id === hash(`undefined-${trial.arm}`).slice(0, 32);
+    const key = `${trial.caseId}:${trial.arm}`;
+    if (
+      !planned ||
+      !arms.includes(trial.arm) ||
+      (!originalFirst && trial.id !== trialId(planned, trial.arm)) ||
+      file !== `${trial.id}.json` ||
+      keys.has(key)
+    )
+      throw new Error("Trial identity mismatch or duplicate attempt");
+    keys.add(key);
+    assertProviderIntegrity(trial);
+    const spec = manifest.cases.find((c) => c.id === trial.caseId);
+    trial.grade = gradeComparison(spec, trial);
+    if (trial.arm !== "stagehand") trial.contractGrade = gradeTrial(spec, trial);
+    trials.push(trial);
+  }
+  return trials;
 }
 
 export async function main(args = process.argv.slice(2)) {
   const options = parseOptions(args);
-  if (options.concurrency !== 1) throw new Error("Comparison requires concurrency 1");
-  const { gradeComparison } = await import("./grade.mjs");
-  const runnerHash = hash(await readFile(new URL("./compare.mjs", import.meta.url), "utf8"));
-  const graderHash = hash(await readFile(new URL("./grade.mjs", import.meta.url), "utf8"));
+  if (options.concurrency !== 1 || options.repetitions !== 1)
+    throw new Error("Engineering comparison uses one attempt per case and arm, concurrency 1");
+  const graderHash = hash(await readFile(new URL("./grade.mjs", import.meta.url)));
   if (options.replay) {
     const manifest = await json(join(options.replay, "manifest.json"));
     const { contentHash, ...body } = manifest;
-    if (
-      hash(body) !== contentHash ||
-      manifest.graderHash !== graderHash ||
-      manifest.runnerHash !== runnerHash
-    )
+    if (hash(body) !== contentHash || manifest.graderHash !== graderHash)
       throw new Error("Comparison manifest/grader integrity mismatch");
-    const trials = [];
-    for (const p of manifest.plan.trials)
-      for (const strategy of ["custom", "stagehand"]) {
-        try {
-          const t = await json(join(options.replay, "trials", `${p.id}-${strategy}.json`));
-          if (t.id !== `${p.id}-${strategy}` || t.caseId !== p.caseId || t.strategy !== strategy)
-            throw new Error("Trial identity mismatch");
-          t.mode = manifest.mode;
-          t.grade = gradeComparison(
-            manifest.cases.find((c) => c.id === t.caseId),
-            t,
-            manifest.accounting?.budgetPolicy,
-          );
-          trials.push(t);
-        } catch (error) {
-          if (error.code !== "ENOENT") throw error;
-        }
-      }
-    const report = summarizePairs(manifest, trials);
-    console.log(JSON.stringify(report, null, 2));
-    return report.passed ? 0 : 1;
+    assertCodeIdentity(manifest.code, await fingerprints());
+    const trials = await readTrials(options.replay, manifest);
+    console.log(JSON.stringify(summarize(manifest, trials), null, 2));
+    return trials.length === manifest.plan.trials.length * arms.length ? 0 : 1;
   }
   if (options.prune) throw new Error("Use the ordinary evaluation prune command");
   const cases = selectCases(options.caseId);
+  const groups = {};
+  for (const group of loadCases().groups)
+    for (const spec of await json(new URL(`../cases/${group}`, import.meta.url)))
+      groups[spec.id] = group.replace(".json", "");
   const output = resolve(options.output);
   await mkdir(join(output, "trials"), { recursive: true, mode: 0o700 });
-  const manifest = {
-    version: "1",
+  let manifest = {
+    version: 3,
     id: randomUUID(),
     createdAt: new Date().toISOString(),
     mode: options.mode,
-    accounting: { version: 1, budgetPolicy: "provider-limit" },
     cases,
+    groups,
     plan: buildPlan(cases, options),
     code: await fingerprints(),
     graderHash,
-    runnerHash,
-    browserBinarySha256: process.env.XPATHED_BROWSER_BINARY_SHA256 ?? null,
+    artifacts: JSON.parse(process.env.XPATHED_ENGINEERING_ARTIFACTS ?? "null"),
+    browserBinarySha256: process.env.XPATHED_BROWSER_BINARY_SHA256,
     stagehand: {
       version: "4.1.0",
       packageLockHash: hash(
-        await readFile(new URL("./stagehand/package-lock.json", import.meta.url), "utf8"),
+        await readFile(new URL("./stagehand/package-lock.json", import.meta.url)),
       ),
     },
     policy: {
-      selection: "first singleton; whole explicit plural set",
+      selection: "first singleton; whole plural set",
       actionExecution: false,
       retries: 0,
       responseReuse: false,
-      comparison: "whole configurations; strategy prompts and DOM representations differ",
+      comparison: "whole configurations; prompts and DOM representations differ",
       retentionDays: 90,
       evidenceDays: 30,
     },
   };
-  manifest.plan.trials = manifest.plan.trials.map((t) => ({ ...t, id: randomUUID() }));
+  if (!manifest.artifacts || !manifest.browserBinarySha256)
+    throw new Error("Run through the verified engineering comparison launcher");
   manifest.contentHash = hash(manifest);
-  await save(join(output, "manifest.json"), manifest);
+  const resume = process.env.XPATHED_COMPARISON_RESUME === "true";
+  let retained = [];
+  if (resume) {
+    const current = manifest;
+    manifest = await json(join(output, "manifest.json"));
+    const { contentHash, ...body } = manifest;
+    if (
+      hash(body) !== contentHash ||
+      manifest.graderHash !== graderHash ||
+      manifest.mode !== options.mode ||
+      hash(manifest.cases) !== hash(cases) ||
+      hash(manifest.artifacts) !== hash(current.artifacts) ||
+      manifest.browserBinarySha256 !== current.browserBinarySha256 ||
+      hash(manifest.stagehand) !== hash(current.stagehand)
+    )
+      throw new Error("Continuation requires unchanged cases, grading, settings and images");
+    assertCodeIdentity(manifest.code, current.code, true);
+    if (hash(manifest.plan) !== hash(current.plan))
+      throw new Error("Continuation requires the original plan and timeout settings");
+    retained = await readTrials(output, manifest);
+    for (const file of await readdir(join(output, "provider"))) {
+      const record = await json(join(output, "provider", file));
+      if (!retained.some((t) => t.id === record.attemptId))
+        throw new Error(
+          "An original provider attempt has no retained result; recover its evidence before continuing",
+        );
+    }
+    await save(join(output, `continuation-${randomUUID()}.json`), {
+      createdAt: new Date().toISOString(),
+      originalManifestHash: contentHash,
+      code: current.code,
+      artifacts: current.artifacts,
+      retainedIds: retained.map((t) => t.id),
+      execution: { concurrency: 3, workers: "one isolated stream per arm" },
+      reason: "Continue only unattempted cases; original attempts remain unchanged",
+    });
+  } else await save(join(output, "manifest.json"), manifest);
   const services = {
-    browser: process.env.EVALUATION_BROWSER_URL ?? "http://browser:8080",
-    resolver: process.env.EVALUATION_RESOLVER_URL ?? "http://resolver:8080",
-    fixture: process.env.EVALUATION_FIXTURE_URL ?? "http://evaluation-fixture:8090",
-    stagehand: process.env.EVALUATION_STAGEHAND_URL ?? "http://stagehand:8092",
+    browser: "http://browser:8080",
+    resolver: "http://resolver:8080",
+    fixture: "http://evaluation-fixture:8090",
+    stagehand: "http://stagehand:8092",
   };
   const trials = [];
-  let proxy;
-  let deterministicProxy;
-  async function pair(spec, planned, mode) {
-    const arms = ["custom", "stagehand"].map((strategy) => ({
-      ...planned,
-      id: `${planned.id}-${strategy}`,
-      strategy,
-      mode,
-      attemptId: hash(`${planned.id}-${strategy}`).slice(0, 32),
-      cardinality: spec.cardinality,
-      createdAt: new Date().toISOString(),
-    }));
-    let session, page;
-    try {
-      for (const arm of arms)
-        await request(
-          `${services.fixture}/trial`,
-          { id: arm.id, caseId: spec.id },
-          options.timeoutMs,
-        );
-      session = await request(`${services.browser}/sessions`, {}, options.timeoutMs);
-      page = await request(
-        `${services.browser}/pages/${session.pageId}/navigate`,
-        { url: `${services.fixture}/fixture?trial=${arms[0].id}` },
-        options.timeoutMs,
-      );
-      arms[0].environment = await command(
-        services.fixture,
-        arms[0].id,
-        { kind: "baseline", setup: spec.setup ?? {} },
-        options.timeoutMs,
-      );
-      arms[1].adapterEnvironment = await request(
-        `${services.stagehand}/prepare`,
-        {
-          url: `${services.fixture}/fixture?trial=${arms[1].id}`,
-          viewport: arms[0].environment.viewport,
+  const proxies = [];
+  let router, deterministicProxy;
+  let failure;
+  const basicReady = new Map(manifest.plan.trials.map((p) => [p.caseId, Promise.withResolvers()]));
+  let summaryWrite = Promise.resolve();
+  async function runCase(spec, planned, mode, onlyArm) {
+    const rows = [];
+    for (const arm of onlyArm ? [onlyArm] : arms) {
+      const previous = retained.find((t) => t.caseId === spec.id && t.arm === arm);
+      if (previous && mode === manifest.mode) {
+        rows.push(previous);
+        if (arm === "basic") basicReady.get(spec.id)?.resolve(previous);
+        continue;
+      }
+      const basic =
+        arm === "stagehand" ? (onlyArm ? await basicReady.get(spec.id).promise : rows[0]) : null;
+      if (failure) return rows;
+      const trial = {
+        ...planned,
+        id: trialId(planned, arm),
+        arm,
+        strategy: arm === "stagehand" ? "stagehand" : "custom",
+        mode,
+        cardinality: spec.cardinality,
+        createdAt: new Date().toISOString(),
+        execution: {
+          cohort: onlyArm ? "parallel" : "serial",
+          concurrency: onlyArm ? 3 : 1,
+          worker: arm,
         },
-        options.timeoutMs,
-      );
-      for (const arm of arms.slice(1))
-        arm.environment = await command(
-          services.fixture,
-          arm.id,
-          { kind: "baseline", setup: spec.setup ?? {} },
-          options.timeoutMs,
-        );
-      assertParity(arms[0].environment, arms[1].environment);
-      if (
-        !process.env.XPATHED_BROWSER_BINARY_SHA256 ||
-        arms[1].adapterEnvironment.browserBinarySha256 !== process.env.XPATHED_BROWSER_BINARY_SHA256
-      )
-        throw new Error("Browser parity mismatch: Chromium binary");
-      // Alternate arm order by repetition; preparation and independent grading are not timed.
-      const order = planned.repetition % 2 ? arms : [...arms].reverse();
-      for (const arm of order) {
-        const start = performance.now();
+      };
+      const proxy = proxies[arms.indexOf(arm)];
+      if (mode === "live") proxy.beginAttempt(trial.id);
+      if (arm === "stagehand")
+        await stagehandTrial(spec, trial, { ...options, mode }, services, basic.environment);
+      else {
+        const endpoints =
+          arm === "basic"
+            ? {
+                ...services,
+                browser: "http://browser-basic:8080",
+                resolver: "http://resolver-basic:8080",
+              }
+            : services;
+        await execute(spec, trial, { ...options, mode }, endpoints);
+        trial.modelCalls = trial.result?.diagnostics?.modelCalls ?? null;
+        trial.configuration = configurationRecord(trial);
+      }
+      if (mode === "live") {
+        await proxy.awaitIdle();
+        const calls = proxy.records.filter((r) => r.attemptId === trial.id);
+        trial.evidence = { ...trial.evidence, provider: calls };
+        trial.provider = calls.map(({ request, response, ...metadata }) => metadata);
         try {
-          if (mode === "live") proxy.beginAttempt(arm.id);
-          if (arm.strategy === "custom") {
-            const envelope = await request(
-              `${services.resolver}/internal/pages/${session.pageId}/resolve`,
-              { instruction: spec.instruction, documentId: page.documentId, contractVersion: "3" },
-              options.timeoutMs,
-              { "X-Xpathed-Attempt-Id": arm.attemptId },
-            );
-            arm.result = envelope.result;
-            arm.evidence = envelope.evidence;
-            arm.configuration = configurationRecord(arm);
-            arm.modelCalls = arm.result.diagnostics?.modelCalls ?? null;
-            if (
-              arm.result.pageId !== session.pageId ||
-              arm.result.documentId !== page.documentId ||
-              arm.result.attemptId !== arm.attemptId
-            )
-              throw new Error("Resolution identity mismatch");
-          } else {
-            const raw = await request(
-              `${services.stagehand}/observe`,
-              {
-                instruction: spec.instruction,
-                cardinality: spec.cardinality,
-                mode,
-                deterministic:
-                  mode === "deterministic"
-                    ? {
-                        elements: spec.provider.actions
-                          .filter((a) => a.outcome === "found")
-                          .map((a) => ({
-                            ...a,
-                            role: a.tag,
-                            method: a.action,
-                            index: ["scoped-save", "nested-frame"].includes(spec.id)
-                              ? 1
-                              : (a.index ?? 0),
-                          })),
-                      }
-                    : undefined,
-              },
-              options.timeoutMs,
-            );
-            arm.result = normalizeStagehand(raw);
-            arm.evidence = { adapter: raw };
-            arm.modelCalls = raw.modelCalls ?? null;
-            arm.cache = raw.metadata?.cache ?? null;
-            arm.configuration = {
-              strategy: "stagehand",
-              version: raw.stagehandVersion,
-              prompts: (raw.modelInputs ?? []).map((input) => ({
-                promptHash: hash(input.systemPrompt ?? ""),
-                schemaHash: hash(input.responseFormat ?? {}),
-              })),
-            };
-          }
-          arm.elapsedMs = performance.now() - start;
-          arm.observation = await command(
-            services.fixture,
-            arm.id,
-            {
-              kind: "observe",
-              expected: spec.expected.actions.map((a) => a.target ?? null),
-              actions: arm.result.actions,
-            },
-            options.timeoutMs,
-          );
-          const input = JSON.stringify(arm.evidence);
-          arm.observation.oracleLeak = (spec.oracleSentinels ?? []).some((s) => input.includes(s));
-          arm.observation.privacyLeak = (spec.privacySentinels ?? []).some((s) =>
-            input.includes(s),
+          assertProviderIntegrity(trial);
+        } catch (error) {
+          failure ??= error;
+          trial.error ??= { message: error.message };
+          for (const ready of basicReady.values()) ready.resolve({});
+        }
+      }
+      if (arm === "improved")
+        try {
+          assertParity(
+            (onlyArm ? await basicReady.get(spec.id).promise : rows[0]).environment,
+            trial.environment,
           );
         } catch (error) {
-          arm.error = { message: error.message };
-          arm.elapsedMs ??= performance.now() - start;
+          trial.error ??= { message: error.message };
         }
-        if (mode === "live") {
-          await proxy.awaitIdle();
-          const calls = proxy.records.filter((r) => r.attemptId === arm.id);
-          arm.evidence = { ...arm.evidence, provider: calls };
-          arm.provider = calls.map(({ request, response, ...metadata }) => metadata);
-        }
-      }
-    } catch (error) {
-      for (const arm of arms) arm.error ??= { message: error.message };
-    } finally {
-      try {
-        if (session) {
-          const response = await fetch(`${services.browser}/sessions/${session.sessionId}`, {
-            method: "DELETE",
-            signal: AbortSignal.timeout(options.timeoutMs),
-          });
-          if (!response.ok) throw new Error(`Browser cleanup HTTP ${response.status}`);
-        }
-      } catch (error) {
-        arms[0].error ??= { message: error.message };
-      }
-      try {
-        await request(`${services.stagehand}/reset`, {}, options.timeoutMs);
-      } catch (error) {
-        arms[1].error ??= { message: `Stagehand cleanup: ${error.message}` };
-      }
+      if (arm !== "stagehand") trial.contractGrade = gradeTrial(spec, trial);
+      trial.grade = gradeComparison(spec, trial);
+      await save(join(output, "trials", `${trial.id}.json`), trial);
+      rows.push(trial);
+      if (arm === "basic") basicReady.get(spec.id)?.resolve(trial);
+      console.log(
+        `${arm}: ${spec.id}: ${trial.grade.passed ? "pass" : trial.grade.failures.map((f) => f.category).join(", ")}`,
+      );
     }
-    for (const arm of arms) {
-      arm.grade = gradeComparison(spec, arm, manifest.accounting.budgetPolicy);
-      await save(join(output, "trials", `${arm.id}.json`), arm);
-    }
-    return arms;
+    return rows;
   }
   try {
     deterministicProxy = createServer(async (req, res) => {
@@ -460,66 +504,108 @@ export async function main(args = process.argv.slice(2)) {
     deterministicProxy.listen(8091, "0.0.0.0");
     await once(deterministicProxy, "listening");
     if (options.mode === "live") {
-      const gates = [];
-      for (const caseId of ["basic-save", "single-action-plural-confirmations"]) {
-        const spec = selectCases(caseId)[0];
-        gates.push(
-          ...(await pair(
-            spec,
-            { id: `compatibility-${randomUUID()}`, caseId, repetition: 1, attempt: 1 },
-            "deterministic",
-          )),
+      let gates = [];
+      if (resume) gates = await json(join(output, "compatibility.json"));
+      else {
+        for (const id of ["basic-save", "single-action-plural-confirmations"]) {
+          const spec = selectCases().find((c) => c.id === id || c.sourceIds?.includes(id));
+          if (!spec) throw new Error(`Missing compatibility case: ${id}`);
+          gates.push(
+            ...(await runCase(
+              spec,
+              { id: randomUUID(), caseId: spec.id, repetition: 1, attempt: 1 },
+              "deterministic",
+            )),
+          );
+        }
+        await save(
+          join(output, "compatibility.json"),
+          gates.map(({ id, caseId, arm, grade }) => ({ id, caseId, arm, grade })),
         );
       }
-      await save(
-        join(output, "compatibility.json"),
-        gates.map(({ id, caseId, strategy, grade }) => ({ id, caseId, strategy, grade })),
-      );
       if (!gates.every((t) => t.grade.passed))
         throw new Error("Deterministic compatibility gate failed; no paid calls made");
       await new Promise((resolve) => deterministicProxy.close(resolve));
       deterministicProxy = undefined;
       const { createBudgetProxy } = await import("../provider.mjs");
-      await mkdir(join(output, "provider"));
-      proxy = await createBudgetProxy({
-        ledgerPath:
-          process.env.XPATHED_BUDGET_PATH ?? resolve(".artifacts/datasets/experiment-budget.json"),
-        onRecord: async (record) => {
-          await writeFile(
-            join(output, "provider", `${record.id}.json`),
-            JSON.stringify(record, null, 2) + "\n",
-            { mode: 0o600 },
-          );
-        },
-      });
-      proxy.server.listen(8091, "0.0.0.0");
-      await once(proxy.server, "listening");
-    }
-    for (const planned of manifest.plan.trials) {
-      trials.push(
-        ...(await pair(
-          cases.find((c) => c.id === planned.caseId),
-          planned,
-          options.mode,
-        )),
+      await mkdir(join(output, "provider"), { recursive: true });
+      for (const arm of arms) {
+        const proxy = await createBudgetProxy({
+          ledgerPath: join(output, `accounting-${arm}.json`),
+          githubRepository: "",
+          githubToken: "",
+          onRecord: (record) =>
+            writeFile(
+              join(output, "provider", `${record.id}.json`),
+              JSON.stringify(record, null, 2) + "\n",
+              { mode: 0o600 },
+            ),
+        });
+        proxies.push(proxy);
+        proxy.server.listen(0, "127.0.0.1");
+        await once(proxy.server, "listening");
+      }
+      router = workerRouter(
+        proxies.map((p) => p.server.address().port),
+        { "comparison-only": 2 },
       );
+      router.listen(8091, "0.0.0.0");
+      await once(router, "listening");
     }
-    const report = summarizePairs(manifest, trials);
-    await save(join(output, "summary.json"), report);
-    console.log(JSON.stringify(report, null, 2));
-    return report.passed ? 0 : 1;
+    const record = async (rows) => {
+      trials.push(...rows);
+      summaryWrite = summaryWrite.then(() =>
+        writeFile(
+          join(output, "summary.json"),
+          JSON.stringify(summarize(manifest, trials), null, 2) + "\n",
+          { mode: 0o600 },
+        ),
+      );
+      await summaryWrite;
+    };
+    if (options.mode === "live") {
+      await Promise.all(
+        arms.map(async (arm) => {
+          for (const planned of manifest.plan.trials) {
+            if (failure) break;
+            try {
+              await record(
+                await runCase(
+                  cases.find((c) => c.id === planned.caseId),
+                  planned,
+                  options.mode,
+                  arm,
+                ),
+              );
+            } catch (error) {
+              failure ??= error;
+              for (const ready of basicReady.values()) ready.resolve({});
+            }
+          }
+        }),
+      );
+      if (failure) throw failure;
+    } else
+      for (const planned of manifest.plan.trials)
+        await record(
+          await runCase(
+            cases.find((c) => c.id === planned.caseId),
+            planned,
+            options.mode,
+          ),
+        );
+    console.log(JSON.stringify(summarize(manifest, trials), null, 2));
+    return 0;
   } finally {
-    await proxy?.close();
+    if (router) await new Promise((resolve) => router.close(resolve));
+    await Promise.all(proxies.map((p) => p.close()));
     if (deterministicProxy) await new Promise((resolve) => deterministicProxy.close(resolve));
   }
 }
-
-if (import.meta.main)
+if (process.argv[1] && resolve(process.argv[1]) === new URL(import.meta.url).pathname)
   main()
-    .then((code) => {
-      process.exitCode = code;
-    })
+    .then((code) => (process.exitCode = code))
     .catch((error) => {
       console.error(error.message);
-      process.exitCode = 2;
+      process.exitCode = 1;
     });

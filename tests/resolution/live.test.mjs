@@ -15,25 +15,15 @@ async function json(url, method = "GET", body) {
   assert.equal(response.status, 200, `Service returned HTTP ${response.status}`);
   return response.json();
 }
-test("actual OpenRouter route resolves scoped frames, offscreen context, expanded actions and legacy absence", async () => {
+test("actual OpenRouter route resolves current-view plural frame targets and scoped absence", async () => {
   const session = await json(`${browser}/sessions`, "POST");
   const run = randomUUID();
   let knownReportedCostUsd = 0;
   let unknownChargeCount = 0;
   try {
-    for (const [path, contractVersion, instruction, outcome] of [
-      [
-        "frames",
-        "2",
-        "Click all Approval buttons inside the Payroll frame, clear Notes in Payroll, fill Notes in Payroll, type into Notes in Payroll, double-click the first Approval button in Payroll, right-click the first Approval button in Payroll, and hover Help in the footer. Also pause for two seconds, navigate to example.com, and drag the first Approval button onto Help.",
-        "partial",
-      ],
-      [
-        "fixture",
-        "1",
-        "Click the Contact button. Return not_found if it does not exist.",
-        "not_found",
-      ],
+    for (const [path, instruction, outcome] of [
+      ["frames", "Click all Approval buttons inside the Payroll frame.", "found"],
+      ["fixture", "Click the Contact button.", "not_found"],
     ]) {
       const page = await json(`${browser}/pages/${session.pageId}/navigate`, "POST", {
         url: `${fixture}/${path}?run=${run}`,
@@ -41,7 +31,7 @@ test("actual OpenRouter route resolves scoped frames, offscreen context, expande
       const result = await json(`${resolver}/pages/${session.pageId}/resolve`, "POST", {
         instruction,
         documentId: page.documentId,
-        contractVersion,
+        contractVersion: "4",
       });
       console.log(
         JSON.stringify({
@@ -97,58 +87,18 @@ test("actual OpenRouter route resolves scoped frames, offscreen context, expande
       assert.equal(result.sessionId, session.sessionId);
       assert.equal(result.pageId, session.pageId);
       assert.equal(result.documentId, page.documentId);
-      if (contractVersion === "2") {
-        assert.equal(result.contractVersion, "2");
-        assert.equal(
-          result.actions.length,
-          11,
-          "All intended plural and compound actions must be represented",
-        );
-        assert.deepEqual(
-          result.actions.map((action) => action.action),
-          [
-            "click",
-            "click",
-            "clear",
-            "fill",
-            "type",
-            "double_click",
-            "right_click",
-            "hover",
-            "unsupported",
-            "unsupported",
-            "unsupported",
-          ],
-        );
-        assert.deepEqual(
-          result.actions.map((action) => action.outcome),
-          [
-            "found",
-            "found",
-            "found",
-            "found",
-            "found",
-            "found",
-            "found",
-            "found",
-            "unsupported",
-            "unsupported",
-            "unsupported",
-          ],
-        );
-        assert.ok(result.actions.slice(8).every((action) => action.code === "unsupported_action"));
-        assert.ok(
-          result.actions.slice(0, 7).every((action) => action.target.frame.chain.length === 2),
-        );
-        assert.equal(result.actions[7].target.frame.id, "main");
-        assert.equal(result.actions[7].target.state.inViewport, false);
-        assert.equal(result.summary.blocked, 5);
-        assert.equal(result.summary.readinessUnknown, 0);
+      assert.equal(result.contractVersion, "4");
+      if (outcome === "found") {
+        assert.equal(result.actions.length, 2);
         assert.ok(
           result.actions.every(
-            (action) => action.diagnosticsReference === result.attemptId && !action.diagnostics,
+            (action) =>
+              action.action === "click" &&
+              action.outcome === "found" &&
+              action.target.frame.chain.length === 2,
           ),
         );
+        assert.equal(result.summary.blocked, 1);
         const targets = result.actions.flatMap((action) =>
           action.target
             ? action.target.xpaths.map((xpath) => ({
@@ -157,16 +107,7 @@ test("actual OpenRouter route resolves scoped frames, offscreen context, expande
               }))
             : [],
         );
-        const expected = [
-          ["frame-approval-first"],
-          ["frame-approval-second"],
-          ["frame-notes"],
-          ["frame-notes"],
-          ["frame-notes"],
-          ["frame-approval-first"],
-          ["frame-approval-first"],
-          ["footer-help"],
-        ];
+        const expected = [["frame-approval-first"], ["frame-approval-second"]];
         await json(`${fixture}/oracle?run=${run}`, "POST", { targets });
         let observed;
         for (let attempt = 0; attempt < 100; attempt++) {
@@ -179,7 +120,7 @@ test("actual OpenRouter route resolves scoped frames, offscreen context, expande
         assert.equal(observed.clicks, 0);
         assert.equal(observed.scrollY, 0);
       } else {
-        assert.equal(result.contractVersion, "1");
+        assert.equal(result.actions[0].outcome, "not_found");
         assert.equal(result.target, null);
       }
     }

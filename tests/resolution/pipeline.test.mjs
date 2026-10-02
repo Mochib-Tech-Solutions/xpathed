@@ -20,26 +20,20 @@ test("Client results preserve nested frame chains and expanded actions through t
       {
         step: 1,
         instruction: "Click Approval in Payroll",
-        action: "double_click",
+        action: "click",
         outcome: "found",
         label: "Approval",
         frameLabel: "Payroll",
       },
       {
-        step: 2,
-        instruction: "Clear Notes",
-        action: "clear",
+        step: 1,
+        instruction: "Click the disabled Approval",
+        action: "click",
         outcome: "found",
-        label: "Notes",
-        tag: "input",
-      },
-      { step: 3, instruction: "Wait for missing element", action: "inspect", outcome: "not_found" },
-      {
-        step: 4,
-        instruction: "Pause",
-        action: "unsupported",
-        outcome: "unsupported",
-        limitation: "unsupported_action",
+        label: "Approval",
+        index: 1,
+        tag: "button",
+        frameLabel: "Payroll",
       },
     ],
   });
@@ -50,15 +44,15 @@ test("Client results preserve nested frame chains and expanded actions through t
       url: `${fixture}/frames?run=${run}`,
     });
     const result = await json(`${client}/api/pages/${page.pageId}/resolve`, "POST", {
-      instruction: "Double click Approval in Payroll, clear Notes, wait for Missing and pause.",
+      instruction: "Click both Approval buttons in Payroll.",
       documentId: page.documentId,
-      contractVersion: "2",
+      contractVersion: "4",
     });
-    assert.equal(result.outcome, "partial", JSON.stringify(result));
+    assert.equal(result.outcome, "found", JSON.stringify(result));
     assert.equal(Object.hasOwn(result, "evidence"), false);
     assert.deepEqual(
       result.actions.map((action) => action.outcome),
-      ["found", "found", "not_found", "unsupported"],
+      ["found", "found"],
     );
     assert.deepEqual(
       result.actions[0].target.frame.chain.map((frame) => frame.label),
@@ -77,7 +71,7 @@ test("Client results preserve nested frame chains and expanded actions through t
       observation = await json(`${fixture}/observation?run=${run}`);
       if (!observation) await delay(50);
     }
-    assert.deepEqual(observation?.matches, [["frame-approval-first"], ["frame-notes"]]);
+    assert.deepEqual(observation?.matches, [["frame-approval-first"], ["frame-approval-second"]]);
     assert.equal(observation.clicks, 0);
     assert.equal(observation.scrollY, 0);
     const provider = await json(`${fixture}/provider-request`);
@@ -90,7 +84,7 @@ test("Client results preserve nested frame chains and expanded actions through t
   }
 });
 
-test("A plural current-page prompt keeps independent targets, blocked state, missing and dependent actions", async () => {
+test("A plural current-view prompt preserves found, blocked and missing targets", async () => {
   await json(`${fixture}/scenario`, "POST", {
     name: "batch",
     actions: [
@@ -110,22 +104,7 @@ test("A plural current-page prompt keeps independent targets, blocked state, mis
         label: "Approval",
         index: 0,
       },
-      {
-        step: 2,
-        instruction: "Fill Notes",
-        action: "fill",
-        outcome: "found",
-        label: "Notes",
-        tag: "input",
-      },
-      { step: 3, instruction: "Hover Contact", action: "hover", outcome: "not_found" },
-      {
-        step: 4,
-        instruction: "Click Done after opening details",
-        action: "click",
-        outcome: "unsupported",
-        limitation: "current_state_dependency",
-      },
+      { step: 2, instruction: "Click Contact", action: "click", outcome: "not_found" },
     ],
   });
   const session = await json(`${client}/api/sessions`, "POST");
@@ -136,38 +115,35 @@ test("A plural current-page prompt keeps independent targets, blocked state, mis
     });
     const before = await observeXpaths(run, []);
     const result = await json(`${client}/api/pages/${page.pageId}/resolve`, "POST", {
-      instruction:
-        "Click all Approval buttons, fill Notes, hover Contact, then click Done after opening details.",
+      instruction: "Click all Approval buttons and Contact.",
       documentId: page.documentId,
-      contractVersion: "2",
+      contractVersion: "4",
     });
     assert.equal(result.outcome, "partial", JSON.stringify(result));
-    assert.equal(result.contractVersion, "2");
+    assert.equal(result.contractVersion, "4");
     assert.deepEqual(
       result.actions.map((action) => action.actionId),
-      ["a1", "a2", "a3", "a4", "a5"],
+      ["a1", "a2", "a3"],
     );
     assert.deepEqual(
       result.actions.map((action) => action.outcome),
-      ["found", "found", "found", "not_found", "unsupported"],
+      ["found", "found", "not_found"],
     );
     assert.equal(result.actions[1].target.interactability.status, "blocked");
-    assert.equal(result.actions[2].target.interactability.reasons.includes("readonly"), true);
-    assert.equal(result.actions[4].code, "current_state_dependency");
     assert.deepEqual(result.summary, {
       processingComplete: true,
       semanticCompleteness: "unverified",
-      total: 5,
-      found: 3,
+      total: 3,
+      found: 2,
       notFound: 1,
-      unsupported: 1,
+      unsupported: 0,
       errors: 0,
-      blocked: 2,
+      blocked: 1,
       readinessUnknown: 0,
       assessmentUnsupported: 0,
     });
     assert.equal(result.diagnostics.modelCalls, 1);
-    assert.equal(result.diagnostics.promptVersion, "6");
+    assert.equal(result.diagnostics.promptVersion, "10");
     assert.ok(
       result.actions.every(
         (action) =>
@@ -178,7 +154,7 @@ test("A plural current-page prompt keeps independent targets, blocked state, mis
     );
     const xpaths = result.actions.flatMap((action) => action.target?.xpaths ?? []);
     const expected = result.actions
-      .slice(0, 3)
+      .slice(0, 2)
       .flatMap((action, index) =>
         action.target.xpaths.map(() => [["approval-first", "approval-second", "notes"][index]]),
       );
@@ -238,9 +214,9 @@ test("One click command resolves every confirmation in the requested list as sep
     const result = await json(`${client}/api/pages/${page.pageId}/resolve`, "POST", {
       instruction: "Click all confirmation buttons in the Pending requests list",
       documentId: page.documentId,
-      contractVersion: "3",
+      contractVersion: "4",
     });
-    assert.equal(result.contractVersion, "3");
+    assert.equal(result.contractVersion, "4");
     assert.equal(result.action, "click");
     assert.equal(result.actions.length, 2);
     assert.ok(result.actions.every((item) => item.action === "click" && item.outcome === "found"));
@@ -284,7 +260,7 @@ test("An independent plural oracle detects omitted actions despite valid returne
     const result = await json(`${client}/api/pages/${page.pageId}/resolve`, "POST", {
       instruction: "Click all Approval buttons",
       documentId: page.documentId,
-      contractVersion: "2",
+      contractVersion: "4",
     });
     assert.equal(result.outcome, "found");
     assert.equal(result.summary.semanticCompleteness, "unverified");
@@ -330,9 +306,9 @@ test("instruction resolves through client, resolver, provider and managed browse
     assert.equal(result.pageId, session.pageId);
     assert.equal(result.documentId, page.documentId);
     assert.equal(result.action, "click");
-    assert.equal(result.target.xpaths.length, 1);
-    assert.match(result.target.xpaths[0], /@data-testid='about-us'/);
-    await json(`${fixture}/oracle?run=${run}`, "POST", { xpaths: result.target.xpaths });
+    assert.equal(result.actions[0].target.xpaths.length, 1);
+    assert.match(result.actions[0].target.xpaths[0], /@data-testid='about-us'/);
+    await json(`${fixture}/oracle?run=${run}`, "POST", { xpaths: result.actions[0].target.xpaths });
     let observed;
     for (let attempt = 0; attempt < 100; attempt++) {
       observed = await json(`${fixture}/observation?run=${run}`);
@@ -342,7 +318,7 @@ test("instruction resolves through client, resolver, provider and managed browse
     assert.ok(observed, "Fixture oracle must independently observe the live selected node");
     assert.deepEqual(
       observed.matches,
-      result.target.xpaths.map(() => ["expected-target"]),
+      result.actions[0].target.xpaths.map(() => ["expected-target"]),
     );
     assert.equal(observed.clicks, 0);
     assert.equal(observed.scrollY, 0);
@@ -361,7 +337,7 @@ test("instruction resolves through client, resolver, provider and managed browse
   }
 });
 
-for (const contractVersion of ["1", "4"])
+for (const contractVersion of ["4"])
   test(`genuine absence preserves its inspected scope through ClientApi (version ${contractVersion})`, async () => {
     await json(
       `${fixture}/scenario`,
@@ -413,7 +389,7 @@ test("ClientApi preserves disabled, off-screen and hover assessments and scopes 
     for (const [path, action, outcome, status] of [
       ["state", "click", "found", "blocked"],
       ["state", "hover", "found", "ready"],
-      ["offscreen", "click", "found", "blocked"],
+      ["offscreen", "click", "not_found", null],
       ["hidden-only", "click", "not_found", null],
     ]) {
       await json(`${fixture}/scenario`, "POST", {
@@ -429,13 +405,13 @@ test("ClientApi preserves disabled, off-screen and hover assessments and scopes 
       });
       assert.equal(result.outcome, outcome, JSON.stringify(result));
       assert.equal(result.action, action);
-      if (result.target) {
-        assert.equal(result.target.interactability.status, status);
-        assert.equal(result.target.interactability.action, action);
-        assert.equal(result.target.state.version, "2");
-        assert.equal(result.diagnostics.promptVersion, "5");
-        assert.equal(result.target.xpaths.length, 1);
-      } else assert.match(result.diagnostics.message, /eligible current-page scope/);
+      if (result.actions[0].target) {
+        assert.equal(result.actions[0].target.interactability.status, status);
+        assert.equal(result.actions[0].target.interactability.action, action);
+        assert.equal(result.actions[0].target.state.version, "2");
+        assert.equal(result.diagnostics.promptVersion, "10");
+        assert.equal(result.actions[0].target.xpaths.length, 1);
+      } else assert.match(result.actions[0].message, /current view/);
       const input = JSON.stringify(await json(`${fixture}/provider-request`));
       assert.doesNotMatch(input, /HIDDEN_DUPLICATE|PRIVATE_REFERENCE_VALUE/);
     }
@@ -499,9 +475,13 @@ test("duplicate test attributes and both quote types still yield one unique same
       documentId: page.documentId,
     });
     assert.equal(result.outcome, "found");
-    assert.ok(result.target.xpaths.some((xpath) => xpath.includes("concat(")));
-    assert.ok(result.target.xpaths.every((xpath) => !xpath.includes("[@data-testid='shared'][1]")));
-    await json(`${fixture}/oracle?run=${run}`, "POST", { xpaths: result.target.xpaths });
+    assert.ok(result.actions[0].target.xpaths.some((xpath) => xpath.includes("concat(")));
+    assert.ok(
+      result.actions[0].target.xpaths.every(
+        (xpath) => !xpath.includes("[@data-testid='shared'][1]"),
+      ),
+    );
+    await json(`${fixture}/oracle?run=${run}`, "POST", { xpaths: result.actions[0].target.xpaths });
     let observation;
     for (let attempt = 0; attempt < 100; attempt++) {
       observation = await json(`${fixture}/observation?run=${run}`);
@@ -511,7 +491,7 @@ test("duplicate test attributes and both quote types still yield one unique same
     assert.ok(observation);
     assert.deepEqual(
       observation.matches,
-      result.target.xpaths.map(() => ["expected-target"]),
+      result.actions[0].target.xpaths.map(() => ["expected-target"]),
     );
   } finally {
     await fetch(`${client}/api/sessions/${session.sessionId}`, { method: "DELETE" });
@@ -565,9 +545,9 @@ test("ClientApi tab routes preserve active-page resolution and one stable sessio
     assert.equal(result.sessionId, session.sessionId);
     assert.equal(result.pageId, page.pageId);
     assert.equal(result.documentId, page.documentId);
-    assert.equal(result.target.label, targetText);
-    assert.equal(result.target.xpaths.length, 1);
-    await json(`${fixture}/oracle?run=${run}`, "POST", { xpaths: result.target.xpaths });
+    assert.equal(result.actions[0].target.label, targetText);
+    assert.equal(result.actions[0].target.xpaths.length, 1);
+    await json(`${fixture}/oracle?run=${run}`, "POST", { xpaths: result.actions[0].target.xpaths });
     let observation;
     for (let attempt = 0; attempt < 100; attempt++) {
       observation = await json(`${fixture}/observation?run=${run}`);
@@ -577,7 +557,7 @@ test("ClientApi tab routes preserve active-page resolution and one stable sessio
     assert.ok(observation);
     assert.deepEqual(
       observation.matches,
-      result.target.xpaths.map(() => ["expected-target"]),
+      result.actions[0].target.xpaths.map(() => ["expected-target"]),
     );
     assert.equal(observation.clicks, 0);
     assert.equal(observation.scrollY, 0);

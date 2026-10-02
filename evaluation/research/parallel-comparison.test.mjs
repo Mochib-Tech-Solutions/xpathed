@@ -87,7 +87,10 @@ test("token router sends concurrent requests to their own proxy and rejects unkn
       server.listen(0, "127.0.0.1");
       await once(server, "listening");
     }
-    router = workerRouter(servers.map((server) => server.address().port));
+    router = workerRouter(
+      servers.map((server) => server.address().port),
+      { "qualification-proxy-only": 0, "comparison-only": 1 },
+    );
     router.listen(0, "127.0.0.1");
     await once(router, "listening");
     const url = `http://127.0.0.1:${router.address().port}/api/v1/chat/completions`;
@@ -104,6 +107,10 @@ test("token router sends concurrent requests to their own proxy and rejects unkn
     assert.equal(
       (await fetch(url, { headers: { authorization: "Bearer evaluation-worker-9" } })).status,
       403,
+    );
+    assert.equal(
+      await (await fetch(url, { headers: { authorization: "Bearer comparison-only" } })).text(),
+      "1",
     );
     assert.equal((await fetch(url)).status, 403);
     assert.equal(

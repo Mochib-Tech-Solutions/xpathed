@@ -1,48 +1,13 @@
 [
   {
-    "id": "luna",
-    "model": "openai/gpt-6-luna",
-    "provider": "openai",
-    "reasoning": { "effort": "none" },
-    "promptCacheOptions": { "mode": "explicit" },
-    "maxTokens": 4096,
-    "resolver": "http://resolver-luna:8080",
-    "variant": "baseline"
-  },
-  {
-    "id": "gemini",
-    "model": "google/gemini-3.8-flash",
-    "provider": "google-ai-studio",
-    "reasoning": { "effort": "low" },
-    "maxTokens": 4096,
-    "resolver": "http://resolver-gemini:8080",
-    "variant": "baseline"
-  },
-  {
     "id": "deepseek",
     "model": "deepseek/deepseek-v4.1-flash",
     "provider": "wafer",
-    "reasoning": { "enabled": false },
+    "reasoning": {
+      "enabled": false
+    },
     "maxTokens": 4096,
     "resolver": "http://resolver:8080",
     "variant": "baseline"
-  },
-  {
-    "id": "qwen",
-    "model": "qwen/qwen3.8-flash",
-    "provider": "alibaba",
-    "reasoning": { "enabled": false },
-    "maxTokens": 4096,
-    "resolver": "http://resolver-qwen:8080",
-    "variant": "baseline"
-  },
-  {
-    "id": "deepseek-concise",
-    "model": "deepseek/deepseek-v4.1-flash",
-    "provider": "wafer",
-    "reasoning": { "enabled": false },
-    "maxTokens": 4096,
-    "resolver": "http://resolver-deepseek-concise:8080",
-    "variant": "concise"
   }
 ]

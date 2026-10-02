@@ -23,7 +23,15 @@ export function gradeComparison(spec, trial) {
     actionCorrect: trial?.result?.action === expectedAction,
   };
   if (metrics.operationalError) fail("operational", "The adapter failed to produce a resolution.");
-  if (metrics.unsupported)
+  const expectedUnsupported = spec.expected.outcome === "unsupported";
+  const correctRefusal =
+    expectedUnsupported &&
+    trial.strategy === "custom" &&
+    metrics.unsupported &&
+    metrics.actionCorrect;
+  if (expectedUnsupported && !correctRefusal)
+    fail("outcome", "Expected an explicit unsupported instruction result.");
+  if (metrics.unsupported && !correctRefusal)
     fail("unsupported", "The adapter cannot evaluate this instruction or selector.");
   if (!Array.isArray(actions)) fail("contract", "The adapter did not return target items.");
   if (!["found", "partial", "not_found", "unsupported", "error"].includes(trial?.result?.outcome))
@@ -55,7 +63,7 @@ export function gradeComparison(spec, trial) {
     }
     if (item?.outcome === "unsupported") {
       metrics.unsupported = true;
-      fail("unsupported", "A target item is unsupported.");
+      if (!correctRefusal) fail("unsupported", "A target item is unsupported.");
     }
     if (item?.outcome !== "found") {
       if (item?.target != null) fail("contract", "A non-found item returned a target.");
@@ -86,7 +94,7 @@ export function gradeComparison(spec, trial) {
     if (!unique || indices.length !== 1) metrics.wrongTargets++;
     else if (!duplicate) for (const value of indices) correct.add(value);
   }
-  if (trial?.result?.outcome === "partial")
+  if (trial?.result?.outcome === "partial" && spec.expected.outcome !== "partial")
     fail("outcome", "The adapter reported incomplete resolution.");
   if (metrics.targetsReturned && trial?.result?.outcome === "not_found")
     fail("contract", "A not-found response returned targets.");

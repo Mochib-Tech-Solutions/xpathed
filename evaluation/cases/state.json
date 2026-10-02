@@ -379,7 +379,8 @@
     "exposedAt": "2026-10-02T11:36:32.165Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "state"
+    "group": "state",
+    "cardinality": "all"
   },
   {
     "viewport": {
@@ -791,7 +792,8 @@
     "exposedAt": "2026-10-02T11:36:32.165Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "state"
+    "group": "state",
+    "cardinality": "all"
   },
   {
     "viewport": {
@@ -1270,7 +1272,8 @@
     "exposedAt": "2026-10-02T11:36:32.165Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "state"
+    "group": "state",
+    "cardinality": "all"
   },
   {
     "id": "release4-optgroups-1",
@@ -1792,7 +1795,8 @@
     },
     "sourceSplit": "held-out",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "state"
+    "group": "state",
+    "cardinality": "all"
   },
   {
     "id": "release4-media-3",
@@ -1924,7 +1928,12 @@
       "viewport-baseline-cases.json",
       "cases.json"
     ],
-    "sourceIds": ["control-states-1-v4", "current-view-control-states-1-v4"],
+    "sourceIds": [
+      "control-states-1-v4",
+      "current-view-control-states-1-v4",
+      "control-states-1-v3",
+      "control-states-1"
+    ],
     "group": "state"
   },
   {
@@ -2004,7 +2013,8 @@
     },
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json", "viewport-baseline-cases.json"],
-    "group": "state"
+    "group": "state",
+    "sourceIds": ["control-states-2-v4", "control-states-2-v3", "control-states-2"]
   },
   {
     "id": "control-states-3-v4",
@@ -2087,6 +2097,2446 @@
     },
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json", "viewport-baseline-cases.json"],
-    "group": "state"
+    "group": "state",
+    "sourceIds": ["control-states-3-v4", "control-states-3-v3", "control-states-3"]
+  },
+  {
+    "id": "control-states-4",
+    "family": "states",
+    "split": "regression",
+    "category": "state",
+    "fixture": "states",
+    "instruction": "Select Country.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "setupRevision": "qualification-1",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-contract-review",
+      "reviewedAt": "2026-09-30T20:59:55.247Z"
+    },
+    "expected": {
+      "outcome": "found",
+      "actions": [
+        {
+          "step": 1,
+          "action": "select",
+          "outcome": "found",
+          "target": {
+            "selector": "#country",
+            "frames": []
+          },
+          "state": {
+            "selectedOptionCount": 1
+          },
+          "interactability": {
+            "status": "unknown",
+            "reasons": [],
+            "checks": {
+              "compatibleControl": "pass",
+              "keyboard": "unknown"
+            }
+          }
+        }
+      ],
+      "summary": {
+        "processingComplete": true,
+        "semanticCompleteness": "unverified",
+        "total": 1,
+        "found": 1,
+        "notFound": 0,
+        "unsupported": 0,
+        "errors": 0,
+        "blocked": 0,
+        "readinessUnknown": 1,
+        "assessmentUnsupported": 0
+      }
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "select",
+          "outcome": "found",
+          "label": "Country",
+          "tag": "select"
+        }
+      ]
+    },
+    "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
+    "privacySentinels": ["PRIVATE_NOTES_VALUE", "PRIVATE_OPTION_VALUE"],
+    "contractVersion": "4",
+    "sourceSplit": "regression",
+    "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
+    "group": "state",
+    "sourceIds": ["control-states-4"]
+  },
+  {
+    "id": "control-states-5",
+    "family": "states",
+    "split": "regression",
+    "category": "state",
+    "fixture": "states",
+    "instruction": "Fill Start date.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "setupRevision": "qualification-1",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-contract-review",
+      "reviewedAt": "2026-09-30T20:59:55.247Z"
+    },
+    "expected": {
+      "outcome": "found",
+      "actions": [
+        {
+          "step": 1,
+          "action": "fill",
+          "outcome": "found",
+          "target": {
+            "selector": "#start-date",
+            "frames": []
+          },
+          "interactability": {
+            "status": "unknown",
+            "reasons": [],
+            "checks": {
+              "compatibleControl": "pass",
+              "writable": "pass",
+              "keyboard": "unknown"
+            }
+          }
+        }
+      ],
+      "summary": {
+        "processingComplete": true,
+        "semanticCompleteness": "unverified",
+        "total": 1,
+        "found": 1,
+        "notFound": 0,
+        "unsupported": 0,
+        "errors": 0,
+        "blocked": 0,
+        "readinessUnknown": 1,
+        "assessmentUnsupported": 0
+      }
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "fill",
+          "outcome": "found",
+          "label": "Start date",
+          "tag": "input"
+        }
+      ]
+    },
+    "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
+    "privacySentinels": ["PRIVATE_NOTES_VALUE", "PRIVATE_OPTION_VALUE"],
+    "contractVersion": "4",
+    "sourceSplit": "regression",
+    "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
+    "group": "state",
+    "sourceIds": ["control-states-5"]
+  },
+  {
+    "id": "control-states-6",
+    "family": "states",
+    "split": "regression",
+    "category": "state",
+    "fixture": "states",
+    "instruction": "Check Custom choice.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "setupRevision": "qualification-1",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-contract-review",
+      "reviewedAt": "2026-09-30T20:59:55.247Z"
+    },
+    "expected": {
+      "outcome": "found",
+      "actions": [
+        {
+          "step": 1,
+          "action": "check",
+          "outcome": "found",
+          "target": {
+            "selector": "#custom-choice",
+            "frames": []
+          },
+          "interactability": {
+            "status": "unsupported",
+            "reasons": ["custom_control_unverified"],
+            "checks": {
+              "compatibleControl": "unknown"
+            }
+          }
+        }
+      ],
+      "summary": {
+        "processingComplete": true,
+        "semanticCompleteness": "unverified",
+        "total": 1,
+        "found": 1,
+        "notFound": 0,
+        "unsupported": 0,
+        "errors": 0,
+        "blocked": 0,
+        "readinessUnknown": 0,
+        "assessmentUnsupported": 1
+      }
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "check",
+          "outcome": "found",
+          "label": "Custom choice",
+          "tag": "div"
+        }
+      ]
+    },
+    "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
+    "privacySentinels": ["PRIVATE_NOTES_VALUE", "PRIVATE_OPTION_VALUE"],
+    "contractVersion": "4",
+    "sourceSplit": "regression",
+    "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
+    "group": "state",
+    "sourceIds": ["control-states-6"]
+  },
+  {
+    "id": "action-families-2",
+    "family": "semantics",
+    "split": "regression",
+    "category": "semantics",
+    "fixture": "semantics",
+    "instruction": "Type into Message.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "setupRevision": "qualification-1",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-contract-review",
+      "reviewedAt": "2026-09-30T20:59:55.247Z"
+    },
+    "expected": {
+      "outcome": "found",
+      "actions": [
+        {
+          "step": 1,
+          "action": "type",
+          "outcome": "found",
+          "target": {
+            "selector": "#message",
+            "frames": []
+          },
+          "interactability": {
+            "status": "unknown",
+            "reasons": [],
+            "checks": {
+              "eventOutcome": "unknown"
+            }
+          }
+        }
+      ],
+      "summary": {
+        "processingComplete": true,
+        "semanticCompleteness": "unverified",
+        "total": 1,
+        "found": 1,
+        "notFound": 0,
+        "unsupported": 0,
+        "errors": 0,
+        "blocked": 0,
+        "readinessUnknown": 1,
+        "assessmentUnsupported": 0
+      }
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "type",
+          "outcome": "found",
+          "label": "Message",
+          "tag": "textarea"
+        }
+      ]
+    },
+    "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
+    "contractVersion": "4",
+    "sourceSplit": "regression",
+    "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
+    "group": "state",
+    "sourceIds": ["action-families-2"]
+  },
+  {
+    "id": "action-families-3",
+    "family": "semantics",
+    "split": "regression",
+    "category": "semantics",
+    "fixture": "semantics",
+    "instruction": "Clear Message.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "setupRevision": "qualification-1",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-contract-review",
+      "reviewedAt": "2026-09-30T20:59:55.247Z"
+    },
+    "expected": {
+      "outcome": "found",
+      "actions": [
+        {
+          "step": 1,
+          "action": "clear",
+          "outcome": "found",
+          "target": {
+            "selector": "#message",
+            "frames": []
+          },
+          "interactability": {
+            "status": "unknown",
+            "reasons": [],
+            "checks": {
+              "eventOutcome": "unknown"
+            }
+          }
+        }
+      ],
+      "summary": {
+        "processingComplete": true,
+        "semanticCompleteness": "unverified",
+        "total": 1,
+        "found": 1,
+        "notFound": 0,
+        "unsupported": 0,
+        "errors": 0,
+        "blocked": 0,
+        "readinessUnknown": 1,
+        "assessmentUnsupported": 0
+      }
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "clear",
+          "outcome": "found",
+          "label": "Message",
+          "tag": "textarea"
+        }
+      ]
+    },
+    "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
+    "contractVersion": "4",
+    "sourceSplit": "regression",
+    "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
+    "group": "state",
+    "sourceIds": ["action-families-3"]
+  },
+  {
+    "id": "action-families-4",
+    "family": "semantics",
+    "split": "regression",
+    "category": "semantics",
+    "fixture": "semantics",
+    "instruction": "Focus Message.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "setupRevision": "qualification-1",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-contract-review",
+      "reviewedAt": "2026-09-30T20:59:55.247Z"
+    },
+    "expected": {
+      "outcome": "found",
+      "actions": [
+        {
+          "step": 1,
+          "action": "focus",
+          "outcome": "found",
+          "target": {
+            "selector": "#message",
+            "frames": []
+          },
+          "interactability": {
+            "status": "unknown",
+            "reasons": [],
+            "checks": {
+              "eventOutcome": "unknown"
+            }
+          }
+        }
+      ],
+      "summary": {
+        "processingComplete": true,
+        "semanticCompleteness": "unverified",
+        "total": 1,
+        "found": 1,
+        "notFound": 0,
+        "unsupported": 0,
+        "errors": 0,
+        "blocked": 0,
+        "readinessUnknown": 1,
+        "assessmentUnsupported": 0
+      }
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "focus",
+          "outcome": "found",
+          "label": "Message",
+          "tag": "textarea"
+        }
+      ]
+    },
+    "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
+    "contractVersion": "4",
+    "sourceSplit": "regression",
+    "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
+    "group": "state",
+    "sourceIds": ["action-families-4"]
+  },
+  {
+    "id": "action-families-5",
+    "family": "semantics",
+    "split": "regression",
+    "category": "semantics",
+    "fixture": "semantics",
+    "instruction": "Blur Message.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "setupRevision": "qualification-1",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-contract-review",
+      "reviewedAt": "2026-09-30T20:59:55.247Z"
+    },
+    "expected": {
+      "outcome": "found",
+      "actions": [
+        {
+          "step": 1,
+          "action": "blur",
+          "outcome": "found",
+          "target": {
+            "selector": "#message",
+            "frames": []
+          },
+          "interactability": {
+            "status": "unknown",
+            "reasons": [],
+            "checks": {
+              "eventOutcome": "unknown"
+            }
+          }
+        }
+      ],
+      "summary": {
+        "processingComplete": true,
+        "semanticCompleteness": "unverified",
+        "total": 1,
+        "found": 1,
+        "notFound": 0,
+        "unsupported": 0,
+        "errors": 0,
+        "blocked": 0,
+        "readinessUnknown": 1,
+        "assessmentUnsupported": 0
+      }
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "blur",
+          "outcome": "found",
+          "label": "Message",
+          "tag": "textarea"
+        }
+      ]
+    },
+    "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
+    "contractVersion": "4",
+    "sourceSplit": "regression",
+    "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
+    "group": "state",
+    "sourceIds": ["action-families-5"]
+  },
+  {
+    "id": "action-families-6",
+    "family": "semantics",
+    "split": "regression",
+    "category": "semantics",
+    "fixture": "semantics",
+    "instruction": "Press Enter on Message.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "setupRevision": "qualification-1",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-contract-review",
+      "reviewedAt": "2026-09-30T20:59:55.247Z"
+    },
+    "expected": {
+      "outcome": "found",
+      "actions": [
+        {
+          "step": 1,
+          "action": "press",
+          "outcome": "found",
+          "target": {
+            "selector": "#message",
+            "frames": []
+          },
+          "interactability": {
+            "status": "unknown",
+            "reasons": [],
+            "checks": {
+              "eventOutcome": "unknown"
+            }
+          }
+        }
+      ],
+      "summary": {
+        "processingComplete": true,
+        "semanticCompleteness": "unverified",
+        "total": 1,
+        "found": 1,
+        "notFound": 0,
+        "unsupported": 0,
+        "errors": 0,
+        "blocked": 0,
+        "readinessUnknown": 1,
+        "assessmentUnsupported": 0
+      }
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "press",
+          "outcome": "found",
+          "label": "Message",
+          "tag": "textarea"
+        }
+      ]
+    },
+    "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
+    "contractVersion": "4",
+    "sourceSplit": "regression",
+    "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
+    "group": "state",
+    "sourceIds": ["action-families-6"]
+  },
+  {
+    "id": "action-families-7",
+    "family": "semantics",
+    "split": "regression",
+    "category": "semantics",
+    "fixture": "semantics",
+    "instruction": "Upload to Attachment.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "setupRevision": "qualification-1",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-contract-review",
+      "reviewedAt": "2026-09-30T20:59:55.247Z"
+    },
+    "expected": {
+      "outcome": "found",
+      "actions": [
+        {
+          "step": 1,
+          "action": "upload",
+          "outcome": "found",
+          "target": {
+            "selector": "#attachment",
+            "frames": []
+          },
+          "interactability": {
+            "status": "unknown",
+            "reasons": [],
+            "checks": {
+              "eventOutcome": "unknown"
+            }
+          }
+        }
+      ],
+      "summary": {
+        "processingComplete": true,
+        "semanticCompleteness": "unverified",
+        "total": 1,
+        "found": 1,
+        "notFound": 0,
+        "unsupported": 0,
+        "errors": 0,
+        "blocked": 0,
+        "readinessUnknown": 1,
+        "assessmentUnsupported": 0
+      }
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "upload",
+          "outcome": "found",
+          "label": "Attachment",
+          "tag": "input"
+        }
+      ]
+    },
+    "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
+    "contractVersion": "4",
+    "sourceSplit": "regression",
+    "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
+    "group": "state",
+    "sourceIds": ["action-families-7"]
+  },
+  {
+    "id": "action-families-8",
+    "family": "semantics",
+    "split": "regression",
+    "category": "semantics",
+    "fixture": "semantics",
+    "instruction": "Inspect Send.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "setupRevision": "qualification-1",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-contract-review",
+      "reviewedAt": "2026-09-30T20:59:55.247Z"
+    },
+    "expected": {
+      "outcome": "found",
+      "actions": [
+        {
+          "step": 1,
+          "action": "inspect",
+          "outcome": "found",
+          "target": {
+            "selector": "#send-message",
+            "frames": []
+          },
+          "interactability": {
+            "status": "ready",
+            "reasons": [],
+            "checks": {
+              "eventOutcome": "unknown"
+            }
+          }
+        }
+      ],
+      "summary": {
+        "processingComplete": true,
+        "semanticCompleteness": "unverified",
+        "total": 1,
+        "found": 1,
+        "notFound": 0,
+        "unsupported": 0,
+        "errors": 0,
+        "blocked": 0,
+        "readinessUnknown": 0,
+        "assessmentUnsupported": 0
+      }
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "inspect",
+          "outcome": "found",
+          "label": "Send",
+          "tag": "button"
+        }
+      ]
+    },
+    "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
+    "contractVersion": "4",
+    "sourceSplit": "regression",
+    "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
+    "group": "state",
+    "sourceIds": ["action-families-8"]
+  },
+  {
+    "id": "action-families-9",
+    "family": "semantics",
+    "split": "regression",
+    "category": "semantics",
+    "fixture": "semantics",
+    "instruction": "Double-click Send.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "setupRevision": "qualification-1",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-contract-review",
+      "reviewedAt": "2026-09-30T20:59:55.247Z"
+    },
+    "expected": {
+      "outcome": "found",
+      "actions": [
+        {
+          "step": 1,
+          "action": "double_click",
+          "outcome": "found",
+          "target": {
+            "selector": "#send-message",
+            "frames": []
+          },
+          "interactability": {
+            "status": "ready",
+            "reasons": [],
+            "checks": {
+              "eventOutcome": "unknown"
+            }
+          }
+        }
+      ],
+      "summary": {
+        "processingComplete": true,
+        "semanticCompleteness": "unverified",
+        "total": 1,
+        "found": 1,
+        "notFound": 0,
+        "unsupported": 0,
+        "errors": 0,
+        "blocked": 0,
+        "readinessUnknown": 0,
+        "assessmentUnsupported": 0
+      }
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "double_click",
+          "outcome": "found",
+          "label": "Send",
+          "tag": "button"
+        }
+      ]
+    },
+    "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
+    "contractVersion": "4",
+    "sourceSplit": "regression",
+    "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
+    "group": "state",
+    "sourceIds": ["action-families-9"]
+  },
+  {
+    "id": "action-families-10",
+    "family": "semantics",
+    "split": "regression",
+    "category": "semantics",
+    "fixture": "semantics",
+    "instruction": "Right-click Send.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "setupRevision": "qualification-1",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-contract-review",
+      "reviewedAt": "2026-09-30T20:59:55.247Z"
+    },
+    "expected": {
+      "outcome": "found",
+      "actions": [
+        {
+          "step": 1,
+          "action": "right_click",
+          "outcome": "found",
+          "target": {
+            "selector": "#send-message",
+            "frames": []
+          },
+          "interactability": {
+            "status": "ready",
+            "reasons": [],
+            "checks": {
+              "eventOutcome": "unknown"
+            }
+          }
+        }
+      ],
+      "summary": {
+        "processingComplete": true,
+        "semanticCompleteness": "unverified",
+        "total": 1,
+        "found": 1,
+        "notFound": 0,
+        "unsupported": 0,
+        "errors": 0,
+        "blocked": 0,
+        "readinessUnknown": 0,
+        "assessmentUnsupported": 0
+      }
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "right_click",
+          "outcome": "found",
+          "label": "Send",
+          "tag": "button"
+        }
+      ]
+    },
+    "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
+    "contractVersion": "4",
+    "sourceSplit": "regression",
+    "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
+    "group": "state",
+    "sourceIds": ["action-families-10"]
+  },
+  {
+    "id": "rail-disabled-reservation",
+    "family": "rail-timetable",
+    "split": "regression",
+    "category": "state",
+    "fixture": {
+      "kind": "derived-static-dom",
+      "tree": {
+        "tag": "table",
+        "children": [
+          {
+            "tag": "caption",
+            "text": "Train departures"
+          },
+          {
+            "tag": "thead",
+            "children": [
+              {
+                "tag": "tr",
+                "children": [
+                  {
+                    "tag": "th",
+                    "text": "Destination"
+                  },
+                  {
+                    "tag": "th",
+                    "text": "Departure"
+                  },
+                  {
+                    "tag": "th",
+                    "text": "Seat"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "tag": "tbody",
+            "children": [
+              {
+                "tag": "tr",
+                "children": [
+                  {
+                    "tag": "td",
+                    "text": "Sfax"
+                  },
+                  {
+                    "tag": "td",
+                    "text": "08:15"
+                  },
+                  {
+                    "tag": "td",
+                    "children": [
+                      {
+                        "tag": "button",
+                        "text": "Reserve",
+                        "attributes": {
+                          "id": "reserve-sfax"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "tag": "tr",
+                "children": [
+                  {
+                    "tag": "td",
+                    "text": "Bizerte"
+                  },
+                  {
+                    "tag": "td",
+                    "text": "09:40"
+                  },
+                  {
+                    "tag": "td",
+                    "children": [
+                      {
+                        "tag": "button",
+                        "text": "Reserve",
+                        "attributes": {
+                          "id": "reserve-bizerte",
+                          "disabled": ""
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "instruction": "Click Reserve in the Bizerte row.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "expected": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "target": {
+            "selector": "#reserve-bizerte",
+            "frames": []
+          },
+          "state": {
+            "enabled": false
+          },
+          "interactability": {
+            "status": "blocked",
+            "reasons": ["disabled"],
+            "checks": {
+              "enabled": "fail"
+            }
+          }
+        }
+      ],
+      "outcome": "found",
+      "summary": {
+        "processingComplete": true,
+        "semanticCompleteness": "unverified",
+        "total": 1,
+        "found": 1,
+        "notFound": 0,
+        "unsupported": 0,
+        "errors": 0,
+        "blocked": 1,
+        "readinessUnknown": 0,
+        "assessmentUnsupported": 0
+      }
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "label": "Reserve",
+          "tag": "button",
+          "index": 1
+        }
+      ]
+    },
+    "oracleSentinels": ["QUALIFICATION_ORACLE_PRIVATE_37e2"],
+    "contractVersion": "4",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-contract-review",
+      "reviewedAt": "2026-09-30T20:59:55.247Z"
+    },
+    "setupRevision": "qualification-1",
+    "previousSplit": "held-out",
+    "exposedAt": "2026-09-30",
+    "exposureRunId": "312713e2-f4ba-4e35-b28b-6df3e3e78fce",
+    "sourceSplit": "regression",
+    "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
+    "group": "state",
+    "sourceIds": ["rail-disabled-reservation"]
+  },
+  {
+    "id": "clinic-readonly-clear",
+    "family": "clinic-consultation",
+    "split": "regression",
+    "category": "state",
+    "fixture": {
+      "kind": "derived-static-dom",
+      "tree": {
+        "tag": "form",
+        "attributes": {
+          "aria-label": "Visit notes"
+        },
+        "children": [
+          {
+            "tag": "p",
+            "text": "Completed consultation"
+          },
+          {
+            "tag": "label",
+            "text": "Clinician summary",
+            "attributes": {
+              "for": "consultation-summary"
+            }
+          },
+          {
+            "tag": "textarea",
+            "attributes": {
+              "id": "consultation-summary",
+              "readonly": ""
+            }
+          },
+          {
+            "tag": "label",
+            "text": "Follow-up question",
+            "attributes": {
+              "for": "followup-question"
+            }
+          },
+          {
+            "tag": "textarea",
+            "attributes": {
+              "id": "followup-question"
+            }
+          }
+        ]
+      }
+    },
+    "instruction": "Clear the clinician summary.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "expected": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "clear",
+          "outcome": "found",
+          "target": {
+            "selector": "#consultation-summary",
+            "frames": []
+          },
+          "state": {
+            "readonly": true,
+            "editable": false
+          },
+          "interactability": {
+            "status": "blocked",
+            "reasons": ["readonly"],
+            "checks": {
+              "writable": "fail",
+              "keyboard": "unknown"
+            }
+          }
+        }
+      ],
+      "outcome": "found",
+      "summary": {
+        "processingComplete": true,
+        "semanticCompleteness": "unverified",
+        "total": 1,
+        "found": 1,
+        "notFound": 0,
+        "unsupported": 0,
+        "errors": 0,
+        "blocked": 1,
+        "readinessUnknown": 0,
+        "assessmentUnsupported": 0
+      }
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "clear",
+          "outcome": "found",
+          "label": "Clinician summary",
+          "tag": "textarea"
+        }
+      ]
+    },
+    "oracleSentinels": ["QUALIFICATION_ORACLE_PRIVATE_37e2"],
+    "contractVersion": "4",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-contract-review",
+      "reviewedAt": "2026-09-30T20:59:55.247Z"
+    },
+    "setupRevision": "qualification-1",
+    "previousSplit": "held-out",
+    "exposedAt": "2026-09-30",
+    "exposureRunId": "312713e2-f4ba-4e35-b28b-6df3e3e78fce",
+    "sourceSplit": "regression",
+    "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
+    "group": "state",
+    "sourceIds": ["clinic-readonly-clear"]
+  },
+  {
+    "id": "clinic-fill-question",
+    "family": "clinic-consultation",
+    "split": "regression",
+    "category": "semantics",
+    "fixture": {
+      "kind": "derived-static-dom",
+      "tree": {
+        "tag": "form",
+        "attributes": {
+          "aria-label": "Visit notes"
+        },
+        "children": [
+          {
+            "tag": "p",
+            "text": "Completed consultation"
+          },
+          {
+            "tag": "label",
+            "text": "Clinician summary",
+            "attributes": {
+              "for": "consultation-summary"
+            }
+          },
+          {
+            "tag": "textarea",
+            "attributes": {
+              "id": "consultation-summary",
+              "readonly": ""
+            }
+          },
+          {
+            "tag": "label",
+            "text": "Follow-up question",
+            "attributes": {
+              "for": "followup-question"
+            }
+          },
+          {
+            "tag": "textarea",
+            "attributes": {
+              "id": "followup-question"
+            }
+          }
+        ]
+      }
+    },
+    "instruction": "Fill Follow-up question with a new message.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "expected": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "fill",
+          "outcome": "found",
+          "target": {
+            "selector": "#followup-question",
+            "frames": []
+          },
+          "state": {
+            "editable": true,
+            "readonly": false
+          },
+          "interactability": {
+            "status": "unknown",
+            "reasons": [],
+            "checks": {
+              "compatibleControl": "pass",
+              "keyboard": "unknown",
+              "eventOutcome": "unknown"
+            }
+          }
+        }
+      ],
+      "outcome": "found",
+      "summary": {
+        "processingComplete": true,
+        "semanticCompleteness": "unverified",
+        "total": 1,
+        "found": 1,
+        "notFound": 0,
+        "unsupported": 0,
+        "errors": 0,
+        "blocked": 0,
+        "readinessUnknown": 1,
+        "assessmentUnsupported": 0
+      }
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "fill",
+          "outcome": "found",
+          "label": "Follow-up question",
+          "tag": "textarea"
+        }
+      ]
+    },
+    "oracleSentinels": ["QUALIFICATION_ORACLE_PRIVATE_37e2"],
+    "contractVersion": "4",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-contract-review",
+      "reviewedAt": "2026-09-30T20:59:55.247Z"
+    },
+    "setupRevision": "qualification-1",
+    "previousSplit": "held-out",
+    "exposedAt": "2026-09-30",
+    "exposureRunId": "312713e2-f4ba-4e35-b28b-6df3e3e78fce",
+    "sourceSplit": "regression",
+    "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
+    "group": "state",
+    "sourceIds": ["clinic-fill-question"]
+  },
+  {
+    "id": "museum-hover-access",
+    "family": "museum-navigation",
+    "split": "regression",
+    "category": "semantics",
+    "fixture": {
+      "kind": "derived-static-dom",
+      "tree": {
+        "tag": "nav",
+        "attributes": {
+          "aria-label": "Museum visitor information"
+        },
+        "children": [
+          {
+            "tag": "h2",
+            "text": "Plan a visit"
+          },
+          {
+            "tag": "ol",
+            "children": [
+              {
+                "tag": "li",
+                "children": [
+                  {
+                    "tag": "a",
+                    "text": "Opening hours",
+                    "attributes": {
+                      "id": "museum-hours",
+                      "href": "#"
+                    }
+                  }
+                ]
+              },
+              {
+                "tag": "li",
+                "children": [
+                  {
+                    "tag": "a",
+                    "text": "À propos du musée",
+                    "attributes": {
+                      "id": "museum-about",
+                      "href": "#"
+                    }
+                  }
+                ]
+              },
+              {
+                "tag": "li",
+                "children": [
+                  {
+                    "tag": "a",
+                    "text": "Accessibility",
+                    "attributes": {
+                      "id": "museum-access",
+                      "href": "#"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "instruction": "Hover over Accessibility.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "expected": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "hover",
+          "outcome": "found",
+          "target": {
+            "selector": "#museum-access",
+            "frames": []
+          },
+          "state": {
+            "enabled": true,
+            "inViewport": true
+          },
+          "interactability": {
+            "status": "ready",
+            "reasons": [],
+            "checks": {
+              "compatibleControl": "pass",
+              "enabled": "not_applicable",
+              "viewport": "pass",
+              "pointerReception": "pass",
+              "eventOutcome": "unknown"
+            }
+          }
+        }
+      ],
+      "outcome": "found",
+      "summary": {
+        "processingComplete": true,
+        "semanticCompleteness": "unverified",
+        "total": 1,
+        "found": 1,
+        "notFound": 0,
+        "unsupported": 0,
+        "errors": 0,
+        "blocked": 0,
+        "readinessUnknown": 0,
+        "assessmentUnsupported": 0
+      }
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "hover",
+          "outcome": "found",
+          "label": "Accessibility",
+          "tag": "a"
+        }
+      ]
+    },
+    "oracleSentinels": ["QUALIFICATION_ORACLE_PRIVATE_37e2"],
+    "contractVersion": "4",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-contract-review",
+      "reviewedAt": "2026-09-30T20:59:55.247Z"
+    },
+    "setupRevision": "qualification-1",
+    "previousSplit": "held-out",
+    "exposedAt": "2026-09-30",
+    "exposureRunId": "312713e2-f4ba-4e35-b28b-6df3e3e78fce",
+    "sourceSplit": "regression",
+    "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
+    "group": "state",
+    "sourceIds": ["museum-hover-access"]
+  },
+  {
+    "id": "greenhouse-uncheck",
+    "family": "greenhouse-controls",
+    "split": "regression",
+    "category": "state",
+    "fixture": {
+      "kind": "derived-static-dom",
+      "tree": {
+        "tag": "aside",
+        "attributes": {
+          "aria-label": "Greenhouse schedule"
+        },
+        "children": [
+          {
+            "tag": "h2",
+            "text": "Irrigation"
+          },
+          {
+            "tag": "label",
+            "children": [
+              {
+                "tag": "input",
+                "attributes": {
+                  "id": "watering-dawn",
+                  "type": "checkbox",
+                  "checked": ""
+                }
+              },
+              {
+                "tag": "span",
+                "text": "Water at dawn"
+              }
+            ]
+          },
+          {
+            "tag": "br"
+          },
+          {
+            "tag": "label",
+            "children": [
+              {
+                "tag": "input",
+                "attributes": {
+                  "id": "watering-dusk",
+                  "type": "checkbox"
+                }
+              },
+              {
+                "tag": "span",
+                "text": "Water at dusk"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "instruction": "Uncheck Water at dawn.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "expected": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "uncheck",
+          "outcome": "found",
+          "target": {
+            "selector": "#watering-dawn",
+            "frames": []
+          },
+          "state": {
+            "checked": true,
+            "enabled": true
+          },
+          "interactability": {
+            "status": "ready",
+            "reasons": [],
+            "checks": {
+              "compatibleControl": "pass",
+              "enabled": "pass",
+              "viewport": "pass",
+              "pointerReception": "pass",
+              "eventOutcome": "unknown"
+            }
+          }
+        }
+      ],
+      "outcome": "found",
+      "summary": {
+        "processingComplete": true,
+        "semanticCompleteness": "unverified",
+        "total": 1,
+        "found": 1,
+        "notFound": 0,
+        "unsupported": 0,
+        "errors": 0,
+        "blocked": 0,
+        "readinessUnknown": 0,
+        "assessmentUnsupported": 0
+      }
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "uncheck",
+          "outcome": "found",
+          "label": "Water at dawn",
+          "tag": "input"
+        }
+      ]
+    },
+    "oracleSentinels": ["QUALIFICATION_ORACLE_PRIVATE_37e2"],
+    "contractVersion": "4",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-contract-review",
+      "reviewedAt": "2026-09-30T20:59:55.247Z"
+    },
+    "setupRevision": "qualification-1",
+    "previousSplit": "held-out",
+    "exposedAt": "2026-09-30",
+    "exposureRunId": "312713e2-f4ba-4e35-b28b-6df3e3e78fce",
+    "sourceSplit": "regression",
+    "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
+    "group": "state",
+    "sourceIds": ["greenhouse-uncheck"]
+  },
+  {
+    "id": "studio-select-codec",
+    "family": "studio-export",
+    "split": "regression",
+    "category": "semantics",
+    "fixture": {
+      "kind": "derived-static-dom",
+      "tree": {
+        "tag": "article",
+        "children": [
+          {
+            "tag": "header",
+            "children": [
+              {
+                "tag": "h1",
+                "text": "Audio mastering"
+              }
+            ]
+          },
+          {
+            "tag": "dl",
+            "children": [
+              {
+                "tag": "dt",
+                "text": "Output"
+              },
+              {
+                "tag": "dd",
+                "children": [
+                  {
+                    "tag": "label",
+                    "text": "Export codec",
+                    "attributes": {
+                      "for": "export-codec"
+                    }
+                  },
+                  {
+                    "tag": "select",
+                    "attributes": {
+                      "id": "export-codec"
+                    },
+                    "children": [
+                      {
+                        "tag": "option",
+                        "text": "FLAC"
+                      },
+                      {
+                        "tag": "option",
+                        "text": "WAV"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "tag": "footer",
+            "children": [
+              {
+                "tag": "button",
+                "text": "Render audio",
+                "attributes": {
+                  "id": "render-audio"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "instruction": "Select the Export codec control.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "expected": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "select",
+          "outcome": "found",
+          "target": {
+            "selector": "#export-codec",
+            "frames": []
+          },
+          "state": {
+            "selectedOptionCount": 1
+          },
+          "interactability": {
+            "status": "unknown",
+            "reasons": [],
+            "checks": {
+              "compatibleControl": "pass",
+              "keyboard": "unknown",
+              "eventOutcome": "unknown"
+            }
+          }
+        }
+      ],
+      "outcome": "found",
+      "summary": {
+        "processingComplete": true,
+        "semanticCompleteness": "unverified",
+        "total": 1,
+        "found": 1,
+        "notFound": 0,
+        "unsupported": 0,
+        "errors": 0,
+        "blocked": 0,
+        "readinessUnknown": 1,
+        "assessmentUnsupported": 0
+      }
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "select",
+          "outcome": "found",
+          "label": "Export codec",
+          "tag": "select"
+        }
+      ]
+    },
+    "oracleSentinels": ["QUALIFICATION_ORACLE_PRIVATE_37e2"],
+    "contractVersion": "4",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-contract-review",
+      "reviewedAt": "2026-09-30T20:59:55.247Z"
+    },
+    "setupRevision": "qualification-1",
+    "previousSplit": "held-out",
+    "exposedAt": "2026-09-30",
+    "exposureRunId": "312713e2-f4ba-4e35-b28b-6df3e3e78fce",
+    "sourceSplit": "regression",
+    "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
+    "group": "state",
+    "sourceIds": ["studio-select-codec"]
+  },
+  {
+    "id": "warehouse-mixed",
+    "family": "warehouse-dispatch",
+    "split": "regression",
+    "category": "semantics",
+    "fixture": {
+      "kind": "derived-static-dom",
+      "tree": {
+        "tag": "main",
+        "children": [
+          {
+            "tag": "section",
+            "attributes": {
+              "aria-label": "Cold storage"
+            },
+            "children": [
+              {
+                "tag": "h2",
+                "text": "Cold storage"
+              },
+              {
+                "tag": "ul",
+                "children": [
+                  {
+                    "tag": "li",
+                    "children": [
+                      {
+                        "tag": "strong",
+                        "text": "Crate 41"
+                      },
+                      {
+                        "tag": "button",
+                        "text": "Release",
+                        "attributes": {
+                          "id": "release-41"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "tag": "li",
+                    "children": [
+                      {
+                        "tag": "strong",
+                        "text": "Crate 42"
+                      },
+                      {
+                        "tag": "button",
+                        "text": "Release",
+                        "attributes": {
+                          "id": "release-42"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "tag": "section",
+            "attributes": {
+              "aria-label": "Dry storage"
+            },
+            "children": [
+              {
+                "tag": "h2",
+                "text": "Dry storage"
+              },
+              {
+                "tag": "button",
+                "text": "Release",
+                "attributes": {
+                  "id": "release-90"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "instruction": "Click a Release button and inspect Cold storage.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "expected": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "unsupported",
+          "outcome": "unsupported"
+        }
+      ],
+      "outcome": "unsupported",
+      "summary": {
+        "processingComplete": true,
+        "semanticCompleteness": "unverified",
+        "total": 1,
+        "found": 0,
+        "notFound": 0,
+        "unsupported": 1,
+        "errors": 0,
+        "blocked": 0,
+        "readinessUnknown": 0,
+        "assessmentUnsupported": 0
+      }
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "unsupported",
+          "outcome": "unsupported",
+          "limitation": "unsupported_action"
+        }
+      ]
+    },
+    "oracleSentinels": ["QUALIFICATION_ORACLE_PRIVATE_37e2"],
+    "contractVersion": "4",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-contract-review",
+      "reviewedAt": "2026-09-30T20:59:55.247Z"
+    },
+    "setupRevision": "qualification-1",
+    "previousSplit": "held-out",
+    "exposedAt": "2026-09-30",
+    "exposureRunId": "312713e2-f4ba-4e35-b28b-6df3e3e78fce",
+    "sourceSplit": "regression",
+    "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
+    "group": "state",
+    "sourceIds": ["warehouse-mixed"]
+  },
+  {
+    "id": "parcel-radio",
+    "family": "parcel-packaging",
+    "split": "regression",
+    "category": "state",
+    "fixture": {
+      "kind": "derived-static-dom",
+      "tree": {
+        "tag": "section",
+        "attributes": {
+          "aria-label": "Parcel preferences"
+        },
+        "children": [
+          {
+            "tag": "h2",
+            "text": "Packaging"
+          },
+          {
+            "tag": "p",
+            "text": "Choose one material."
+          },
+          {
+            "tag": "label",
+            "children": [
+              {
+                "tag": "input",
+                "attributes": {
+                  "id": "package-paper",
+                  "type": "radio",
+                  "name": "material"
+                }
+              },
+              {
+                "tag": "span",
+                "text": "Recycled paper"
+              }
+            ]
+          },
+          {
+            "tag": "label",
+            "children": [
+              {
+                "tag": "input",
+                "attributes": {
+                  "id": "package-fiber",
+                  "type": "radio",
+                  "name": "material",
+                  "checked": ""
+                }
+              },
+              {
+                "tag": "span",
+                "text": "Plant fibre"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "instruction": "Check Recycled paper.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "expected": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "check",
+          "outcome": "found",
+          "target": {
+            "selector": "#package-paper",
+            "frames": []
+          },
+          "state": {
+            "checked": false,
+            "enabled": true
+          },
+          "interactability": {
+            "status": "ready",
+            "reasons": [],
+            "checks": {
+              "compatibleControl": "pass",
+              "enabled": "pass",
+              "viewport": "pass",
+              "pointerReception": "pass",
+              "eventOutcome": "unknown"
+            }
+          }
+        }
+      ],
+      "outcome": "found",
+      "summary": {
+        "processingComplete": true,
+        "semanticCompleteness": "unverified",
+        "total": 1,
+        "found": 1,
+        "notFound": 0,
+        "unsupported": 0,
+        "errors": 0,
+        "blocked": 0,
+        "readinessUnknown": 0,
+        "assessmentUnsupported": 0
+      }
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "check",
+          "outcome": "found",
+          "label": "Recycled paper",
+          "tag": "input"
+        }
+      ]
+    },
+    "oracleSentinels": ["QUALIFICATION_ORACLE_PRIVATE_37e2"],
+    "contractVersion": "4",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-contract-review",
+      "reviewedAt": "2026-09-30T20:59:55.247Z"
+    },
+    "setupRevision": "qualification-1",
+    "previousSplit": "held-out",
+    "exposedAt": "2026-09-30",
+    "exposureRunId": "312713e2-f4ba-4e35-b28b-6df3e3e78fce",
+    "sourceSplit": "regression",
+    "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
+    "group": "state",
+    "sourceIds": ["parcel-radio"]
+  },
+  {
+    "id": "laboratory-upload",
+    "family": "laboratory-submission",
+    "split": "regression",
+    "category": "semantics",
+    "fixture": {
+      "kind": "derived-static-dom",
+      "tree": {
+        "tag": "form",
+        "attributes": {
+          "aria-label": "Microscopy submission"
+        },
+        "children": [
+          {
+            "tag": "h2",
+            "text": "Specimen evidence"
+          },
+          {
+            "tag": "figure",
+            "children": [
+              {
+                "tag": "figcaption",
+                "text": "Attach the laboratory image for review."
+              },
+              {
+                "tag": "label",
+                "text": "Micrograph file",
+                "attributes": {
+                  "for": "micrograph-file"
+                }
+              },
+              {
+                "tag": "input",
+                "attributes": {
+                  "id": "micrograph-file",
+                  "type": "file"
+                }
+              }
+            ]
+          },
+          {
+            "tag": "button",
+            "text": "Submit specimen",
+            "attributes": {
+              "id": "submit-specimen"
+            }
+          }
+        ]
+      }
+    },
+    "instruction": "Upload to Micrograph file.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "expected": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "upload",
+          "outcome": "found",
+          "target": {
+            "selector": "#micrograph-file",
+            "frames": []
+          },
+          "state": {
+            "enabled": true,
+            "inViewport": true
+          },
+          "interactability": {
+            "status": "unknown",
+            "reasons": [],
+            "checks": {
+              "compatibleControl": "pass",
+              "keyboard": "unknown",
+              "eventOutcome": "unknown"
+            }
+          }
+        }
+      ],
+      "outcome": "found",
+      "summary": {
+        "processingComplete": true,
+        "semanticCompleteness": "unverified",
+        "total": 1,
+        "found": 1,
+        "notFound": 0,
+        "unsupported": 0,
+        "errors": 0,
+        "blocked": 0,
+        "readinessUnknown": 1,
+        "assessmentUnsupported": 0
+      }
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "upload",
+          "outcome": "found",
+          "label": "Micrograph file",
+          "tag": "input"
+        }
+      ]
+    },
+    "oracleSentinels": ["QUALIFICATION_ORACLE_PRIVATE_37e2"],
+    "contractVersion": "4",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-contract-review",
+      "reviewedAt": "2026-09-30T20:59:55.247Z"
+    },
+    "setupRevision": "qualification-1",
+    "previousSplit": "held-out",
+    "exposedAt": "2026-09-30",
+    "exposureRunId": "312713e2-f4ba-4e35-b28b-6df3e3e78fce",
+    "sourceSplit": "regression",
+    "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
+    "group": "state",
+    "sourceIds": ["laboratory-upload"]
+  },
+  {
+    "id": "laboratory-future-workflow",
+    "family": "laboratory-submission",
+    "split": "regression",
+    "category": "semantics",
+    "fixture": {
+      "kind": "derived-static-dom",
+      "tree": {
+        "tag": "form",
+        "attributes": {
+          "aria-label": "Microscopy submission"
+        },
+        "children": [
+          {
+            "tag": "h2",
+            "text": "Specimen evidence"
+          },
+          {
+            "tag": "figure",
+            "children": [
+              {
+                "tag": "figcaption",
+                "text": "Attach the laboratory image for review."
+              },
+              {
+                "tag": "label",
+                "text": "Micrograph file",
+                "attributes": {
+                  "for": "micrograph-file"
+                }
+              },
+              {
+                "tag": "input",
+                "attributes": {
+                  "id": "micrograph-file",
+                  "type": "file"
+                }
+              }
+            ]
+          },
+          {
+            "tag": "button",
+            "text": "Submit specimen",
+            "attributes": {
+              "id": "submit-specimen"
+            }
+          }
+        ]
+      }
+    },
+    "instruction": "Click Submit specimen, then click the confirmation dialog button.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "expected": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "unsupported"
+        }
+      ],
+      "outcome": "unsupported",
+      "summary": {
+        "processingComplete": true,
+        "semanticCompleteness": "unverified",
+        "total": 1,
+        "found": 0,
+        "notFound": 0,
+        "unsupported": 1,
+        "errors": 0,
+        "blocked": 0,
+        "readinessUnknown": 0,
+        "assessmentUnsupported": 0
+      }
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "unsupported",
+          "limitation": "current_state_dependency"
+        }
+      ]
+    },
+    "oracleSentinels": ["QUALIFICATION_ORACLE_PRIVATE_37e2"],
+    "contractVersion": "4",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-contract-review",
+      "reviewedAt": "2026-09-30T20:59:55.247Z"
+    },
+    "setupRevision": "qualification-1",
+    "previousSplit": "held-out",
+    "exposedAt": "2026-09-30",
+    "exposureRunId": "312713e2-f4ba-4e35-b28b-6df3e3e78fce",
+    "sourceSplit": "regression",
+    "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
+    "group": "state",
+    "sourceIds": ["laboratory-future-workflow"]
+  },
+  {
+    "id": "recipe-named-targets",
+    "family": "recipe-planning",
+    "split": "regression",
+    "category": "semantics",
+    "fixture": {
+      "kind": "derived-static-dom",
+      "tree": {
+        "tag": "article",
+        "attributes": {
+          "aria-label": "Couscous recipe"
+        },
+        "children": [
+          {
+            "tag": "h1",
+            "text": "Vegetable couscous"
+          },
+          {
+            "tag": "blockquote",
+            "text": "Allow the broth to simmer gently."
+          },
+          {
+            "tag": "div",
+            "children": [
+              {
+                "tag": "button",
+                "text": "Print recipe",
+                "attributes": {
+                  "id": "recipe-print"
+                }
+              },
+              {
+                "tag": "button",
+                "text": "Add to meal plan",
+                "attributes": {
+                  "id": "recipe-plan"
+                }
+              }
+            ]
+          },
+          {
+            "tag": "hr"
+          },
+          {
+            "tag": "p",
+            "text": "Serves four."
+          }
+        ]
+      }
+    },
+    "instruction": "Click Print recipe and Add to meal plan.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "expected": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "target": {
+            "selector": "#recipe-print",
+            "frames": []
+          },
+          "state": {
+            "enabled": true,
+            "inViewport": true
+          },
+          "interactability": {
+            "status": "ready",
+            "reasons": [],
+            "checks": {
+              "compatibleControl": "pass",
+              "enabled": "pass",
+              "viewport": "pass",
+              "pointerReception": "pass",
+              "eventOutcome": "unknown"
+            }
+          }
+        },
+        {
+          "step": 2,
+          "action": "click",
+          "outcome": "found",
+          "target": {
+            "selector": "#recipe-plan",
+            "frames": []
+          },
+          "state": {
+            "enabled": true,
+            "inViewport": true
+          },
+          "interactability": {
+            "status": "ready",
+            "reasons": [],
+            "checks": {
+              "compatibleControl": "pass",
+              "enabled": "pass",
+              "viewport": "pass",
+              "pointerReception": "pass",
+              "eventOutcome": "unknown"
+            }
+          }
+        }
+      ],
+      "outcome": "found",
+      "summary": {
+        "processingComplete": true,
+        "semanticCompleteness": "unverified",
+        "total": 2,
+        "found": 2,
+        "notFound": 0,
+        "unsupported": 0,
+        "errors": 0,
+        "blocked": 0,
+        "readinessUnknown": 0,
+        "assessmentUnsupported": 0
+      }
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "label": "Print recipe",
+          "tag": "button"
+        },
+        {
+          "step": 2,
+          "action": "click",
+          "outcome": "found",
+          "label": "Add to meal plan",
+          "tag": "button"
+        }
+      ]
+    },
+    "oracleSentinels": ["QUALIFICATION_ORACLE_PRIVATE_37e2"],
+    "contractVersion": "4",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-contract-review",
+      "reviewedAt": "2026-09-30T20:59:55.247Z"
+    },
+    "setupRevision": "qualification-1",
+    "previousSplit": "held-out",
+    "exposedAt": "2026-09-30",
+    "exposureRunId": "312713e2-f4ba-4e35-b28b-6df3e3e78fce",
+    "sourceSplit": "regression",
+    "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
+    "group": "state",
+    "sourceIds": ["recipe-named-targets"],
+    "cardinality": "all"
+  },
+  {
+    "id": "plural-partial",
+    "family": "batch",
+    "split": "regression",
+    "category": "semantics",
+    "fixture": "batch",
+    "instruction": "Click all Approve buttons, hover Missing, and pause for two seconds.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "setupRevision": "1",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-fixture-review",
+      "reviewedAt": "2026-09-30T17:17:50Z"
+    },
+    "expected": {
+      "outcome": "unsupported",
+      "actions": [
+        {
+          "step": 1,
+          "action": "unsupported",
+          "outcome": "unsupported",
+          "code": "unsupported_action"
+        }
+      ]
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "unsupported",
+          "outcome": "unsupported",
+          "limitation": "unsupported_action"
+        }
+      ]
+    },
+    "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
+    "sourceSplit": "development",
+    "sourceCatalogs": ["cases.json"],
+    "group": "state",
+    "contractVersion": "4",
+    "sourceIds": ["plural-partial"],
+    "cardinality": "all"
+  },
+  {
+    "id": "control-states",
+    "family": "states",
+    "split": "regression",
+    "category": "state",
+    "fixture": "states",
+    "instruction": "Click Save settings, fill Notes, check Newsletter, select Country, fill Start date, and check Custom choice.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "setupRevision": "1",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-fixture-review",
+      "reviewedAt": "2026-09-30T17:17:50Z"
+    },
+    "expected": {
+      "outcome": "unsupported",
+      "actions": [
+        {
+          "step": 1,
+          "action": "unsupported",
+          "outcome": "unsupported",
+          "code": "unsupported_action"
+        }
+      ]
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "unsupported",
+          "outcome": "unsupported",
+          "limitation": "unsupported_action"
+        }
+      ]
+    },
+    "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
+    "privacySentinels": ["PRIVATE_NOTES_VALUE", "PRIVATE_OPTION_VALUE"],
+    "sourceSplit": "regression",
+    "sourceCatalogs": ["cases.json"],
+    "group": "state",
+    "contractVersion": "4",
+    "sourceIds": ["control-states"]
+  },
+  {
+    "id": "action-families",
+    "family": "semantics",
+    "split": "regression",
+    "category": "semantics",
+    "fixture": "semantics",
+    "instruction": "Fill Message, type into Message, clear Message, focus Message, blur Message, press Enter on Message, upload to Attachment, inspect Send, double-click Send, then right-click Send.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "setupRevision": "1",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-fixture-review",
+      "reviewedAt": "2026-09-30T17:17:50Z"
+    },
+    "expected": {
+      "outcome": "unsupported",
+      "actions": [
+        {
+          "step": 1,
+          "action": "unsupported",
+          "outcome": "unsupported",
+          "code": "unsupported_action"
+        }
+      ]
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "unsupported",
+          "outcome": "unsupported",
+          "limitation": "unsupported_action"
+        }
+      ]
+    },
+    "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
+    "sourceSplit": "regression",
+    "sourceCatalogs": ["cases.json"],
+    "group": "state",
+    "contractVersion": "4",
+    "sourceIds": ["action-families"]
   }
 ]

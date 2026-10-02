@@ -109,7 +109,7 @@ const server = createServer(async (request, response) => {
           )
           .replace("</nav>", '<button data-testid="shared">Other</button></nav>');
       if (path === "/oversized")
-        html = html.replace("</nav>", "</nav>" + "<button>Extra</button>".repeat(2100));
+        html = html.replace("</nav>", "</nav>" + "<button>Extra</button>".repeat(20100));
       response.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
       response.end(html);
       return;
@@ -201,13 +201,24 @@ const server = createServer(async (request, response) => {
                         limitation: item.limitation ?? "none",
                       })),
                     }
-                  : scenario === "absent"
-                    ? { outcome: "not_found", action: targetAction, candidateId: null }
-                    : {
-                        outcome: "found",
-                        action: targetAction,
-                        candidateId: scenario === "unknown" ? "fabricated-id" : target.id,
-                      },
+                  : {
+                      complete: true,
+                      actions: [
+                        {
+                          step: 1,
+                          instruction: `${targetAction} ${targetText}`,
+                          action: targetAction,
+                          outcome: scenario === "absent" ? "not_found" : "found",
+                          candidateId:
+                            scenario === "absent"
+                              ? null
+                              : scenario === "unknown"
+                                ? "fabricated-id"
+                                : target.id,
+                          limitation: "none",
+                        },
+                      ],
+                    },
               ),
             },
           },

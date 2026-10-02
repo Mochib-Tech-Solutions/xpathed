@@ -75,7 +75,7 @@ else if(args[0]==='image'&&args[1]==='inspect'){const id=args.at(-1);console.log
 else if(args[0]==='image'&&args[1]==='save')fs.writeFileSync(args[args.indexOf('--output')+1],'images');
 else if(args[0]==='image'&&args[1]==='load'){}
 else if(args[0]==='ps') { if(fs.existsSync(process.env.TEST_STATE)){const filter=args.find(a=>a.includes('compose.service=')); const replacement=process.env.TEST_FAIL==='replacement'&&fs.existsSync(process.env.TEST_STATE+'.executed'); if(filter)console.log(filter.endsWith('=browser-baseline')?'4'.repeat(64):filter.endsWith('=resolver-baseline')?'5'.repeat(64):filter.endsWith('=browser')?'1'.repeat(64):(replacement?'3':'2').repeat(64));} }
-else if(args[0]==='inspect'){const id=args.at(-1); const reference=['4','5'].some(n=>id===n.repeat(64));const component=['1','4'].some(n=>id===n.repeat(64))?'browser':'resolver';const after=fs.existsSync(process.env.TEST_STATE+'.executed');console.log(JSON.stringify([{Id:id,Image:process.env.TEST_FAIL===(after?'after':'before')?'sha256:'+'f'.repeat(64):ids[component],State:{Running:true},Config:{Labels:{'com.docker.compose.project':process.env.COMPOSE_PROJECT_NAME,'com.docker.compose.service':reference?component+'-baseline':component==='browser'?'browser':'resolver-qwen','com.docker.compose.project.working_dir':process.env.TEST_ROOT}}}]));}
+else if(args[0]==='inspect'){const id=args.at(-1); const reference=['4','5'].some(n=>id===n.repeat(64));const component=['1','4'].some(n=>id===n.repeat(64))?'browser':'resolver';const after=fs.existsSync(process.env.TEST_STATE+'.executed');console.log(JSON.stringify([{Id:id,Image:process.env.TEST_FAIL===(after?'after':'before')?'sha256:'+'f'.repeat(64):ids[component],State:{Running:true},Config:{Labels:{'com.docker.compose.project':process.env.COMPOSE_PROJECT_NAME,'com.docker.compose.service':reference?component+'-baseline':component==='browser'?'browser':'resolver','com.docker.compose.project.working_dir':process.env.TEST_ROOT}}}]));}
 else if(args[0]==='compose'){
  const operation=args.find(a=>['config','down','run','up','exec'].includes(a));
  if(operation==='config'){}
@@ -101,7 +101,7 @@ else if(args[0]==='compose'){
       "scripts/release/bundle.mjs",
       "create",
       "--profile",
-      "qwen",
+      "deepseek",
       "--source-sha",
       sha,
       "--output",
@@ -122,7 +122,7 @@ else if(args[0]==='compose'){
       "--sha256",
       digest,
       "--profile",
-      "qwen",
+      "deepseek",
       "--mode",
       "deterministic",
       "--output",
@@ -150,7 +150,7 @@ test("qualification uses only the restored component IDs and attests them before
     ),
   );
   const up = calls.find((args) => args.includes("up"));
-  assert.deepEqual(up.slice(-3), ["browser", "resolver-qwen", "evaluation-fixture"]);
+  assert.deepEqual(up.slice(-3), ["browser", "resolver", "evaluation-fixture"]);
   assert.equal(up[up.indexOf("--pull") + 1], "never");
   assert.ok(calls.some((args) => args.includes("down")));
 });
@@ -179,7 +179,7 @@ test("wrong digest, dirty source, source revision, profile and identity override
         "--sha256",
         failure === "digest" ? "f".repeat(64) : work.digest,
         "--profile",
-        failure === "profile" ? "luna" : "qwen",
+        failure === "profile" ? "luna" : "deepseek",
         "--mode",
         "deterministic",
         "--output",

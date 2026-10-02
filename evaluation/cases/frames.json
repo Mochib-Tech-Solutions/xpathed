@@ -51,7 +51,7 @@
       "viewport-baseline-cases.json",
       "cases.json"
     ],
-    "sourceIds": ["clipped-frame-v4", "current-view-clipped-frame-v4"],
+    "sourceIds": ["clipped-frame-v4", "current-view-clipped-frame-v4", "clipped-frame-v3"],
     "group": "frames"
   },
   {
@@ -126,6 +126,63 @@
     "contractVersion": "4",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "frames"
+    "group": "frames",
+    "sourceIds": ["nested-frame-v4", "nested-frame", "nested-frame-contract-1"]
+  },
+  {
+    "id": "shadow-unsupported",
+    "family": "shadow",
+    "split": "regression",
+    "category": "integration",
+    "fixture": "shadow",
+    "instruction": "Click Shadow save.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "setupRevision": "qualification-1",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-contract-review",
+      "reviewedAt": "2026-09-30T20:59:55.247Z"
+    },
+    "expected": {
+      "outcome": "unsupported",
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "unsupported"
+        }
+      ],
+      "summary": {
+        "processingComplete": true,
+        "semanticCompleteness": "unverified",
+        "total": 1,
+        "found": 0,
+        "notFound": 0,
+        "unsupported": 1,
+        "errors": 0,
+        "blocked": 0,
+        "readinessUnknown": 0,
+        "assessmentUnsupported": 0
+      }
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "not_found"
+        }
+      ]
+    },
+    "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
+    "contractVersion": "4",
+    "sourceSplit": "regression",
+    "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
+    "group": "frames",
+    "sourceIds": ["shadow-unsupported", "shadow-unsupported-contract-1"]
   }
 ]

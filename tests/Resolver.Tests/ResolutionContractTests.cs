@@ -16,8 +16,7 @@ public sealed class ResolutionContractTests
     [InlineData("/pages/page-1/capture", false)]
     [InlineData("/api/v1/chat/completions", false)]
     [InlineData("/pages/page-1/selections", false)]
-    [InlineData("/api/v1/chat/completions", true)]
-    public async Task CurrentViewResolutionCompletesBeyondTheTwoSecondLatencyTarget(string slowPath, bool assisted)
+    public async Task CurrentViewResolutionCompletesBeyondTheTwoSecondLatencyTarget(string slowPath, bool evidence)
     {
         var handler = new DeterministicServicesHandler
         {
@@ -31,20 +30,19 @@ public sealed class ResolutionContractTests
                 }
             },
         };
-        var envelope = await ResolveContextAsync(handler, assisted ? "jev-v1" : null, "Click Save", assisted);
-        var result = assisted ? envelope.GetProperty("result") : envelope;
+        var envelope = await ResolveContextAsync(handler, "Click Save", evidence);
+        var result = evidence ? envelope.GetProperty("result") : envelope;
         Assert.Equal("found", result.GetProperty("outcome").GetString());
         Assert.True(
             result.GetProperty("diagnostics").GetProperty("timingsMs").GetProperty("total").GetDouble() >= 2000
         );
         Assert.Equal(1, handler.ProviderRequestCount);
         Assert.Equal(1, handler.SelectionRequestCount);
-        Assert.Equal(assisted ? 1 : 0, handler.DecisionRequestCount);
         Assert.Equal(
             0.0000215m,
             result.GetProperty("diagnostics").GetProperty("usage").GetProperty("cost").GetDecimal()
         );
-        if (assisted)
+        if (evidence)
         {
             using var config = JsonDocument.Parse(
                 envelope.GetProperty("evidence").GetProperty("configurationJson").GetString()!
@@ -56,465 +54,13 @@ public sealed class ResolutionContractTests
         }
     }
 
-    [Fact]
-    public async Task EvaluationContextPlanningOmitsOnlyConfidentlyUnneededEvidence()
-    {
-        var handler = new DeterministicServicesHandler
-        {
-            CaptureBody = CurrentViewCapture(),
-            ProviderBody = BilledSelection(),
-        };
-        await using var application = CreateApplication(
-            handler,
-            new Dictionary<string, string?> { ["Evaluation:ContextPlanning"] = "jev-v1" }
-        );
-        using var client = application.CreateClient();
-        client.DefaultRequestHeaders.Add("X-Xpathed-Attempt-Id", Guid.NewGuid().ToString("N"));
-        using var response = await client.PostAsJsonAsync(
-            "/internal/pages/page-1/resolve",
-            new
-            {
-                instruction = "Click Save",
-                documentId = "document-1",
-                contractVersion = "4",
-            }
-        );
-        var envelope = await response.Content.ReadFromJsonAsync<JsonElement>();
-        Assert.Equal("found", envelope.GetProperty("result").GetProperty("outcome").GetString());
-        Assert.Equal(1, handler.DecisionRequestCount);
-        Assert.Equal("Click Save", handler.DecisionRequest.GetProperty("state").GetString());
-        using var input = JsonDocument.Parse(
-            handler.ModelRequest.GetProperty("messages")[1].GetProperty("content").GetString()!
-        );
-        var candidate = input.RootElement.GetProperty("candidates")[0];
-        Assert.Equal("button-save", candidate.GetProperty("id").GetString());
-        Assert.Equal("Save", candidate.GetProperty("label").GetString());
-        Assert.False(candidate.TryGetProperty("geometry", out _));
-        Assert.False(candidate.TryGetProperty("appearance", out _));
-        Assert.Equal(
-            "not_requested",
-            input.RootElement.GetProperty("evidenceAvailability").GetProperty("appearance").GetString()
-        );
-    }
-
-    [Theory]
-    [InlineData(0.99, 0.99, true, true, "classified")]
-    [InlineData(0.99, 0.01, true, false, "classified")]
-    [InlineData(0.01, 0.99, false, true, "classified")]
-    [InlineData(0.05, 0.05, false, false, "classified")]
-    [InlineData(0.01, 0.5, true, true, "fallback_uncertain")]
-    [InlineData(0.5, 0.01, true, true, "fallback_uncertain")]
-    [InlineData(-0.1, 0.01, true, true, "fallback_error")]
-    [InlineData(0.01, 1.1, true, true, "fallback_error")]
-    public async Task EvaluationContextPlanningPreservesCoreContextAndRecordsDecisions(
-        double appearance,
-        double layout,
-        bool keepsAppearance,
-        bool keepsGeometry,
-        string status
-    )
-    {
-        var capture = JsonNode.Parse(CurrentViewCapture())!;
-        var second = capture["candidates"]![0]!.DeepClone();
-        second["id"] = "second";
-        second["state"]!["enabled"] = false;
-        capture["candidates"]!.AsArray().Add(second);
-        capture["coverage"]!["capturedCount"] = 2;
-        capture["coverage"]!["eligibleCount"] = 2;
-        var body = JsonSerializer.Serialize(
-            new
-            {
-                model = "typesafe/jev-1.13-20260917",
-                provider = "TypeSafe",
-                answers = new
-                {
-                    appearance = new { type = "noul", noul = appearance },
-                    layout = new { type = "noul", noul = layout },
-                },
-            }
-        );
-        var originalInstruction = "Click Save above the red link 東京";
-        var control = new DeterministicServicesHandler
-        {
-            CaptureBody = capture.ToJsonString(),
-            ProviderBody = BilledSelection(),
-        };
-        var assisted = new DeterministicServicesHandler
-        {
-            CaptureBody = capture.ToJsonString(),
-            ProviderBody = BilledSelection(),
-            DecisionBody = body,
-        };
-        var baseline = await ResolveContextAsync(control, null, originalInstruction);
-        var result = await ResolveContextAsync(assisted, "jev-v1", originalInstruction);
-        Assert.Equal("found", result.GetProperty("result").GetProperty("outcome").GetString());
-        Assert.Equal(1, assisted.DecisionRequestCount);
-        Assert.Equal(1, assisted.ProviderRequestCount);
-        Assert.Equal("typesafe/jev-1.13", assisted.DecisionRequest.GetProperty("model").GetString());
-        Assert.Equal(originalInstruction, assisted.DecisionRequest.GetProperty("state").GetString());
-        Assert.Equal(2, assisted.DecisionRequest.GetProperty("questions").EnumerateObject().Count());
-        var before = JsonNode.Parse(
-            control.ModelRequest.GetProperty("messages")[1].GetProperty("content").GetString()!
-        )!;
-        var after = JsonNode.Parse(
-            assisted.ModelRequest.GetProperty("messages")[1].GetProperty("content").GetString()!
-        )!;
-        Assert.Equal(originalInstruction, after["instruction"]!.GetValue<string>());
-        Assert.Equal(2, after["candidates"]!.AsArray().Count);
-        foreach (var candidate in after["candidates"]!.AsArray())
-        {
-            Assert.Equal(keepsAppearance, candidate!.AsObject().ContainsKey("appearance"));
-            Assert.Equal(keepsGeometry, candidate.AsObject().ContainsKey("geometry"));
-        }
-        foreach (var input in new[] { before, after })
-        {
-            input.AsObject().Remove("evidenceAvailability");
-            foreach (var candidate in input["candidates"]!.AsArray())
-            {
-                candidate!.AsObject().Remove("appearance");
-                candidate.AsObject().Remove("geometry");
-            }
-        }
-        Assert.Equal(before.ToJsonString(), after.ToJsonString());
-        using var config = JsonDocument.Parse(
-            result.GetProperty("evidence").GetProperty("configurationJson").GetString()!
-        );
-        Assert.Equal(status, config.RootElement.GetProperty("contextPlanning").GetProperty("status").GetString());
-        Assert.Equal(
-            "jev-v1",
-            config
-                .RootElement.GetProperty("effective")
-                .GetProperty("contextPlanning")
-                .GetProperty("version")
-                .GetString()
-        );
-        Assert.NotEqual(
-            baseline.GetProperty("result").GetProperty("configurationId").GetString(),
-            result.GetProperty("result").GetProperty("configurationId").GetString()
-        );
-        Assert.Equal(
-            result.GetProperty("result").GetProperty("configurationId").GetString(),
-            Convert.ToHexStringLower(
-                System.Security.Cryptography.SHA256.HashData(
-                    System.Text.Encoding.UTF8.GetBytes(config.RootElement.GetProperty("effective").GetRawText())
-                )
-            )
-        );
-        Assert.DoesNotContain(originalInstruction, config.RootElement.GetRawText(), StringComparison.Ordinal);
-    }
-
-    [Theory]
-    [InlineData("{")]
-    [InlineData("null")]
-    [InlineData("{\"answers\":{}}")]
-    [InlineData(
-        "{\"answers\":{\"appearance\":{\"type\":\"noul\",\"score\":0},\"layout\":{\"type\":\"noul\",\"noul\":0}}}"
-    )]
-    public async Task EvaluationContextPlanningMalformedAnswersKeepFullEvidence(string body)
-    {
-        var handler = new DeterministicServicesHandler
-        {
-            CaptureBody = CurrentViewCapture(),
-            ProviderBody = BilledSelection(),
-            DecisionBody = body,
-        };
-        var result = await ResolveContextAsync(handler, "jev-v1", "Click Save");
-        Assert.Equal("found", result.GetProperty("result").GetProperty("outcome").GetString());
-        using var input = JsonDocument.Parse(
-            handler.ModelRequest.GetProperty("messages")[1].GetProperty("content").GetString()!
-        );
-        Assert.True(input.RootElement.GetProperty("candidates")[0].TryGetProperty("geometry", out _));
-        Assert.True(input.RootElement.GetProperty("candidates")[0].TryGetProperty("appearance", out _));
-    }
-
-    [Theory]
-    [InlineData("model")]
-    [InlineData("provider")]
-    [InlineData("extra_answer")]
-    [InlineData("extra_root")]
-    [InlineData("extra_probability")]
-    public async Task EvaluationContextPlanningUntrustedAnswersNeverRemoveEvidence(string problem)
-    {
-        var body = JsonNode.Parse(new DeterministicServicesHandler().DecisionBody)!;
-        switch (problem)
-        {
-            case "model":
-                body["model"] = "unexpected-model";
-                break;
-            case "provider":
-                body["provider"] = "unexpected-provider";
-                break;
-            case "extra_answer":
-                body["answers"]!["target"] = "button-save";
-                break;
-            case "extra_root":
-                body["prompt"] = "untrusted-provider-instruction";
-                break;
-            case "extra_probability":
-                body["answers"]!["appearance"]!["score"] = 0;
-                break;
-        }
-        var handler = new DeterministicServicesHandler
-        {
-            CaptureBody = CurrentViewCapture(),
-            ProviderBody = BilledSelection(),
-            DecisionBody = body.ToJsonString(),
-        };
-        var result = await ResolveContextAsync(handler, "jev-v1", "Click Save");
-        Assert.Equal("found", result.GetProperty("result").GetProperty("outcome").GetString());
-        using var input = JsonDocument.Parse(
-            handler.ModelRequest.GetProperty("messages")[1].GetProperty("content").GetString()!
-        );
-        Assert.True(input.RootElement.GetProperty("candidates")[0].TryGetProperty("geometry", out _));
-        Assert.True(input.RootElement.GetProperty("candidates")[0].TryGetProperty("appearance", out _));
-        Assert.DoesNotContain(
-            "untrusted-provider-instruction",
-            handler.ModelRequest.GetRawText(),
-            StringComparison.Ordinal
-        );
-    }
-
-    [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task EvaluationContextPlanningIsDisabledForPublicRequests(bool enabled)
-    {
-        var handler = new DeterministicServicesHandler
-        {
-            CaptureBody = CurrentViewCapture(),
-            ProviderBody = BilledSelection(),
-        };
-        var result = await ResolveContextAsync(handler, enabled ? "jev-v1" : null, "Click Save", false);
-        Assert.Equal("found", result.GetProperty("outcome").GetString());
-        Assert.Equal(0, handler.DecisionRequestCount);
-        using var input = JsonDocument.Parse(
-            handler.ModelRequest.GetProperty("messages")[1].GetProperty("content").GetString()!
-        );
-        Assert.False(input.RootElement.TryGetProperty("evidenceAvailability", out _));
-        Assert.True(input.RootElement.GetProperty("candidates")[0].TryGetProperty("appearance", out _));
-        Assert.DoesNotContain("jev-v1", handler.ModelRequest.GetRawText(), StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public async Task EvaluationContextPlanningFailureDoesNotRetryOrChangeTheLlmModel()
-    {
-        var calls = 0;
-        var handler = new DeterministicServicesHandler
-        {
-            CaptureBody = CurrentViewCapture(),
-            ProviderBody = BilledSelection(),
-            BeforeRespondAsync = (path, _) =>
-            {
-                if (path == "/api/alpha/decisions")
-                {
-                    calls++;
-                    throw new HttpRequestException();
-                }
-                return Task.CompletedTask;
-            },
-        };
-        var result = await ResolveContextAsync(handler, "jev-v1", "Click Save");
-        Assert.Equal("found", result.GetProperty("result").GetProperty("outcome").GetString());
-        Assert.Equal(1, calls);
-        Assert.Equal(1, handler.ProviderRequestCount);
-        Assert.Equal("deepseek/deepseek-v4.1-flash", handler.ModelRequest.GetProperty("model").GetString());
-        using var input = JsonDocument.Parse(
-            handler.ModelRequest.GetProperty("messages")[1].GetProperty("content").GetString()!
-        );
-        Assert.True(input.RootElement.GetProperty("candidates")[0].TryGetProperty("geometry", out _));
-        Assert.True(input.RootElement.GetProperty("candidates")[0].TryGetProperty("appearance", out _));
-    }
-
-    [Fact]
-    public async Task EvaluationContextPlanningKeepsTheSamePolicyIdentityAcrossChoices()
-    {
-        var first = await ResolveContextAsync(
-            new DeterministicServicesHandler { CaptureBody = CurrentViewCapture(), ProviderBody = BilledSelection() },
-            "jev-v1",
-            "Click Save"
-        );
-        var second = await ResolveContextAsync(
-            new DeterministicServicesHandler
-            {
-                CaptureBody = CurrentViewCapture(),
-                ProviderBody = BilledSelection(),
-                DecisionBody = new DeterministicServicesHandler()
-                    .DecisionBody.Replace("0.01", "0.99", StringComparison.Ordinal)
-                    .Replace("0.02", "0.99", StringComparison.Ordinal),
-            },
-            "jev-v1",
-            "Click Save"
-        );
-        Assert.Equal(
-            first.GetProperty("result").GetProperty("configurationId").GetString(),
-            second.GetProperty("result").GetProperty("configurationId").GetString()
-        );
-    }
-
-    [Fact]
-    public async Task EvaluationContextPlanningDoesNotApplyToLegacyDiagnosticContracts()
-    {
-        var handler = new DeterministicServicesHandler { ProviderBody = BilledSelection() };
-        await using var application = CreateApplication(
-            handler,
-            new Dictionary<string, string?> { ["Evaluation:ContextPlanning"] = "jev-v1" }
-        );
-        using var client = application.CreateClient();
-        client.DefaultRequestHeaders.Add("X-Xpathed-Attempt-Id", Guid.NewGuid().ToString("N"));
-        using var response = await client.PostAsJsonAsync(
-            "/internal/pages/page-1/resolve",
-            new
-            {
-                instruction = "Click Save",
-                documentId = "document-1",
-                contractVersion = "3",
-            }
-        );
-        var result = await response.Content.ReadFromJsonAsync<JsonElement>();
-        Assert.Equal("found", result.GetProperty("result").GetProperty("outcome").GetString());
-        Assert.Equal(0, handler.DecisionRequestCount);
-        Assert.DoesNotContain(
-            "contextPlanning",
-            result.GetProperty("evidence").GetProperty("configurationJson").GetString(),
-            StringComparison.Ordinal
-        );
-    }
-
-    [Fact]
-    public async Task EvaluationContextPlanningTimingIsSeparateFromTheFinalModelAndValidation()
-    {
-        var handler = new DeterministicServicesHandler
-        {
-            CaptureBody = CurrentViewCapture(),
-            ProviderBody = BilledSelection(),
-            BeforeRespondAsync = async (path, token) =>
-            {
-                if (path == "/api/alpha/decisions")
-                {
-                    await Task.Delay(TimeSpan.FromMilliseconds(200), token);
-                }
-            },
-        };
-        var envelope = await ResolveContextAsync(handler, "jev-v1", "Click Save");
-        var timings = envelope.GetProperty("result").GetProperty("diagnostics").GetProperty("timingsMs");
-        using var config = JsonDocument.Parse(
-            envelope.GetProperty("evidence").GetProperty("configurationJson").GetString()!
-        );
-        var classification = config.RootElement.GetProperty("contextPlanning").GetProperty("elapsedMs").GetDouble();
-        var planning = timings.GetProperty("planning").GetDouble();
-        Assert.True(planning >= classification);
-        Assert.True(timings.GetProperty("model").GetDouble() < planning);
-        var stages =
-            timings.GetProperty("capture").GetDouble()
-            + planning
-            + timings.GetProperty("model").GetDouble()
-            + timings.GetProperty("validation").GetDouble();
-        Assert.True(stages <= timings.GetProperty("total").GetDouble());
-        var baseline = await ResolveContextAsync(
-            new DeterministicServicesHandler { CaptureBody = CurrentViewCapture(), ProviderBody = BilledSelection() },
-            null,
-            "Click Save"
-        );
-        Assert.False(
-            baseline
-                .GetProperty("result")
-                .GetProperty("diagnostics")
-                .GetProperty("timingsMs")
-                .TryGetProperty("planning", out _)
-        );
-    }
-
-    [Fact]
-    public async Task EvaluationContextPlanningAfterSlowCaptureKeepsWaitingForTheFinalSelection()
-    {
-        var handler = new DeterministicServicesHandler
-        {
-            CaptureBody = CurrentViewCapture(),
-            ProviderBody = BilledSelection(),
-            BeforeRespondAsync = async (path, token) =>
-            {
-                if (path == "/pages/page-1/capture")
-                {
-                    await Task.Delay(TimeSpan.FromMilliseconds(1700), token);
-                }
-                if (path == "/api/alpha/decisions")
-                {
-                    await Task.Delay(TimeSpan.FromSeconds(10), token);
-                }
-            },
-        };
-        var envelope = await ResolveContextAsync(handler, "jev-v1", "Click Save");
-        var diagnostics = envelope.GetProperty("result").GetProperty("diagnostics");
-        Assert.Equal("found", envelope.GetProperty("result").GetProperty("outcome").GetString());
-        Assert.Equal("complete", diagnostics.GetProperty("stage").GetString());
-        Assert.Equal(1, handler.ProviderRequestCount);
-        var timings = diagnostics.GetProperty("timingsMs");
-        Assert.True(timings.GetProperty("planning").GetDouble() > 0);
-        Assert.True(timings.TryGetProperty("model", out _));
-        var stages = timings.GetProperty("capture").GetDouble() + timings.GetProperty("planning").GetDouble();
-        Assert.True(stages <= timings.GetProperty("total").GetDouble());
-    }
-
-    [Fact]
-    public async Task EvaluationContextPlanningTimeoutFallsBackWhileResolutionKeepsWaiting()
-    {
-        var handler = new DeterministicServicesHandler
-        {
-            CaptureBody = CurrentViewCapture(),
-            ProviderBody = BilledSelection(),
-            BeforeRespondAsync = async (path, token) =>
-            {
-                if (path == "/api/alpha/decisions")
-                {
-                    await Task.Delay(TimeSpan.FromSeconds(10), token);
-                }
-                if (path == "/pages/page-1/selections")
-                {
-                    await Task.Delay(TimeSpan.FromSeconds(2), token);
-                }
-            },
-        };
-        var result = await ResolveContextAsync(handler, "jev-v1", "Click Save");
-        Assert.Equal("found", result.GetProperty("result").GetProperty("outcome").GetString());
-        Assert.True(
-            result
-                .GetProperty("result")
-                .GetProperty("diagnostics")
-                .GetProperty("timingsMs")
-                .GetProperty("total")
-                .GetDouble() >= 2000
-        );
-        using var config = JsonDocument.Parse(
-            result.GetProperty("evidence").GetProperty("configurationJson").GetString()!
-        );
-        Assert.Equal(
-            "fallback_timeout",
-            config.RootElement.GetProperty("contextPlanning").GetProperty("status").GetString()
-        );
-        Assert.Equal(1, handler.ProviderRequestCount);
-    }
-
-    [Fact]
-    public async Task EvaluationContextPlanningRejectsUnknownStartupMode()
-    {
-        await using var application = CreateApplication(
-            new DeterministicServicesHandler(),
-            new Dictionary<string, string?> { ["Evaluation:ContextPlanning"] = "unknown" }
-        );
-        Assert.Throws<InvalidOperationException>(() => application.CreateClient());
-    }
-
     private static async Task<JsonElement> ResolveContextAsync(
         DeterministicServicesHandler handler,
-        string? mode,
         string instruction,
         bool diagnostic = true
     )
     {
-        await using var application = CreateApplication(
-            handler,
-            new Dictionary<string, string?> { ["Evaluation:ContextPlanning"] = mode }
-        );
+        await using var application = CreateApplication(handler);
         using var client = application.CreateClient();
         client.DefaultRequestHeaders.Add("X-Xpathed-Attempt-Id", Guid.NewGuid().ToString("N"));
         using var response = await client.PostAsJsonAsync(
@@ -738,7 +284,6 @@ public sealed class ResolutionContractTests
     }
 
     [Theory]
-    [InlineData("3", false)]
     [InlineData("4", true)]
     public async Task AppearanceLimitationIsVersionedInSentAndRetainedSchema(string version, bool supported)
     {
@@ -812,31 +357,6 @@ public sealed class ResolutionContractTests
     }
 
     [Theory]
-    [InlineData("1")]
-    [InlineData("2")]
-    [InlineData("3")]
-    public async Task LegacyPreparedInputPreservesBaselineBytes(string version)
-    {
-        var handler = new DeterministicServicesHandler { ProviderBody = version == "1" ? null : BilledSelection() };
-        await using var application = CreateApplication(handler);
-        using var client = application.CreateClient();
-        using var response = await client.PostAsJsonAsync(
-            "/pages/page-1/resolve",
-            new
-            {
-                instruction = "Click Save",
-                documentId = "document-1",
-                contractVersion = version,
-            }
-        );
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Equal(
-            """{"instruction":"Click Save","frameId":"main","candidates":[{"id":"button-save","tag":"button","role":"button","label":"Save","scope":["Profile"],"state":{"rendered":true,"inViewport":true,"enabled":true,"editable":false},"geometry":{"x":20,"y":40,"width":90,"height":30}}]}""",
-            handler.ModelRequest.GetProperty("messages")[1].GetProperty("content").GetString()
-        );
-    }
-
-    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     public async Task CurrentViewCompactStatePreservesMeaningfulFlags(bool constrained)
@@ -886,9 +406,6 @@ public sealed class ResolutionContractTests
     }
 
     [Theory]
-    [InlineData("1", "page")]
-    [InlineData("2", "page")]
-    [InlineData("3", "page")]
     [InlineData("4", "current_view")]
     public async Task RequestedVersionPreservesScopeAndOnlyCurrentViewCarriesAppearance(string version, string scope)
     {
@@ -900,12 +417,7 @@ public sealed class ResolutionContractTests
         var handler = new DeterministicServicesHandler
         {
             CaptureBody = capture.ToJsonString(),
-            ProviderBody =
-                version == "1"
-                    ? null
-                    : ProviderSelection(
-                        """{"complete":true,"actions":[{"step":1,"instruction":"Click Save","action":"click","outcome":"found","candidateId":"button-save","limitation":"none"}]}"""
-                    ),
+            ProviderBody = BilledSelection(),
         };
         await using var application = CreateApplication(handler);
         using var client = application.CreateClient();
@@ -931,23 +443,13 @@ public sealed class ResolutionContractTests
         Assert.Equal("button-save", candidate.GetProperty("id").GetString());
         Assert.Equal("Profile", candidate.GetProperty("scope")[0].GetString());
         Assert.Equal(20, candidate.GetProperty("geometry").GetProperty("x").GetInt32());
-        if (version == "4")
-        {
-            Assert.Equal("10", result.GetProperty("diagnostics").GetProperty("promptVersion").GetString());
-            Assert.Equal("current_view", input.RootElement.GetProperty("scope").GetString());
-            Assert.Equal(
-                "rgb(255, 0, 0)",
-                candidate.GetProperty("appearance").GetProperty("backgroundColor").GetString()
-            );
-            Assert.Equal(
-                "background_transparent",
-                candidate.GetProperty("appearance").GetProperty("limitations")[0].GetString()
-            );
-        }
-        else
-        {
-            Assert.False(candidate.TryGetProperty("appearance", out _));
-        }
+        Assert.Equal("10", result.GetProperty("diagnostics").GetProperty("promptVersion").GetString());
+        Assert.Equal("current_view", input.RootElement.GetProperty("scope").GetString());
+        Assert.Equal("rgb(255, 0, 0)", candidate.GetProperty("appearance").GetProperty("backgroundColor").GetString());
+        Assert.Equal(
+            "background_transparent",
+            candidate.GetProperty("appearance").GetProperty("limitations")[0].GetString()
+        );
         Assert.Equal(1, handler.ProviderRequestCount);
         Assert.Equal(1, handler.SelectionRequestCount);
     }
@@ -1178,13 +680,12 @@ public sealed class ResolutionContractTests
     }
 
     [Theory]
-    [InlineData("3", "found")]
     [InlineData("4", "error")]
-    public async Task CurrentViewRejectsAnOffscreenVerifiedTargetWhileLegacyRetainsIt(string version, string outcome)
+    public async Task RejectsAnOffscreenVerifiedTarget(string version, string outcome)
     {
         var handler = new DeterministicServicesHandler
         {
-            CaptureBody = version == "4" ? CurrentViewCapture() : new DeterministicServicesHandler().CaptureBody,
+            CaptureBody = CurrentViewCapture(),
             ProviderBody = BilledSelection(),
             SelectionBody = """
                 {"actions":[{"actionId":"a1","target":{"candidateId":"button-save","tag":"button","label":"Save",
@@ -1205,14 +706,8 @@ public sealed class ResolutionContractTests
         );
         var result = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal(outcome, result.GetProperty("outcome").GetString());
-        if (version == "4")
-        {
-            Assert.Equal(
-                "invalid_browser_selection",
-                result.GetProperty("diagnostics").GetProperty("code").GetString()
-            );
-            Assert.Empty(result.GetProperty("actions").EnumerateArray());
-        }
+        Assert.Equal("invalid_browser_selection", result.GetProperty("diagnostics").GetProperty("code").GetString());
+        Assert.Empty(result.GetProperty("actions").EnumerateArray());
         Assert.Equal(1, handler.ProviderRequestCount);
         Assert.Equal(1, handler.SelectionRequestCount);
         Assert.Equal(
@@ -1294,59 +789,10 @@ public sealed class ResolutionContractTests
         return response.ToJsonString();
     }
 
-    [Theory]
-    [InlineData("none")]
-    [InlineData("low")]
-    public async Task ExplicitReasoningSettingsAreSentAndRetained(string effort)
+    [Fact]
+    public async Task DiagnosticConfigurationDescribesEffectiveSettingsWithoutCredentialsOrPageInput()
     {
-        var handler = new DeterministicServicesHandler();
-        await using var application = CreateApplication(
-            handler,
-            new Dictionary<string, string?>
-            {
-                ["OpenRouter:ReasoningEffort"] = effort,
-                ["OpenRouter:PromptCacheMode"] = "explicit",
-            }
-        );
-        using var client = application.CreateClient();
-        client.DefaultRequestHeaders.Add("X-Xpathed-Attempt-Id", Guid.NewGuid().ToString("N"));
-        using var response = await client.PostAsJsonAsync(
-            "/internal/pages/page-1/resolve",
-            new { instruction = "Click Save", documentId = "document-1" }
-        );
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var envelope = await response.Content.ReadFromJsonAsync<JsonElement>();
-        using var retained = JsonDocument.Parse(
-            envelope.GetProperty("evidence").GetProperty("configurationJson").GetString()!
-        );
-        var request = retained.RootElement.GetProperty("effective").GetProperty("request");
-        Assert.Equal(effort, request.GetProperty("reasoning").GetProperty("effort").GetString());
-        Assert.Equal("explicit", request.GetProperty("prompt_cache_options").GetProperty("mode").GetString());
-        Assert.Equal(effort, handler.ModelRequest.GetProperty("reasoning").GetProperty("effort").GetString());
-    }
-
-    [Theory]
-    [InlineData("1", 512, 1, "5", null)]
-    [InlineData("2", 4096, 16, "6", null)]
-    [InlineData("3", 4096, 16, "7", null)]
-    [InlineData("3", 4096, 16, "7-concise-1", "concise")]
-    public async Task DiagnosticConfigurationDescribesEffectiveSettingsWithoutCredentialsOrPageInput(
-        string version,
-        int outputTokens,
-        int maximumActions,
-        string promptVersion,
-        string? variant
-    )
-    {
-        var handler = new DeterministicServicesHandler
-        {
-            ProviderBody =
-                version != "1"
-                    ? ProviderSelection(
-                        """{"complete":true,"actions":[{"step":1,"instruction":"Click Save","action":"click","outcome":"found","candidateId":"button-save","limitation":"none"}]}"""
-                    )
-                    : null,
-        };
+        var handler = new DeterministicServicesHandler { ProviderBody = BilledSelection() };
         await using var application = CreateApplication(
             handler,
             new Dictionary<string, string?>
@@ -1356,7 +802,6 @@ public sealed class ResolutionContractTests
                 ["OpenRouter:Provider"] = "configured-route",
                 ["OpenRouter:TimeoutSeconds"] = "47",
                 ["OpenRouter:ApiKey"] = "configuration-secret-canary",
-                ["Resolution:PromptVariant"] = variant,
             }
         );
         using var client = application.CreateClient();
@@ -1367,7 +812,7 @@ public sealed class ResolutionContractTests
             {
                 instruction = "Click the unique instruction-canary",
                 documentId = "document-1",
-                contractVersion = version,
+                contractVersion = "4",
             }
         );
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -1379,8 +824,8 @@ public sealed class ResolutionContractTests
         var effective = configuration.RootElement.GetProperty("effective");
         Assert.Equal("http://configured-provider.test/api/v1/", effective.GetProperty("endpoint").GetString());
         Assert.Equal("47", effective.GetProperty("timeoutSeconds").GetString());
-        Assert.Equal(maximumActions, effective.GetProperty("maximumActions").GetInt32());
-        Assert.Equal(promptVersion, effective.GetProperty("promptVersion").GetString());
+        Assert.Equal(16, effective.GetProperty("maximumActions").GetInt32());
+        Assert.Equal("10", effective.GetProperty("promptVersion").GetString());
         Assert.Equal(
             handler.ModelRequest.GetProperty("messages")[0].GetProperty("content").GetString(),
             envelope.GetProperty("evidence").GetProperty("systemPrompt").GetString()
@@ -1389,7 +834,7 @@ public sealed class ResolutionContractTests
         var request = effective.GetProperty("request");
         Assert.Equal("configured/model", request.GetProperty("model").GetString());
         Assert.Equal("configured-route", request.GetProperty("provider").GetProperty("only")[0].GetString());
-        Assert.Equal(outputTokens, request.GetProperty("max_tokens").GetInt32());
+        Assert.Equal(4096, request.GetProperty("max_tokens").GetInt32());
         Assert.False(request.GetProperty("reasoning").GetProperty("enabled").GetBoolean());
         Assert.Equal(string.Empty, request.GetProperty("messages")[1].GetProperty("content").GetString());
         Assert.Equal(
@@ -1541,7 +986,9 @@ public sealed class ResolutionContractTests
     {
         var handler = new DeterministicServicesHandler
         {
-            ProviderBody = ProviderSelection("""{"outcome":"not_found","action":"fill","candidateId":null}"""),
+            ProviderBody = ProviderSelection(
+                """{"complete":true,"actions":[{"step":1,"instruction":"Fill control","outcome":"not_found","action":"fill","candidateId":null,"limitation":"none"}]}"""
+            ),
         };
         await using var application = CreateApplication(handler);
         using var client = application.CreateClient();
@@ -1646,17 +1093,15 @@ public sealed class ResolutionContractTests
         Assert.False(sent[0].TryGetProperty("placeholder", out _));
         Assert.False(sent[0].GetProperty("state").TryGetProperty("checked", out _));
         Assert.False(sent[0].GetProperty("state").TryGetProperty("version", out _));
-        Assert.False(sent[0].GetProperty("state").GetProperty("editable").GetBoolean());
+        Assert.False(sent[0].GetProperty("state").TryGetProperty("editable", out _));
         Assert.Equal("Save changes", sent[1].GetProperty("text").GetString());
         Assert.False(sent[1].GetProperty("state").GetProperty("enabled").GetBoolean());
         Assert.True(sent[1].GetProperty("state").GetProperty("readonly").GetBoolean());
     }
 
     [Theory]
-    [InlineData("1", false)]
-    [InlineData("2", false)]
-    [InlineData("1", true)]
-    [InlineData("2", true)]
+    [InlineData("4", false)]
+    [InlineData("4", true)]
     public async Task FrameIdentityMustMatchTheCapturedCandidate(string version, bool mismatch)
     {
         var capture = JsonNode.Parse(new DeterministicServicesHandler().CaptureBody)!;
@@ -1664,30 +1109,23 @@ public sealed class ResolutionContractTests
             """{"id":"f2","documentId":"frame-document","chain":[{"frameId":"f1","xpath":"//iframe[@id='outer']","label":"Employee"},{"frameId":"f2","xpath":"//iframe[@id='inner']","label":"Payroll"}]}"""
         )!;
         capture["candidates"]![0]!["frame"] = frame.DeepClone();
-        var target = JsonNode.Parse(
-            """{"candidateId":"button-save","tag":"button","label":"Save","xpaths":["//button"],"state":{"rendered":true,"inViewport":true,"enabled":true,"editable":false,"checked":null},"geometry":{"x":150,"y":150,"width":120,"height":40}}"""
-        )!;
+        var target = DeterministicServicesHandler.VerifiedTarget();
         target["frame"] = frame.DeepClone();
         if (mismatch)
         {
             target["frame"]!["documentId"] = "another-document";
         }
-        var selection =
-            version == "1"
-                ? new JsonObject { ["target"] = target }
-                : new JsonObject
-                {
-                    ["actions"] = new JsonArray(new JsonObject { ["actionId"] = "a1", ["target"] = target }),
-                    ["inspectedActionId"] = "a1",
-                };
+        var selection = new JsonObject
+        {
+            ["actions"] = new JsonArray(new JsonObject { ["actionId"] = "a1", ["target"] = target }),
+            ["inspectedActionId"] = "a1",
+        };
         var handler = new DeterministicServicesHandler
         {
             CaptureBody = capture.ToJsonString(),
             SelectionBody = selection.ToJsonString(),
             ProviderBody = ProviderSelection(
-                version == "1"
-                    ? """{"outcome":"found","action":"click","candidateId":"button-save"}"""
-                    : """{"complete":true,"actions":[{"step":1,"instruction":"Click Save in Payroll","outcome":"found","action":"click","candidateId":"button-save","limitation":"none"}]}"""
+                """{"complete":true,"actions":[{"step":1,"instruction":"Click Save in Payroll","outcome":"found","action":"click","candidateId":"button-save","limitation":"none"}]}"""
             ),
         };
         await using var application = CreateApplication(handler);
@@ -1712,7 +1150,7 @@ public sealed class ResolutionContractTests
         }
         else
         {
-            var action = version == "1" ? result : result.GetProperty("actions")[0];
+            var action = result.GetProperty("actions")[0];
             Assert.Equal("f2", action.GetProperty("frameId").GetString());
             Assert.Equal(
                 "frame-document",
@@ -1745,7 +1183,7 @@ public sealed class ResolutionContractTests
             {
                 instruction = "Click Save",
                 documentId = "document-1",
-                contractVersion = "2",
+                contractVersion = "4",
             }
         );
         var result = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -1755,26 +1193,15 @@ public sealed class ResolutionContractTests
     }
 
     [Theory]
-    [InlineData("incomplete", "decomposition_incomplete", "2")]
-    [InlineData("incomplete", "decomposition_incomplete", "3")]
     [InlineData("incomplete", "decomposition_incomplete", "4")]
-    [InlineData("duplicate", "provider_malformed_response", "2")]
-    [InlineData("duplicate", "provider_malformed_response", "3")]
-    [InlineData("unknown", "provider_unknown_candidate", "2")]
-    [InlineData("unknown", "provider_unknown_candidate", "3")]
-    [InlineData("step_gap", "provider_malformed_response", "2")]
-    [InlineData("step_gap", "provider_malformed_response", "3")]
-    [InlineData("dependent_found", "provider_malformed_response", "2")]
-    [InlineData("dependent_found", "provider_malformed_response", "3")]
-    [InlineData("empty", "provider_malformed_response", "2")]
-    [InlineData("empty", "provider_malformed_response", "3")]
-    [InlineData("limit", "action_budget_exceeded", "2")]
-    [InlineData("limit", "action_budget_exceeded", "3")]
+    [InlineData("duplicate", "provider_malformed_response", "4")]
+    [InlineData("unknown", "provider_unknown_candidate", "4")]
+    [InlineData("step_gap", "provider_malformed_response", "4")]
+    [InlineData("dependent_found", "provider_malformed_response", "4")]
+    [InlineData("empty", "provider_malformed_response", "4")]
     [InlineData("limit", "action_budget_exceeded", "4")]
-    [InlineData("output_limit", "action_output_budget_exceeded", "2")]
-    [InlineData("output_limit", "action_output_budget_exceeded", "3")]
-    [InlineData("truncated", "provider_truncated_response", "2")]
-    [InlineData("truncated", "provider_truncated_response", "3")]
+    [InlineData("output_limit", "action_output_budget_exceeded", "4")]
+    [InlineData("truncated", "provider_truncated_response", "4")]
     public async Task IncompleteOrInvalidActionListsCannotBecomeUsefulLookingPartialResults(
         string problem,
         string code,
@@ -1825,7 +1252,7 @@ public sealed class ResolutionContractTests
         }
         var handler = new DeterministicServicesHandler
         {
-            CaptureBody = version == "4" ? CurrentViewCapture() : new DeterministicServicesHandler().CaptureBody,
+            CaptureBody = CurrentViewCapture(),
             ProviderBody = JsonSerializer.Serialize(
                 new
                 {
@@ -1923,7 +1350,7 @@ public sealed class ResolutionContractTests
             {
                 instruction,
                 documentId = "document-1",
-                contractVersion = "3",
+                contractVersion = "4",
             }
         );
         response.EnsureSuccessStatusCode();
@@ -1937,9 +1364,9 @@ public sealed class ResolutionContractTests
         Assert.Equal(1, result.GetProperty("summary").GetProperty("unsupported").GetInt32());
         Assert.Equal(0, result.GetProperty("summary").GetProperty("found").GetInt32());
         Assert.Equal(1, handler.ProviderRequestCount);
-        Assert.Equal("7", result.GetProperty("diagnostics").GetProperty("promptVersion").GetString());
+        Assert.Equal("10", result.GetProperty("diagnostics").GetProperty("promptVersion").GetString());
         var prompt = handler.ModelRequest.GetProperty("messages")[0].GetProperty("content").GetString()!;
-        Assert.Contains("ONE interaction type", prompt, StringComparison.Ordinal);
+        Assert.Contains("one interaction shared", prompt, StringComparison.Ordinal);
         Assert.DoesNotContain("ALL independently resolvable actions", prompt, StringComparison.Ordinal);
     }
 
@@ -1955,6 +1382,14 @@ public sealed class ResolutionContractTests
         candidates.Add(other);
         capture["coverage"]!["eligibleCount"] = 2;
         capture["coverage"]!["capturedCount"] = 2;
+        static JsonObject ConfirmTarget()
+        {
+            var target = DeterministicServicesHandler.VerifiedTarget();
+            target["candidateId"] = "button-confirm";
+            target["label"] = "Confirm";
+            target["xpaths"] = new JsonArray("//button[@id='confirm']");
+            return target;
+        }
         var handler = new DeterministicServicesHandler
         {
             CaptureBody = capture.ToJsonString(),
@@ -1965,14 +1400,17 @@ public sealed class ResolutionContractTests
                   {"step":1,"instruction":"Click Save","outcome":"found","action":"click","candidateId":"button-save","limitation":"none"}]}
                 """
             ),
-            SelectionBody = """
-                {"actions":[
-                  {"actionId":"a1","target":{"candidateId":"button-save","tag":"button","label":"Save","xpaths":["//button[@id='save']"],
-                   "state":{"rendered":true,"inViewport":true,"enabled":true,"editable":false},"geometry":{"x":20,"y":40,"width":90,"height":30}}},
-                  {"actionId":"a2","target":{"candidateId":"button-confirm","tag":"button","label":"Confirm","xpaths":["//button[@id='confirm']"],
-                   "state":{"rendered":true,"inViewport":true,"enabled":true,"editable":false},"geometry":{"x":20,"y":80,"width":90,"height":30}}}],
-                 "inspectedActionId":"a1"}
-                """,
+            SelectionBody = JsonSerializer.Serialize(
+                new
+                {
+                    actions = new[]
+                    {
+                        new { actionId = "a1", target = DeterministicServicesHandler.VerifiedTarget() },
+                        new { actionId = "a2", target = ConfirmTarget() },
+                    },
+                    inspectedActionId = "a1",
+                }
+            ),
         };
         await using var application = CreateApplication(handler);
         using var client = application.CreateClient();
@@ -1982,7 +1420,7 @@ public sealed class ResolutionContractTests
             {
                 instruction = "Click all buttons in Profile",
                 documentId = "document-1",
-                contractVersion = "3",
+                contractVersion = "4",
             }
         );
         response.EnsureSuccessStatusCode();
@@ -2050,7 +1488,7 @@ public sealed class ResolutionContractTests
             {
                 instruction = "Click Save and Contact",
                 documentId = "document-1",
-                contractVersion = "3",
+                contractVersion = "4",
             }
         );
         var result = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -2084,12 +1522,12 @@ public sealed class ResolutionContractTests
             {
                 instruction = "Click Save and Contact",
                 documentId = "document-1",
-                contractVersion = "3",
+                contractVersion = "4",
             }
         );
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var result = await response.Content.ReadFromJsonAsync<JsonElement>();
-        Assert.Equal("3", result.GetProperty("contractVersion").GetString());
+        Assert.Equal("4", result.GetProperty("contractVersion").GetString());
         Assert.Equal("click", result.GetProperty("action").GetString());
         Assert.Equal("partial", result.GetProperty("outcome").GetString());
         Assert.Equal(2, result.GetProperty("actions").GetArrayLength());
@@ -2104,76 +1542,6 @@ public sealed class ResolutionContractTests
         Assert.Equal(1, handler.SelectionRequestCount);
     }
 
-    [Fact]
-    public async Task CurrentPageActionsPreserveIndependentOutcomesWithOneInferenceCharge()
-    {
-        var handler = new DeterministicServicesHandler
-        {
-            ProviderBody = JsonSerializer.Serialize(
-                new
-                {
-                    id = "generation-batch",
-                    model = "deepseek/deepseek-v4.1-flash",
-                    provider = "Wafer",
-                    choices = new[]
-                    {
-                        new
-                        {
-                            finish_reason = "stop",
-                            message = new
-                            {
-                                content = """
-                                {"complete":true,"actions":[
-                                  {"step":1,"instruction":"Click Save","outcome":"found","action":"click","candidateId":"button-save","limitation":"none"},
-                                  {"step":2,"instruction":"Hover Contact","outcome":"not_found","action":"hover","candidateId":null,"limitation":"none"}]}
-                                """,
-                            },
-                        },
-                    },
-                    usage = new
-                    {
-                        prompt_tokens = 140,
-                        completion_tokens = 100,
-                        total_tokens = 240,
-                        cost = 0.0001m,
-                    },
-                }
-            ),
-        };
-        await using var application = CreateApplication(handler);
-        using var client = application.CreateClient();
-        using var response = await client.PostAsJsonAsync(
-            "/pages/page-1/resolve",
-            new
-            {
-                instruction = "Click Save and hover Contact",
-                documentId = "document-1",
-                contractVersion = "2",
-            }
-        );
-        var result = await response.Content.ReadFromJsonAsync<JsonElement>();
-        Assert.Equal("2", result.GetProperty("contractVersion").GetString());
-        Assert.Equal("partial", result.GetProperty("outcome").GetString());
-        var actions = result.GetProperty("actions");
-        Assert.Equal(2, actions.GetArrayLength());
-        Assert.Equal("a1", actions[0].GetProperty("actionId").GetString());
-        Assert.Equal("button-save", actions[0].GetProperty("target").GetProperty("candidateId").GetString());
-        Assert.Equal("not_found", actions[1].GetProperty("outcome").GetString());
-        Assert.Equal(JsonValueKind.Null, actions[1].GetProperty("target").ValueKind);
-        Assert.Equal(1, result.GetProperty("summary").GetProperty("found").GetInt32());
-        Assert.Equal(1, result.GetProperty("summary").GetProperty("notFound").GetInt32());
-        Assert.All(
-            actions.EnumerateArray(),
-            action =>
-                Assert.Equal(
-                    result.GetProperty("attemptId").GetString(),
-                    action.GetProperty("diagnosticsReference").GetString()
-                )
-        );
-        Assert.Equal(0.0001m, result.GetProperty("diagnostics").GetProperty("usage").GetProperty("cost").GetDecimal());
-        Assert.Equal(1, handler.ProviderRequestCount);
-    }
-
     [Theory]
     [InlineData("click", "blocked", "found")]
     [InlineData("hover", "blocked", "error")]
@@ -2186,18 +1554,10 @@ public sealed class ResolutionContractTests
     {
         var handler = new DeterministicServicesHandler
         {
-            SelectionBody = """
-                {"target":{"candidateId":"button-save","tag":"button","label":"Save","xpaths":["//button"],
-                  "state":{"version":"2","accessibilityExposed":true,"rendered":true,"inViewport":true,"enabled":false,"editable":false,"readonly":false,"checked":null},
-                  "geometry":{"x":20,"y":40,"width":90,"height":30},
-                  "interactability":{"version":"1","action":"ACTION","status":"STATUS","reasons":["disabled"],
-                    "checks":{"compatibleControl":"pass","enabled":"fail","writable":"not_applicable","viewport":"pass",
-                      "pointerReception":"pass","keyboard":"not_applicable","stability":"unknown","eventOutcome":"unknown"}}}}
-                """.Replace("ACTION", assessedAction, StringComparison.Ordinal).Replace(
-                "STATUS",
-                status,
-                StringComparison.Ordinal
-            ),
+            SelectionBody =
+                """{"actions":[{"actionId":"a1","target":{"candidateId":"button-save","tag":"button","label":"Save","xpaths":["//button"],"state":{"version":"2","accessibilityExposed":true,"rendered":true,"inViewport":true,"enabled":false,"editable":false,"readonly":false,"checked":null},"geometry":{"x":20,"y":40,"width":90,"height":30},"interactability":{"version":"2","action":"ACTION","status":"STATUS","reasons":["disabled"],"checks":{"compatibleControl":"pass","enabled":"fail","writable":"not_applicable","viewport":"pass","pointerReception":"pass","keyboard":"not_applicable","stability":"unknown","eventOutcome":"unknown"}}}}],"inspectedActionId":"a1"}"""
+                    .Replace("ACTION", assessedAction, StringComparison.Ordinal)
+                    .Replace("STATUS", status, StringComparison.Ordinal),
         };
         await using var application = CreateApplication(handler);
         using var client = application.CreateClient();
@@ -2209,10 +1569,15 @@ public sealed class ResolutionContractTests
         Assert.Equal(outcome, result.GetProperty("outcome").GetString());
         if (outcome == "found")
         {
-            Assert.Equal("1", result.GetProperty("contractVersion").GetString());
+            Assert.Equal("4", result.GetProperty("contractVersion").GetString());
             Assert.Equal(
                 "blocked",
-                result.GetProperty("target").GetProperty("interactability").GetProperty("status").GetString()
+                result
+                    .GetProperty("actions")[0]
+                    .GetProperty("target")
+                    .GetProperty("interactability")
+                    .GetProperty("status")
+                    .GetString()
             );
             Assert.Equal(1, result.GetProperty("diagnostics").GetProperty("modelCalls").GetInt32());
         }
@@ -2227,6 +1592,7 @@ public sealed class ResolutionContractTests
 
     [Theory]
     [InlineData("1", "ready", "pass", "error")]
+    [InlineData("1", "unknown", "unknown", "error")]
     [InlineData("2", "ready", "pass", "found")]
     [InlineData("2", "ready", "unknown", "error")]
     [InlineData("2", "ready", "fail", "error")]
@@ -2240,18 +1606,11 @@ public sealed class ResolutionContractTests
     {
         var handler = new DeterministicServicesHandler
         {
-            SelectionBody = """
-                {"target":{"candidateId":"button-save","tag":"button","label":"Save","xpaths":["//button"],
-                  "state":{"version":"2","accessibilityExposed":true,"rendered":true,"inViewport":true,"enabled":true,"editable":false,"readonly":false,"checked":null},
-                  "geometry":{"x":20,"y":40,"width":90,"height":30},
-                  "interactability":{"version":"VERSION","action":"click","status":"STATUS","reasons":[],
-                    "checks":{"compatibleControl":"pass","enabled":"pass","writable":"not_applicable","viewport":"pass",
-                      "pointerReception":"POINTER","keyboard":"not_applicable","stability":"unknown","eventOutcome":"unknown"}}}}
-                """.Replace("VERSION", version, StringComparison.Ordinal).Replace(
-                "STATUS",
-                status,
-                StringComparison.Ordinal
-            ).Replace("POINTER", pointerReception, StringComparison.Ordinal),
+            SelectionBody =
+                """{"actions":[{"actionId":"a1","target":{"candidateId":"button-save","tag":"button","label":"Save","xpaths":["//button"],"state":{"version":"2","accessibilityExposed":true,"rendered":true,"inViewport":true,"enabled":true,"editable":false,"readonly":false,"checked":null},"geometry":{"x":20,"y":40,"width":90,"height":30},"interactability":{"version":"VERSION","action":"click","status":"STATUS","reasons":[],"checks":{"compatibleControl":"pass","enabled":"pass","writable":"not_applicable","viewport":"pass","pointerReception":"POINTER","keyboard":"not_applicable","stability":"unknown","eventOutcome":"unknown"}}}}],"inspectedActionId":"a1"}"""
+                    .Replace("VERSION", version, StringComparison.Ordinal)
+                    .Replace("STATUS", status, StringComparison.Ordinal)
+                    .Replace("POINTER", pointerReception, StringComparison.Ordinal),
         };
         await using var application = CreateApplication(handler);
         using var client = application.CreateClient();
@@ -2266,6 +1625,7 @@ public sealed class ResolutionContractTests
             Assert.Equal(
                 "unknown",
                 result
+                    .GetProperty("actions")[0]
                     .GetProperty("target")
                     .GetProperty("interactability")
                     .GetProperty("checks")
@@ -2288,33 +1648,12 @@ public sealed class ResolutionContractTests
     public async Task ReturnsOnlyOneVerifiedXPath(int pathCount, string outcome)
     {
         string[] paths = ["//button", "//*[@id='save']"];
+        var target = DeterministicServicesHandler.VerifiedTarget();
+        target["xpaths"] = JsonSerializer.SerializeToNode(paths.Take(pathCount));
         var handler = new DeterministicServicesHandler
         {
             SelectionBody = JsonSerializer.Serialize(
-                new
-                {
-                    target = new
-                    {
-                        candidateId = "button-save",
-                        tag = "button",
-                        label = "Save",
-                        xpaths = paths.Take(pathCount),
-                        state = new
-                        {
-                            rendered = true,
-                            inViewport = true,
-                            enabled = true,
-                            editable = false,
-                        },
-                        geometry = new
-                        {
-                            x = 20,
-                            y = 40,
-                            width = 90,
-                            height = 30,
-                        },
-                    },
-                }
+                new { actions = new[] { new { actionId = "a1", target } }, inspectedActionId = "a1" }
             ),
         };
         await using var application = CreateApplication(handler);
@@ -2350,10 +1689,13 @@ public sealed class ResolutionContractTests
         Assert.Equal("found", result.GetProperty("outcome").GetString());
         Assert.Equal("page-1", result.GetProperty("pageId").GetString());
         Assert.Equal("document-1", result.GetProperty("documentId").GetString());
-        Assert.Equal("button-save", result.GetProperty("target").GetProperty("candidateId").GetString());
+        Assert.Equal(
+            "button-save",
+            result.GetProperty("actions")[0].GetProperty("target").GetProperty("candidateId").GetString()
+        );
         Assert.Equal(
             "//*[@data-testid='save-profile']",
-            result.GetProperty("target").GetProperty("xpaths")[0].GetString()
+            result.GetProperty("actions")[0].GetProperty("target").GetProperty("xpaths")[0].GetString()
         );
     }
 
@@ -2363,11 +1705,8 @@ public sealed class ResolutionContractTests
         await using var application = CreateApplication(
             new DeterministicServicesHandler
             {
-                ProviderBody = """
-                {"id":"generation-unknown","model":"deepseek/deepseek-v4.1-flash","provider":"Wafer",
-                 "choices":[{"finish_reason":"stop","message":{"content":"{\"outcome\":\"found\",\"action\":\"click\",\"candidateId\":\"invented\"}"}}],
-                 "usage":{"prompt_tokens":140,"completion_tokens":15,"total_tokens":155,"cost":0.0000215,"completion_tokens_details":{"reasoning_tokens":0}}}
-                """,
+                ProviderBody =
+                    """{"id":"generation-unknown","model":"deepseek/deepseek-v4.1-flash","provider":"Wafer","choices":[{"finish_reason":"stop","message":{"content":"{\"complete\":true,\"actions\":[{\"step\":1,\"instruction\":\"Click Save\",\"outcome\":\"found\",\"action\":\"click\",\"candidateId\":\"invented\",\"limitation\":\"none\"}]}"}}],"usage":{"prompt_tokens":140,"completion_tokens":15,"total_tokens":155,"cost":2.15e-05,"completion_tokens_details":{"reasoning_tokens":0}}}""",
             }
         );
         using var client = application.CreateClient();
@@ -2553,9 +1892,19 @@ public sealed class ResolutionContractTests
                 JsonSerializer.Serialize(
                     new
                     {
-                        outcome,
-                        action,
-                        candidateId = (string?)null,
+                        complete = true,
+                        actions = new[]
+                        {
+                            new
+                            {
+                                step = 1,
+                                instruction = "Click Save",
+                                outcome,
+                                action,
+                                candidateId = (string?)null,
+                                limitation = outcome == "unsupported" ? "unsupported_action" : "none",
+                            },
+                        },
                     }
                 )
             ),
@@ -2596,9 +1945,19 @@ public sealed class ResolutionContractTests
                 JsonSerializer.Serialize(
                     new
                     {
-                        outcome,
-                        action,
-                        candidateId,
+                        complete = true,
+                        actions = new[]
+                        {
+                            new
+                            {
+                                step = 1,
+                                instruction = "Click Save",
+                                outcome,
+                                action,
+                                candidateId,
+                                limitation = outcome == "unsupported" ? "unsupported_action" : "none",
+                            },
+                        },
                     }
                 )
             ),
@@ -2649,7 +2008,7 @@ public sealed class ResolutionContractTests
     [Theory]
     [InlineData("/api/v1/chat/completions", "provider_timeout")]
     [InlineData("/pages/page-1/capture", "browser_timeout")]
-    [InlineData("/pages/page-1/selection", "browser_timeout")]
+    [InlineData("/pages/page-1/selections", "browser_timeout")]
     public async Task UpstreamTimeoutsRemainOperationalErrors(string failedPath, string expectedCode)
     {
         var handler = new DeterministicServicesHandler
@@ -2671,9 +2030,8 @@ public sealed class ResolutionContractTests
     }
 
     [Theory]
-    [InlineData("/api/v1/chat/completions")]
     [InlineData("/pages/page-1/capture")]
-    [InlineData("/pages/page-1/selection")]
+    [InlineData("/pages/page-1/selections")]
     [InlineData("/api/v1/models/deepseek/deepseek-v4.1-flash/endpoints")]
     public async Task RequestCancellationReachesEveryUpstreamBoundary(string blockedPath)
     {
@@ -2714,9 +2072,9 @@ public sealed class ResolutionContractTests
     }
 
     [Theory]
-    [InlineData("""{"target":null}""")]
+    [InlineData("""{"actions":[{"actionId":"a1","target":null}],"inspectedActionId":null}""")]
     [InlineData(
-        """{"target":{"candidateId":"different","tag":"button","label":"Save","xpaths":["//*[@id='different']"]}}"""
+        """{"actions":[{"actionId":"a1","target":{"candidateId":"different","tag":"button","label":"Save","xpaths":["//*[@id='different']"]}}],"inspectedActionId":"a1"}"""
     )]
     public async Task AContradictoryBrowserSelectionCannotBecomeFound(string body)
     {
@@ -2730,6 +2088,28 @@ public sealed class ResolutionContractTests
         var result = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal("error", result.GetProperty("outcome").GetString());
         Assert.Equal("invalid_browser_selection", result.GetProperty("diagnostics").GetProperty("code").GetString());
+    }
+
+    [Theory]
+    [InlineData("1")]
+    [InlineData("2")]
+    [InlineData("3")]
+    public async Task RetiredContractsAreRejectedBeforeInference(string version)
+    {
+        var handler = new DeterministicServicesHandler();
+        await using var application = CreateApplication(handler);
+        using var client = application.CreateClient();
+        using var response = await client.PostAsJsonAsync(
+            "/pages/page-1/resolve",
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                contractVersion = version,
+            }
+        );
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(0, handler.ProviderRequestCount);
     }
 
     [Theory]
@@ -2752,7 +2132,6 @@ public sealed class ResolutionContractTests
 
     [Theory]
     [InlineData("OpenRouter:ApiKey", null, "provider_not_configured")]
-    [InlineData("Resolution:Strategy", "unimplemented", "unsupported_strategy")]
     [InlineData("OpenRouter:BaseUrl", "file:///tmp/model/", "invalid_provider_configuration")]
     [InlineData("OpenRouter:BaseUrl", "http://user:password@localhost/api/v1/", "invalid_provider_configuration")]
     [InlineData("OpenRouter:TimeoutSeconds", "0", "invalid_provider_configuration")]
@@ -2761,8 +2140,6 @@ public sealed class ResolutionContractTests
     [InlineData("OpenRouter:TimeoutSeconds", "NaN", "invalid_provider_configuration")]
     [InlineData("OpenRouter:TimeoutSeconds", "Infinity", "invalid_provider_configuration")]
     [InlineData("OpenRouter:TimeoutSeconds", "-Infinity", "invalid_provider_configuration")]
-    [InlineData("OpenRouter:ReasoningEffort", "maximum", "invalid_provider_configuration")]
-    [InlineData("OpenRouter:PromptCacheMode", "automatic", "invalid_provider_configuration")]
     public async Task InvalidConfigurationCannotClaimAModelCall(string key, string? value, string expectedCode)
     {
         var handler = new DeterministicServicesHandler();
@@ -2782,8 +2159,6 @@ public sealed class ResolutionContractTests
     [Theory]
     [InlineData("OpenRouter:Model", "other/model", "Click Save", false)]
     [InlineData("OpenRouter:Provider", "other", "Click Save", false)]
-    [InlineData("OpenRouter:ReasoningEffort", "none", "Click Save", false)]
-    [InlineData("OpenRouter:PromptCacheMode", "explicit", "Click Save", false)]
     [InlineData("OpenRouter:BaseUrl", "http://localhost:9089/api/v1/", "Click Save", false)]
     [InlineData("OpenRouter:TimeoutSeconds", "31", "Click Save", false)]
     [InlineData("OpenRouter:ApiKey", "another-test-key", "Click Save", true)]
@@ -2836,7 +2211,7 @@ public sealed class ResolutionContractTests
         Assert.Equal("deepseek/deepseek-v4.1-flash", body.GetProperty("model").GetString());
         Assert.False(body.GetProperty("reasoning").GetProperty("enabled").GetBoolean());
         Assert.False(body.TryGetProperty("service_tier", out _));
-        Assert.Equal(512, body.GetProperty("max_tokens").GetInt32());
+        Assert.Equal(4096, body.GetProperty("max_tokens").GetInt32());
         Assert.Equal("wafer", body.GetProperty("provider").GetProperty("only")[0].GetString());
         Assert.False(body.GetProperty("provider").TryGetProperty("max_price", out _));
         Assert.False(body.GetProperty("provider").GetProperty("allow_fallbacks").GetBoolean());
@@ -2908,16 +2283,15 @@ public sealed class ResolutionContractTests
     )]
     public async Task MissingInvalidOrAmbiguousPricingDoesNotDiscardTheResolution(int status, string body)
     {
-        foreach (var version in new[] { "1", "4" })
+        foreach (var version in new[] { "4" })
         {
             await using var application = CreateApplication(
                 new DeterministicServicesHandler
                 {
                     PricingStatus = (HttpStatusCode)status,
                     PricingBody = body,
-                    CaptureBody =
-                        version == "4" ? CurrentViewCapture() : new DeterministicServicesHandler().CaptureBody,
-                    ProviderBody = version == "4" ? BilledSelection() : null,
+                    CaptureBody = CurrentViewCapture(),
+                    ProviderBody = BilledSelection(),
                 }
             );
             using var client = application.CreateClient();
@@ -2945,14 +2319,13 @@ public sealed class ResolutionContractTests
     [InlineData("network")]
     public async Task PricingLookupFailuresKeepSuccessfulResolutionAndUsage(string failure)
     {
-        foreach (var version in new[] { "1", "4" })
+        foreach (var version in new[] { "4" })
         {
             await using var application = CreateApplication(
                 new DeterministicServicesHandler
                 {
-                    CaptureBody =
-                        version == "4" ? CurrentViewCapture() : new DeterministicServicesHandler().CaptureBody,
-                    ProviderBody = version == "4" ? BilledSelection() : null,
+                    CaptureBody = CurrentViewCapture(),
+                    ProviderBody = BilledSelection(),
                     BeforeRespondAsync = (path, _) =>
                         path.EndsWith("/endpoints", StringComparison.Ordinal)
                             ? Task.FromException(
