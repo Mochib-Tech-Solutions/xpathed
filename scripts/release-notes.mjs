@@ -48,7 +48,9 @@ export function releaseNotes({
     `- Provider: \`${profile.provider}\` through OpenRouter`,
     `- Profile: \`${profile.id}\`; prompt variant: \`${profile.variant}\``,
     `- Reasoning: \`${JSON.stringify(profile.reasoning)}\`; output limit: ${profile.maxTokens} tokens`,
-    `- Qualification policy: ${policy.version}; latency margin: ${100 * (policy.latencyMargin ?? 0)}%`,
+    policy.version === "6"
+      ? `- Qualification policy: ${policy.version}; latency is reported and does not gate approval`
+      : `- Qualification policy: ${policy.version}; latency margin: ${100 * (policy.latencyMargin ?? 0)}%`,
     "",
     "## Evaluation results",
     "",

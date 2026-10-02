@@ -95,9 +95,9 @@ function assess(manifest, trials, policy) {
   if (manifest.baseline) insufficient.push("development_baseline_not_release_qualification");
   if (manifest.monitoring) insufficient.push("monitoring_not_release_qualification");
   const baseline = manifest.baselineEvidence?.profiles?.[manifest.profile.id];
-  if (!["4", "5"].includes(policy.version) && baseline?.criticalFailures?.length)
+  if (!["4", "5", "6"].includes(policy.version) && baseline?.criticalFailures?.length)
     reasons.push("baseline_critical_failure");
-  if (!["4", "5"].includes(policy.version) && baseline?.hardFailures?.length)
+  if (!["4", "5", "6"].includes(policy.version) && baseline?.hardFailures?.length)
     reasons.push("baseline_hard_invariant_failure");
   if (baseline?.capabilityGaps?.length || entries.some(({ spec }) => spec.capabilityGap))
     reasons.push("unresolved_capability_gap");
@@ -132,7 +132,7 @@ function assess(manifest, trials, policy) {
       }
     }
   }
-  const comparison = ["4", "5"].includes(policy.version)
+  const comparison = ["4", "5", "6"].includes(policy.version)
     ? compareTrials(manifest, trials, policy)
     : null;
   if (comparison?.status === "infrastructure_failure") insufficient.push(...comparison.reasons);
@@ -140,7 +140,7 @@ function assess(manifest, trials, policy) {
   const overall = rates(entries);
   if (hardFailures.length) reasons.push("hard_invariant_failure");
   if (
-    !["4", "5"].includes(policy.version) &&
+    !["4", "5", "6"].includes(policy.version) &&
     entries.some(({ spec, grade }) => spec.critical === true && !grade.passed)
   )
     reasons.push("critical_case_failed");
@@ -194,7 +194,9 @@ function assess(manifest, trials, policy) {
   const successfulFamilies = families.filter((family) =>
     heldOut
       .filter(({ spec }) => spec.family === family)
-      .every(({ onTime, correct }) => (["4", "5"].includes(policy.version) ? correct : onTime)),
+      .every(({ onTime, correct }) =>
+        ["4", "5", "6"].includes(policy.version) ? correct : onTime,
+      ),
   ).length;
   if (manifest.mode !== "live") insufficient.push("live_evidence_required");
   if (

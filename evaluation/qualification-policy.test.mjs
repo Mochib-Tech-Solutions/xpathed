@@ -164,7 +164,8 @@ test("current-view release qualification requires its own coverage and measured 
   trials[4].observation.actions[0].matches[0].intended = true;
   trials[0].elapsedMs = 9000;
   trials[1].elapsedMs = 9000;
-  assert.ok(status().reasons.includes("tail_latency_regression"));
+  assert.equal(status().status, "qualified");
+  assert.equal(status().comparison.candidate.p95, 9000);
   trials[0].baseline.elapsedMs = null;
   assert.equal(compareTrials(manifest, trials, currentViewPolicy).status, "infrastructure_failure");
 });
@@ -706,8 +707,36 @@ test("paid provider evidence cannot turn infrastructure failures into baseline s
       diagnostics: { code: "provider_malformed_response" },
     },
   };
-  const entry = measuredEntry(spec, malformed, profile, currentViewPolicy);
-  assert.equal(entry.passed, false);
-  assert.equal(entry.operational, false);
-  assert.equal(compareMeasurements([entry], [entry]).status, "passed");
+  for (const code of ["provider_malformed_response", "decomposition_incomplete"]) {
+    malformed.result.diagnostics.code = code;
+    const entry = measuredEntry(spec, malformed, profile, currentViewPolicy);
+    assert.equal(entry.passed, false);
+    assert.equal(entry.operational, false, code);
+    assert.equal(compareMeasurements([entry], [entry]).status, "passed");
+    if (code === "decomposition_incomplete")
+      for (const version of ["4", "5"])
+        assert.equal(
+          measuredEntry(spec, malformed, profile, { ...currentViewPolicy, version }).operational,
+          true,
+        );
+    const unaccounted = structuredClone(malformed);
+    unaccounted.provider[0].reportedUsd = null;
+    assert.equal(measuredEntry(spec, unaccounted, profile, currentViewPolicy).operational, true);
+  }
+});
+
+test("report-only latency preserves correctness and evidence gates", () => {
+  const baseline = [{ caseId: "a", passed: true, elapsedMs: 100 }];
+  const candidate = [{ ...baseline[0], elapsedMs: 40000 }];
+  const report = compareMeasurements(candidate, baseline, null);
+  assert.equal(report.status, "passed");
+  assert.equal(report.candidate.p95, 40000);
+  assert.equal(
+    compareMeasurements([{ ...candidate[0], passed: false }], baseline, null).status,
+    "semantic_drift",
+  );
+  assert.equal(
+    compareMeasurements([{ ...candidate[0], elapsedMs: null }], baseline, null).status,
+    "infrastructure_failure",
+  );
 });
