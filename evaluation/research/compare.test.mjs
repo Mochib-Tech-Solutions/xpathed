@@ -1,6 +1,18 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { arms, assertParity, selectCases, summarize } from "./compare.mjs";
+import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import {
+  arms,
+  assertParity,
+  assertProviderIntegrity,
+  assertCodeIdentity,
+  readTrials,
+  trialId,
+  selectCases,
+  summarize,
+} from "./compare.mjs";
 
 test("comparison uses the shared current cases and explicit plural labels", () => {
   const cases = selectCases();
@@ -56,4 +68,77 @@ test("every planned case and arm gets a distinct stable attempt identity", async
     ids,
     plan.trials.flatMap((p) => arms.map((arm) => trialId(p, arm))),
   );
+});
+
+test("provider identity and cache violations are rejected even on the final attempt", () => {
+  const record = { forwarded: true, status: 200, identityValid: true, responseCacheHit: false };
+  assert.doesNotThrow(() => assertProviderIntegrity({ provider: [record] }));
+  for (const changed of [
+    { identityValid: false },
+    { identityValid: undefined },
+    { responseCacheHit: true },
+  ])
+    assert.throws(
+      () => assertProviderIntegrity({ provider: [{ ...record, ...changed }] }),
+      /comparison stopped/,
+    );
+  assert.doesNotThrow(() =>
+    assertProviderIntegrity({ provider: [{ ...record, status: 503, identityValid: false }] }),
+  );
+});
+
+test("continuation freezes fixture, oracle, provider and grader code; replay checks both graders", () => {
+  const files = Object.fromEntries(
+    [
+      "evaluation/fixtures/pages.mjs",
+      "evaluation/fixtures/oracle.js",
+      "evaluation/provider.mjs",
+      "evaluation/profiles.json",
+      "evaluation/run.mjs",
+      "evaluation/grader.mjs",
+      "evaluation/research/grade.mjs",
+      "evaluation/research/compare.mjs",
+    ].map((path) => [path, "original"]),
+  );
+  const recorded = { files };
+  for (const path of Object.keys(files)) {
+    const current = { files: { ...files, [path]: "changed" } };
+    assert.throws(() => assertCodeIdentity(recorded, current, true), /identity mismatch/);
+    if (path.endsWith("/grader.mjs") || path.endsWith("/grade.mjs"))
+      assert.throws(() => assertCodeIdentity(recorded, current), /identity mismatch/);
+  }
+  assert.throws(
+    () =>
+      assertCodeIdentity(
+        recorded,
+        { files: { ...files, "evaluation/fixtures/new.js": "added" } },
+        true,
+      ),
+    /identity mismatch/,
+  );
+});
+
+test("replay recomputes resolver contract grades and rejects invalid saved provider identity", async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), "engineering-replay-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  await mkdir(join(directory, "trials"));
+  const spec = selectCases("basic-save")[0];
+  const planned = { caseId: spec.id, repetition: 1 };
+  const trial = {
+    ...planned,
+    id: trialId(planned, "improved"),
+    arm: "improved",
+    strategy: "custom",
+    mode: "live",
+    error: { message: "original failure" },
+    contractGrade: { passed: true },
+    provider: [{ forwarded: true, status: 200, identityValid: true, responseCacheHit: false }],
+  };
+  const path = join(directory, "trials", `${trial.id}.json`);
+  const manifest = { mode: "live", plan: { trials: [planned] }, cases: [spec] };
+  await writeFile(path, JSON.stringify(trial));
+  assert.equal((await readTrials(directory, manifest))[0].contractGrade.passed, false);
+  trial.provider[0].identityValid = false;
+  await writeFile(path, JSON.stringify(trial));
+  await assert.rejects(readTrials(directory, manifest), /comparison stopped/);
 });

@@ -2,6 +2,21 @@
 
 xpathed resolves one English action across targets in the current view. Its design keeps language interpretation measurable, locator verification deterministic and failures available for investigation.
 
+## From Basic to Improved
+
+The progression below explains what changed and why. **Basic** is the archived earlier current-view setup used in the comparison; it already selected candidate IDs and verified XPath in the browser.
+
+| Step | Change | Reason |
+| --- | --- | --- |
+| Basic | Capture the current view, ask the model to select targets, then verify their XPath and state | Establish a working baseline with measurable target correctness |
+| Clarify selection | Distinguish requested controls from section containers and repeated descendant text | Reduce selections of surrounding context instead of the intended control |
+| Clarify absence | Give missing candidates and empty captures explicit outcomes; completeness covers every requested target | Avoid confusing a missing target with an incomplete answer |
+| Revalidate the view | Check current-view membership again after inference | Reject results based on targets that moved out of scope while the model was responding |
+| Consolidate the implementation | Share one prompt and schema between browser and offline selection; remove retired runtime paths | Keep future changes in one place, with earlier implementations recoverable through Git and image archives |
+| Compare the result | Run Basic, Improved and Stagehand against the same independently labelled browser cases | Measure the combined effect, expose regressions and separate action interpretation from target selection |
+
+We measured Basic and Improved as complete systems. There is no isolated accuracy measurement for each intermediate step. The [comparison report](research/engineering-comparison.md) contains the category graph, paired gains and losses, costs and original evidence identities.
+
 ## Give the model a bounded job
 
 The model selects candidate IDs from browser observations. Browser code builds XPath and verifies that it uniquely identifies the selected node. This division prevents invented locator text from becoming the trust boundary.

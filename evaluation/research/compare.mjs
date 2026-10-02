@@ -243,6 +243,30 @@ export function trialId(planned, arm) {
   return hash(`${planned.id ?? `${planned.caseId}:${planned.repetition}`}-${arm}`).slice(0, 32);
 }
 
+export function assertProviderIntegrity(trial) {
+  for (const record of trial.provider ?? []) {
+    if (
+      record.forwarded &&
+      (record.responseCacheHit === true ||
+        (record.status >= 200 && record.status < 300 && record.identityValid !== true))
+    )
+      throw new Error("Provider identity mismatch or response cache hit; comparison stopped");
+  }
+}
+
+export function assertCodeIdentity(recorded, current, continuation = false) {
+  const required = continuation
+    ? Object.keys(current.files).filter((path) => path.startsWith("evaluation/"))
+    : ["evaluation/grader.mjs", "evaluation/research/grade.mjs"];
+  const paths = new Set([
+    ...required,
+    ...Object.keys(recorded.files).filter((path) => continuation && path.startsWith("evaluation/")),
+  ]);
+  for (const path of paths)
+    if (!recorded.files[path] || recorded.files[path] !== current.files[path])
+      throw new Error(`Comparison code identity mismatch: ${path}`);
+}
+
 export async function readTrials(directory, manifest) {
   const trials = [];
   const keys = new Set();
@@ -266,10 +290,10 @@ export async function readTrials(directory, manifest) {
     )
       throw new Error("Trial identity mismatch or duplicate attempt");
     keys.add(key);
-    trial.grade = gradeComparison(
-      manifest.cases.find((c) => c.id === trial.caseId),
-      trial,
-    );
+    assertProviderIntegrity(trial);
+    const spec = manifest.cases.find((c) => c.id === trial.caseId);
+    trial.grade = gradeComparison(spec, trial);
+    if (trial.arm !== "stagehand") trial.contractGrade = gradeTrial(spec, trial);
     trials.push(trial);
   }
   return trials;
@@ -285,6 +309,7 @@ export async function main(args = process.argv.slice(2)) {
     const { contentHash, ...body } = manifest;
     if (hash(body) !== contentHash || manifest.graderHash !== graderHash)
       throw new Error("Comparison manifest/grader integrity mismatch");
+    assertCodeIdentity(manifest.code, await fingerprints());
     const trials = await readTrials(options.replay, manifest);
     console.log(JSON.stringify(summarize(manifest, trials), null, 2));
     return trials.length === manifest.plan.trials.length * arms.length ? 0 : 1;
@@ -344,6 +369,9 @@ export async function main(args = process.argv.slice(2)) {
       hash(manifest.stagehand) !== hash(current.stagehand)
     )
       throw new Error("Continuation requires unchanged cases, grading, settings and images");
+    assertCodeIdentity(manifest.code, current.code, true);
+    if (hash(manifest.plan) !== hash(current.plan))
+      throw new Error("Continuation requires the original plan and timeout settings");
     retained = await readTrials(output, manifest);
     for (const file of await readdir(join(output, "provider"))) {
       const record = await json(join(output, "provider", file));
@@ -371,6 +399,7 @@ export async function main(args = process.argv.slice(2)) {
   const trials = [];
   const proxies = [];
   let router, deterministicProxy;
+  let failure;
   const basicReady = new Map(manifest.plan.trials.map((p) => [p.caseId, Promise.withResolvers()]));
   let summaryWrite = Promise.resolve();
   async function runCase(spec, planned, mode, onlyArm) {
@@ -382,6 +411,9 @@ export async function main(args = process.argv.slice(2)) {
         if (arm === "basic") basicReady.get(spec.id)?.resolve(previous);
         continue;
       }
+      const basic =
+        arm === "stagehand" ? (onlyArm ? await basicReady.get(spec.id).promise : rows[0]) : null;
+      if (failure) return rows;
       const trial = {
         ...planned,
         id: trialId(planned, arm),
@@ -399,13 +431,7 @@ export async function main(args = process.argv.slice(2)) {
       const proxy = proxies[arms.indexOf(arm)];
       if (mode === "live") proxy.beginAttempt(trial.id);
       if (arm === "stagehand")
-        await stagehandTrial(
-          spec,
-          trial,
-          { ...options, mode },
-          services,
-          (onlyArm ? await basicReady.get(spec.id).promise : rows[0]).environment,
-        );
+        await stagehandTrial(spec, trial, { ...options, mode }, services, basic.environment);
       else {
         const endpoints =
           arm === "basic"
@@ -418,23 +444,30 @@ export async function main(args = process.argv.slice(2)) {
         await execute(spec, trial, { ...options, mode }, endpoints);
         trial.modelCalls = trial.result?.diagnostics?.modelCalls ?? null;
         trial.configuration = configurationRecord(trial);
-        if (arm === "improved")
-          try {
-            assertParity(
-              (onlyArm ? await basicReady.get(spec.id).promise : rows[0]).environment,
-              trial.environment,
-            );
-          } catch (error) {
-            trial.error ??= { message: error.message };
-          }
-        trial.contractGrade = gradeTrial(spec, trial);
       }
       if (mode === "live") {
         await proxy.awaitIdle();
         const calls = proxy.records.filter((r) => r.attemptId === trial.id);
         trial.evidence = { ...trial.evidence, provider: calls };
         trial.provider = calls.map(({ request, response, ...metadata }) => metadata);
+        try {
+          assertProviderIntegrity(trial);
+        } catch (error) {
+          failure ??= error;
+          trial.error ??= { message: error.message };
+          for (const ready of basicReady.values()) ready.resolve({});
+        }
       }
+      if (arm === "improved")
+        try {
+          assertParity(
+            (onlyArm ? await basicReady.get(spec.id).promise : rows[0]).environment,
+            trial.environment,
+          );
+        } catch (error) {
+          trial.error ??= { message: error.message };
+        }
+      if (arm !== "stagehand") trial.contractGrade = gradeTrial(spec, trial);
       trial.grade = gradeComparison(spec, trial);
       await save(join(output, "trials", `${trial.id}.json`), trial);
       rows.push(trial);
@@ -531,7 +564,6 @@ export async function main(args = process.argv.slice(2)) {
       await summaryWrite;
     };
     if (options.mode === "live") {
-      let failure;
       await Promise.all(
         arms.map(async (arm) => {
           for (const planned of manifest.plan.trials) {
