@@ -78,3 +78,42 @@ The failed hosted candidate remains available as private Release assets under `c
 ### Remaining evidence for issue #11
 
 A candidate must first pass the unchanged development gate, then full exact-image regression and fresh held-out qualification. Until that happens, there is no valid candidate to promote, activate or monitor for model drift. Real rollback also needs a retained qualified predecessor; synthetic rollback checks already cover the implementation boundary. The first scheduled run and its notification delivery remain unobserved. These requirements keep #11 open despite the completed setup.
+
+## First approved release — 2026-10-02
+
+The maintainer accepted temporary policy 7: overall correctness must match or exceed the baseline, every individual gain/lost pass remains visible, and latency is descriptive. Safety, provider accounting, complete evidence and exact artifact identity remain mandatory. Preserving each individual baseline pass is intended for a later policy version. Historical qualification outcomes retain their original policies.
+
+[Qualification run 37007941576](https://github.com/Mochib-Tech-Solutions/xpathed/actions/runs/37007941576) passed on source `86d8937d97e312be83fca5c626111dacd58225c4`, following successful exact-revision [main CI](https://github.com/Mochib-Tech-Solutions/xpathed/actions/runs/37006721334). The candidate uses DeepSeek V4.1 Flash through Wafer, reasoning disabled, maximum output 4,096 tokens, contract 4, prompt 10, capture 5 and XPath strategy 4. Both candidate and pinned bootstrap images were verified before comparison; every original attempt is retained.
+
+| Phase        | Arm                | Correct | Median, ms | p95, ms |
+| ------------ | ------------------ | ------: | ---------: | ------: |
+| Pilot        | Candidate          |     3/5 |     1367.0 |  1961.6 |
+| Pilot        | Bootstrap baseline |     3/5 |     1822.7 |  2197.2 |
+| Confirmation | Candidate          | 119/135 |     1116.9 |  1710.2 |
+| Confirmation | Bootstrap baseline | 105/135 |      856.8 |  1894.4 |
+
+Confirmation improved by 14 passing cases overall: 15 gains and one lost baseline pass. In `release3-listbox-1`, the candidate found the correct Greek option but interpreted `click` as `select`, changing the readiness assessment. The two pilot failures and sixteen confirmation failures remain recorded. These authored browser fixtures do not establish production accuracy or statistically significant speed differences. Of all confirmation cases, 117/135 were correct and complete within two seconds; speed did not determine qualification.
+
+All 280 calls across both arms reconciled, with **$0.02556002 USD** reported and **zero unknown charges in this run**. Historical unknown ledger entries remain preserved separately. The downloaded original confirmation evidence replayed to the same qualified result. The thirty newly exposed cases in ten families cannot count as fresh held-out coverage for another qualification.
+
+[Explicit promotion 37013033372](https://github.com/Mochib-Tech-Solutions/xpathed/actions/runs/37013033372) downloaded and verified the unchanged candidate assets, then selected [v1.0.0](https://github.com/Mochib-Tech-Solutions/xpathed/releases/tag/v1.0.0) in authoritative approval state. The original `v1.0.0-rc.6` Git tag remains at the same source. Verified identities:
+
+- Candidate: `4bbb4040984368a85f2c20e3e33d25547cc289975729467e2b4d2d9fa9860e92`.
+- Bundle: `23c6ed2b4969951e5fd45b9e841ed2ef837eaaea9dd7cfceafe723a4e22cc4f2`.
+- Evidence archive: `29ca5867ede541f98998fd37b68969627244fb3c969641f223ca4b5d2ada2446`.
+
+The approval freezes fifteen sentinel cases and their original measurements; its monitoring receipt permits nightly verification after the thirty-day qualification archive expires. New promotions still require fresh qualification. Local evidence is retained under `.artifacts/release-live-37007941576/`.
+
+### Approved-release monitoring and cleanup
+
+[Monitoring run 37013255851](https://github.com/Mochib-Tech-Solutions/xpathed/actions/runs/37013255851) passed against the exact approved images: 12/15 correct, matching the frozen baseline, with no gains or lost passes. The three known failures remain visible. Median latency was 1,057.9 ms and p95 was 1,578.6 ms. All fifteen calls reconciled for **$0.00128837 USD**, with no unknown charges. The authoritative last-completed record agrees with the downloaded evidence and retains the same approved candidate digest. This manual run verifies approved-artifact execution; the first scheduled run against this approved release is still pending.
+
+After approval and asset verification, the eight older unapproved Release objects were deleted at the maintainer's request. Their Git tags and local diagnostic evidence were retained. `v1.0.0` is the sole published Release; its assets are unchanged.
+
+### Scheduled failure delivery
+
+[Scheduled monitoring run 36956795982](https://github.com/Mochib-Tech-Solutions/xpathed/actions/runs/36956795982) started at 02:41:33 UTC on 2026-10-02, after the nominal 02:17 schedule. It failed explicitly because no release was approved at that time, made no inference calls and left the runtime unchanged. Read-only mailbox inspection confirmed a delivered failure email that links to this exact scheduled run. Manual and scheduled failure-email delivery are now observed. This does not guarantee delivery for a schedule GitHub never starts. Private recipient details are excluded.
+
+### Remaining operational scope
+
+Approval has not activated these images in the local development stack. Local activation restarts browser sessions and records deployment identity separately. A first approved release has no qualified predecessor for a real operational rollback; deterministic rollback boundary tests remain the current evidence. Issue #11 stays open for those operational checks.
