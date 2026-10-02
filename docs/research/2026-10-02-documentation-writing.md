@@ -18,7 +18,7 @@ Keep sentences short and links selective. Explain the essential point where it a
 
 Give each diagram one takeaway and a useful caption. Separate service ownership, request flow and release decisions. Label arrows with the data or operation crossing the boundary. Use scalable SVG and inspect it at normal article width. [Google: Illustrations](https://developers.google.com/tech-writing/two/illustrations), [C4: Notation](https://c4model.com/diagrams/notation)
 
-The diagnostic diagram must reflect the EF mapping and migration: one application table, three JSONB columns and explicit indexes. Identifiers are not automatically foreign keys; embedded objects are not child tables. JSONB supports indexing, but the project defines no JSONB query index. [PostgreSQL: JSON types](https://www.postgresql.org/docs/current/datatype-json.html)
+Keep the README database explanation to its purpose and a small illustrative result. Put physical storage details in the diagnostics reference; a full schema diagram adds little to this overview.
 
 Preserve headings, meaningful link text and image alternatives. Essential information must exist in text, and diagrams must remain understandable without color. [Google: Accessible documentation](https://developers.google.com/style/accessibility)
 
@@ -39,6 +39,8 @@ Use at most two figures:
 
 Use text labels as well as color. Prefer a perceptually uniform sequential palette for rates; reserve a zero-centered diverging scale for signed changes. Avoid rainbow scales. [Matplotlib: Colormaps](https://matplotlib.org/stable/users/explain/colors/colormaps.html)
 
-Every figure needs its run, cohort, configuration and scoring rule. Pair identical case inputs; separate browser and offline denominators. Preserve missing attempts, operational failures and unsupported cases. An aggregate gain must not hide a lost baseline pass.
+Every figure needs its cohort, configuration and scoring rule. Keep dates and full run identity in the evidence report. Pair identical case inputs; separate browser and offline denominators. Preserve missing attempts, operational failures and unsupported cases. An aggregate gain must not hide a lost baseline pass.
+
+Name the configurations and state which settings changed. Holding other factors fixed makes the comparison easier to interpret; changing several rules together measures the whole configuration. This applies NIST’s experimental-design guidance, while MLCommons emphasizes reproducible benchmarks with defined models, datasets and permitted changes. A paired run with fixed arm order does not control provider warmth or all timing effects. [NIST: Blocking](https://www.itl.nist.gov/div898/handbook/pri/section3/pri332.htm), [MLCommons: Benchmark goals](https://mlcommons.org/benchmarks/)
 
 Recorded counts describe the tested suite and attempts, not production accuracy or repeat-run stability. Do not invent intervals. If a later study estimates uncertainty, preserve case pairing and explain sampling assumptions; repeated cases from one page may need page-level grouping. SciPy supports shared-index paired resampling. Show uncertainty when it changes interpretation. [SciPy: Bootstrap](https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.bootstrap.html), [ONS: Uncertainty](https://service-manual.ons.gov.uk/data-visualisation/guidance/showing-uncertainty-in-charts)

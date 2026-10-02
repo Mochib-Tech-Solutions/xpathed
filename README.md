@@ -52,7 +52,7 @@ All five services run in Docker. Ctrl+C or `pnpm docker:down` removes developmen
 
 ## Architecture
 
-![Service ownership and request paths](docs/diagrams/system-design.svg)
+[![Service ownership and request paths](docs/diagrams/system-design.svg)](docs/diagrams/system-design.svg)
 
 | Service                       | Responsibility                                         |
 | ----------------------------- | ------------------------------------------------------ |
@@ -78,13 +78,17 @@ The development default is **`deepseek/deepseek-v4.1-flash` through OpenRouter's
 
 `ActionSelectionStrategy` owns the prompt/schema. `OpenRouterGateway` pins the provider, disables reasoning and fallback, and limits output to 4,096 tokens. A configuration hash identifies effective settings. No model is trained here; changes to the pretrained model, prompt or context require evaluation. Runtime defaults and approved release configurations are separate.
 
-## Why there is a database
+## Failure diagnostics
 
-ClientApi records each attempt before resolution and completes it afterward. PostgreSQL preserves the outcome, configuration, timings, available charges and sanitized evidence for investigation.
+PostgreSQL keeps resolution results and sanitized evidence so failures can be investigated after a tab closes. ClientApi records each attempt; chat stays in the browser workspace. See [diagnostics](docs/diagnostics.md) for investigation tools.
 
-![One diagnostic_records table with metadata, result, evidence and provenance](docs/diagrams/diagnostic-storage.svg)
+Illustrative saved click result:
 
-The single application table combines indexed metadata with three `jsonb` payloads. It cannot restore browser sessions; chat history stays in Web memory. Default retention is 90 days for records and 30 days for page evidence, with explicit retained-artifact exceptions. Storage failures are logged without replacing the resolution outcome. The [diagnostics guide](docs/diagnostics.md) explains the schema and failure analysis.
+```text
+Target: Save in Profile
+XPath: verified against the selected button
+Readiness: blocked — button disabled
+```
 
 ## Scope
 
@@ -96,18 +100,35 @@ This is a local application. Hosted use needs authentication, network isolation 
 
 Independent labels check target identity, complete target sets, action, XPath and readiness. Deterministic tests check the pipeline; live runs measure model behavior. Offline selection and browser results have separate denominators.
 
-### Recorded measurements
+### Compare configurations on the same cases
 
-These are saved runs, not a fresh validation of the current checkout.
+Both configurations use **DeepSeek V4.1 Flash through Wafer**, with the same inference settings, cases and grader.
 
-| Date and scope                                                      | Result                                     | Details                                                                                                                                        |
-| ------------------------------------------------------------------- | ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| 2026-10-02 · 135 authored browser cases, DeepSeek/Wafer             | **119/135 (88.15%)**; baseline **105/135** | Median **1,116.9 ms**, p95 **1,710.2 ms**. [Evidence](docs/research/2026-10-01-release-monitoring-setup.md#first-approved-release--2026-10-02) |
-| 2026-10-01 · 860 reviewed PhraseNode inputs, DeepSeek/DeepInfra FP8 | **547/860 (63.60%)**                       | Offline target selection; **$1.618648388** reported. [Evidence](docs/research/deepinfra-labelled-baseline-report.md)                           |
+| Configuration       | What it tests                                                                                    | Correct browser cases |
+| ------------------- | ------------------------------------------------------------------------------------------------ | --------------------: |
+| Earlier — prompt 8  | Current-view selection and captured-target verification                                          |       111/140 (79.3%) |
+| Current — prompt 10 | Clearer control/context distinctions, explicit scoped absence and stronger viewport revalidation |   **120/140 (85.7%)** |
 
-![135 paired browser cases: 104 passed both versions, 15 improved, one regressed and 15 failed both](docs/assets/evaluation/paired-outcomes.svg)
+The current configuration gained **10 passes and lost one**, a net **6.4 percentage-point increase**. This measures the combined changes; it does not isolate an individual prompt rule. The regression remains visible and would fail the release requirement to preserve every baseline pass.
 
-The browser run gained 15 passes and lost one. That regression would fail the current **no-lost-baseline-pass** release gate. These workloads do not establish unseen-site accuracy.
+[![Paired browser outcomes, including gains and regressions](docs/assets/evaluation/paired-outcomes.svg)](docs/assets/evaluation/paired-outcomes.svg)
+
+All **140 browser cases** received one original attempt per configuration:
+
+| Category    | What it checks                                     | Cases |
+| ----------- | -------------------------------------------------- | ----: |
+| Targeting   | Names, roles and language variations               |    27 |
+| Context     | Sections, repeated labels and relationships        |    51 |
+| Cardinality | Complete sets of requested targets                 |     4 |
+| Appearance  | CSS colors and relative positions                  |     5 |
+| Scope       | Current view, absence and unsupported instructions |    19 |
+| State       | Disabled, covered and partially visible controls   |    30 |
+| Robustness  | Untrusted page text and large pages                |     2 |
+| Frames      | Targets inside nested documents                    |     2 |
+
+The separate **1,084-case offline collection** returned **716/1,084 (66.1%)** and **710/1,084 (65.5%)** exact results. Both arms use the same offline prompt and implementation: this measures repeat variation, not the browser changes. Every reviewed input retains its supplied candidates.
+
+The [full comparison](docs/research/configuration-comparison.md) includes the category heatmap, remaining failures, timing by execution phase and recorded charges. All **2,448 arm attempts** are retained, including errors; none were retried.
 
 ```sh
 pnpm check                              # local checks

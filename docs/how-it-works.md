@@ -4,7 +4,7 @@
 
 ## Service ownership
 
-![Service ownership and request paths](diagrams/system-design.svg)
+[![Service ownership and request paths](diagrams/system-design.svg)](diagrams/system-design.svg)
 
 Web owns chat, tabs and the noVNC viewer. ClientApi accepts requests and stores diagnostics. Resolver coordinates capture, model selection and verification. Browser owns Playwright, Chromium and live page state. PostgreSQL retains diagnostic records. `Common` defines the records exchanged between services.
 
@@ -12,7 +12,7 @@ Each managed session owns a Chromium process, browser context and display. Opera
 
 ## Follow one command
 
-![Capture, selection, browser verification and response](diagrams/resolution-flow.svg)
+[![Capture, selection, browser verification and response](diagrams/resolution-flow.svg)](diagrams/resolution-flow.svg)
 
 ### 1. Capture the current view
 
@@ -28,7 +28,7 @@ Passwords, editable values, cookies, storage and URL attributes are excluded. Na
 
 Resolver sends the instruction and every scoped candidate to OpenRouter. The model returns strict JSON: one shared interaction, distinct candidate IDs and per-target outcomes. It receives page text as untrusted data and has no browser tools.
 
-The development default is DeepSeek V4.1 Flash through Wafer. `ActionSelectionStrategy` owns prompt/schema validation; `OpenRouterGateway` owns transport, pinned provider settings and accounting. No model is trained or fine-tuned locally.
+The default is DeepSeek V4.1 Flash through Wafer. `ActionSelectionStrategy` defines the prompt, schema and selection checks; `OpenRouterGateway` owns transport, provider settings and accounting. No model is trained locally.
 
 Resolver checks IDs, action consistency, duplicates and completeness. Ambiguity, scoped absence, unsupported instructions and malformed output remain distinct. Valid JSON cannot establish whether the selected button was intended; independent evaluation supplies that check.
 
@@ -58,13 +58,9 @@ Estimated and provider-reported cost remain separate; missing accounting is unkn
 
 ## Storage and failure investigation
 
-ClientApi's `ResolutionRecorder` starts a pending record, calls Resolver and completes the same attempt. A retry has a new ID. `DiagnosticStore` and EF Core's `AppDbContext` own persistence; Resolver does not depend on the database.
+ClientApi records each attempt's result and sanitized evidence in PostgreSQL so failures can be investigated after a tab closes. Retries get new IDs; storage failure is logged without replacing the resolution outcome. Resolver has no database dependency.
 
-The sole application table, `diagnostic_records`, stores scalar identity, outcome and retention fields alongside `ResultJson`, `EvidenceJson` and `ProvenanceJson`. Page/time and expiration indexes support lookup and cleanup. Page IDs are diagnostic references, not restorable browser sessions.
-
-Each database write has a two-second allowance. Storage failure is logged separately without replacing the resolution outcome. Ordinary records expire after 90 days and evidence after 30 by default; retained artifacts have explicit exceptions.
-
-Investigate by attempt/trace ID, configuration, stage and reason code. Determine whether the failure occurred during capture, provider transport, response validation or browser verification. Semantic mistakes require an independently known intended target. Expired or withheld evidence limits the conclusion. The [diagnostics guide](diagnostics.md) includes the schema, commands and a worked example.
+Follow the attempt/trace ID, configuration, stage and reason code to distinguish capture, provider, response-validation and browser-verification failures. Judging a wrong selection also requires an independently known intended target. The [diagnostics guide](diagnostics.md) gives the commands and a worked example.
 
 ## Extending and integrating
 
@@ -78,9 +74,9 @@ Investigate by attempt/trace ID, configuration, stage and reason code. Determine
 
 These are source boundaries. `candidate-selection-v1` is the only runtime strategy; the optional context planner is evaluation-only. Changes require corresponding target, contract, privacy and browser checks.
 
-A caller can resolve against an xpathed-owned page with `POST /api/pages/{pageId}/resolve`, supplying `instruction`, `documentId` and `contractVersion: "4"`. An external runner's browser needs a new adapter or an ownership change; raw HTML cannot attach it to today's API.
+A caller can resolve against an xpathed-owned page with `POST /api/pages/{pageId}/resolve`, supplying `instruction`, `documentId` and `contractVersion: "4"`. Connecting an external runner's browser requires an adapter that preserves page, document and target identities; today's API cannot attach raw HTML or an external browser session.
 
-The consuming runner would own action-time revalidation, execution and postconditions. Browser ownership, cancellation, authentication and evidence retention need an explicit agreement. No action executor or external-runner adapter is implemented.
+The consuming runner would own revalidation immediately before execution and checks of the resulting state. The integration must define browser ownership, cancellation, authentication and evidence retention. No action executor or external-runner adapter is implemented.
 
 ## Deployment limits
 
