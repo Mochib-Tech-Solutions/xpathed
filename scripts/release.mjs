@@ -58,7 +58,7 @@ function fresh(value) {
     "Evidence timestamp is invalid or expired",
   );
 }
-function configuration(trial, profile, policy, currentViewPromptVersion = "9") {
+function configuration(trial, profile, policy, currentViewPromptVersion = "10") {
   fresh(trial.createdAt);
   const recorded = configurationRecord(trial);
   ensure(
@@ -406,7 +406,7 @@ async function evidence(options) {
           trial.baseline,
           m.comparison.profile,
           defaultPolicy,
-          m.comparison.artifact.sourceSha === defaultPolicy.bootstrap.sourceSha ? "8" : "9",
+          m.comparison.artifact.sourceSha === defaultPolicy.bootstrap.sourceSha ? "8" : "10",
         );
         const baselineKey = `release-baseline:${trial.result.contractVersion}`;
         ensure(

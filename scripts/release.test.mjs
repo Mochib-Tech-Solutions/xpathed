@@ -467,7 +467,7 @@ test("portable evidence archives verify in a relocated exact-source checkout and
 test("published candidates require a pinned digest and restore the exact source, images and measured sentinels", async (t) => {
   const work = await workspace(t, {
     contractVersion: "4",
-    promptVersion: "9",
+    promptVersion: "10",
     qualificationPolicy: "6",
     bootstrapBaseline: true,
   });
@@ -777,7 +777,7 @@ test("seal and verify bind qualified evidence without activating a default or ov
 });
 
 test("legacy release policy cannot seal current-view evidence with either current or legacy prompts", async (t) => {
-  for (const promptVersion of ["9", "5"]) {
+  for (const promptVersion of ["10", "5"]) {
     await t.test(`prompt ${promptVersion}`, async (t) => {
       const work = await workspace(t, { contractVersion: "4", promptVersion });
       const sealed = work.seal();
@@ -790,7 +790,7 @@ test("legacy release policy cannot seal current-view evidence with either curren
 test("current-view evidence seals only under its frozen policy and actual scope", async (t) => {
   const work = await workspace(t, {
     contractVersion: "4",
-    promptVersion: "9",
+    promptVersion: "10",
     qualificationPolicy: "6",
   });
   const bound = work.bindArtifact();
