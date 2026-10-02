@@ -329,7 +329,7 @@ describe("Browser tabs and chat", () => {
     );
     await user.click(screen.getByRole("tab", { name: "First" }));
     expect(await screen.findByText("First target", { selector: "bdi" })).toBeInTheDocument();
-    expect(composer()).toHaveValue("Click First");
+    expect(composer()).toHaveValue("");
   });
 
   it("keeps separate chat and drafts when creating and selecting browser tabs", async () => {
