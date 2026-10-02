@@ -21,7 +21,7 @@ internal sealed class BrowserFrameCapture(
     public HashSet<string> CandidateIds { get; } = new(StringComparer.Ordinal);
     public IJSHandle? Highlight { get; set; }
 
-    public async Task RefreshAsync(int budgetMs)
+    public async Task<int> RefreshAsync(int budgetMs, int scanBudget)
     {
         var timer = System.Diagnostics.Stopwatch.StartNew();
         string? environment = null;
@@ -50,8 +50,13 @@ internal sealed class BrowserFrameCapture(
             environment = info.GetProperty("environment").GetRawText();
         }
         var updated = await Handle.EvaluateAsync<JsonElement>(
-            "(capture, args) => capture.updateEnvironment(args.environment, args.budgetMs)",
-            new { environment, budgetMs = Math.Max(0, budgetMs - timer.ElapsedMilliseconds) }
+            "(capture, args) => capture.updateEnvironment(args.environment, args.budgetMs, args.scanBudget)",
+            new
+            {
+                environment,
+                budgetMs = Math.Max(0, budgetMs - timer.ElapsedMilliseconds),
+                scanBudget,
+            }
         );
         if (updated.TryGetProperty("errorCode", out var error))
         {
@@ -64,5 +69,6 @@ internal sealed class BrowserFrameCapture(
                     : "Viewport observation exceeded its processing budget."
             );
         }
+        return updated.GetProperty("scannedCount").GetInt32();
     }
 }

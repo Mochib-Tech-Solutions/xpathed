@@ -1245,6 +1245,12 @@ describe("Workspace resolution", () => {
     ["error", "provider_rate_limited", "Resolution failed", "The model provider is rate limited."],
     [
       "error",
+      "stale_capture",
+      "Resolution failed",
+      "The page or current view changed. Resolve the instruction again.",
+    ],
+    [
+      "error",
       "decomposition_incomplete",
       "Incomplete response",
       "The model returned an incomplete response for this instruction.",
@@ -1286,6 +1292,11 @@ describe("Workspace resolution", () => {
     expect(await screen.findByRole("heading", { name: title })).toBeVisible();
     expect(screen.getByText(message)).toBeVisible();
     expect(screen.queryByRole("button", { name: /Copy XPath/ })).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("I couldn’t find that element on this page."),
+    ).not.toBeInTheDocument();
+    if (outcome !== "not_found")
+      expect(screen.queryByRole("heading", { name: "Target not found" })).not.toBeInTheDocument();
     if (outcome === "error") expect(screen.getByRole("alert")).toHaveTextContent(message);
     else expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
