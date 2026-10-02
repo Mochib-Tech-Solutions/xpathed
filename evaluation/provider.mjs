@@ -703,6 +703,7 @@ export async function createBudgetProxy({
     const started = performance.now();
     const record = current.preparedRecord ?? newRecord();
     let reservation = current.reservation;
+    let receivingProvider = false;
     try {
       const chunks = [];
       let size = 0;
@@ -730,6 +731,7 @@ export async function createBudgetProxy({
       if (!reservation) await reserve(record, maximum);
       reservation = current.reservation;
       record.forwarded = true;
+      receivingProvider = true;
       const result = await fetchImpl(`${upstream}/chat/completions`, {
         method: "POST",
         headers: {
@@ -741,6 +743,7 @@ export async function createBudgetProxy({
         body: text,
         signal: AbortSignal.timeout(45000),
       });
+      receivingProvider = false;
       record.status = result.status;
       record.headers = Object.fromEntries(
         [...result.headers].filter(([key]) =>
@@ -751,7 +754,10 @@ export async function createBudgetProxy({
       );
       record.responseReuseDisabled = true;
       await retain(record);
-      record.response = safe(await result.text());
+      receivingProvider = true;
+      const responseText = await result.text();
+      receivingProvider = false;
+      record.response = safe(responseText);
       const payload = JSON.parse(record.response);
       record.response = safe(payload);
       record.usage = safe(payload.usage ?? null);
@@ -795,7 +801,7 @@ export async function createBudgetProxy({
       await retain(record);
       send(result.status, payload);
     } catch (error) {
-      blocked ||= current.reservation != null;
+      blocked ||= current.reservation != null && !receivingProvider;
       record.error = safe(String(error.message));
       const generationId = record.headers?.["x-generation-id"];
       if (!current.context && current.reservation && record.reportedUsd == null && generationId) {

@@ -26,6 +26,18 @@ Cases are organized by the behavior they check, rather than by the version that 
 
 Each release comparison freezes the complete eligible browser collection and every reviewed eligible imported case. Both candidate and approved baseline receive the same case inputs and current grading rules, with one original attempt per arm. Browser state resets independently. New cases and improved checks are welcome: apply the same updated expectations to both arms. Changing the collection or grader after a run requires another comparison.
 
+### Compare configurations on equal cases
+
+Name each arm by its configuration: source/image identity, model, provider, prompt, reasoning and output limit. A source change plus a prompt change is a system comparison; it cannot isolate a model or prompt effect.
+
+Freeze one case collection and grader for both arms. Give each arm the same cases, one original attempt per case, with no automatic retries or replacements after failures. Report planned, completed and failed counts for each track. Missing results stay visible and fail release completeness.
+
+Use the group files listed in `evaluation/cases/index.json` for browser categories: targeting, cardinality, appearance, context, scope, state, robustness and frames. Compatibility and saved-locator cases remain deterministic checks. Historical `family` values identify related fixtures; they are not the current behavior categories. Offline source labels do not establish these browser capabilities.
+
+Show paired gains and losses, plus passing cases over the full denominator, for every group and arm. Keep browser and offline results separate. Provider routes, cache conditions and execution settings belong beside the scores. An unchanged approved configuration rerun measures repeatability, not a new implementation improvement.
+
+A historical configuration may be an explicitly selected research comparator. Release approval still compares with the latest approved release under the current policy. The release launcher accepts one candidate and one baseline; comparing several model profiles requires a separate research run with the same frozen inputs.
+
 ### Browser cases
 
 A live case exercises the complete Resolver request: Browser captures candidates, the real model selects targets, Browser constructs and verifies XPath expressions and observes readiness, and the independent oracle grades the final response. There is no separate paid XPath-algorithm phase.
@@ -98,7 +110,7 @@ The source acquisition and adaptation commands remain `pnpm datasets:fetch`, `pn
 
 Track estimates, token usage, provider generation IDs, reported charges and unknown amounts separately. Cost amounts, estimate overruns, missing prices, unavailable billing metadata and accounting-service availability do not stop resolution evaluation or reject a release. Preserve charge records where available and report accounting failures explicitly; never invent a zero charge.
 
-Authentication, transport failures, provider rejection and missing resolution results are operational failures. A provider-enforced key limit can reject a call, but the evaluator adds no monetary continuation gate. Keep the dedicated evaluation key, standard routes, original attempts and existing charge history. Successful billing reconciliation never turns a failed model response into a passing case.
+Authentication, transport failures, provider rejection and missing resolution results are operational failures. A completed transport failure remains a failed attempt with its original charge status; once the proxy is idle, the runner continues with the next distinct attempt. It does not retry. Identity, response-cache and evidence-integrity violations still stop the run. A provider-enforced key limit can reject a call, but the evaluator adds no monetary continuation gate. Keep the dedicated evaluation key, standard routes, original attempts and existing charge history. Successful billing reconciliation never turns a failed model response into a passing case.
 
 ## Research comparisons
 
