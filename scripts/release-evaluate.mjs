@@ -239,7 +239,7 @@ async function main() {
     await save(statePath, state);
     const overlay = join(temporary, "compose.yaml");
     const imageService = (name, image, environment) =>
-      `  ${name}:\n${name === "browser-baseline" ? "    extends: {service: browser}\n" : ""}    build: !reset null\n    image: ${JSON.stringify(image.id)}\n    platform: ${manifest.platform.os}/${manifest.platform.architecture}\n    pull_policy: never\n${environment ? `    environment: ${JSON.stringify(environment)}\n` : ""}`;
+      `  ${name}:\n${name === "browser-baseline" ? `    extends: {file: ${JSON.stringify(resolve("docker/compose.yaml"))}, service: browser}\n` : ""}    build: !reset null\n    image: ${JSON.stringify(image.id)}\n    platform: ${manifest.platform.os}/${manifest.platform.architecture}\n    pull_policy: never\n${environment ? `    environment: ${JSON.stringify(environment)}\n` : ""}`;
     await writeFile(
       overlay,
       "services:\n" +

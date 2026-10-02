@@ -244,7 +244,7 @@ async function fetch(repo, tag, candidateSha256, destination, approved = null) {
                 trial.result?.summary?.processingComplete === true &&
                 Number.isFinite(trial.elapsedMs) &&
                 trial.elapsedMs <= policy.deadlineMs),
-          "A sentinel lacks a correct complete measured baseline",
+          "A sentinel lacks a valid measured baseline",
         );
         measured.push(measurement ?? { caseId: trial.caseId, elapsedMs: trial.elapsedMs });
       }

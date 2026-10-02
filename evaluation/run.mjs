@@ -682,6 +682,10 @@ export async function prune(path, now = new Date()) {
         value = await readJson(name);
       value.evidence = null;
       value.evidenceAvailability = "expired";
+      if (value.baseline) {
+        value.baseline.evidence = null;
+        value.baseline.evidenceAvailability = "expired";
+      }
       if (value.mutation?.fresh) value.mutation.fresh.evidence = null;
       await writeFile(name, JSON.stringify(value, null, 2) + "\n");
     }
