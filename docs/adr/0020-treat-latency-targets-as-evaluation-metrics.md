@@ -1,6 +1,6 @@
 # Treat latency targets as evaluation metrics
 
-Current release acceptance is superseded by [ADR-0022](0022-qualify-against-the-latest-baseline.md). The thresholds below describe the historical policy; original evidence retains those rules.
+Current release acceptance follows [ADR-0023](0023-simplify-release-evaluation.md): latency is descriptive and does not gate approval. The application cancellation decision below remains in force; historical qualification thresholds retain their original meaning only for their recorded evidence.
 
 Status: Accepted, 2026-10-01. Supersedes only the total-response deadline in [ADR-0018](0018-scope-resolution-to-the-current-view.md).
 

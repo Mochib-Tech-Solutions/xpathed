@@ -1,5 +1,7 @@
 # Qualify against the latest baseline
 
+Current release design is superseded by [ADR-0023](0023-simplify-release-evaluation.md). The rules below describe historical decisions and remain relevant to their original artifacts; they are not additional gates for new release PRs.
+
 Accepted, 2026-10-02. The maintainer replaced the absolute 95% requirements with no regression against the latest baseline. Policy 4 supersedes the numerical gates in ADR-0016 and ADR-0021; two seconds remains an aspirational speed metric under ADR-0020. Historical evidence keeps its original policy.
 
 Use the latest approved release as the baseline. Before the first approval, use the maintainer-confirmed current DeepSeek/Wafer configuration pinned to its source. Freeze both exact Browser/Resolver image sets before the pilot, then run one attempt per arm on identical cases with independently reset browser state. Preserve every baseline pass and require candidate median and p95 Resolver HTTP time to be no worse; ties pass. Keep existing failures visible instead of imposing an absolute accuracy floor. No statistical improvement claim follows from a small single-attempt comparison.

@@ -270,7 +270,6 @@ jobs:
         run: |
           mkdir -p .artifacts/ci
           pnpm evaluate --mode deterministic --output .artifacts/ci/browser 2>&1 | tee .artifacts/ci/browser.log
-          pnpm evaluate --mode deterministic --suite evaluation/current-view-qualification-cases.json --output .artifacts/ci/current-view 2>&1 | tee .artifacts/ci/current-view.log
       - uses: ./.github/actions/ci-receipt
         with:
           job: browser
@@ -282,8 +281,6 @@ jobs:
           path: |
             .artifacts/ci/browser/
             .artifacts/ci/browser.log
-            .artifacts/ci/current-view/
-            .artifacts/ci/current-view.log
           include-hidden-files: true
           if-no-files-found: error
           retention-days: 30

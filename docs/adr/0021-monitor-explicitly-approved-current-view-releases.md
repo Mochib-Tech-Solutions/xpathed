@@ -1,6 +1,6 @@
 # Monitor explicitly approved current-view releases
 
-Current release acceptance is superseded by [ADR-0022](0022-qualify-against-the-latest-baseline.md). The thresholds below describe the historical policy; original evidence retains those rules.
+Current release design is superseded by [ADR-0023](0023-simplify-release-evaluation.md). The rules below describe historical decisions and remain relevant to their original artifacts; they are not additional gates for new release PRs.
 
 Accepted, 2026-10-01. The maintainer authorized completing release setup and recurring monitoring with `OPENROUTER_EVAL_API_KEY`, using GitHub Actions failure notifications. This supersedes the earlier deferral of paid scheduled monitoring. Application credentials remain separate and provider key limits remain the spending control.
 

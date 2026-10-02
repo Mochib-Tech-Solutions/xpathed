@@ -102,7 +102,7 @@ The performance of the requested interaction on a resolved target element.
 A test instruction paired with a specified page state and independently defined expected resolution and target state.
 
 **Evaluation run**:
-An assessment of a resolver configuration against a versioned collection of evaluation cases.
+An assessment of a resolver configuration against a frozen collection of evaluation cases and independently defined expectations.
 
 **Evaluation trial**:
 One declared execution of an evaluation case. Repetitions and later diagnostic reruns retain separate identities and outcomes.
@@ -111,7 +111,7 @@ One declared execution of an evaluation case. Repetitions and later diagnostic r
 An independently established mapping from an expected action to its intended element. It is separate from the resolver's selected candidate and generated XPath.
 
 **Comparison pair**:
-Two strategy attempts on equivalent independently reset page states and the same instruction, retained together even when one fails or cannot support the case.
+Two resolution attempts on the same evaluation case with equivalent inputs and independently reset page state where applicable. A release comparison pairs the candidate with the approved baseline and retains both outcomes, including failures.
 
 **Target-set completeness**:
 Whether the returned distinct elements exactly cover all independently labelled targets for the command, with no missing or extra elements. Correct interaction and passive state are assessed separately.
@@ -132,10 +132,19 @@ The qualified resolver release selected for clients that do not request another 
 The evaluation of a resolver release against the agreed acceptance criteria before it can become an approved default.
 
 **Release baseline**:
-The previously approved resolver release used as the comparison reference, or the explicitly chosen operational configuration before the first approval.
+The approved resolver release retained as the comparison reference while a candidate is evaluated. Development changes do not replace it; approving a replacement establishes the next baseline.
+
+**Release comparison**:
+The assessment of a candidate and the approved baseline on the same frozen collection. A lost baseline pass is a case that the baseline passes and the candidate fails.
+
+**Approved evaluation collection**:
+The cases and expected observations frozen when a resolver release is approved. Repeating them measures regression and drift; it does not establish unseen-data generalization.
+
+**Model drift**:
+A change in the observed behavior of an approved resolver configuration when its frozen cases are repeated against the hosted model.
 
 **Sentinel case**:
-An evaluation case frozen with an approved release and repeated to detect changes in its observed behavior.
+A case in the smaller monitoring subset retained by historical approvals. New approvals monitor their complete approved evaluation collection.
 
 **Release activation**:
 Deploying an explicitly approved release and checking that its exact components are running.

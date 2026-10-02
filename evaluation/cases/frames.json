@@ -1,0 +1,131 @@
+[
+  {
+    "id": "clipped-frame-v4",
+    "family": "clipped-frame",
+    "category": "geometry",
+    "fixture": "viewport-clipped",
+    "instruction": "Click Lower action in Clipped panel.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "expected": {
+      "outcome": "not_found",
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "not_found"
+        }
+      ]
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "not_found",
+          "label": "Lower action",
+          "tag": "button",
+          "frameLabel": "Clipped panel"
+        }
+      ]
+    },
+    "contractVersion": "4",
+    "split": "regression",
+    "setupRevision": "viewport-baseline-1",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-fixture-source-review",
+      "reviewedAt": "2026-10-01T14:02:32.742097+00:00"
+    },
+    "labelProvenance": {
+      "kind": "controlled-authored",
+      "sourceCaseId": "clipped-frame",
+      "scopeReview": "independent source review; browser observation pending"
+    },
+    "sourceSplit": "regression",
+    "sourceCatalogs": [
+      "current-view-qualification-cases.json",
+      "viewport-baseline-cases.json",
+      "cases.json"
+    ],
+    "sourceIds": ["clipped-frame-v4", "current-view-clipped-frame-v4"],
+    "group": "frames"
+  },
+  {
+    "id": "nested-frame-v4",
+    "family": "frames",
+    "split": "regression",
+    "category": "integration",
+    "fixture": "frames",
+    "instruction": "Click Submit in Payroll inside Employee.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "setupRevision": "qualification-1",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-contract-review",
+      "reviewedAt": "2026-09-30T20:59:55.247Z"
+    },
+    "expected": {
+      "outcome": "found",
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "target": {
+            "selector": "#submit-payroll",
+            "frames": ["#employee-panel", "#payroll-panel"]
+          },
+          "interactability": {
+            "status": "ready",
+            "reasons": [],
+            "checks": {
+              "compatibleControl": "pass",
+              "enabled": "pass",
+              "viewport": "pass",
+              "pointerReception": "pass",
+              "keyboard": "not_applicable",
+              "stability": "unknown",
+              "eventOutcome": "unknown"
+            }
+          }
+        }
+      ],
+      "summary": {
+        "processingComplete": true,
+        "semanticCompleteness": "unverified",
+        "total": 1,
+        "found": 1,
+        "notFound": 0,
+        "unsupported": 0,
+        "errors": 0,
+        "blocked": 0,
+        "readinessUnknown": 0,
+        "assessmentUnsupported": 0
+      }
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "label": "Submit",
+          "frameLabel": "Payroll"
+        }
+      ]
+    },
+    "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
+    "contractVersion": "4",
+    "sourceSplit": "regression",
+    "sourceCatalogs": ["current-view-qualification-cases.json"],
+    "group": "frames"
+  }
+]

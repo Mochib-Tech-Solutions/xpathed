@@ -1,0 +1,18 @@
+{
+  "version": "current",
+  "requiredContractVersion": "4",
+  "latencyProtocol": "resolver-http-v1",
+  "goalMs": 1000,
+  "deadlineMs": 2000,
+  "hardFailureCategories": [
+    "privacy",
+    "oracle_leak",
+    "passive_state",
+    "contract",
+    "unplanned_trial",
+    "duplicate_trial"
+  ],
+  "correctnessAcceptance": "preserve-every-baseline-pass",
+  "latencyAcceptance": "report-only",
+  "costAcceptance": "report-only"
+}
