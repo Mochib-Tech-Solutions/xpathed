@@ -1,7 +1,7 @@
 {
   "version": "1",
   "qualificationPolicy": "6",
-  "description": "Current-view release suite: exposed legacy/current-view regression and development plus 30 fresh cases from ten authored held-out fixture families. Independent label/template review and deterministic browser checks completed before model inference. Authored families are not a random production sample.",
+  "description": "Current-view release suite: retained exposed regression/development and 30 fresh controlled cases from ten reviewed distinct fixture families. Authored families are not a random production sample.",
   "cases": [
     {
       "id": "basic-save-v3",
@@ -7717,7 +7717,7 @@
     {
       "id": "release-holdout-warehouse-1",
       "family": "release-holdout-warehouse",
-      "split": "held-out",
+      "split": "regression",
       "category": "current-view",
       "fixture": "release-warehouse",
       "instruction": "Click Dispatch for North depot.",
@@ -7770,15 +7770,18 @@
       },
       "labelProvenance": {
         "kind": "controlled-authored",
-        "modelExposure": "none before frozen qualification",
+        "modelExposure": "Paired policy-6 confirmation run 36988432337; retained as regression",
         "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
         "browserReview": "Deterministic browser identity, scope and readiness checks passed"
-      }
+      },
+      "previousSplit": "held-out",
+      "exposureRunId": "36988432337",
+      "exposedAt": "2026-10-02T09:25:27Z"
     },
     {
       "id": "release-holdout-warehouse-2",
       "family": "release-holdout-warehouse",
-      "split": "held-out",
+      "split": "regression",
       "category": "current-view",
       "fixture": "release-warehouse",
       "instruction": "Click both Dispatch buttons.",
@@ -7855,15 +7858,18 @@
       },
       "labelProvenance": {
         "kind": "controlled-authored",
-        "modelExposure": "none before frozen qualification",
+        "modelExposure": "Paired policy-6 confirmation run 36988432337; retained as regression",
         "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
         "browserReview": "Deterministic browser identity, scope and readiness checks passed"
-      }
+      },
+      "previousSplit": "held-out",
+      "exposureRunId": "36988432337",
+      "exposedAt": "2026-10-02T09:25:27Z"
     },
     {
       "id": "release-holdout-warehouse-3",
       "family": "release-holdout-warehouse",
-      "split": "held-out",
+      "split": "regression",
       "category": "current-view",
       "fixture": "release-warehouse",
       "instruction": "Click Export queue.",
@@ -7916,15 +7922,18 @@
       },
       "labelProvenance": {
         "kind": "controlled-authored",
-        "modelExposure": "none before frozen qualification",
+        "modelExposure": "Paired policy-6 confirmation run 36988432337; retained as regression",
         "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
         "browserReview": "Deterministic browser identity, scope and readiness checks passed"
-      }
+      },
+      "previousSplit": "held-out",
+      "exposureRunId": "36988432337",
+      "exposedAt": "2026-10-02T09:25:27Z"
     },
     {
       "id": "release-holdout-clinic-4",
       "family": "release-holdout-clinic",
-      "split": "held-out",
+      "split": "regression",
       "category": "current-view",
       "fixture": "release-clinic",
       "instruction": "Type into Visit notes.",
@@ -7977,15 +7986,18 @@
       },
       "labelProvenance": {
         "kind": "controlled-authored",
-        "modelExposure": "none before frozen qualification",
+        "modelExposure": "Paired policy-6 confirmation run 36988432337; retained as regression",
         "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
         "browserReview": "Deterministic browser identity, scope and readiness checks passed"
-      }
+      },
+      "previousSplit": "held-out",
+      "exposureRunId": "36988432337",
+      "exposedAt": "2026-10-02T09:25:27Z"
     },
     {
       "id": "release-holdout-clinic-5",
       "family": "release-holdout-clinic",
-      "split": "held-out",
+      "split": "regression",
       "category": "current-view",
       "fixture": "release-clinic",
       "instruction": "Select the Visit type dropdown.",
@@ -8038,15 +8050,18 @@
       },
       "labelProvenance": {
         "kind": "controlled-authored",
-        "modelExposure": "none before frozen qualification",
+        "modelExposure": "Paired policy-6 confirmation run 36988432337; retained as regression",
         "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
         "browserReview": "Deterministic browser identity, scope and readiness checks passed"
-      }
+      },
+      "previousSplit": "held-out",
+      "exposureRunId": "36988432337",
+      "exposedAt": "2026-10-02T09:25:27Z"
     },
     {
       "id": "release-holdout-clinic-6",
       "family": "release-holdout-clinic",
-      "split": "held-out",
+      "split": "regression",
       "category": "current-view",
       "fixture": "release-clinic",
       "instruction": "Click Confirm visit.",
@@ -8099,15 +8114,18 @@
       },
       "labelProvenance": {
         "kind": "controlled-authored",
-        "modelExposure": "none before frozen qualification",
+        "modelExposure": "Paired policy-6 confirmation run 36988432337; retained as regression",
         "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
         "browserReview": "Deterministic browser identity, scope and readiness checks passed"
-      }
+      },
+      "previousSplit": "held-out",
+      "exposureRunId": "36988432337",
+      "exposedAt": "2026-10-02T09:25:27Z"
     },
     {
       "id": "release-holdout-library-7",
       "family": "release-holdout-library",
-      "split": "held-out",
+      "split": "regression",
       "category": "current-view",
       "fixture": "release-library",
       "instruction": "Click New arrivals in the catalogue navigation.",
@@ -8160,15 +8178,18 @@
       },
       "labelProvenance": {
         "kind": "controlled-authored",
-        "modelExposure": "none before frozen qualification",
+        "modelExposure": "Paired policy-6 confirmation run 36988432337; retained as regression",
         "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
         "browserReview": "Deterministic browser identity, scope and readiness checks passed"
-      }
+      },
+      "previousSplit": "held-out",
+      "exposureRunId": "36988432337",
+      "exposedAt": "2026-10-02T09:25:27Z"
     },
     {
       "id": "release-holdout-library-8",
       "family": "release-holdout-library",
-      "split": "held-out",
+      "split": "regression",
       "category": "current-view",
       "fixture": "release-library",
       "instruction": "Hover over Reading list.",
@@ -8221,15 +8242,18 @@
       },
       "labelProvenance": {
         "kind": "controlled-authored",
-        "modelExposure": "none before frozen qualification",
+        "modelExposure": "Paired policy-6 confirmation run 36988432337; retained as regression",
         "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
         "browserReview": "Deterministic browser identity, scope and readiness checks passed"
-      }
+      },
+      "previousSplit": "held-out",
+      "exposureRunId": "36988432337",
+      "exposedAt": "2026-10-02T09:25:27Z"
     },
     {
       "id": "release-holdout-library-9",
       "family": "release-holdout-library",
-      "split": "held-out",
+      "split": "regression",
       "category": "current-view",
       "fixture": "release-library",
       "instruction": "Click Reserve copy in Astronomy.",
@@ -8282,15 +8306,18 @@
       },
       "labelProvenance": {
         "kind": "controlled-authored",
-        "modelExposure": "none before frozen qualification",
+        "modelExposure": "Paired policy-6 confirmation run 36988432337; retained as regression",
         "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
         "browserReview": "Deterministic browser identity, scope and readiness checks passed"
-      }
+      },
+      "previousSplit": "held-out",
+      "exposureRunId": "36988432337",
+      "exposedAt": "2026-10-02T09:25:27Z"
     },
     {
       "id": "release-holdout-museum-10",
       "family": "release-holdout-museum",
-      "split": "held-out",
+      "split": "regression",
       "category": "current-view",
       "fixture": "release-museum",
       "instruction": "Click Audio guide.",
@@ -8343,15 +8370,18 @@
       },
       "labelProvenance": {
         "kind": "controlled-authored",
-        "modelExposure": "none before frozen qualification",
+        "modelExposure": "Paired policy-6 confirmation run 36988432337; retained as regression",
         "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
         "browserReview": "Deterministic browser identity, scope and readiness checks passed"
-      }
+      },
+      "previousSplit": "held-out",
+      "exposureRunId": "36988432337",
+      "exposedAt": "2026-10-02T09:25:27Z"
     },
     {
       "id": "release-holdout-museum-11",
       "family": "release-holdout-museum",
-      "split": "held-out",
+      "split": "regression",
       "category": "current-view",
       "fixture": "release-museum",
       "instruction": "Click Large print.",
@@ -8404,15 +8434,18 @@
       },
       "labelProvenance": {
         "kind": "controlled-authored",
-        "modelExposure": "none before frozen qualification",
+        "modelExposure": "Paired policy-6 confirmation run 36988432337; retained as regression",
         "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
         "browserReview": "Deterministic browser identity, scope and readiness checks passed"
-      }
+      },
+      "previousSplit": "held-out",
+      "exposureRunId": "36988432337",
+      "exposedAt": "2026-10-02T09:25:27Z"
     },
     {
       "id": "release-holdout-museum-12",
       "family": "release-holdout-museum",
-      "split": "held-out",
+      "split": "regression",
       "category": "current-view",
       "fixture": "release-museum",
       "instruction": "Hover over Gallery map.",
@@ -8465,15 +8498,18 @@
       },
       "labelProvenance": {
         "kind": "controlled-authored",
-        "modelExposure": "none before frozen qualification",
+        "modelExposure": "Paired policy-6 confirmation run 36988432337; retained as regression",
         "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
         "browserReview": "Deterministic browser identity, scope and readiness checks passed"
-      }
+      },
+      "previousSplit": "held-out",
+      "exposureRunId": "36988432337",
+      "exposedAt": "2026-10-02T09:25:27Z"
     },
     {
       "id": "release-holdout-travel-13",
       "family": "release-holdout-travel",
-      "split": "held-out",
+      "split": "regression",
       "category": "current-view",
       "fixture": "release-travel",
       "instruction": "Uncheck Quiet carriage.",
@@ -8526,15 +8562,18 @@
       },
       "labelProvenance": {
         "kind": "controlled-authored",
-        "modelExposure": "none before frozen qualification",
+        "modelExposure": "Paired policy-6 confirmation run 36988432337; retained as regression",
         "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
         "browserReview": "Deterministic browser identity, scope and readiness checks passed"
-      }
+      },
+      "previousSplit": "held-out",
+      "exposureRunId": "36988432337",
+      "exposedAt": "2026-10-02T09:25:27Z"
     },
     {
       "id": "release-holdout-travel-14",
       "family": "release-holdout-travel",
-      "split": "held-out",
+      "split": "regression",
       "category": "current-view",
       "fixture": "release-travel",
       "instruction": "Check Bicycle space.",
@@ -8587,15 +8626,18 @@
       },
       "labelProvenance": {
         "kind": "controlled-authored",
-        "modelExposure": "none before frozen qualification",
+        "modelExposure": "Paired policy-6 confirmation run 36988432337; retained as regression",
         "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
         "browserReview": "Deterministic browser identity, scope and readiness checks passed"
-      }
+      },
+      "previousSplit": "held-out",
+      "exposureRunId": "36988432337",
+      "exposedAt": "2026-10-02T09:25:27Z"
     },
     {
       "id": "release-holdout-travel-15",
       "family": "release-holdout-travel",
-      "split": "held-out",
+      "split": "regression",
       "category": "current-view",
       "fixture": "release-travel",
       "instruction": "Click Plan journey.",
@@ -8648,15 +8690,18 @@
       },
       "labelProvenance": {
         "kind": "controlled-authored",
-        "modelExposure": "none before frozen qualification",
+        "modelExposure": "Paired policy-6 confirmation run 36988432337; retained as regression",
         "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
         "browserReview": "Deterministic browser identity, scope and readiness checks passed"
-      }
+      },
+      "previousSplit": "held-out",
+      "exposureRunId": "36988432337",
+      "exposedAt": "2026-10-02T09:25:27Z"
     },
     {
       "id": "release-holdout-ledger-16",
       "family": "release-holdout-ledger",
-      "split": "held-out",
+      "split": "regression",
       "category": "current-view",
       "fixture": "release-ledger",
       "instruction": "Click Receipt file.",
@@ -8709,15 +8754,18 @@
       },
       "labelProvenance": {
         "kind": "controlled-authored",
-        "modelExposure": "none before frozen qualification",
+        "modelExposure": "Paired policy-6 confirmation run 36988432337; retained as regression",
         "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
         "browserReview": "Deterministic browser identity, scope and readiness checks passed"
-      }
+      },
+      "previousSplit": "held-out",
+      "exposureRunId": "36988432337",
+      "exposedAt": "2026-10-02T09:25:27Z"
     },
     {
       "id": "release-holdout-ledger-17",
       "family": "release-holdout-ledger",
-      "split": "held-out",
+      "split": "regression",
       "category": "current-view",
       "fixture": "release-ledger",
       "instruction": "Click Statement file.",
@@ -8770,15 +8818,18 @@
       },
       "labelProvenance": {
         "kind": "controlled-authored",
-        "modelExposure": "none before frozen qualification",
+        "modelExposure": "Paired policy-6 confirmation run 36988432337; retained as regression",
         "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
         "browserReview": "Deterministic browser identity, scope and readiness checks passed"
-      }
+      },
+      "previousSplit": "held-out",
+      "exposureRunId": "36988432337",
+      "exposedAt": "2026-10-02T09:25:27Z"
     },
     {
       "id": "release-holdout-ledger-18",
       "family": "release-holdout-ledger",
-      "split": "held-out",
+      "split": "regression",
       "category": "current-view",
       "fixture": "release-ledger",
       "instruction": "Click Send reminder.",
@@ -8831,15 +8882,18 @@
       },
       "labelProvenance": {
         "kind": "controlled-authored",
-        "modelExposure": "none before frozen qualification",
+        "modelExposure": "Paired policy-6 confirmation run 36988432337; retained as regression",
         "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
         "browserReview": "Deterministic browser identity, scope and readiness checks passed"
-      }
+      },
+      "previousSplit": "held-out",
+      "exposureRunId": "36988432337",
+      "exposedAt": "2026-10-02T09:25:27Z"
     },
     {
       "id": "release-holdout-editor-19",
       "family": "release-holdout-editor",
-      "split": "held-out",
+      "split": "regression",
       "category": "current-view",
       "fixture": "release-editor",
       "instruction": "Type into Edition title.",
@@ -8892,15 +8946,18 @@
       },
       "labelProvenance": {
         "kind": "controlled-authored",
-        "modelExposure": "none before frozen qualification",
+        "modelExposure": "Paired policy-6 confirmation run 36988432337; retained as regression",
         "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
         "browserReview": "Deterministic browser identity, scope and readiness checks passed"
-      }
+      },
+      "previousSplit": "held-out",
+      "exposureRunId": "36988432337",
+      "exposedAt": "2026-10-02T09:25:27Z"
     },
     {
       "id": "release-holdout-editor-20",
       "family": "release-holdout-editor",
-      "split": "held-out",
+      "split": "regression",
       "category": "current-view",
       "fixture": "release-editor",
       "instruction": "Click Preview edition.",
@@ -8953,15 +9010,18 @@
       },
       "labelProvenance": {
         "kind": "controlled-authored",
-        "modelExposure": "none before frozen qualification",
+        "modelExposure": "Paired policy-6 confirmation run 36988432337; retained as regression",
         "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
         "browserReview": "Deterministic browser identity, scope and readiness checks passed"
-      }
+      },
+      "previousSplit": "held-out",
+      "exposureRunId": "36988432337",
+      "exposedAt": "2026-10-02T09:25:27Z"
     },
     {
       "id": "release-holdout-editor-21",
       "family": "release-holdout-editor",
-      "split": "held-out",
+      "split": "regression",
       "category": "current-view",
       "fixture": "release-editor",
       "instruction": "Click Schedule edition.",
@@ -9014,15 +9074,18 @@
       },
       "labelProvenance": {
         "kind": "controlled-authored",
-        "modelExposure": "none before frozen qualification",
+        "modelExposure": "Paired policy-6 confirmation run 36988432337; retained as regression",
         "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
         "browserReview": "Deterministic browser identity, scope and readiness checks passed"
-      }
+      },
+      "previousSplit": "held-out",
+      "exposureRunId": "36988432337",
+      "exposedAt": "2026-10-02T09:25:27Z"
     },
     {
       "id": "release-holdout-inventory-22",
       "family": "release-holdout-inventory",
-      "split": "held-out",
+      "split": "regression",
       "category": "current-view",
       "fixture": "release-inventory",
       "instruction": "Click Start Camera inspection.",
@@ -9075,15 +9138,18 @@
       },
       "labelProvenance": {
         "kind": "controlled-authored",
-        "modelExposure": "none before frozen qualification",
+        "modelExposure": "Paired policy-6 confirmation run 36988432337; retained as regression",
         "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
         "browserReview": "Deterministic browser identity, scope and readiness checks passed"
-      }
+      },
+      "previousSplit": "held-out",
+      "exposureRunId": "36988432337",
+      "exposedAt": "2026-10-02T09:25:27Z"
     },
     {
       "id": "release-holdout-inventory-23",
       "family": "release-holdout-inventory",
-      "split": "held-out",
+      "split": "regression",
       "category": "current-view",
       "fixture": "release-inventory",
       "instruction": "Click Start tripod inspection.",
@@ -9136,15 +9202,18 @@
       },
       "labelProvenance": {
         "kind": "controlled-authored",
-        "modelExposure": "none before frozen qualification",
+        "modelExposure": "Paired policy-6 confirmation run 36988432337; retained as regression",
         "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
         "browserReview": "Deterministic browser identity, scope and readiness checks passed"
-      }
+      },
+      "previousSplit": "held-out",
+      "exposureRunId": "36988432337",
+      "exposedAt": "2026-10-02T09:25:27Z"
     },
     {
       "id": "release-holdout-inventory-24",
       "family": "release-holdout-inventory",
-      "split": "held-out",
+      "split": "regression",
       "category": "current-view",
       "fixture": "release-inventory",
       "instruction": "Click Retire equipment.",
@@ -9197,15 +9266,18 @@
       },
       "labelProvenance": {
         "kind": "controlled-authored",
-        "modelExposure": "none before frozen qualification",
+        "modelExposure": "Paired policy-6 confirmation run 36988432337; retained as regression",
         "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
         "browserReview": "Deterministic browser identity, scope and readiness checks passed"
-      }
+      },
+      "previousSplit": "held-out",
+      "exposureRunId": "36988432337",
+      "exposedAt": "2026-10-02T09:25:27Z"
     },
     {
       "id": "release-holdout-timetable-25",
       "family": "release-holdout-timetable",
-      "split": "held-out",
+      "split": "regression",
       "category": "current-view",
       "fixture": "release-timetable",
       "instruction": "Click Book ceramics in the Monday morning slot.",
@@ -9258,15 +9330,18 @@
       },
       "labelProvenance": {
         "kind": "controlled-authored",
-        "modelExposure": "none before frozen qualification",
+        "modelExposure": "Paired policy-6 confirmation run 36988432337; retained as regression",
         "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
         "browserReview": "Deterministic browser identity, scope and readiness checks passed"
-      }
+      },
+      "previousSplit": "held-out",
+      "exposureRunId": "36988432337",
+      "exposedAt": "2026-10-02T09:25:27Z"
     },
     {
       "id": "release-holdout-timetable-26",
       "family": "release-holdout-timetable",
-      "split": "held-out",
+      "split": "regression",
       "category": "current-view",
       "fixture": "release-timetable",
       "instruction": "Click Book weaving in the Tuesday morning slot.",
@@ -9319,15 +9394,18 @@
       },
       "labelProvenance": {
         "kind": "controlled-authored",
-        "modelExposure": "none before frozen qualification",
+        "modelExposure": "Paired policy-6 confirmation run 36988432337; retained as regression",
         "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
         "browserReview": "Deterministic browser identity, scope and readiness checks passed"
-      }
+      },
+      "previousSplit": "held-out",
+      "exposureRunId": "36988432337",
+      "exposedAt": "2026-10-02T09:25:27Z"
     },
     {
       "id": "release-holdout-timetable-27",
       "family": "release-holdout-timetable",
-      "split": "held-out",
+      "split": "regression",
       "category": "current-view",
       "fixture": "release-timetable",
       "instruction": "Click Book pottery in the Monday afternoon slot.",
@@ -9380,15 +9458,18 @@
       },
       "labelProvenance": {
         "kind": "controlled-authored",
-        "modelExposure": "none before frozen qualification",
+        "modelExposure": "Paired policy-6 confirmation run 36988432337; retained as regression",
         "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
         "browserReview": "Deterministic browser identity, scope and readiness checks passed"
-      }
+      },
+      "previousSplit": "held-out",
+      "exposureRunId": "36988432337",
+      "exposedAt": "2026-10-02T09:25:27Z"
     },
     {
       "id": "release-holdout-window-28",
       "family": "release-holdout-window",
-      "split": "held-out",
+      "split": "regression",
       "category": "current-view",
       "fixture": "release-window",
       "instruction": "Click Dismiss alert.",
@@ -9441,15 +9522,18 @@
       },
       "labelProvenance": {
         "kind": "controlled-authored",
-        "modelExposure": "none before frozen qualification",
+        "modelExposure": "Paired policy-6 confirmation run 36988432337; retained as regression",
         "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
         "browserReview": "Deterministic browser identity, scope and readiness checks passed"
-      }
+      },
+      "previousSplit": "held-out",
+      "exposureRunId": "36988432337",
+      "exposedAt": "2026-10-02T09:25:27Z"
     },
     {
       "id": "release-holdout-window-29",
       "family": "release-holdout-window",
-      "split": "held-out",
+      "split": "regression",
       "category": "current-view",
       "fixture": "release-window",
       "instruction": "Click Archive alerts in the current view.",
@@ -9489,15 +9573,18 @@
       },
       "labelProvenance": {
         "kind": "controlled-authored",
-        "modelExposure": "none before frozen qualification",
+        "modelExposure": "Paired policy-6 confirmation run 36988432337; retained as regression",
         "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
         "browserReview": "Deterministic browser identity, scope and readiness checks passed"
-      }
+      },
+      "previousSplit": "held-out",
+      "exposureRunId": "36988432337",
+      "exposedAt": "2026-10-02T09:25:27Z"
     },
     {
       "id": "release-holdout-window-30",
       "family": "release-holdout-window",
-      "split": "held-out",
+      "split": "regression",
       "category": "current-view",
       "fixture": "release-window",
       "instruction": "Click Recover alert.",
@@ -9537,10 +9624,13 @@
       },
       "labelProvenance": {
         "kind": "controlled-authored",
-        "modelExposure": "none before frozen qualification",
+        "modelExposure": "Paired policy-6 confirmation run 36988432337; retained as regression",
         "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
         "browserReview": "Deterministic browser identity, scope and readiness checks passed"
-      }
+      },
+      "previousSplit": "held-out",
+      "exposureRunId": "36988432337",
+      "exposedAt": "2026-10-02T09:25:27Z"
     },
     {
       "id": "named-found-missing-v4",
@@ -9822,6 +9912,1922 @@
       },
       "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
       "contractVersion": "4"
+    },
+    {
+      "id": "release2-breadcrumbs-1",
+      "family": "release2-breadcrumbs",
+      "split": "held-out",
+      "category": "current-view",
+      "fixture": "release2-breadcrumbs",
+      "instruction": "Click Forest route.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "setupRevision": "release-current-view-2",
+      "contractVersion": "4",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-release-label-review",
+        "reviewedAt": "2026-10-02T09:51:00.919216+00:00"
+      },
+      "expected": {
+        "outcome": "found",
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "target": {
+              "selector": "#forest-route",
+              "frames": []
+            },
+            "state": {
+              "inViewport": true,
+              "enabled": true
+            },
+            "interactability": {
+              "status": "ready"
+            }
+          }
+        ],
+        "summary": {
+          "processingComplete": true
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "label": "Forest route",
+            "tag": "a"
+          }
+        ]
+      },
+      "labelProvenance": {
+        "kind": "controlled-authored",
+        "modelExposure": "none before frozen qualification",
+        "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
+        "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt9-holdout-check"
+      }
+    },
+    {
+      "id": "release2-breadcrumbs-2",
+      "family": "release2-breadcrumbs",
+      "split": "held-out",
+      "category": "current-view",
+      "fixture": "release2-breadcrumbs",
+      "instruction": "Click Trailhead and Forest route.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "setupRevision": "release-current-view-2",
+      "contractVersion": "4",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-release-label-review",
+        "reviewedAt": "2026-10-02T09:51:00.919216+00:00"
+      },
+      "expected": {
+        "outcome": "found",
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "target": {
+              "selector": "#park-root",
+              "frames": []
+            },
+            "state": {
+              "inViewport": true,
+              "enabled": true
+            },
+            "interactability": {
+              "status": "ready"
+            }
+          },
+          {
+            "step": 2,
+            "action": "click",
+            "outcome": "found",
+            "target": {
+              "selector": "#forest-route",
+              "frames": []
+            },
+            "state": {
+              "inViewport": true,
+              "enabled": true
+            },
+            "interactability": {
+              "status": "ready"
+            }
+          }
+        ],
+        "summary": {
+          "processingComplete": true
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "label": "Trailhead",
+            "tag": "a"
+          },
+          {
+            "step": 2,
+            "action": "click",
+            "outcome": "found",
+            "label": "Forest route",
+            "tag": "a"
+          }
+        ]
+      },
+      "labelProvenance": {
+        "kind": "controlled-authored",
+        "modelExposure": "none before frozen qualification",
+        "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
+        "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt9-holdout-check"
+      }
+    },
+    {
+      "id": "release2-breadcrumbs-3",
+      "family": "release2-breadcrumbs",
+      "split": "held-out",
+      "category": "current-view",
+      "fixture": "release2-breadcrumbs",
+      "instruction": "Click Mountain route.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "setupRevision": "release-current-view-2",
+      "contractVersion": "4",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-release-label-review",
+        "reviewedAt": "2026-10-02T09:51:00.919216+00:00"
+      },
+      "expected": {
+        "outcome": "not_found",
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "not_found"
+          }
+        ],
+        "summary": {
+          "processingComplete": true
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "not_found"
+          }
+        ]
+      },
+      "labelProvenance": {
+        "kind": "controlled-authored",
+        "modelExposure": "none before frozen qualification",
+        "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
+        "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt9-holdout-check"
+      }
+    },
+    {
+      "id": "release2-fieldset-1",
+      "family": "release2-fieldset",
+      "split": "held-out",
+      "category": "current-view",
+      "fixture": "release2-fieldset",
+      "instruction": "Click Enable notices.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "setupRevision": "release-current-view-2",
+      "contractVersion": "4",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-release-label-review",
+        "reviewedAt": "2026-10-02T09:51:00.919216+00:00"
+      },
+      "expected": {
+        "outcome": "found",
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "target": {
+              "selector": "#enable-notices",
+              "frames": []
+            },
+            "state": {
+              "inViewport": true,
+              "enabled": true
+            },
+            "interactability": {
+              "status": "ready"
+            }
+          }
+        ],
+        "summary": {
+          "processingComplete": true
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "label": "Enable notices",
+            "tag": "button"
+          }
+        ]
+      },
+      "labelProvenance": {
+        "kind": "controlled-authored",
+        "modelExposure": "none before frozen qualification",
+        "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
+        "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt9-holdout-check"
+      }
+    },
+    {
+      "id": "release2-fieldset-2",
+      "family": "release2-fieldset",
+      "split": "held-out",
+      "category": "current-view",
+      "fixture": "release2-fieldset",
+      "instruction": "Click Send test notice.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "setupRevision": "release-current-view-2",
+      "contractVersion": "4",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-release-label-review",
+        "reviewedAt": "2026-10-02T09:51:00.919216+00:00"
+      },
+      "expected": {
+        "outcome": "found",
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "target": {
+              "selector": "#send-test",
+              "frames": []
+            },
+            "state": {
+              "inViewport": true,
+              "enabled": false
+            },
+            "interactability": {
+              "status": "blocked"
+            }
+          }
+        ],
+        "summary": {
+          "processingComplete": true
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "label": "Send test notice",
+            "tag": "button"
+          }
+        ]
+      },
+      "labelProvenance": {
+        "kind": "controlled-authored",
+        "modelExposure": "none before frozen qualification",
+        "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
+        "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt9-holdout-check"
+      }
+    },
+    {
+      "id": "release2-fieldset-3",
+      "family": "release2-fieldset",
+      "split": "held-out",
+      "category": "current-view",
+      "fixture": "release2-fieldset",
+      "instruction": "Click Preview notice.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "setupRevision": "release-current-view-2",
+      "contractVersion": "4",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-release-label-review",
+        "reviewedAt": "2026-10-02T09:51:00.919216+00:00"
+      },
+      "expected": {
+        "outcome": "found",
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "target": {
+              "selector": "#notice-preview",
+              "frames": []
+            },
+            "state": {
+              "inViewport": true,
+              "enabled": true
+            },
+            "interactability": {
+              "status": "ready"
+            }
+          }
+        ],
+        "summary": {
+          "processingComplete": true
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "label": "Preview notice",
+            "tag": "button"
+          }
+        ]
+      },
+      "labelProvenance": {
+        "kind": "controlled-authored",
+        "modelExposure": "none before frozen qualification",
+        "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
+        "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt9-holdout-check"
+      }
+    },
+    {
+      "id": "release2-tabs-1",
+      "family": "release2-tabs",
+      "split": "held-out",
+      "category": "current-view",
+      "fixture": "release2-tabs",
+      "instruction": "Click Calendar.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "setupRevision": "release-current-view-2",
+      "contractVersion": "4",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-release-label-review",
+        "reviewedAt": "2026-10-02T09:51:00.919216+00:00"
+      },
+      "expected": {
+        "outcome": "found",
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "target": {
+              "selector": "#project-calendar",
+              "frames": []
+            },
+            "state": {
+              "inViewport": true,
+              "enabled": true
+            },
+            "interactability": {
+              "status": "ready"
+            }
+          }
+        ],
+        "summary": {
+          "processingComplete": true
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "label": "Calendar",
+            "tag": "button"
+          }
+        ]
+      },
+      "labelProvenance": {
+        "kind": "controlled-authored",
+        "modelExposure": "none before frozen qualification",
+        "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
+        "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt9-holdout-check"
+      }
+    },
+    {
+      "id": "release2-tabs-2",
+      "family": "release2-tabs",
+      "split": "held-out",
+      "category": "current-view",
+      "fixture": "release2-tabs",
+      "instruction": "Click all tabs in Project views.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "setupRevision": "release-current-view-2",
+      "contractVersion": "4",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-release-label-review",
+        "reviewedAt": "2026-10-02T09:51:00.919216+00:00"
+      },
+      "expected": {
+        "outcome": "found",
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "target": {
+              "selector": "#project-board",
+              "frames": []
+            },
+            "state": {
+              "inViewport": true,
+              "enabled": true
+            },
+            "interactability": {
+              "status": "ready"
+            }
+          },
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "target": {
+              "selector": "#project-calendar",
+              "frames": []
+            },
+            "state": {
+              "inViewport": true,
+              "enabled": true
+            },
+            "interactability": {
+              "status": "ready"
+            }
+          },
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "target": {
+              "selector": "#project-files",
+              "frames": []
+            },
+            "state": {
+              "inViewport": true,
+              "enabled": true
+            },
+            "interactability": {
+              "status": "ready"
+            }
+          }
+        ],
+        "summary": {
+          "processingComplete": true
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "label": "Board",
+            "tag": "button"
+          },
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "label": "Calendar",
+            "tag": "button"
+          },
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "label": "Files",
+            "tag": "button"
+          }
+        ]
+      },
+      "labelProvenance": {
+        "kind": "controlled-authored",
+        "modelExposure": "none before frozen qualification",
+        "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
+        "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt9-holdout-check"
+      }
+    },
+    {
+      "id": "release2-tabs-3",
+      "family": "release2-tabs",
+      "split": "held-out",
+      "category": "current-view",
+      "fixture": "release2-tabs",
+      "instruction": "Click Reports.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "setupRevision": "release-current-view-2",
+      "contractVersion": "4",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-release-label-review",
+        "reviewedAt": "2026-10-02T09:51:00.919216+00:00"
+      },
+      "expected": {
+        "outcome": "not_found",
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "not_found"
+          }
+        ],
+        "summary": {
+          "processingComplete": true
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "not_found"
+          }
+        ]
+      },
+      "labelProvenance": {
+        "kind": "controlled-authored",
+        "modelExposure": "none before frozen qualification",
+        "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
+        "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt9-holdout-check"
+      }
+    },
+    {
+      "id": "release2-tree-1",
+      "family": "release2-tree",
+      "split": "held-out",
+      "category": "current-view",
+      "fixture": "release2-tree",
+      "instruction": "Click Open fonts.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "setupRevision": "release-current-view-2",
+      "contractVersion": "4",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-release-label-review",
+        "reviewedAt": "2026-10-02T09:51:00.919216+00:00"
+      },
+      "expected": {
+        "outcome": "found",
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "target": {
+              "selector": "#open-fonts",
+              "frames": []
+            },
+            "state": {
+              "inViewport": true,
+              "enabled": true
+            },
+            "interactability": {
+              "status": "ready"
+            }
+          }
+        ],
+        "summary": {
+          "processingComplete": true
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "label": "Open fonts",
+            "tag": "button"
+          }
+        ]
+      },
+      "labelProvenance": {
+        "kind": "controlled-authored",
+        "modelExposure": "none before frozen qualification",
+        "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
+        "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt9-holdout-check"
+      }
+    },
+    {
+      "id": "release2-tree-2",
+      "family": "release2-tree",
+      "split": "held-out",
+      "category": "current-view",
+      "fixture": "release2-tree",
+      "instruction": "Click Open icons and Open fonts.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "setupRevision": "release-current-view-2",
+      "contractVersion": "4",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-release-label-review",
+        "reviewedAt": "2026-10-02T09:51:00.919216+00:00"
+      },
+      "expected": {
+        "outcome": "found",
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "target": {
+              "selector": "#open-icons",
+              "frames": []
+            },
+            "state": {
+              "inViewport": true,
+              "enabled": true
+            },
+            "interactability": {
+              "status": "ready"
+            }
+          },
+          {
+            "step": 2,
+            "action": "click",
+            "outcome": "found",
+            "target": {
+              "selector": "#open-fonts",
+              "frames": []
+            },
+            "state": {
+              "inViewport": true,
+              "enabled": true
+            },
+            "interactability": {
+              "status": "ready"
+            }
+          }
+        ],
+        "summary": {
+          "processingComplete": true
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "label": "Open icons",
+            "tag": "button"
+          },
+          {
+            "step": 2,
+            "action": "click",
+            "outcome": "found",
+            "label": "Open fonts",
+            "tag": "button"
+          }
+        ]
+      },
+      "labelProvenance": {
+        "kind": "controlled-authored",
+        "modelExposure": "none before frozen qualification",
+        "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
+        "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt9-holdout-check"
+      }
+    },
+    {
+      "id": "release2-tree-3",
+      "family": "release2-tree",
+      "split": "held-out",
+      "category": "current-view",
+      "fixture": "release2-tree",
+      "instruction": "Hover over Restore folder.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "setupRevision": "release-current-view-2",
+      "contractVersion": "4",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-release-label-review",
+        "reviewedAt": "2026-10-02T09:51:00.919216+00:00"
+      },
+      "expected": {
+        "outcome": "found",
+        "actions": [
+          {
+            "step": 1,
+            "action": "hover",
+            "outcome": "found",
+            "target": {
+              "selector": "#restore-folder",
+              "frames": []
+            },
+            "state": {
+              "inViewport": true,
+              "enabled": true
+            },
+            "interactability": {
+              "status": "ready"
+            }
+          }
+        ],
+        "summary": {
+          "processingComplete": true
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "hover",
+            "outcome": "found",
+            "label": "Restore folder",
+            "tag": "button"
+          }
+        ]
+      },
+      "labelProvenance": {
+        "kind": "controlled-authored",
+        "modelExposure": "none before frozen qualification",
+        "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
+        "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt9-holdout-check"
+      }
+    },
+    {
+      "id": "release2-figures-1",
+      "family": "release2-figures",
+      "split": "held-out",
+      "category": "current-view",
+      "fixture": "release2-figures",
+      "instruction": "Click Export floor layout.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "setupRevision": "release-current-view-2",
+      "contractVersion": "4",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-release-label-review",
+        "reviewedAt": "2026-10-02T09:51:00.919216+00:00"
+      },
+      "expected": {
+        "outcome": "found",
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "target": {
+              "selector": "#export-layout",
+              "frames": []
+            },
+            "state": {
+              "inViewport": true,
+              "enabled": true
+            },
+            "interactability": {
+              "status": "ready"
+            }
+          }
+        ],
+        "summary": {
+          "processingComplete": true
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "label": "Export floor layout",
+            "tag": "button"
+          }
+        ]
+      },
+      "labelProvenance": {
+        "kind": "controlled-authored",
+        "modelExposure": "none before frozen qualification",
+        "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
+        "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt9-holdout-check"
+      }
+    },
+    {
+      "id": "release2-figures-2",
+      "family": "release2-figures",
+      "split": "held-out",
+      "category": "current-view",
+      "fixture": "release2-figures",
+      "instruction": "Click both Export buttons.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "setupRevision": "release-current-view-2",
+      "contractVersion": "4",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-release-label-review",
+        "reviewedAt": "2026-10-02T09:51:00.919216+00:00"
+      },
+      "expected": {
+        "outcome": "found",
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "target": {
+              "selector": "#export-elevation",
+              "frames": []
+            },
+            "state": {
+              "inViewport": true,
+              "enabled": true
+            },
+            "interactability": {
+              "status": "ready"
+            }
+          },
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "target": {
+              "selector": "#export-layout",
+              "frames": []
+            },
+            "state": {
+              "inViewport": true,
+              "enabled": true
+            },
+            "interactability": {
+              "status": "ready"
+            }
+          }
+        ],
+        "summary": {
+          "processingComplete": true
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "label": "Export north elevation",
+            "tag": "button"
+          },
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "label": "Export floor layout",
+            "tag": "button"
+          }
+        ]
+      },
+      "labelProvenance": {
+        "kind": "controlled-authored",
+        "modelExposure": "none before frozen qualification",
+        "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
+        "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt9-holdout-check"
+      }
+    },
+    {
+      "id": "release2-figures-3",
+      "family": "release2-figures",
+      "split": "held-out",
+      "category": "current-view",
+      "fixture": "release2-figures",
+      "instruction": "Click Export roof plan.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "setupRevision": "release-current-view-2",
+      "contractVersion": "4",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-release-label-review",
+        "reviewedAt": "2026-10-02T09:51:00.919216+00:00"
+      },
+      "expected": {
+        "outcome": "not_found",
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "not_found"
+          }
+        ],
+        "summary": {
+          "processingComplete": true
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "not_found"
+          }
+        ]
+      },
+      "labelProvenance": {
+        "kind": "controlled-authored",
+        "modelExposure": "none before frozen qualification",
+        "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
+        "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt9-holdout-check"
+      }
+    },
+    {
+      "id": "release2-linked-form-1",
+      "family": "release2-linked-form",
+      "split": "held-out",
+      "category": "current-view",
+      "fixture": "release2-linked-form",
+      "instruction": "Click Renew membership.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "setupRevision": "release-current-view-2",
+      "contractVersion": "4",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-release-label-review",
+        "reviewedAt": "2026-10-02T09:51:00.919216+00:00"
+      },
+      "expected": {
+        "outcome": "found",
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "target": {
+              "selector": "#submit-renewal",
+              "frames": []
+            },
+            "state": {
+              "inViewport": true,
+              "enabled": true
+            },
+            "interactability": {
+              "status": "ready"
+            }
+          }
+        ],
+        "summary": {
+          "processingComplete": true
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "label": "Renew membership",
+            "tag": "button"
+          }
+        ]
+      },
+      "labelProvenance": {
+        "kind": "controlled-authored",
+        "modelExposure": "none before frozen qualification",
+        "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
+        "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt9-holdout-check"
+      }
+    },
+    {
+      "id": "release2-linked-form-2",
+      "family": "release2-linked-form",
+      "split": "held-out",
+      "category": "current-view",
+      "fixture": "release2-linked-form",
+      "instruction": "Hover over Member code.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "setupRevision": "release-current-view-2",
+      "contractVersion": "4",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-release-label-review",
+        "reviewedAt": "2026-10-02T09:51:00.919216+00:00"
+      },
+      "expected": {
+        "outcome": "found",
+        "actions": [
+          {
+            "step": 1,
+            "action": "hover",
+            "outcome": "found",
+            "target": {
+              "selector": "#member-code",
+              "frames": []
+            },
+            "state": {
+              "inViewport": true,
+              "enabled": true
+            },
+            "interactability": {
+              "status": "ready"
+            }
+          }
+        ],
+        "summary": {
+          "processingComplete": true
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "hover",
+            "outcome": "found",
+            "label": "Member code",
+            "tag": "input"
+          }
+        ]
+      },
+      "labelProvenance": {
+        "kind": "controlled-authored",
+        "modelExposure": "none before frozen qualification",
+        "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
+        "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt9-holdout-check"
+      }
+    },
+    {
+      "id": "release2-linked-form-3",
+      "family": "release2-linked-form",
+      "split": "held-out",
+      "category": "current-view",
+      "fixture": "release2-linked-form",
+      "instruction": "Click Reset renewal.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "setupRevision": "release-current-view-2",
+      "contractVersion": "4",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-release-label-review",
+        "reviewedAt": "2026-10-02T09:51:00.919216+00:00"
+      },
+      "expected": {
+        "outcome": "found",
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "target": {
+              "selector": "#cancel-renewal",
+              "frames": []
+            },
+            "state": {
+              "inViewport": true,
+              "enabled": true
+            },
+            "interactability": {
+              "status": "ready"
+            }
+          }
+        ],
+        "summary": {
+          "processingComplete": true
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "label": "Reset renewal",
+            "tag": "button"
+          }
+        ]
+      },
+      "labelProvenance": {
+        "kind": "controlled-authored",
+        "modelExposure": "none before frozen qualification",
+        "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
+        "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt9-holdout-check"
+      }
+    },
+    {
+      "id": "release2-accordion-1",
+      "family": "release2-accordion",
+      "split": "held-out",
+      "category": "current-view",
+      "fixture": "release2-accordion",
+      "instruction": "Click Gift box.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "setupRevision": "release-current-view-2",
+      "contractVersion": "4",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-release-label-review",
+        "reviewedAt": "2026-10-02T09:51:00.919216+00:00"
+      },
+      "expected": {
+        "outcome": "found",
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "target": {
+              "selector": "#gift-box",
+              "frames": []
+            },
+            "state": {
+              "inViewport": true,
+              "enabled": true
+            },
+            "interactability": {
+              "status": "ready"
+            }
+          }
+        ],
+        "summary": {
+          "processingComplete": true
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "label": "Gift box",
+            "tag": "button"
+          }
+        ]
+      },
+      "labelProvenance": {
+        "kind": "controlled-authored",
+        "modelExposure": "none before frozen qualification",
+        "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
+        "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt9-holdout-check"
+      }
+    },
+    {
+      "id": "release2-accordion-2",
+      "family": "release2-accordion",
+      "split": "held-out",
+      "category": "current-view",
+      "fixture": "release2-accordion",
+      "instruction": "Click Express courier.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "setupRevision": "release-current-view-2",
+      "contractVersion": "4",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-release-label-review",
+        "reviewedAt": "2026-10-02T09:51:00.919216+00:00"
+      },
+      "expected": {
+        "outcome": "not_found",
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "not_found"
+          }
+        ],
+        "summary": {
+          "processingComplete": true
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "not_found"
+          }
+        ]
+      },
+      "labelProvenance": {
+        "kind": "controlled-authored",
+        "modelExposure": "none before frozen qualification",
+        "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
+        "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt9-holdout-check"
+      }
+    },
+    {
+      "id": "release2-accordion-3",
+      "family": "release2-accordion",
+      "split": "held-out",
+      "category": "current-view",
+      "fixture": "release2-accordion",
+      "instruction": "Click Paper wrap and Gift box.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "setupRevision": "release-current-view-2",
+      "contractVersion": "4",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-release-label-review",
+        "reviewedAt": "2026-10-02T09:51:00.919216+00:00"
+      },
+      "expected": {
+        "outcome": "found",
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "target": {
+              "selector": "#paper-wrap",
+              "frames": []
+            },
+            "state": {
+              "inViewport": true,
+              "enabled": true
+            },
+            "interactability": {
+              "status": "ready"
+            }
+          },
+          {
+            "step": 2,
+            "action": "click",
+            "outcome": "found",
+            "target": {
+              "selector": "#gift-box",
+              "frames": []
+            },
+            "state": {
+              "inViewport": true,
+              "enabled": true
+            },
+            "interactability": {
+              "status": "ready"
+            }
+          }
+        ],
+        "summary": {
+          "processingComplete": true
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "label": "Paper wrap",
+            "tag": "button"
+          },
+          {
+            "step": 2,
+            "action": "click",
+            "outcome": "found",
+            "label": "Gift box",
+            "tag": "button"
+          }
+        ]
+      },
+      "labelProvenance": {
+        "kind": "controlled-authored",
+        "modelExposure": "none before frozen qualification",
+        "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
+        "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt9-holdout-check"
+      }
+    },
+    {
+      "id": "release2-timeline-1",
+      "family": "release2-timeline",
+      "split": "held-out",
+      "category": "current-view",
+      "fixture": "release2-timeline",
+      "instruction": "Click View package log.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "setupRevision": "release-current-view-2",
+      "contractVersion": "4",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-release-label-review",
+        "reviewedAt": "2026-10-02T09:51:00.919216+00:00"
+      },
+      "expected": {
+        "outcome": "found",
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "target": {
+              "selector": "#package-log",
+              "frames": []
+            },
+            "state": {
+              "inViewport": true,
+              "enabled": true
+            },
+            "interactability": {
+              "status": "ready"
+            }
+          }
+        ],
+        "summary": {
+          "processingComplete": true
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "label": "View package log",
+            "tag": "button"
+          }
+        ]
+      },
+      "labelProvenance": {
+        "kind": "controlled-authored",
+        "modelExposure": "none before frozen qualification",
+        "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
+        "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt9-holdout-check"
+      }
+    },
+    {
+      "id": "release2-timeline-2",
+      "family": "release2-timeline",
+      "split": "held-out",
+      "category": "current-view",
+      "fixture": "release2-timeline",
+      "instruction": "Click Restart build.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "setupRevision": "release-current-view-2",
+      "contractVersion": "4",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-release-label-review",
+        "reviewedAt": "2026-10-02T09:51:00.919216+00:00"
+      },
+      "expected": {
+        "outcome": "found",
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "target": {
+              "selector": "#restart-build",
+              "frames": []
+            },
+            "state": {
+              "inViewport": true,
+              "enabled": false
+            },
+            "interactability": {
+              "status": "blocked"
+            }
+          }
+        ],
+        "summary": {
+          "processingComplete": true
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "label": "Restart build",
+            "tag": "button"
+          }
+        ]
+      },
+      "labelProvenance": {
+        "kind": "controlled-authored",
+        "modelExposure": "none before frozen qualification",
+        "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
+        "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt9-holdout-check"
+      }
+    },
+    {
+      "id": "release2-timeline-3",
+      "family": "release2-timeline",
+      "split": "held-out",
+      "category": "current-view",
+      "fixture": "release2-timeline",
+      "instruction": "Hover over View compile log.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "setupRevision": "release-current-view-2",
+      "contractVersion": "4",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-release-label-review",
+        "reviewedAt": "2026-10-02T09:51:00.919216+00:00"
+      },
+      "expected": {
+        "outcome": "found",
+        "actions": [
+          {
+            "step": 1,
+            "action": "hover",
+            "outcome": "found",
+            "target": {
+              "selector": "#compile-log",
+              "frames": []
+            },
+            "state": {
+              "inViewport": true,
+              "enabled": true
+            },
+            "interactability": {
+              "status": "ready"
+            }
+          }
+        ],
+        "summary": {
+          "processingComplete": true
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "hover",
+            "outcome": "found",
+            "label": "View compile log",
+            "tag": "button"
+          }
+        ]
+      },
+      "labelProvenance": {
+        "kind": "controlled-authored",
+        "modelExposure": "none before frozen qualification",
+        "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
+        "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt9-holdout-check"
+      }
+    },
+    {
+      "id": "release2-palette-1",
+      "family": "release2-palette",
+      "split": "held-out",
+      "category": "current-view",
+      "fixture": "release2-palette",
+      "instruction": "Click the leftmost button in Drawing tools.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "setupRevision": "release-current-view-2",
+      "contractVersion": "4",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-release-label-review",
+        "reviewedAt": "2026-10-02T09:51:00.919216+00:00"
+      },
+      "expected": {
+        "outcome": "found",
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "target": {
+              "selector": "#palette-eraser",
+              "frames": []
+            },
+            "state": {
+              "inViewport": true,
+              "enabled": true
+            },
+            "interactability": {
+              "status": "ready"
+            }
+          }
+        ],
+        "summary": {
+          "processingComplete": true
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "label": "Eraser",
+            "tag": "button"
+          }
+        ]
+      },
+      "labelProvenance": {
+        "kind": "controlled-authored",
+        "modelExposure": "none before frozen qualification",
+        "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
+        "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt9-holdout-check"
+      }
+    },
+    {
+      "id": "release2-palette-2",
+      "family": "release2-palette",
+      "split": "held-out",
+      "category": "current-view",
+      "fixture": "release2-palette",
+      "instruction": "Click Pen.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "setupRevision": "release-current-view-2",
+      "contractVersion": "4",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-release-label-review",
+        "reviewedAt": "2026-10-02T09:51:00.919216+00:00"
+      },
+      "expected": {
+        "outcome": "found",
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "target": {
+              "selector": "#palette-pen",
+              "frames": []
+            },
+            "state": {
+              "inViewport": true,
+              "enabled": true
+            },
+            "interactability": {
+              "status": "ready"
+            }
+          }
+        ],
+        "summary": {
+          "processingComplete": true
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "label": "Pen",
+            "tag": "button"
+          }
+        ]
+      },
+      "labelProvenance": {
+        "kind": "controlled-authored",
+        "modelExposure": "none before frozen qualification",
+        "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
+        "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt9-holdout-check"
+      }
+    },
+    {
+      "id": "release2-palette-3",
+      "family": "release2-palette",
+      "split": "held-out",
+      "category": "current-view",
+      "fixture": "release2-palette",
+      "instruction": "Hover over Clear canvas.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "setupRevision": "release-current-view-2",
+      "contractVersion": "4",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-release-label-review",
+        "reviewedAt": "2026-10-02T09:51:00.919216+00:00"
+      },
+      "expected": {
+        "outcome": "found",
+        "actions": [
+          {
+            "step": 1,
+            "action": "hover",
+            "outcome": "found",
+            "target": {
+              "selector": "#clear-canvas",
+              "frames": []
+            },
+            "state": {
+              "inViewport": true,
+              "enabled": false
+            },
+            "interactability": {
+              "status": "ready"
+            }
+          }
+        ],
+        "summary": {
+          "processingComplete": true
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "hover",
+            "outcome": "found",
+            "label": "Clear canvas",
+            "tag": "button"
+          }
+        ]
+      },
+      "labelProvenance": {
+        "kind": "controlled-authored",
+        "modelExposure": "none before frozen qualification",
+        "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
+        "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt9-holdout-check"
+      }
+    },
+    {
+      "id": "release2-dialog-1",
+      "family": "release2-dialog",
+      "split": "held-out",
+      "category": "current-view",
+      "fixture": "release2-dialog",
+      "instruction": "Click Keep draft.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "setupRevision": "release-current-view-2",
+      "contractVersion": "4",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-release-label-review",
+        "reviewedAt": "2026-10-02T09:51:00.919216+00:00"
+      },
+      "expected": {
+        "outcome": "found",
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "target": {
+              "selector": "#keep-draft",
+              "frames": []
+            },
+            "state": {
+              "inViewport": true,
+              "enabled": true
+            },
+            "interactability": {
+              "status": "ready"
+            }
+          }
+        ],
+        "summary": {
+          "processingComplete": true
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "label": "Keep draft",
+            "tag": "button"
+          }
+        ]
+      },
+      "labelProvenance": {
+        "kind": "controlled-authored",
+        "modelExposure": "none before frozen qualification",
+        "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
+        "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt9-holdout-check"
+      }
+    },
+    {
+      "id": "release2-dialog-2",
+      "family": "release2-dialog",
+      "split": "held-out",
+      "category": "current-view",
+      "fixture": "release2-dialog",
+      "instruction": "Click Discard draft.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "setupRevision": "release-current-view-2",
+      "contractVersion": "4",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-release-label-review",
+        "reviewedAt": "2026-10-02T09:51:00.919216+00:00"
+      },
+      "expected": {
+        "outcome": "found",
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "target": {
+              "selector": "#discard-draft",
+              "frames": []
+            },
+            "state": {
+              "inViewport": true,
+              "enabled": false
+            },
+            "interactability": {
+              "status": "blocked"
+            }
+          }
+        ],
+        "summary": {
+          "processingComplete": true
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "label": "Discard draft",
+            "tag": "button"
+          }
+        ]
+      },
+      "labelProvenance": {
+        "kind": "controlled-authored",
+        "modelExposure": "none before frozen qualification",
+        "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
+        "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt9-holdout-check"
+      }
+    },
+    {
+      "id": "release2-dialog-3",
+      "family": "release2-dialog",
+      "split": "held-out",
+      "category": "current-view",
+      "fixture": "release2-dialog",
+      "instruction": "Hover over Return to editor.",
+      "viewport": {
+        "width": 1280,
+        "height": 800,
+        "tolerance": 1
+      },
+      "setupRevision": "release-current-view-2",
+      "contractVersion": "4",
+      "review": {
+        "status": "reviewed",
+        "reviewer": "independent-release-label-review",
+        "reviewedAt": "2026-10-02T09:51:00.919216+00:00"
+      },
+      "expected": {
+        "outcome": "found",
+        "actions": [
+          {
+            "step": 1,
+            "action": "hover",
+            "outcome": "found",
+            "target": {
+              "selector": "#return-editor",
+              "frames": []
+            },
+            "state": {
+              "inViewport": true,
+              "enabled": true
+            },
+            "interactability": {
+              "status": "ready"
+            }
+          }
+        ],
+        "summary": {
+          "processingComplete": true
+        }
+      },
+      "provider": {
+        "actions": [
+          {
+            "step": 1,
+            "action": "hover",
+            "outcome": "found",
+            "label": "Return to editor",
+            "tag": "a"
+          }
+        ]
+      },
+      "labelProvenance": {
+        "kind": "controlled-authored",
+        "modelExposure": "none before frozen qualification",
+        "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
+        "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt9-holdout-check"
+      }
     }
   ],
   "sentinels": [

@@ -138,7 +138,7 @@ public sealed partial class ResolutionService(
             Stage = "configuration",
             Strategy = strategy,
             PromptVersion =
-                request.ContractVersion == "4" ? "8"
+                request.ContractVersion == "4" ? "9"
                 : singleInteraction ? (configuration["Resolution:PromptVariant"] == "concise" ? "7-concise-1" : "7")
                 : multiple ? "6"
                 : "5",
