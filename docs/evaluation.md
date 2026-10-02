@@ -26,6 +26,18 @@ Cases are organized by the behavior they check, rather than by the version that 
 
 Each release comparison freezes the complete eligible browser collection and every reviewed eligible imported case. Both candidate and approved baseline receive the same case inputs and current grading rules, with one original attempt per arm. Browser state resets independently. New cases and improved checks are welcome: apply the same updated expectations to both arms. Changing the collection or grader after a run requires another comparison.
 
+### Compare configurations on equal cases
+
+Name each arm by its configuration: source/image identity, model, provider, prompt, reasoning and output limit. A source change plus a prompt change is a system comparison; it cannot isolate a model or prompt effect.
+
+Freeze one case collection and grader for both arms. Give each arm the same cases, one original attempt per case, with no automatic retries or replacements after failures. Report planned, completed and failed counts for each track. Missing results stay visible and fail release completeness.
+
+Use the group files listed in `evaluation/cases/index.json` for browser categories: targeting, cardinality, appearance, context, scope, state, robustness and frames. Compatibility and saved-locator cases remain deterministic checks. Historical `family` values identify related fixtures; they are not the current behavior categories. Offline source labels do not establish these browser capabilities.
+
+Show paired gains and losses, plus passing cases over the full denominator, for every group and arm. Keep browser and offline results separate. Provider routes, cache conditions and execution settings belong beside the scores. An unchanged approved configuration rerun measures repeatability, not a new implementation improvement.
+
+A historical configuration may be an explicitly selected research comparator. Release approval still compares with the latest approved release under the current policy. The release launcher accepts one candidate and one baseline; comparing several model profiles requires a separate research run with the same frozen inputs.
+
 ### Browser cases
 
 A live case exercises the complete Resolver request: Browser captures candidates, the real model selects targets, Browser constructs and verifies XPath expressions and observes readiness, and the independent oracle grades the final response. There is no separate paid XPath-algorithm phase.
@@ -49,7 +61,7 @@ pnpm evaluate:live -- --case CASE_ID --output .artifacts/evaluation/my-live-chec
 pnpm evaluate:replay RUN_DIRECTORY
 ```
 
-Deterministic mode is the default. Individual cases run concurrently in fresh browser sessions, with up to four workers based on available CPUs. Use `--concurrency 1` for serial timing or a value from 1 to 4 to limit resource use. Live and comparison runners remain serial. The manifest records concurrency; parallel-run timings include contention.
+Deterministic mode is the default. Individual cases run concurrently in fresh browser sessions, with up to four workers based on available CPUs. Use `--concurrency 1` for serial timing or a value from 1 to 4 to limit resource use. Ordinary live checks and release comparisons remain serial. Research continuation has its own bounded parallel runner below. The manifest records concurrency; parallel-run timings include contention.
 
 A controlled provider response makes fixtures, contracts and grader checks repeatable; those results are not model-quality scores. Live mode calls the configured route. Use `OPENROUTER_EVAL_API_KEY` in the environment or ignored evaluation environment file. Keep the application's key separate; deterministic CI receives no provider credentials.
 
@@ -98,7 +110,7 @@ The source acquisition and adaptation commands remain `pnpm datasets:fetch`, `pn
 
 Track estimates, token usage, provider generation IDs, reported charges and unknown amounts separately. Cost amounts, estimate overruns, missing prices, unavailable billing metadata and accounting-service availability do not stop resolution evaluation or reject a release. Preserve charge records where available and report accounting failures explicitly; never invent a zero charge.
 
-Authentication, transport failures, provider rejection and missing resolution results are operational failures. A provider-enforced key limit can reject a call, but the evaluator adds no monetary continuation gate. Keep the dedicated evaluation key, standard routes, original attempts and existing charge history. Successful billing reconciliation never turns a failed model response into a passing case.
+Authentication, transport failures, provider rejection and missing resolution results are operational failures. A completed transport failure remains a failed attempt with its original charge status; once the proxy is idle, the runner continues with the next distinct attempt. It does not retry. Identity, response-cache and evidence-integrity violations still stop the run. A provider-enforced key limit can reject a call, but the evaluator adds no monetary continuation gate. Keep the dedicated evaluation key, standard routes, original attempts and existing charge history. Successful billing reconciliation never turns a failed model response into a passing case.
 
 ## Research comparisons
 
@@ -111,6 +123,21 @@ Research remains part of the interview assignment. It uses shared fixtures, prov
 ### Compare and qualify models
 
 Model profiles permit controlled comparisons of explicit routes and settings. Record prompt or provider changes so a whole-configuration comparison is not mistaken for a model-only result.
+
+### Continue a research comparison in parallel
+
+`evaluation/research/parallel-comparison.mjs` continues a frozen paired research run with up to eight provider workers. One worker owns browser cases; the others run offline Resolver processes. Each worker has its own proxy state and charge ledger. A routing token selects the worker while the Resolver endpoint and configuration identity stay unchanged.
+
+The operator first drains the original run, preserves its directory, and starts an isolated stack from the same verified candidate and baseline images. The continuation requires those artifact identities, an explicit `XPATHED_RESEARCH_CONTINUATION=true`, and a host offline worker with the matching concurrency. Inside that prepared stack:
+
+```sh
+node evaluation/research/parallel-comparison.mjs \
+  --source ORIGINAL_RUN --output NEW_RUN --concurrency 8
+```
+
+The runner copies the frozen plan and evidence, retains completed successes and failures, and executes only missing arms. An unfinished attempted arm blocks continuation; it is never silently retried. Identity, response-reuse or evidence-integrity failures stop new work while active attempts drain.
+
+Keep the phase manifest, per-arm claims, worker charge ledgers and before/after image receipts. Report serial and parallel latency cohorts separately because contention and cache conditions differ. This path produces research evidence; ordinary release comparison and approval remain unchanged.
 
 ### External datasets
 

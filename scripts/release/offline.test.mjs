@@ -6,6 +6,20 @@ import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { startOfflineWorker } from "./offline.mjs";
 
+test("polling failures remain observed until shutdown reports them", async () => {
+  const root = await mkdtemp(join(tmpdir(), "xpathed-offline-poll-failure-"));
+  await writeFile(join(root, "offline"), "not a directory");
+  const stop = startOfflineWorker({ output: root }, async () =>
+    assert.fail("Unexpected Docker call"),
+  );
+  try {
+    await delay(50);
+    await assert.rejects(stop(), { code: "ENOTDIR" });
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
 test("offline worker sends only model input to pinned images and retains execution errors", async () => {
   const root = await mkdtemp(join(tmpdir(), "xpathed-offline-worker-"));
   const bin = join(root, "bin"),
@@ -58,12 +72,12 @@ else console.log(JSON.stringify({outcome:"found"}));
   process.env.PATH = `${bin}:${originalPath}`;
   const stop = startOfflineWorker(state, docker);
   let sequence = 0;
-  async function request(instruction, baseline = false) {
+  async function request(instruction, baseline = false, workerId) {
     const name = (++sequence).toString(16).padStart(32, "0");
     const input = { instruction, candidates: [{ id: "target" }] };
     await writeFile(
       join(output, "offline", `${name}.request.json`),
-      JSON.stringify({ baseline, input, expected: "private-oracle-label" }),
+      JSON.stringify({ baseline, input, workerId, expected: "private-oracle-label" }),
     );
     const deadline = Date.now() + 5000;
     while (Date.now() < deadline) {
@@ -89,6 +103,8 @@ else console.log(JSON.stringify({outcome:"found"}));
     assert.deepEqual(failed.prepared, { prepared: true });
     assert.match((await request("malformed")).error, /JSON/);
     const before = await readFile(log, "utf8");
+    assert.match((await request("select target", false, 16)).error, /Invalid offline request/);
+    assert.equal(await readFile(log, "utf8"), before);
     wrongImage = true;
     assert.match((await request("select target")).error, /artifact mismatch/);
     assert.equal(await readFile(log, "utf8"), before);
@@ -112,6 +128,111 @@ else console.log(JSON.stringify({outcome:"found"}));
       assert.equal(call.context, "");
     }
   } finally {
+    await stop();
+    process.env.PATH = originalPath;
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("parallel offline requests isolate routing, bound execution, drain and never replay IDs", async () => {
+  const root = await mkdtemp(join(tmpdir(), "xpathed-offline-parallel-"));
+  const directory = join(root, "offline"),
+    bin = join(root, "bin"),
+    log = join(root, "calls");
+  await mkdir(directory);
+  await mkdir(bin);
+  await writeFile(log, "");
+  await writeFile(
+    join(bin, "docker"),
+    `#!${process.execPath}
+const fs = require("node:fs");
+const args = process.argv.slice(2), input = JSON.parse(fs.readFileSync(0, "utf8"));
+if (args.includes("--prepare-only")) console.log(JSON.stringify({prepared:true}));
+else {
+  fs.appendFileSync(${JSON.stringify(log)}, JSON.stringify({args,input})+"\\n");
+  const timer = setInterval(() => {
+    if (fs.existsSync(${JSON.stringify(root)}+"/release-"+input.worker)) {
+      clearInterval(timer); console.log(JSON.stringify({outcome:"found"}));
+    }
+  }, 10);
+}
+`,
+    { mode: 0o700 },
+  );
+  const id = "b".repeat(64),
+    image = "sha256:" + "a".repeat(64);
+  const docker = async (args) =>
+    args[0] === "ps"
+      ? id
+      : JSON.stringify([
+          { Image: image, Config: { Labels: { "com.docker.compose.project.working_dir": root } } },
+        ]);
+  const originalPath = process.env.PATH;
+  process.env.PATH = `${bin}:${originalPath}`;
+  const stop = startOfflineWorker(
+    {
+      output: root,
+      directory: root,
+      project: "parallel",
+      service: "resolver",
+      artifact: { images: [{}, { id: image }] },
+      concurrency: 2,
+    },
+    docker,
+  );
+  const name = (index) => (index + 1).toString(16).padStart(32, "0");
+  const send = (index) =>
+    writeFile(
+      join(directory, `${name(index)}.request.json`),
+      JSON.stringify({ baseline: false, workerId: index, input: { worker: index } }),
+    );
+  const calls = async () =>
+    (await readFile(log, "utf8")).trim().split("\n").filter(Boolean).map(JSON.parse);
+  async function until(condition) {
+    for (let i = 0; i < 200; i++) {
+      if (await condition()) return;
+      await delay(25);
+    }
+    assert.fail("Timed out waiting for offline workers");
+  }
+  try {
+    await Promise.all([0, 1, 2].map(send));
+    await until(async () => (await calls()).length === 2);
+    await delay(150);
+    assert.equal((await calls()).length, 2, "third request must wait for capacity");
+    await Promise.all([0, 1].map((i) => writeFile(join(root, `release-${i}`), "")));
+    await until(async () => (await calls()).length === 3);
+    await send(0);
+    await delay(150);
+    assert.equal((await calls()).length, 3, "recreated request ID must not replay");
+    let drained = false;
+    const closing = stop().then(() => {
+      drained = true;
+    });
+    await delay(150);
+    assert.equal(drained, false, "shutdown must await the active request");
+    await writeFile(join(root, "release-2"), "");
+    await closing;
+    for (const call of await calls()) {
+      assert.deepEqual(call.args.slice(0, 5), [
+        "exec",
+        "-i",
+        "-e",
+        `OpenRouter__ApiKey=evaluation-worker-${call.input.worker}`,
+        id,
+      ]);
+      assert.equal(
+        call.args.some((arg) => arg.includes("BaseUrl")),
+        false,
+      );
+      assert.equal(
+        JSON.parse(await readFile(join(directory, `${name(call.input.worker)}.response.json`)))
+          .result.outcome,
+        "found",
+      );
+    }
+  } finally {
+    await Promise.all([0, 1, 2].map((i) => writeFile(join(root, `release-${i}`), "")));
     await stop();
     process.env.PATH = originalPath;
     await rm(root, { recursive: true, force: true });

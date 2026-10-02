@@ -16,7 +16,7 @@ test("offline bridge sends only reviewed input, retains Resolver evidence and or
   };
   for (const failed of [false, true]) {
     const trial = { id: failed ? "failed" : "success" };
-    const running = executeOffline(spec, trial, output, 1000, failed);
+    const running = executeOffline(spec, trial, output, 1000, failed, failed ? 3 : undefined);
     const path = join(output, "offline", trial.id);
     let request;
     for (let i = 0; i < 100 && !request; i++) {
@@ -27,7 +27,11 @@ test("offline bridge sends only reviewed input, retains Resolver evidence and or
         });
       if (!request) await delay(10);
     }
-    assert.deepEqual(request, { baseline: failed, input: spec.input });
+    assert.deepEqual(request, {
+      baseline: failed,
+      input: spec.input,
+      ...(failed ? { workerId: 3 } : {}),
+    });
     const result = {
       outcome: "found",
       configurationId: "configuration",
@@ -63,4 +67,12 @@ test("offline bridge sends only reviewed input, retains Resolver evidence and or
       assert.equal(trial.elapsedMs, 123);
     }
   }
+});
+
+test("offline bridge rejects invalid worker routing before writing requests", async () => {
+  for (const workerId of [-1, 16, 1.5, "1", null])
+    await assert.rejects(
+      executeOffline({}, {}, "/unused", 1000, false, workerId),
+      /worker identity/,
+    );
 });

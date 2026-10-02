@@ -37,16 +37,26 @@ export function normalize(result, attemptId) {
 }
 
 // The host executes this request using the attested Resolver container, including old releases.
-export async function executeOffline(spec, trial, output, timeoutMs, baseline) {
+export async function executeOffline(spec, trial, output, timeoutMs, baseline, workerId) {
+  if (workerId !== undefined && (!Number.isInteger(workerId) || workerId < 0 || workerId > 15))
+    throw new Error("Invalid offline worker identity");
   const directory = join(output, "offline");
   await mkdir(directory, { recursive: true, mode: 0o700 });
   const path = join(directory, trial.id);
   const started = performance.now();
   try {
-    await writeFile(`${path}.partial`, JSON.stringify({ baseline, input: spec.input }), {
-      flag: "wx",
-      mode: 0o600,
-    });
+    await writeFile(
+      `${path}.partial`,
+      JSON.stringify({
+        baseline,
+        input: spec.input,
+        ...(workerId === undefined ? {} : { workerId }),
+      }),
+      {
+        flag: "wx",
+        mode: 0o600,
+      },
+    );
     await rename(`${path}.partial`, `${path}.request.json`);
     let response;
     while (!response) {

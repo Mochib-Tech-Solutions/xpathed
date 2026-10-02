@@ -177,13 +177,16 @@ test("tracking records charges above estimates and still rejects unknown routes 
   assert.equal(calls.length, 1);
 });
 
-test("body timeout recovers its header-identified charge without inventing a successful response", async (t) => {
+test("body timeout preserves the failed attempt and allows a distinct attempt after idle", async (t) => {
+  let completions = 0;
   const { proxy, post, calls, ledgerPath } = await setup(t, {
     completion: (url) => {
       if (url.endsWith("/generation?id=gen-timeout"))
         return Response.json({
           data: { id: "gen-timeout", model, provider_name: "Wafer", total_cost: 0.001 },
         });
+      if (++completions > 1)
+        return Response.json({ id: "next", model, provider: "Wafer", usage: { cost: 0.002 } });
       return {
         status: 200,
         headers: new Headers({ "X-Generation-Id": "gen-timeout" }),
@@ -209,7 +212,15 @@ test("body timeout recovers its header-identified charge without inventing a suc
   assert.equal(record.observedIdentity, undefined);
   assert.equal(proxy.budget.pendingCharges, 0);
   assert.equal(JSON.parse(await readFile(ledgerPath, "utf8")).entries[0].reportedUsd, 0.001);
-  assert.throws(() => proxy.beginAttempt("next"), /blocked/);
+  await proxy.awaitIdle();
+  assert.throws(() => proxy.beginAttempt("timeout"), /repeated/);
+  proxy.beginAttempt("next");
+  assert.equal((await post()).status, 200);
+  await proxy.awaitIdle();
+  assert.equal(calls.filter((call) => call.url.endsWith("/chat/completions")).length, 2);
+  assert.equal(proxy.records[0].error, "Response body timed out");
+  assert.equal(proxy.records[1].attemptId, "next");
+  assert.equal(proxy.records[1].reportedUsd, 0.002);
 });
 
 test("unverified timeout accounting retains its full reservation without retrying inference", async (t) => {
@@ -265,7 +276,9 @@ test("unverified timeout accounting retains its full reservation without retryin
       assert.equal(proxy.records[0].reportedUsd, recovered);
       assert.equal(proxy.budget.pendingCharges, recovered === null ? 1 : 0);
       assert.equal(proxy.budget.spentUsd, recovered ?? proxy.records[0].reservedUsd);
-      assert.throws(() => proxy.beginAttempt("next"), /blocked/);
+      await proxy.awaitIdle();
+      assert.throws(() => proxy.beginAttempt("timeout"), /repeated/);
+      assert.doesNotThrow(() => proxy.beginAttempt("next"));
     });
 });
 

@@ -8,9 +8,9 @@ The model selects candidate IDs from browser observations. Browser code builds X
 
 The remaining uncertainty is explicit: the model may select the wrong element. Independent expected targets measure that error. A disabled intended target can be correctly selected while remaining unavailable for the requested action.
 
-The runtime uses one selection call. The default is DeepSeek V4.1 Flash through OpenRouter's Wafer provider, with reasoning and provider fallback disabled and strict structured output. The choice balances correct target selection, interactive latency and cost. It is not a claim that the model has the highest accuracy on every workload. No model is trained here.
+The runtime uses one selection call. DeepSeek V4.1 Flash through OpenRouter's Wafer provider is an inexpensive default for live testing, with reasoning and provider fallback disabled and strict structured output. Its target accuracy, latency and cost must be measured on the project's cases. No model is trained here.
 
-Model, provider, prompt and schema settings form a configuration identity. Evaluate changes together on the same cases before approving them. Detailed comparison records remain in the dated research reports.
+Model, provider, prompt and schema settings form a configuration identity. Evaluate changes together on the same cases before approving them.
 
 ## Match the scope to the visible page
 
@@ -32,15 +32,17 @@ Controlled browser cases define expected nodes independently of model input. The
 
 Reviewed imported data adds language and page variety. Offline target selection cannot establish live readiness or viewport correctness, so its denominator stays separate. Repeatedly used cases are regression evidence, not unseen-site generalization.
 
-### Saved browser comparison
+### Compare the changed configurations
 
-The October 2, 2026 comparison recorded **119/135 correct candidate responses**, against **105/135** for its baseline. It contained 15 gained passes and one lost pass; the current no-regression gate would reject that loss. Candidate median latency was **1,116.9 ms**, with **1,710.2 ms** p95. These are saved measurements, not a fresh check of this checkout.
+The earlier and current configurations use the same DeepSeek V4.1 Flash model, Wafer provider and inference settings. The browser prompt changes from 8 to 10; offline selection keeps prompt 7 unchanged. The current browser configuration makes three rules explicit:
 
-![Paired changes by behavior family in the saved browser comparison](assets/evaluation/changed-families.svg)
+- Match the requested control itself; headings, scope containers and repeated descendant text provide context.
+- Report missing targets within the current view. Completeness describes whether every requested target is represented, including absent targets.
+- Recheck viewport membership after inference before returning found or absent results.
 
-One failure illustrates why command grading matters: `release3-listbox-1` selected the correct Greek option but changed the requested `click` to `select`. A correct target and valid XPath did not make the action correct. The [saved comparison record](research/2026-10-01-release-monitoring-setup.md#first-approved-release--2026-10-02) retains the outcomes and charges.
+The complete comparison used identical inputs and grading rules for both saved configurations. Browser passes increased **111→120/140**, with **10 gains and one regression**. Offline selection was **716→710/1,084**, with **78 gains and 84 losses** despite an unchanged prompt and configuration. This measures combined browser changes and repeated offline calls; it does not isolate individual prompt rules.
 
-The separate October 1 offline run returned **547/860 exact targets (63.60%)**. Its naming gap—495/657 named targets versus 52/203 unnamed targets—makes capture context a useful investigation area, without isolating a cause. See the [offline report](research/deepinfra-labelled-baseline-report.md).
+The browser regression correctly reported an absent option but changed the explicit action from `click` to `select`. Action interpretation and target correctness need separate checks. The run does not meet the release gate. The [comparison report](research/configuration-comparison.md) retains every failure, separates serial and parallel latency, and reports known and unavailable charges.
 
 ## Preserve evidence and protect known behavior
 
