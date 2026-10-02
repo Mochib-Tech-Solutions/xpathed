@@ -444,7 +444,7 @@ async function evidence(options) {
   }
   const pilot = await load(options.pilot, "pilot");
   const confirmation = await load(options.confirmation, "confirmation");
-  if (["4", "5", "6"].includes(defaultPolicy.version)) {
+  if (["4", "5", "6", "7"].includes(defaultPolicy.version)) {
     ensure(
       artifact && pilot.manifest.comparison && confirmation.manifest.comparison,
       "Relative qualification requires exact candidate and baseline artifacts",
@@ -456,7 +456,7 @@ async function evidence(options) {
     );
   }
   const exposure = confirmation.manifest.qualification.exposure;
-  if (["3", "4", "5", "6"].includes(defaultPolicy.version))
+  if (["3", "4", "5", "6", "7"].includes(defaultPolicy.version))
     ensure(
       exposure?.runId === confirmation.manifest.id &&
         exposure.sourceSha === options.sourceSha &&

@@ -206,7 +206,7 @@ async function fetch(repo, tag, candidateSha256, destination, approved = null) {
             suite.sentinels.includes(t.caseId) &&
             Number.isFinite(t.elapsedMs) &&
             t.elapsedMs >= 0 &&
-            (["4", "5", "6"].includes(policy.version)
+            (["4", "5", "6", "7"].includes(policy.version)
               ? typeof t.passed === "boolean" && !t.operational && !t.hardFailure
               : t.elapsedMs <= policy.deadlineMs),
         ),
@@ -214,7 +214,7 @@ async function fetch(repo, tag, candidateSha256, destination, approved = null) {
     );
     return { source, candidate, release: approved };
   }
-  const { measuredEntry } = ["4", "5", "6"].includes(policy.version)
+  const { measuredEntry } = ["4", "5", "6", "7"].includes(policy.version)
     ? await import(pathToFileURL(join(source, "evaluation/release-comparison.mjs")))
     : {};
   const measured = [];
@@ -225,7 +225,7 @@ async function fetch(repo, tag, candidateSha256, destination, approved = null) {
         const trial = JSON.parse(
           await readFile(join(source, run, "trials", `${planned.id}.json`), "utf8"),
         );
-        const measurement = ["4", "5", "6"].includes(policy.version)
+        const measurement = ["4", "5", "6", "7"].includes(policy.version)
           ? measuredEntry(
               suite.cases.find((c) => c.id === trial.caseId),
               trial,
