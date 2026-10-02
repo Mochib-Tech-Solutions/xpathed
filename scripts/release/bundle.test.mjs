@@ -18,7 +18,7 @@ import { join } from "node:path";
 import test from "node:test";
 
 const hash = (bytes) => createHash("sha256").update(bytes).digest("hex");
-function workspace(t) {
+function workspace(t, profileFile = "profiles.json") {
   const directory = realpathSync(mkdtempSync(join(tmpdir(), "xpathed-bundle-")));
   t.after(() => rmSync(directory, { recursive: true, force: true }));
   const cwd = join(directory, "source");
@@ -26,7 +26,7 @@ function workspace(t) {
   mkdirSync(join(cwd, "scripts"));
   mkdirSync(join(cwd, "evaluation"));
   cpSync("scripts/release/bundle.mjs", join(cwd, "scripts/release/bundle.mjs"));
-  cpSync("evaluation/profiles.json", join(cwd, "evaluation/profiles.json"));
+  cpSync("evaluation/profiles.json", join(cwd, "evaluation", profileFile));
   writeFileSync(join(cwd, ".gitignore"), ".artifacts/\n.env\n");
   const git = (...args) => {
     const result = spawnSync("git", args, { cwd, encoding: "utf8" });
@@ -148,6 +148,50 @@ test("create preserves exact immutable images and verify/restore work after the 
       "fixture-secret-not-for-archive",
     ),
   );
+});
+
+test("verify reads the legacy profile catalog from the pinned archive", (t) => {
+  const work = workspace(t, "qualification-profiles.json");
+  const created = work.create();
+  assert.equal(created.status, 0, created.stderr);
+  const digest = hash(readFileSync(join(work.output, "manifest.json")));
+  writeFileSync(join(work.cwd, "evaluation/profiles.json"), "invalid current catalog");
+  const before = readFileSync(work.log, "utf8");
+  const verified = work.run("verify", work.output, "--sha256", digest);
+  assert.equal(verified.status, 0, verified.stderr);
+  assert.equal(readFileSync(work.log, "utf8"), before);
+});
+
+test("a malformed current catalog cannot fall back to a valid legacy catalog", (t) => {
+  const work = workspace(t);
+  cpSync(
+    join(work.cwd, "evaluation/profiles.json"),
+    join(work.cwd, "evaluation/qualification-profiles.json"),
+  );
+  writeFileSync(join(work.cwd, "evaluation/profiles.json"), "invalid current catalog");
+  work.git("add", "evaluation");
+  work.git(
+    "-c",
+    "user.name=Bundle test",
+    "-c",
+    "user.email=bundle@example.invalid",
+    "commit",
+    "--quiet",
+    "-m",
+    "Malformed current catalog fixture",
+  );
+  const result = work.run(
+    "create",
+    "--profile",
+    "deepseek",
+    "--source-sha",
+    work.git("rev-parse", "HEAD"),
+    "--output",
+    work.output,
+  );
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /JSON/);
+  assert.equal(existsSync(work.log), false);
 });
 
 test("a caller-pinned digest and exact regular-file inventory gate every restore", (t) => {
