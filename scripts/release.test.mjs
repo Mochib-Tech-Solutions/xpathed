@@ -137,7 +137,7 @@ async function workspace(
         frozenAt: time(-3000),
         heldOutStartedAt: phase === "pilot" ? null : time(-2000),
         baselineRunIds: pilot ? [pilot.manifest.id] : [],
-        ...(["4", "5", "6"].includes(defaultPolicy.version) && phase === "confirmation"
+        ...(["4", "5", "6", "7"].includes(defaultPolicy.version) && phase === "confirmation"
           ? {
               exposure: {
                 repository: "example/private",
@@ -468,7 +468,7 @@ test("published candidates require a pinned digest and restore the exact source,
   const work = await workspace(t, {
     contractVersion: "4",
     promptVersion: "10",
-    qualificationPolicy: "6",
+    qualificationPolicy: "7",
     bootstrapBaseline: true,
   });
   const bound = work.bindArtifact();
@@ -791,7 +791,7 @@ test("current-view evidence seals only under its frozen policy and actual scope"
   const work = await workspace(t, {
     contractVersion: "4",
     promptVersion: "10",
-    qualificationPolicy: "6",
+    qualificationPolicy: "7",
   });
   const bound = work.bindArtifact();
   const sealed = bound.seal();

@@ -190,6 +190,36 @@ test("frozen sentinel monitoring separates semantic drift, latency and infrastru
     "passed",
   );
   assert.equal(summarizeMonitoring(monitoring, [trial]).status, "infrastructure_failure");
+  const lost = structuredClone(trial);
+  lost.result.action = lost.result.actions[0].action = "hover";
+  const gained = structuredClone(trial);
+  gained.id += "-gain";
+  gained.caseId += "-gain";
+  gained.provider[0].observedIdentity.generationId = "candidate-gain";
+  gained.baseline.id = createHash("sha256")
+    .update(`${gained.id}:baseline`)
+    .digest("hex")
+    .slice(0, 32);
+  gained.baseline.caseId = gained.caseId;
+  gained.baseline.result.action = gained.baseline.result.actions[0].action = "hover";
+  gained.baseline.provider[0].observedIdentity.generationId = "baseline-gain";
+  const paired = { ...relative, cases: [spec, { ...spec, id: gained.caseId }] };
+  const saved = [...baseline, { caseId: gained.caseId, passed: false, elapsedMs: 3500 }];
+  const monitored = { ...paired, monitoring: true };
+  assert.equal(assertPilotReady({ manifest: paired, trials: [lost, gained] }).status, "passed");
+  const aggregate = summarizeMonitoring(monitored, [lost, gained], saved);
+  assert.equal(aggregate.status, "passed");
+  assert.deepEqual(aggregate.regressions, [spec.id]);
+  assert.deepEqual(aggregate.gains, [gained.caseId]);
+  const strict = { ...currentPolicy, version: "6" };
+  assert.throws(
+    () => assertPilotReady({ manifest: { ...paired, policy: strict }, trials: [lost, gained] }),
+    /Pilot failed/,
+  );
+  assert.equal(
+    summarizeMonitoring({ ...monitored, policy: strict }, [lost, gained], saved).status,
+    "semantic_drift",
+  );
 });
 
 test("qualification interleaves every profile per case and rotates first position", () => {

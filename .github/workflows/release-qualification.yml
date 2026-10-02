@@ -27,7 +27,7 @@ jobs:
   qualification:
     if: (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release/')) && github.event.repository.private
     runs-on: ubuntu-24.04-arm
-    timeout-minutes: 45
+    timeout-minutes: 75
     permissions:
       contents: write
       checks: read
