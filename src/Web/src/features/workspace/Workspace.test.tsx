@@ -138,6 +138,8 @@ describe("Workspace resolution", () => {
       vi.setSystemTime(sentAt);
       try {
         await submitInstruction(user);
+        expect(screen.getByRole("textbox", { name: "Describe an element" })).toHaveValue("");
+        expect(screen.getByLabelText("Sent message")).toHaveTextContent("Click Pay now");
         const sent = screen.getByLabelText(/^Sent /, { selector: "time" });
         expect(sent).toHaveAttribute("datetime", sentAt.toISOString());
         expect(screen.queryByLabelText(/^Received /, { selector: "time" })).not.toBeInTheDocument();
@@ -155,6 +157,7 @@ describe("Workspace resolution", () => {
         );
         const received = await screen.findByLabelText(/^Received /, { selector: "time" });
         expect(received).toHaveAttribute("datetime", receivedAt.toISOString());
+        expect(screen.getByRole("textbox", { name: "Describe an element" })).toHaveValue("");
         expect(sent).toHaveAttribute("datetime", sentAt.toISOString());
         expect(sent).toHaveTextContent(
           sentAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
@@ -696,7 +699,7 @@ describe("Workspace resolution", () => {
     await user.hover(cost);
     expect(within(screen.getByRole("tooltip")).getAllByText("Unavailable")).toHaveLength(12);
     await user.unhover(cost);
-    await user.click(screen.getByRole("button", { name: "Resolve instruction" }));
+    await submitInstruction(user);
     expect(await screen.findByRole("button", { name: "Cost unavailable" })).toBeInTheDocument();
   });
 
@@ -735,7 +738,7 @@ describe("Workspace resolution", () => {
     const user = await openWorkspace();
     await submitInstruction(user);
     await screen.findByText("Pay now", { selector: "bdi" });
-    await user.click(screen.getByRole("button", { name: "Resolve instruction" }));
+    await submitInstruction(user);
     await waitFor(() =>
       expect(screen.getAllByText("Pay now", { selector: "bdi" })).toHaveLength(2),
     );
@@ -783,7 +786,7 @@ describe("Workspace resolution", () => {
     await user.type(instruction, "Click Pay now{Enter}");
 
     expect(await screen.findByText("Pay now", { selector: "bdi" })).toBeInTheDocument();
-    expect(instruction).toHaveValue("Click Pay now");
+    expect(instruction).toHaveValue("");
   });
 
   it("returns focus to the composer when a sent request completes", async () => {
@@ -1080,6 +1083,7 @@ describe("Workspace resolution", () => {
     const user = await openWorkspace();
     await submitInstruction(user);
     await screen.findByText("Pay now", { selector: "bdi" });
+    await user.type(screen.getByRole("textbox", { name: "Describe an element" }), "Next draft");
     const originalFetch = globalThis.fetch;
     vi.stubGlobal(
       "fetch",
@@ -1099,9 +1103,7 @@ describe("Workspace resolution", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("Unable to close the browser.");
     expect(screen.getByRole("tab", { name: "Checkout" })).toBeInTheDocument();
     expect(screen.getByText("Pay now", { selector: "bdi" })).toBeInTheDocument();
-    expect(screen.getByRole("textbox", { name: "Describe an element" })).toHaveValue(
-      "Click Pay now",
-    );
+    expect(screen.getByRole("textbox", { name: "Describe an element" })).toHaveValue("Next draft");
     expect(screen.getByRole("button", { name: "Close all tabs" })).toBeEnabled();
   });
 
@@ -1169,7 +1171,9 @@ describe("Workspace resolution", () => {
       expect(
         screen.queryByText("I couldn’t find that element on this page."),
       ).not.toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Resolve instruction" })).toBeEnabled();
+      expect(screen.getByRole("textbox", { name: "Describe an element" })).toBeEnabled();
+      expect(screen.getByRole("textbox", { name: "Describe an element" })).toHaveValue("");
+      expect(screen.getByRole("button", { name: "Resolve instruction" })).toBeDisabled();
     },
   );
 
