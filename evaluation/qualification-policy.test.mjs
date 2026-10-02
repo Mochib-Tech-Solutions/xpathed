@@ -161,6 +161,14 @@ test("current-view release qualification requires its own coverage and measured 
   assert.equal(status().correctCompleteWithinDeadline.rate, 0);
   trials[4].observation.actions[0].matches[0].intended = false;
   assert.ok(status().reasons.includes("correctness_regression"));
+  trials[0].observation.actions[0].matches[0].intended = true;
+  assert.equal(status().status, "qualified");
+  assert.deepEqual(status().comparison.regressions, [trials[4].caseId]);
+  assert.deepEqual(status().comparison.gains, [trials[0].caseId]);
+  assert.equal(
+    compareTrials(manifest, trials, { ...currentViewPolicy, version: "6" }).status,
+    "semantic_drift",
+  );
   trials[4].observation.actions[0].matches[0].intended = true;
   trials[0].elapsedMs = 9000;
   trials[1].elapsedMs = 9000;
@@ -739,4 +747,43 @@ test("report-only latency preserves correctness and evidence gates", () => {
     compareMeasurements([{ ...candidate[0], elapsedMs: null }], baseline, null).status,
     "infrastructure_failure",
   );
+});
+
+test("policy 7 accepts aggregate ties and gains while retaining individual losses and safety gates", () => {
+  const baseline = [
+    { caseId: "a", passed: true, elapsedMs: 100 },
+    { caseId: "b", passed: false, elapsedMs: 200 },
+    { caseId: "c", passed: false, elapsedMs: 300 },
+  ];
+  const candidate = baseline.map((entry, index) => ({
+    ...entry,
+    passed: index === 1,
+    elapsedMs: 40000,
+  }));
+  const compare = () => compareMeasurements(candidate, baseline, null, true);
+  assert.equal(compare().status, "passed");
+  assert.deepEqual(compare().gains, ["b"]);
+  assert.deepEqual(compare().regressions, ["a"]);
+  assert.equal(compareMeasurements(candidate, baseline, null).status, "semantic_drift");
+  candidate[2].passed = true;
+  assert.equal(compare().status, "passed");
+  candidate[1].passed = candidate[2].passed = false;
+  assert.equal(compare().status, "semantic_drift");
+  candidate[1].passed = true;
+  for (const invalid of [
+    { hardFailure: true },
+    { operational: true },
+    { elapsedMs: null },
+    { caseId: "a" },
+  ]) {
+    assert.equal(
+      compareMeasurements(
+        [candidate[0], { ...candidate[1], ...invalid }, candidate[2]],
+        baseline,
+        null,
+        true,
+      ).status,
+      "infrastructure_failure",
+    );
+  }
 });
