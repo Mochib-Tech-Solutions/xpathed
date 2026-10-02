@@ -227,6 +227,7 @@ export default function useWorkspace() {
           ...previous.tabs,
           [page.pageId]: {
             ...previous.tabs[page.pageId]!,
+            instruction: "",
             history: [...historical(previous.tabs[page.pageId]!.history), entry],
           },
         },
