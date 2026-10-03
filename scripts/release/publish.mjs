@@ -134,7 +134,7 @@ if (import.meta.main) {
     const receipt = JSON.parse(await readFile(`${directory}/receipt.json`, "utf8"));
     const merge = api(`repos/${repository}/git/commits/${pr.merge_commit_sha}`);
     verifyMerge(pr, receipt, merge.tree.sha);
-    await requireCI(repository, receipt.sourceSha);
+    await requireCI(repository, receipt);
     if (merge.parents[0]?.sha !== receipt.baselineCommit)
       throw new Error("Release baseline changed after evaluation");
     const bundle = await verify(`${directory}/bundle`, receipt.bundleSha256);
