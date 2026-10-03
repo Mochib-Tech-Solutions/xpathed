@@ -1,6 +1,6 @@
 # PhraseNode expectation audit — 3 October 2026
 
-**Prepared-input follow-up:** The initial review below admitted 671 cases against retained imported inputs. [The subsequent runtime-boundary audit](2026-10-03-prepared-input-audit.md) found six more cases whose essential text is removed during preparation. The current collection admits **665 cases** and preserves **419 exclusions**. The original source reconciliation and initial review remain recorded below.
+**Superseding reviews:** The initial review below admitted 671 cases. The [runtime-boundary audit](2026-10-03-prepared-input-audit.md) reduced admission to 665. The [full target-uniqueness recheck](2026-10-03-target-uniqueness-audit.md) now admits **573 cases** and preserves **511 exclusions**. Counts and examples below describe the initial review; subsequent decisions take precedence.
 
 ## Result
 
