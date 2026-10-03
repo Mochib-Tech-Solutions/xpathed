@@ -115,7 +115,7 @@ Assessment of the complete resolution request, from browser capture through targ
 Assessment of the stage after selection: known selected elements must produce XPath expressions that uniquely identify the intended nodes in a real browser, with accurate state observations.
 
 **Model-selection evaluation**:
-Assessment of target selection from saved page inputs and independent labels. Offline describes the page inputs; inference can use a live model. Imported cases enter accuracy measurement only after a semantic label review confirms that the instruction and supplied evidence distinguish the expected target; source provenance and permission to submit the input are separate checks.
+Assessment of target selection from saved page inputs and independent labels. Offline describes the page inputs; inference can use a live model. Imported cases enter accuracy measurement only after a semantic label review confirms that the instruction and prepared model evidence distinguish the expected target, with hashes checked after privacy sanitization and before inference; source provenance and permission to submit the input are separate checks.
 
 **Regression**:
 A case that passes in a reference run and fails in the compared run. It describes a comparison outcome, rather than a kind of evaluation set.

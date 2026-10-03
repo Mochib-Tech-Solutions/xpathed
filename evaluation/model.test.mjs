@@ -38,6 +38,7 @@ spec.labelReview = {
   caseId: spec.id,
   inputHash: spec.review.inputHash,
   labelHash: createHash("sha256").update(JSON.stringify(spec.expected)).digest("hex"),
+  preparedInputHash: createHash("sha256").update(JSON.stringify(spec.input)).digest("hex"),
   disposition: "validated",
   reason: "Source confirms the unique named Save button.",
   reviewer: "fixture-source-review",
@@ -86,7 +87,12 @@ for (const invalidIdentity of [false, true])
           if (!file.endsWith(".request.json")) continue;
           const path = join(output, "offline", file);
           const request = JSON.parse(await readFile(path));
-          assert.deepEqual(Object.keys(request).sort(), ["baseline", "input"]);
+          assert.deepEqual(Object.keys(request).sort(), [
+            "baseline",
+            "expectedPreparedInputHash",
+            "input",
+          ]);
+          assert.equal(request.expectedPreparedInputHash, spec.labelReview.preparedInputHash);
           assert.deepEqual(request.input, input);
           processed++;
           await writeFile(

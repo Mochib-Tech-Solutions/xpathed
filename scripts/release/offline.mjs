@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
 import { readFile, readdir, writeFile, rename, rm } from "node:fs/promises";
 import { join } from "node:path";
@@ -52,10 +53,19 @@ export function startOfflineWorker(state, docker) {
   async function processRequest(file) {
     const path = join(directory, file);
     let response,
+      prepared,
       worker,
       ownsWorker = false;
     try {
       const request = JSON.parse(await readFile(path, "utf8"));
+      if (
+        typeof request.expectedPreparedInputHash !== "string" ||
+        !/^[a-f\d]{64}$/.test(request.expectedPreparedInputHash)
+      )
+        throw Object.assign(
+          new Error("Invalid offline request: missing reviewed prepared input hash"),
+          { code: "unreviewed_prepared_input" },
+        );
       if (
         typeof request.baseline !== "boolean" ||
         !request.input ||
@@ -89,13 +99,25 @@ export function startOfflineWorker(state, docker) {
         container.Config?.Labels?.["com.docker.compose.project.working_dir"] !== state.directory
       )
         throw new Error("Offline Resolver artifact mismatch");
-      const prepared = await execute(id, request.input, true, request.workerId);
+      prepared = await execute(id, request.input, true, request.workerId);
       if (prepared.outcome === "error") throw new Error("Resolver rejected offline input");
+      const preparedInputHash = createHash("sha256")
+        .update(JSON.stringify(JSON.parse(prepared.modelInput)))
+        .digest("hex");
+      if (preparedInputHash !== request.expectedPreparedInputHash)
+        throw Object.assign(
+          new Error("Prepared model input does not match the reviewed input hash"),
+          { code: "unreviewed_prepared_input" },
+        );
       const start = performance.now();
       const result = await execute(id, request.input, false, request.workerId);
       response = { prepared, result, elapsedMs: performance.now() - start };
     } catch (error) {
-      response = { error: error.message };
+      response = {
+        ...(prepared === undefined ? {} : { prepared }),
+        error: error.message,
+        ...(error.code === "unreviewed_prepared_input" ? { errorCode: error.code } : {}),
+      };
     } finally {
       if (ownsWorker) activeWorkers.delete(worker);
     }

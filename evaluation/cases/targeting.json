@@ -715,7 +715,7 @@
     "split": "regression",
     "category": "current-view",
     "fixture": "release2-linked-form",
-    "instruction": "Hover over Member code.",
+    "instruction": "Hover over the Member code field.",
     "viewport": {
       "width": 1280,
       "height": 800,
@@ -764,7 +764,7 @@
     "labelProvenance": {
       "kind": "controlled-authored",
       "modelExposure": "Reserved for interrupted live qualification 36994124655; retained as regression without relabeling",
-      "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
+      "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference. Follow-up review 2026-10-03: original instruction \"Hover over Member code.\" was underspecified because the visible label and its associated textbox are separate eligible hover targets. Added \"the\" and \"field\" to identify the intended textbox; expected identity and readiness are unchanged. Original wording and case evidence remain in the browser-label audit inventory and frozen selection-hints study.",
       "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt9-holdout-check"
     },
     "previousSplit": "held-out",

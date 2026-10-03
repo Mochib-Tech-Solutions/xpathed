@@ -1,5 +1,7 @@
 # PhraseNode expectation audit — 3 October 2026
 
+**Prepared-input follow-up:** The initial review below admitted 671 cases against retained imported inputs. [The subsequent runtime-boundary audit](2026-10-03-prepared-input-audit.md) found six more cases whose essential text is removed during preparation. The current collection admits **665 cases** and preserves **419 exclusions**. The original source reconciliation and initial review remain recorded below.
+
 ## Result
 
 The pinned collection reproduces its original source annotations correctly, but those annotations are not all valid singleton expectations for the retained offline input. All **1,084 cases across 192 page families** received a source-and-input semantic disposition. **671 cases across 177 families** have supported target expectations; **413 cases** remain excluded from accuracy evaluation under the current input representation.
