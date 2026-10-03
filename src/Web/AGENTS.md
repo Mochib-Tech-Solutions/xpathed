@@ -4,7 +4,7 @@ Read [resolution](../../docs/resolution.md) before changing action cards or read
 
 Display observations at the precision returned by the API. A passed pointer check describes the checked point, not successful application behavior. Unknown and untested checks stay distinguishable from passed checks.
 
-Backend diagnostic logging is automatic and has no history browser, export control or capture-consent UI; see [ADR-0013](../../docs/adr/0013-store-diagnostics-as-automatic-backend-logs.md). Current-session chat behavior remains independent of durable records.
+Chat drafts and results live in the workspace session; closing a tab or reloading the app discards them. See [ADR-0013](../../docs/adr/0013-keep-workspace-state-in-memory.md).
 
 ## Code Review Rules
 

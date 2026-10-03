@@ -79,7 +79,6 @@ export function classifyChanges(paths) {
     tooling,
     docker,
     solution,
-    persistence: affected.has("ClientApi"),
     browser: browser || affected.has("Browser") || affected.has("Resolver"),
   };
 }

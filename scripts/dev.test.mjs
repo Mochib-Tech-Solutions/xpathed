@@ -24,8 +24,7 @@ async function fixture(t) {
   await mkdir(join(root, "bin"));
   await cp(new URL("./dev.mjs", import.meta.url), join(root, "scripts/dev.mjs"));
   await cp(new URL("../docker/compose.sh", import.meta.url), join(root, "docker/compose.sh"));
-  await writeFile(join(root, ".env"), "POSTGRES_PASSWORD=keep-this\n");
-  await writeFile(join(root, "database"), "keep-data");
+  await writeFile(join(root, ".env"), "OPENROUTER_API_KEY=keep-this\n");
   await writeFile(join(root, "scripts/setup.sh"), "#!/bin/sh\nprintf 'setup\\n' >> events\n", {
     mode: 0o755,
   });
@@ -121,7 +120,7 @@ if (command === 'up') {
   return { root, start, events, waitFor, waitForUps, port, digest, releasePort };
 }
 
-test("dev replaces its previous owner and retains configuration and database data", async (t) => {
+test("dev replaces its previous owner and retains configuration", async (t) => {
   const { root, start, events, waitFor, waitForUps } = await fixture(t);
   const first = start();
   await waitForUps(1);
@@ -132,8 +131,7 @@ test("dev replaces its previous owner and retains configuration and database dat
   second.kill("SIGTERM");
   await waitFor(() => exited(second));
   assert.doesNotMatch(await events(), /--volumes|--remove-orphans|overlap/);
-  assert.equal(await readFile(join(root, ".env"), "utf8"), "POSTGRES_PASSWORD=keep-this\n");
-  assert.equal(await readFile(join(root, "database"), "utf8"), "keep-data");
+  assert.equal(await readFile(join(root, ".env"), "utf8"), "OPENROUTER_API_KEY=keep-this\n");
 });
 
 test("concurrent dev invocations serialize setup and leave one owner", async (t) => {

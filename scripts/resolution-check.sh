@@ -8,7 +8,7 @@ if [ -z "${XPATHED_ENV_FILE:-}" ]; then
   scripts/setup.sh
 fi
 resolution_env=${XPATHED_ENV_FILE:-.env}
-# Use a separate stack and loopback port; preserve its database volume on exit.
+# Use a separate stack and loopback port.
 export COMPOSE_PROJECT_NAME=xpathed-resolution
 export XPATHED_PORT=${XPATHED_TEST_PORT:-8081}
 compose() {
@@ -21,7 +21,7 @@ compose() {
 compose down
 trap 'compose down' EXIT
 if [ "$mode" = --live ]; then
-  # Prove the direct resolver path without running the client or PostgreSQL.
+  # Prove the direct resolver path without running the client.
   compose up --build --wait browser resolver resolution-fixture
   compose exec -T resolution-fixture node ready.mjs http://browser:8080/health http://resolver:8080/health http://resolution-fixture:8090/health
   compose exec -T resolution-fixture node --test live.test.mjs

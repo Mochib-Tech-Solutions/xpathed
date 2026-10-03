@@ -30,7 +30,7 @@
       "id": "client",
       "type": "backend",
       "label": "ClientApi",
-      "sublabel": "Requests + diagnostics",
+      "sublabel": "Test-client requests",
       "pos": [
         320,
         150
@@ -84,21 +84,6 @@
         60
       ],
       "brand": "openrouter"
-    },
-    {
-      "id": "db",
-      "type": "database",
-      "label": "PostgreSQL",
-      "sublabel": "Sanitized diagnostic records",
-      "pos": [
-        320,
-        280
-      ],
-      "size": [
-        160,
-        60
-      ],
-      "brand": "postgresql"
     }
   ],
   "connections": [
@@ -139,13 +124,6 @@
       "from": "resolver",
       "to": "model",
       "label": "Sanitized candidates",
-      "labelDy": 45
-    },
-    {
-      "id": "store",
-      "from": "client",
-      "to": "db",
-      "label": "EF Core",
       "labelDy": 45
     }
   ]

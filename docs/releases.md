@@ -50,7 +50,7 @@ pnpm release:state status
 pnpm release:activate --expected-current APPROVED_CANDIDATE_DIGEST
 ```
 
-Activation verifies approved artifacts and the local Compose project's ownership, preserves the application credentials and database volumes, and records actual container/image identities. Stop this checkout's development runner first. Browser sessions restart. A failed activation remains a failed deployment, even when approval succeeded.
+Activation verifies approved artifacts and the local Compose project's ownership, preserves the application credentials, and records actual container/image identities. Stop this checkout's development runner first. Browser sessions restart. A failed activation remains a failed deployment, even when approval succeeded.
 
 Rollback explicitly selects the retained compatible previous approval and then activates it:
 
@@ -63,7 +63,7 @@ Restoring images cannot restore a hosted provider's historical weights. Keep cur
 
 ## Artifacts and evidence
 
-Release helpers live in `scripts/release/`. A bundle contains tracked source, exact Browser/Resolver images, nonsecret configuration and an integrity manifest. Credentials, local environment files, databases and user browsing state are excluded. Resolver qualification does not attest separately built Web or ClientApi images.
+Release helpers live in `scripts/release/`. A bundle contains tracked source, exact Browser/Resolver images, nonsecret configuration and an integrity manifest. Credentials, local environment files and user browsing state are excluded. Resolver qualification does not attest separately built Web or ClientApi images.
 
 Local packaging and inspection remain available:
 

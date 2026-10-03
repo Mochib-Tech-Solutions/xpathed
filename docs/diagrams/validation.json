@@ -7,14 +7,14 @@
       "name": "system-design",
       "diagram_type": "architecture",
       "specification": {
-        "sha256": "9e3ddff70fe1f0dd1398693138733ad4578afac1c87ef9e6687578f8d88eecf0",
-        "bytes": 2666
+        "sha256": "49d9894ef6fe9fb47d70d6f529743323d9f018fa6b0a857d65420577e66da018",
+        "bytes": 2280
       },
       "artifact": {
-        "sha256": "3270209e6c9bfe33a1449b2de289bf9b1f6dd948ffd63d6dcfc015b7ba6fd3b1",
-        "bytes": 815962
+        "sha256": "0631fd40349de1de3f7b0dde2c9d6d715ecc9d3cf0f182ba2a6bc1549c646f11",
+        "bytes": 807998
       },
-      "svg_sha256": "999495537867a4af009d567cdffac6213f4d27c0fdf15384eb885c9787049e25",
+      "svg_sha256": "978d732249317efaf5dfcc4a8439d028620ae581400aaa4d68b32cbc0aeedd74",
       "validation": {
         "checksPassed": 9,
         "checkCount": 9,
@@ -61,15 +61,16 @@
       "visual_review": "passed",
       "correction_rounds": 0,
       "embedded_svg_review": {
-        "image_width_px": 900,
+        "image_width_px": 800,
         "themes": [
           "light",
           "dark"
         ],
         "status": "passed",
-        "primary_text_px": 12.375,
-        "secondary_text_px": 10.125
-      }
+        "primary_text_px": 11,
+        "secondary_text_px": 9
+      },
+      "date": "2026-10-03"
     },
     {
       "name": "resolution-flow",
