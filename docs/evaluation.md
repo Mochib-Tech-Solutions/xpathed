@@ -87,7 +87,7 @@ A Saved-page selection example is `phrasenode-db978249f30c2c27d84a36a8` in the [
 | Latency                           | Median and p95 from the recorded request interval, separated by execution cohort                | Observed timing under those conditions; failed attempts remain recorded                  |
 | Cost                              | Sum of reported charges, alongside estimates and counts of unreported charges                   | Known spend; an unavailable charge is never zero                                         |
 
-All planned failures remain in their category denominator. Category-specific exclusions are recorded before execution. The three-system comparison's common score is narrower than full Live-browser Resolver: Stagehand does not produce the xpathed readiness/coverage contract. See [case outcomes](research/engineering-comparison.md#case-examples) for examples of a shared pass, a gain and regressions.
+All planned failures remain in their category denominator. Category-specific exclusions are recorded before execution. The three-system comparison's common score is narrower than full Live-browser Resolver: Stagehand does not produce the xpathed readiness/coverage contract. See [historical case outcomes](research/engineering-comparison.md#case-examples) for examples from the earlier three-system comparison. Its recorded case set and source remain distinct from the current collection.
 
 ## Run and replay
 
@@ -133,7 +133,7 @@ Live-browser Resolver timing is the Resolver HTTP duration, including capture, p
 
 ## Private dataset collection
 
-`evaluation/datasets/collection.json` pins the private archive's repository, release asset, local path, digest and inventory. The payload lives under ignored `.artifacts/datasets/`; raw or derived page inputs are not committed to source.
+`evaluation/datasets/collection.json` pins the active private archive, its digest and inventory. This derived archive contains only admitted cases, with unchanged instructions, candidates, expected labels and original splits. The original source archive and complete exclusion audit remain separate provenance. Payloads live under ignored `.artifacts/datasets/`; raw or derived page inputs are not committed to source.
 
 Build a reviewed collection from imported inputs and explicit review files:
 
@@ -149,7 +149,11 @@ Obtain and verify the pinned private asset with:
 pnpm datasets:collection fetch
 ```
 
-The private `evaluation-data/reviewed-72d140c1.json.gz` asset is published. Its original payloads and expected labels remain immutable. The collection manifest also pins `label-review.json`, which accounts for every archived case and binds each decision to its imported-input and expected-label hashes. A validated case also binds the exact prepared model input after Resolver sanitization. Before inference, the host runs `--prepare-only` and checks this prepared-input hash for both candidate and baseline; missing or changed bindings stop further inference while preserving prepared evidence. Only `validated` cases enter accuracy inference. Incorrect, ambiguous, evidence-insufficient and unresolved cases remain visible as explicit pre-run exclusions; they are never counted as model failures or silently relabelled. A missing, incomplete or changed audit blocks loading. The [prepared-input audit](research/2026-10-03-prepared-input-audit.md) records the additional checks at the actual model boundary; reviewing only the imported JSON is insufficient. The [label audit](research/2026-10-03-phrasenode-label-audit.md) records the source reconciliation, semantic decisions and limits. A fresh download was checked against the pinned digest; the workflow performs the same verification before reading the collection. A missing or changed required dataset fails completeness checks; it must not silently reduce the release denominator.
+The collection manifest identifies the active asset and pins `label-review.json`, which accounts for the full original source inventory, including cases excluded from the active archive. Every decision binds the imported-input and expected-label hashes. Admitted cases also bind the exact prepared model input after Resolver sanitization. Repacking copies admitted records unchanged; it does not relabel cases, rerun inference or revise previous results.
+
+Before inference, the host runs `--prepare-only` and checks the prepared-input hash for both candidate and baseline. Missing or changed bindings stop further inference while preserving prepared evidence. Only `validated` cases enter accuracy inference. Incorrect, ambiguous, evidence-insufficient and unresolved source records remain explicit exclusions; they are never counted as model failures or silently discarded from the source inventory. Missing required inputs or an incomplete or changed audit block loading.
+
+The [instruction-contract audit](research/2026-10-03-contract-admission-audit.md) records the final admission decisions. The active archive contains 569 admitted records; the separate pinned audit preserves all 1,084 source decisions and 515 exclusions. A fresh download of the admitted-only archive was verified against its digest and exact validated ID set. The earlier [prepared-input audit](research/2026-10-03-prepared-input-audit.md) and [label audit](research/2026-10-03-phrasenode-label-audit.md) retain their source reconciliation, semantic review and limits.
 
 Use `pnpm datasets:fetch` and `pnpm datasets:import` with the checked-in source manifests to prepare collection inputs. Reviewed Saved-page selection cases run through the release evaluator. Keep imported, excluded, unsupported, ambiguous and unreconstructible records visible with reasons. Dataset terms and submission review remain required even when cost is unrestricted.
 

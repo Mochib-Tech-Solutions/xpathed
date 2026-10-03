@@ -114,9 +114,9 @@ export function parseQualificationOptions(args) {
   return options;
 }
 
-export function selectQualificationCases(cases, options = {}) {
+export function selectQualificationCases(cases, options = {}, sourceExclusions = []) {
   const selected = [],
-    exclusions = [];
+    exclusions = [...sourceExclusions];
   for (const item of cases) {
     const review = item.track === "offline-selection" ? validateLabelReview(item) : undefined;
     const reason =
@@ -133,7 +133,7 @@ export function selectQualificationCases(cases, options = {}) {
     else selected.push(item);
   }
   if (!selected.length) throw new Error("No eligible release cases");
-  return { cases: selected, exclusions };
+  return { cases: selected, exclusions, sourceCases: cases.length + sourceExclusions.length };
 }
 
 export function buildMatrixPlan(cases, selectedProfiles, options) {
@@ -297,9 +297,14 @@ export async function main(args = process.argv.slice(2)) {
       process.env.XPATHED_EVALUATION_SUITE ||
       new URL("./cases/index.json", import.meta.url),
   );
-  suite.cases.push(...readCollection());
+  const collection = readCollection();
+  suite.cases.push(...collection.cases);
   const allCases = validateCases(suite);
-  const { cases, exclusions } = selectQualificationCases(allCases, options);
+  const { cases, exclusions, sourceCases } = selectQualificationCases(
+    allCases,
+    options,
+    collection.exclusions,
+  );
   if (!artifact && cases.some((spec) => spec.track === "offline-selection"))
     throw new Error(
       "Use release:evaluate with a verified image bundle to start the Saved-page selection worker",
@@ -326,6 +331,7 @@ export async function main(args = process.argv.slice(2)) {
     ...(options.monitoring ? { monitoring: true } : {}),
     cases,
     exclusions,
+    sourceCases,
     sourceManifestHash: hash(suite),
     profiles: selectedProfiles,
     ...(comparison ? { comparison } : {}),

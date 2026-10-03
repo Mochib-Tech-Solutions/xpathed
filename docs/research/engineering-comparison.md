@@ -1,5 +1,7 @@
 # Basic resolver, Improved resolver and Stagehand
 
+**Historical comparison — 2 October 2026.** These results retain their original source and case definitions. Later review clarified one instruction and added required reason codes to five cases. They are not a fresh measurement of the current evaluation set.
+
 ## Results
 
 All three systems received the same frozen browser evaluation cases and independent target labels, with one original attempt per case and no retries. This authored evaluation set measures performance on these cases; it does not estimate accuracy on unseen websites.

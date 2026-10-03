@@ -1,5 +1,7 @@
 # Basic and Improved resolver: historical comparison
 
+**Historical comparison — 2 October 2026.** The saved-page scores below use the original collection before later semantic, prepared-input, uniqueness and instruction-contract audits excluded invalid expectations. They are not the clean-dataset baseline. Original scores and evidence remain unchanged; see the [active dataset contract](../evaluation.md#private-dataset-collection).
+
 On the same complete collection, browser passes rose from **111 to 120 out of 140**, with ten gained passes and one lost pass. Saved-page selection was **716 versus 710 out of 1,084** under the same prompt and configuration. Every planned case received one attempt per arm.
 
 ## What changed

@@ -152,7 +152,7 @@ The **evaluation set** has three categories, scored separately:
 | XPath construction and verification | Controlled selections go directly to Browser; independent DOM labels check XPath identity, state and locator mutations | `pnpm evaluate:xpath`         |
 | Live-browser Resolver               | Instruction → real browser capture → real model → verified XPath and final response                                    | `pnpm evaluate:resolver:live` |
 
-`pnpm evaluate` runs all three and writes separate results plus a combined summary. **It makes paid model calls** for Saved-page selection and Live-browser Resolver; XPath evaluation needs no provider key. Commands using live provider inference use `OPENROUTER_EVAL_API_KEY`. Fetch the reviewed inputs with `pnpm datasets:collection fetch` if they are not already available. Imported accuracy cases also require a pinned semantic review of the expected target against the supplied input; ambiguous or unanswerable labels remain documented exclusions. See the [dataset review contract](docs/evaluation.md#private-dataset-collection).
+`pnpm evaluate` runs all three and writes separate results plus a combined summary. **It makes paid model calls** for Saved-page selection and Live-browser Resolver; XPath evaluation needs no provider key. Commands using live provider inference use `OPENROUTER_EVAL_API_KEY`. Fetch the reviewed inputs with `pnpm datasets:collection fetch` if they are not already available. The active archive contains only the 569 admitted saved-page cases; the original 1,084-case source archive and the audit explaining 515 exclusions remain available for traceability. Imported accuracy cases also require a pinned semantic review of the expected target against the supplied input; ambiguous or unanswerable labels remain documented exclusions. See the [dataset review contract](docs/evaluation.md#private-dataset-collection).
 
 Saved-page selection calls a real model using saved page inputs. Live-browser Resolver uses a real Chromium page; its provider mode can be controlled (provider-free) or live (paid inference). XPath evaluation supplies known selections to isolate the stage after inference. Live-browser Resolver checks whether both stages work together. The chat UI is outside this boundary. A **regression** is a lost pass between compared runs. Reusing cases does not establish unseen-site accuracy.
 
@@ -172,7 +172,7 @@ These are actual cases from the shared evaluation set. Expected selectors belong
 
 See [case IDs, fixtures and metric definitions](docs/evaluation.md#example-cases-and-metrics), and [actual outcomes across the three systems](docs/research/engineering-comparison.md#case-examples).
 
-### Basic resolver, Improved resolver and Stagehand
+### Historical comparison: Basic resolver, Improved resolver and Stagehand
 
 All three systems receive the same instruction and reset page state, but prepare their own model input:
 
@@ -182,7 +182,7 @@ All three systems receive the same instruction and reset page state, but prepare
 | Improved resolver | The same architecture, clearer control/context and absence rules, plus stricter current-view revalidation; selected implementation in `main` | The same resolution contract, with the changes evaluated together                 |
 | Stagehand         | Stock `observe`, its own page snapshot, prompt and selector generation; cache and self-healing disabled                                      | Suggested actions and selectors, normalized and checked by the independent grader |
 
-The [resolver comparison](docs/research/engineering-comparison.md) uses **183 shared browser cases**, the same DeepSeek V4.1 Flash/Wafer route, and one original attempt per system. Three isolated workers run concurrently. Earlier resolver code stays in saved images; the application keeps one implementation.
+The [recorded 2 October comparison](docs/research/engineering-comparison.md) used **183 shared browser cases**, the same DeepSeek V4.1 Flash/Wafer route, and one original attempt per system. Three isolated workers ran concurrently. Earlier resolver code stays in saved images; the application keeps one implementation. Later review changed six case definitions, so these recorded figures are not current-set measurements.
 
 | System            | Correct action and targets | Target selection only |
 | ----------------- | -------------------------: | --------------------: |
