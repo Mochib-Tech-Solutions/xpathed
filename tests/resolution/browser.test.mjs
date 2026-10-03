@@ -455,6 +455,78 @@ test("targeting-independent-target-is-captured-and-highlighted-without-execution
   });
 });
 
+test("context-repeated-cards-retain-whole-item-identity-and-child-controls", async () => {
+  await withFixture(
+    `<style>#catalogue{display:grid;grid-template-columns:300px 300px;gap:20px}
+    .card{height:180px;border:1px solid;display:flex;flex-direction:column}
+    #shirt{order:2}#backpack{order:0}#lamp{order:1}</style>
+    <main aria-label="Catalogue"><div id="catalogue">
+      <div class="card" id="shirt"><a href="#">Shirt</a><p>Soft cotton</p><button id="shirt-cart">Add to cart</button><input data-observe-value value="PRIVATE_CARD_VALUE"><span hidden>PRIVATE_HIDDEN_CARD_TEXT</span></div>
+      <div class="card" id="backpack"><a href="#">Backpack</a><p>Travel bag</p><button>Add to cart</button><input value="PRIVATE_OTHER_VALUE"><span hidden>PRIVATE_OTHER_TEXT</span></div>
+      <div class="card" id="lamp"><a href="#">Lamp</a><p>Desk light</p><button disabled>Add to cart</button><input><span hidden>Hidden</span></div>
+    </div></main><script>window.mutateXpathFixture=()=>document.querySelector('#backpack').style.order='3'</script>`,
+    async (session, page) => {
+      const before = await observe();
+      const capture = await request(`/pages/${page.pageId}/capture`, {
+        documentId: page.documentId,
+      });
+      assert.equal(capture.coverage.complete, true);
+      assert.ok(!JSON.stringify(capture).includes("PRIVATE_"));
+      const shirt = capture.candidates.find(
+        (c) => c.tag === "div" && c.text === "Shirt Soft cotton Add to cart",
+      );
+      const backpack = capture.candidates.find(
+        (c) => c.tag === "div" && c.text === "Backpack Travel bag Add to cart",
+      );
+      const lamp = capture.candidates.find(
+        (c) => c.tag === "div" && c.text === "Lamp Desk light Add to cart",
+      );
+      assert.ok(shirt && backpack && lamp, "Plain repeated cards must be selectable");
+      assert.ok(shirt.geometry.y > backpack.geometry.y);
+      assert.equal(lamp.geometry.y, backpack.geometry.y);
+      assert.ok(lamp.geometry.x > backpack.geometry.x);
+      assert.equal(capture.candidates.filter((c) => c.tag === "button").length, 3);
+      assert.equal(capture.candidates.filter((c) => c.tag === "a").length, 3);
+      assert.equal(capture.candidates.filter((c) => c.tag === "input").length, 3);
+      const button = capture.candidates.find((c) => c.tag === "button" && c.parentId === shirt.id);
+      assert.ok(button, "Item membership must survive unnamed layout wrappers");
+      for (const candidate of capture.candidates) {
+        if (candidate.parentId)
+          assert.ok(capture.candidates.some((c) => c.id === candidate.parentId));
+      }
+      for (const [candidate, expected] of [
+        [shirt, "shirt"],
+        [button, "shirt-cart"],
+      ]) {
+        const { target } = await request(`/pages/${page.pageId}/selection`, {
+          documentId: page.documentId,
+          captureId: capture.captureId,
+          candidateId: candidate.id,
+          action: "click",
+        });
+        const observed = await verify(target.xpaths);
+        assert.deepEqual(observed.matches, [[expected]]);
+        assert.equal(observed.scrollY, before.scrollY);
+        assert.equal(observed.activeElement, before.activeElement);
+        assert.deepEqual(observed.values, before.values);
+        assert.equal(target.interactability.status, "ready");
+      }
+      await observe({ mutateXpath: true });
+      await expectError(
+        `/pages/${page.pageId}/selection`,
+        {
+          documentId: page.documentId,
+          captureId: capture.captureId,
+          candidateId: shirt.id,
+          action: "click",
+        },
+        409,
+        "stale_capture",
+      );
+    },
+  );
+});
+
 test("scope-capture-retains-partial-and-blocked-targets-with-safe-layout-evidence", async () => {
   await withFixture(
     `<style>body{margin:0}button{width:100px;height:30px;background:rgb(255,0,0);color:rgb(255,255,255);border:2px solid rgb(0,0,0)}
