@@ -276,6 +276,7 @@ jobs:
           retention-days: 30
 
   check:
+    name: Check
     needs: [changes, dotnet, persistence, solution, web, tooling, docker, browser]
     if: always()
     runs-on: ubuntu-24.04

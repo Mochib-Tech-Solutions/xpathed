@@ -58,7 +58,7 @@ test("release requires the latest ordinary CI decision on the exact tested revis
     repository = "owner/repo";
   const good = {
     id: 1,
-    name: "check",
+    name: "Check",
     app: { slug: "github-actions" },
     status: "completed",
     conclusion: "success",
