@@ -28,6 +28,8 @@ GitHub is the live source of requirements and progress. These files are maintain
 
 ## Architecture and ownership
 
+For XPath text changes, preserve the distinction between sanitized candidate names and XPath string values. Verify saved locators after DOM mutations and keep hidden/editable values out of generated text predicates; see the [preferred XPath policy](docs/resolution.md#preferred-xpath).
+
 Keep Resolver independently usable by API callers and evaluation runners. Browser integration uses `BrowserUrl` and serialized Common contracts; replacement implementations must preserve the documented semantics. Playwright/Chromium is the only verified implementation. Keep browser handles and implementation dependencies inside Browser, and client display concerns outside Resolver.
 
 Before editing a service or tests, read its scoped `AGENTS.md`. Use `$xpathed-resolution-checks` for cross-service resolution verification.

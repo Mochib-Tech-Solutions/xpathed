@@ -1730,5 +1730,1361 @@
     "group": "locators",
     "contractVersion": "4",
     "sourceIds": ["mutation-rerender"]
+  },
+  {
+    "id": "locators-nbsp-text-survives-wrapper",
+    "family": "text-locator",
+    "split": "regression",
+    "category": "locator",
+    "fixture": {
+      "kind": "derived-static-dom",
+      "tree": {
+        "tag": "div",
+        "children": [
+          {
+            "tag": "button",
+            "text": "Learn more"
+          }
+        ]
+      }
+    },
+    "instruction": "Click Learn more.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "setupRevision": "1",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-fixture-source-review",
+      "reviewedAt": "2026-10-03",
+      "notes": "One known button; evaluate the saved XPath after inserting a wrapper around the same node."
+    },
+    "expected": {
+      "outcome": "found",
+      "actions": [
+        {
+          "action": "click",
+          "outcome": "found",
+          "target": {
+            "selector": "button",
+            "frames": []
+          },
+          "step": 1
+        }
+      ]
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "label": "Learn more",
+          "tag": "button"
+        }
+      ]
+    },
+    "mutation": {
+      "kind": "wrapper",
+      "target": {
+        "selector": "button",
+        "frames": []
+      },
+      "afterExpected": {
+        "outcome": "found",
+        "actions": [
+          {
+            "action": "click",
+            "outcome": "found",
+            "target": {
+              "selector": "button",
+              "frames": []
+            },
+            "step": 1
+          }
+        ]
+      }
+    },
+    "contractVersion": "4",
+    "deterministicOnly": true,
+    "sourceSplit": "development",
+    "sourceCatalogs": ["locators.json"],
+    "group": "locators",
+    "sourceIds": []
+  },
+  {
+    "id": "locators-hidden-descendant-text-survives-wrapper",
+    "family": "text-locator",
+    "split": "regression",
+    "category": "locator",
+    "fixture": {
+      "kind": "derived-static-dom",
+      "tree": {
+        "tag": "div",
+        "children": [
+          {
+            "tag": "button",
+            "text": "Learn more",
+            "children": [
+              {
+                "tag": "span",
+                "attributes": {
+                  "hidden": ""
+                },
+                "text": "PRIVATE_HIDDEN_VALUE"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "instruction": "Click Learn more.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "setupRevision": "1",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-fixture-source-review",
+      "reviewedAt": "2026-10-03",
+      "notes": "One known button; evaluate the saved XPath after inserting a wrapper around the same node."
+    },
+    "expected": {
+      "outcome": "found",
+      "actions": [
+        {
+          "action": "click",
+          "outcome": "found",
+          "target": {
+            "selector": "button",
+            "frames": []
+          },
+          "step": 1
+        }
+      ]
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "label": "Learn more",
+          "tag": "button"
+        }
+      ]
+    },
+    "mutation": {
+      "kind": "wrapper",
+      "target": {
+        "selector": "button",
+        "frames": []
+      },
+      "afterExpected": {
+        "outcome": "found",
+        "actions": [
+          {
+            "action": "click",
+            "outcome": "found",
+            "target": {
+              "selector": "button",
+              "frames": []
+            },
+            "step": 1
+          }
+        ]
+      }
+    },
+    "contractVersion": "4",
+    "deterministicOnly": true,
+    "sourceSplit": "development",
+    "sourceCatalogs": ["locators.json"],
+    "group": "locators",
+    "sourceIds": [],
+    "privacySentinels": ["PRIVATE_HIDDEN_VALUE"]
+  },
+  {
+    "id": "locators-xml-whitespace-text-survives-wrapper",
+    "family": "text-locator",
+    "split": "regression",
+    "category": "locator",
+    "fixture": {
+      "kind": "derived-static-dom",
+      "tree": {
+        "tag": "button",
+        "attributes": {},
+        "children": [
+          {
+            "tag": "#text",
+            "text": " \tLearn\n more\r "
+          }
+        ]
+      }
+    },
+    "instruction": "Click Learn more.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "setupRevision": "1",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-fixture-source-review",
+      "reviewedAt": "2026-10-03",
+      "notes": "One known button; evaluate the saved XPath after inserting a wrapper around the same node."
+    },
+    "expected": {
+      "outcome": "found",
+      "actions": [
+        {
+          "action": "click",
+          "outcome": "found",
+          "target": {
+            "selector": "button",
+            "frames": []
+          },
+          "step": 1
+        }
+      ]
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "label": "Learn more",
+          "tag": "button"
+        }
+      ]
+    },
+    "mutation": {
+      "kind": "wrapper",
+      "target": {
+        "selector": "button",
+        "frames": []
+      },
+      "afterExpected": {
+        "outcome": "found",
+        "actions": [
+          {
+            "action": "click",
+            "outcome": "found",
+            "target": {
+              "selector": "button",
+              "frames": []
+            },
+            "step": 1
+          }
+        ]
+      }
+    },
+    "contractVersion": "4",
+    "deterministicOnly": true,
+    "sourceSplit": "development",
+    "sourceCatalogs": ["locators.json"],
+    "group": "locators",
+    "sourceIds": []
+  },
+  {
+    "id": "locators-narrow-nbsp-text-survives-wrapper",
+    "family": "text-locator",
+    "split": "regression",
+    "category": "locator",
+    "fixture": {
+      "kind": "derived-static-dom",
+      "tree": {
+        "tag": "button",
+        "attributes": {},
+        "children": [
+          {
+            "tag": "#text",
+            "text": "Learn more"
+          }
+        ]
+      }
+    },
+    "instruction": "Click Learn more.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "setupRevision": "1",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-fixture-source-review",
+      "reviewedAt": "2026-10-03",
+      "notes": "One known button; evaluate the saved XPath after inserting a wrapper around the same node."
+    },
+    "expected": {
+      "outcome": "found",
+      "actions": [
+        {
+          "action": "click",
+          "outcome": "found",
+          "target": {
+            "selector": "button",
+            "frames": []
+          },
+          "step": 1
+        }
+      ]
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "label": "Learn more",
+          "tag": "button"
+        }
+      ]
+    },
+    "mutation": {
+      "kind": "wrapper",
+      "target": {
+        "selector": "button",
+        "frames": []
+      },
+      "afterExpected": {
+        "outcome": "found",
+        "actions": [
+          {
+            "action": "click",
+            "outcome": "found",
+            "target": {
+              "selector": "button",
+              "frames": []
+            },
+            "step": 1
+          }
+        ]
+      }
+    },
+    "contractVersion": "4",
+    "deterministicOnly": true,
+    "sourceSplit": "development",
+    "sourceCatalogs": ["locators.json"],
+    "group": "locators",
+    "sourceIds": []
+  },
+  {
+    "id": "locators-adjacent-spans-text-survives-wrapper",
+    "family": "text-locator",
+    "split": "regression",
+    "category": "locator",
+    "fixture": {
+      "kind": "derived-static-dom",
+      "tree": {
+        "tag": "button",
+        "attributes": {},
+        "children": [
+          {
+            "tag": "span",
+            "attributes": {},
+            "children": [
+              {
+                "tag": "#text",
+                "text": "Learn"
+              }
+            ]
+          },
+          {
+            "tag": "span",
+            "attributes": {},
+            "children": [
+              {
+                "tag": "#text",
+                "text": "more"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "instruction": "Click Learn more.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "setupRevision": "1",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-fixture-source-review",
+      "reviewedAt": "2026-10-03",
+      "notes": "One known button; evaluate the saved XPath after inserting a wrapper around the same node."
+    },
+    "expected": {
+      "outcome": "found",
+      "actions": [
+        {
+          "action": "click",
+          "outcome": "found",
+          "target": {
+            "selector": "button",
+            "frames": []
+          },
+          "step": 1
+        }
+      ]
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "label": "Learn more",
+          "tag": "button"
+        }
+      ]
+    },
+    "mutation": {
+      "kind": "wrapper",
+      "target": {
+        "selector": "button",
+        "frames": []
+      },
+      "afterExpected": {
+        "outcome": "found",
+        "actions": [
+          {
+            "action": "click",
+            "outcome": "found",
+            "target": {
+              "selector": "button",
+              "frames": []
+            },
+            "step": 1
+          }
+        ]
+      }
+    },
+    "contractVersion": "4",
+    "deterministicOnly": true,
+    "sourceSplit": "development",
+    "sourceCatalogs": ["locators.json"],
+    "group": "locators",
+    "sourceIds": []
+  },
+  {
+    "id": "locators-decomposed-unicode-text-survives-wrapper",
+    "family": "text-locator",
+    "split": "regression",
+    "category": "locator",
+    "fixture": {
+      "kind": "derived-static-dom",
+      "tree": {
+        "tag": "button",
+        "attributes": {},
+        "children": [
+          {
+            "tag": "#text",
+            "text": "Café"
+          }
+        ]
+      }
+    },
+    "instruction": "Click Café.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "setupRevision": "1",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-fixture-source-review",
+      "reviewedAt": "2026-10-03",
+      "notes": "One known button; evaluate the saved XPath after inserting a wrapper around the same node."
+    },
+    "expected": {
+      "outcome": "found",
+      "actions": [
+        {
+          "action": "click",
+          "outcome": "found",
+          "target": {
+            "selector": "button",
+            "frames": []
+          },
+          "step": 1
+        }
+      ]
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "label": "Café",
+          "tag": "button"
+        }
+      ]
+    },
+    "mutation": {
+      "kind": "wrapper",
+      "target": {
+        "selector": "button",
+        "frames": []
+      },
+      "afterExpected": {
+        "outcome": "found",
+        "actions": [
+          {
+            "action": "click",
+            "outcome": "found",
+            "target": {
+              "selector": "button",
+              "frames": []
+            },
+            "step": 1
+          }
+        ]
+      }
+    },
+    "contractVersion": "4",
+    "deterministicOnly": true,
+    "sourceSplit": "development",
+    "sourceCatalogs": ["locators.json"],
+    "group": "locators",
+    "sourceIds": []
+  },
+  {
+    "id": "locators-quoted-nbsp-text-survives-wrapper",
+    "family": "text-locator",
+    "split": "regression",
+    "category": "locator",
+    "fixture": {
+      "kind": "derived-static-dom",
+      "tree": {
+        "tag": "button",
+        "attributes": {},
+        "children": [
+          {
+            "tag": "#text",
+            "text": "He said \"don't\""
+          }
+        ]
+      }
+    },
+    "instruction": "Click He said \"don't\".",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "setupRevision": "1",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-fixture-source-review",
+      "reviewedAt": "2026-10-03",
+      "notes": "One known button; evaluate the saved XPath after inserting a wrapper around the same node."
+    },
+    "expected": {
+      "outcome": "found",
+      "actions": [
+        {
+          "action": "click",
+          "outcome": "found",
+          "target": {
+            "selector": "button",
+            "frames": []
+          },
+          "step": 1
+        }
+      ]
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "label": "He said \"don't\"",
+          "tag": "button"
+        }
+      ]
+    },
+    "mutation": {
+      "kind": "wrapper",
+      "target": {
+        "selector": "button",
+        "frames": []
+      },
+      "afterExpected": {
+        "outcome": "found",
+        "actions": [
+          {
+            "action": "click",
+            "outcome": "found",
+            "target": {
+              "selector": "button",
+              "frames": []
+            },
+            "step": 1
+          }
+        ]
+      }
+    },
+    "contractVersion": "4",
+    "deterministicOnly": true,
+    "sourceSplit": "development",
+    "sourceCatalogs": ["locators.json"],
+    "group": "locators",
+    "sourceIds": []
+  },
+  {
+    "id": "locators-hidden-prefix-text-survives-wrapper",
+    "family": "text-locator",
+    "split": "regression",
+    "category": "locator",
+    "fixture": {
+      "kind": "derived-static-dom",
+      "tree": {
+        "tag": "button",
+        "attributes": {},
+        "children": [
+          {
+            "tag": "span",
+            "attributes": {
+              "hidden": ""
+            },
+            "children": [
+              {
+                "tag": "#text",
+                "text": "PRIVATE_PREFIX"
+              }
+            ]
+          },
+          {
+            "tag": "#text",
+            "text": "Learn more"
+          }
+        ]
+      }
+    },
+    "instruction": "Click Learn more.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "setupRevision": "1",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-fixture-source-review",
+      "reviewedAt": "2026-10-03",
+      "notes": "One known button; evaluate the saved XPath after inserting a wrapper around the same node."
+    },
+    "expected": {
+      "outcome": "found",
+      "actions": [
+        {
+          "action": "click",
+          "outcome": "found",
+          "target": {
+            "selector": "button",
+            "frames": []
+          },
+          "step": 1
+        }
+      ]
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "label": "Learn more",
+          "tag": "button"
+        }
+      ]
+    },
+    "mutation": {
+      "kind": "wrapper",
+      "target": {
+        "selector": "button",
+        "frames": []
+      },
+      "afterExpected": {
+        "outcome": "found",
+        "actions": [
+          {
+            "action": "click",
+            "outcome": "found",
+            "target": {
+              "selector": "button",
+              "frames": []
+            },
+            "step": 1
+          }
+        ]
+      }
+    },
+    "contractVersion": "4",
+    "deterministicOnly": true,
+    "sourceSplit": "development",
+    "sourceCatalogs": ["locators.json"],
+    "group": "locators",
+    "sourceIds": [],
+    "privacySentinels": ["PRIVATE_PREFIX"]
+  },
+  {
+    "id": "locators-aria-hidden-text-survives-wrapper",
+    "family": "text-locator",
+    "split": "regression",
+    "category": "locator",
+    "fixture": {
+      "kind": "derived-static-dom",
+      "tree": {
+        "tag": "button",
+        "attributes": {},
+        "children": [
+          {
+            "tag": "#text",
+            "text": "Learn more"
+          },
+          {
+            "tag": "span",
+            "attributes": {
+              "aria-hidden": "true"
+            },
+            "children": [
+              {
+                "tag": "#text",
+                "text": "PRIVATE_ARIA"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "instruction": "Click Learn more.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "setupRevision": "1",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-fixture-source-review",
+      "reviewedAt": "2026-10-03",
+      "notes": "One known button; evaluate the saved XPath after inserting a wrapper around the same node."
+    },
+    "expected": {
+      "outcome": "found",
+      "actions": [
+        {
+          "action": "click",
+          "outcome": "found",
+          "target": {
+            "selector": "button",
+            "frames": []
+          },
+          "step": 1
+        }
+      ]
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "label": "Learn more",
+          "tag": "button"
+        }
+      ]
+    },
+    "mutation": {
+      "kind": "wrapper",
+      "target": {
+        "selector": "button",
+        "frames": []
+      },
+      "afterExpected": {
+        "outcome": "found",
+        "actions": [
+          {
+            "action": "click",
+            "outcome": "found",
+            "target": {
+              "selector": "button",
+              "frames": []
+            },
+            "step": 1
+          }
+        ]
+      }
+    },
+    "contractVersion": "4",
+    "deterministicOnly": true,
+    "sourceSplit": "development",
+    "sourceCatalogs": ["locators.json"],
+    "group": "locators",
+    "sourceIds": [],
+    "privacySentinels": ["PRIVATE_ARIA"]
+  },
+  {
+    "id": "locators-embedded-editor-text-survives-wrapper",
+    "family": "text-locator",
+    "split": "regression",
+    "category": "locator",
+    "fixture": {
+      "kind": "derived-static-dom",
+      "tree": {
+        "tag": "button",
+        "attributes": {},
+        "children": [
+          {
+            "tag": "#text",
+            "text": "Learn more"
+          },
+          {
+            "tag": "textarea",
+            "attributes": {},
+            "children": [
+              {
+                "tag": "#text",
+                "text": "PRIVATE_EDITOR"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "instruction": "Click Learn more.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "setupRevision": "1",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-fixture-source-review",
+      "reviewedAt": "2026-10-03",
+      "notes": "One known button containing an excluded textarea; the saved XPath must survive a wrapper without exposing the textarea value."
+    },
+    "expected": {
+      "outcome": "found",
+      "actions": [
+        {
+          "action": "click",
+          "outcome": "found",
+          "target": {
+            "selector": "button",
+            "frames": []
+          },
+          "step": 1
+        }
+      ]
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "label": "Learn more",
+          "tag": "button"
+        }
+      ]
+    },
+    "mutation": {
+      "kind": "wrapper",
+      "target": {
+        "selector": "button",
+        "frames": []
+      },
+      "afterExpected": {
+        "outcome": "found",
+        "actions": [
+          {
+            "action": "click",
+            "outcome": "found",
+            "target": {
+              "selector": "button",
+              "frames": []
+            },
+            "step": 1
+          }
+        ]
+      }
+    },
+    "contractVersion": "4",
+    "deterministicOnly": true,
+    "sourceSplit": "development",
+    "sourceCatalogs": ["locators.json"],
+    "group": "locators",
+    "sourceIds": [],
+    "privacySentinels": ["PRIVATE_EDITOR"]
+  },
+  {
+    "id": "locators-nbsp-heading-scopes-repeated-labels",
+    "family": "text-locator",
+    "split": "regression",
+    "category": "locator",
+    "fixture": {
+      "kind": "derived-static-dom",
+      "tree": {
+        "tag": "div",
+        "attributes": {},
+        "children": [
+          {
+            "tag": "section",
+            "attributes": {},
+            "children": [
+              {
+                "tag": "h2",
+                "attributes": {},
+                "children": [
+                  {
+                    "tag": "#text",
+                    "text": "Employee group"
+                  }
+                ]
+              },
+              {
+                "tag": "button",
+                "attributes": {},
+                "children": [
+                  {
+                    "tag": "#text",
+                    "text": "Save"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "tag": "button",
+            "attributes": {},
+            "children": [
+              {
+                "tag": "#text",
+                "text": "Save"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "instruction": "Click Save.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "setupRevision": "1",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-fixture-source-review",
+      "reviewedAt": "2026-10-03",
+      "notes": "Repeated Save buttons in named sections; the saved XPath must retain the section identified by its NBSP heading after wrapper insertion."
+    },
+    "expected": {
+      "outcome": "found",
+      "actions": [
+        {
+          "action": "click",
+          "outcome": "found",
+          "target": {
+            "selector": "section button",
+            "frames": []
+          },
+          "step": 1
+        }
+      ]
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "label": "Save",
+          "tag": "button",
+          "scope": "Employee group"
+        }
+      ]
+    },
+    "mutation": {
+      "kind": "wrapper",
+      "target": {
+        "selector": "section button",
+        "frames": []
+      },
+      "afterExpected": {
+        "outcome": "found",
+        "actions": [
+          {
+            "action": "click",
+            "outcome": "found",
+            "target": {
+              "selector": "section button",
+              "frames": []
+            },
+            "step": 1
+          }
+        ]
+      }
+    },
+    "contractVersion": "4",
+    "deterministicOnly": true,
+    "sourceSplit": "development",
+    "sourceCatalogs": ["locators.json"],
+    "group": "locators",
+    "sourceIds": []
+  },
+  {
+    "id": "locators-decomposed-row-text-scopes-repeated-controls",
+    "family": "text-locator",
+    "split": "regression",
+    "category": "locator",
+    "fixture": {
+      "kind": "derived-static-dom",
+      "tree": {
+        "tag": "table",
+        "attributes": {},
+        "children": [
+          {
+            "tag": "tr",
+            "attributes": {},
+            "children": [
+              {
+                "tag": "td",
+                "attributes": {},
+                "children": [
+                  {
+                    "tag": "#text",
+                    "text": "Café"
+                  }
+                ]
+              },
+              {
+                "tag": "td",
+                "attributes": {},
+                "children": [
+                  {
+                    "tag": "button",
+                    "attributes": {},
+                    "children": [
+                      {
+                        "tag": "#text",
+                        "text": "Approve"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "tag": "tr",
+            "attributes": {},
+            "children": [
+              {
+                "tag": "td",
+                "attributes": {},
+                "children": [
+                  {
+                    "tag": "#text",
+                    "text": "Other"
+                  }
+                ]
+              },
+              {
+                "tag": "td",
+                "attributes": {},
+                "children": [
+                  {
+                    "tag": "button",
+                    "attributes": {},
+                    "children": [
+                      {
+                        "tag": "#text",
+                        "text": "Approve"
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "instruction": "Click Approve.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "setupRevision": "1",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-fixture-source-review",
+      "reviewedAt": "2026-10-03",
+      "notes": "Repeated controls in table rows; the saved XPath must retain the row identified by decomposed Unicode text after wrapper insertion."
+    },
+    "expected": {
+      "outcome": "found",
+      "actions": [
+        {
+          "action": "click",
+          "outcome": "found",
+          "target": {
+            "selector": "tr:first-child button",
+            "frames": []
+          },
+          "step": 1
+        }
+      ]
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "label": "Approve",
+          "tag": "button",
+          "scope": "Café Approve"
+        }
+      ]
+    },
+    "mutation": {
+      "kind": "wrapper",
+      "target": {
+        "selector": "tr:first-child button",
+        "frames": []
+      },
+      "afterExpected": {
+        "outcome": "found",
+        "actions": [
+          {
+            "action": "click",
+            "outcome": "found",
+            "target": {
+              "selector": "tr:first-child button",
+              "frames": []
+            },
+            "step": 1
+          }
+        ]
+      }
+    },
+    "contractVersion": "4",
+    "deterministicOnly": true,
+    "sourceSplit": "development",
+    "sourceCatalogs": ["locators.json"],
+    "group": "locators",
+    "sourceIds": []
+  },
+  {
+    "id": "locators-nbsp-native-label-survives-wrapper",
+    "family": "text-locator",
+    "split": "regression",
+    "category": "locator",
+    "fixture": {
+      "kind": "derived-static-dom",
+      "tree": {
+        "tag": "div",
+        "attributes": {},
+        "children": [
+          {
+            "tag": "label",
+            "attributes": {
+              "for": ":r0:"
+            },
+            "children": [
+              {
+                "tag": "#text",
+                "text": "Country name"
+              }
+            ]
+          },
+          {
+            "tag": "input",
+            "attributes": {
+              "id": ":r0:"
+            },
+            "children": []
+          }
+        ]
+      }
+    },
+    "instruction": "Click Country name.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "setupRevision": "1",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-fixture-source-review",
+      "reviewedAt": "2026-10-03",
+      "notes": "One input identified through its native label containing NBSP; the saved XPath must survive wrapper insertion."
+    },
+    "expected": {
+      "outcome": "found",
+      "actions": [
+        {
+          "action": "click",
+          "outcome": "found",
+          "target": {
+            "selector": "input",
+            "frames": []
+          },
+          "step": 1
+        }
+      ]
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "label": "Country name",
+          "tag": "input"
+        }
+      ]
+    },
+    "mutation": {
+      "kind": "wrapper",
+      "target": {
+        "selector": "input",
+        "frames": []
+      },
+      "afterExpected": {
+        "outcome": "found",
+        "actions": [
+          {
+            "action": "click",
+            "outcome": "found",
+            "target": {
+              "selector": "input",
+              "frames": []
+            },
+            "step": 1
+          }
+        ]
+      }
+    },
+    "contractVersion": "4",
+    "deterministicOnly": true,
+    "sourceSplit": "development",
+    "sourceCatalogs": ["locators.json"],
+    "group": "locators",
+    "sourceIds": []
+  },
+  {
+    "id": "locators-hidden-text-locator-rejects-replacement",
+    "family": "text-locator",
+    "split": "regression",
+    "category": "locator",
+    "fixture": {
+      "kind": "derived-static-dom",
+      "tree": {
+        "tag": "button",
+        "attributes": {},
+        "children": [
+          {
+            "tag": "#text",
+            "text": "Learn more"
+          },
+          {
+            "tag": "span",
+            "attributes": {
+              "hidden": ""
+            },
+            "children": [
+              {
+                "tag": "#text",
+                "text": "PRIVATE_REPLACEMENT"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    "instruction": "Click Learn more.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "setupRevision": "1",
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-fixture-source-review",
+      "reviewedAt": "2026-10-03",
+      "notes": "One button containing hidden text; the saved XPath must reject its replacement when the visible label changes."
+    },
+    "expected": {
+      "outcome": "found",
+      "actions": [
+        {
+          "action": "click",
+          "outcome": "found",
+          "target": {
+            "selector": "button",
+            "frames": []
+          },
+          "step": 1
+        }
+      ]
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "label": "Learn more",
+          "tag": "button"
+        }
+      ]
+    },
+    "mutation": {
+      "kind": "replacement",
+      "target": {
+        "selector": "button",
+        "frames": []
+      },
+      "afterExpected": {
+        "outcome": "not_found",
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "not_found",
+            "target": null
+          }
+        ]
+      }
+    },
+    "contractVersion": "4",
+    "deterministicOnly": true,
+    "sourceSplit": "development",
+    "sourceCatalogs": ["locators.json"],
+    "group": "locators",
+    "sourceIds": [],
+    "privacySentinels": ["PRIVATE_REPLACEMENT"]
   }
 ]
