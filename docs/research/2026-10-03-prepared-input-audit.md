@@ -1,5 +1,7 @@
 # Prepared model input audit — 3 October 2026
 
+**Superseding semantic review:** The [full target-uniqueness recheck](2026-10-03-target-uniqueness-audit.md) now admits **573 cases** with **511 exclusions**. The counts below record the earlier prepared-input audit. Its hash checks remain in force; unchanged bytes alone do not establish unique answerability.
+
 ## Result
 
 The initial label review missed a later boundary: the offline Resolver sanitizes each string after loading the reviewed imported input. That can erase a valid instruction or target name. The collection now admits **665 of 1,084 imported cases**, with **419 explicit exclusions**: 276 lack necessary evidence, 138 are ambiguous and five have contradictory expectations. The admitted cases span 177 historical page families (636 dev, 26 test, three train).
