@@ -1,5 +1,7 @@
 # Evaluation, release gates, and action coverage
 
+Storage references below describe the earlier design. Application persistence was removed on 2026-10-03; see [ADR-0013](../adr/0013-keep-workspace-state-in-memory.md) and the [current runtime](../runtime.md).
+
 Primary sources and read-only repository checks performed on 2026-09-29. The policies below are proposals for specification issue #1, not configured repository protections or agreed acceptance thresholds.
 
 Subsequent decisions put full qualification on release branches, regression evaluation on main, and alert-only drift checks on the approved configuration. Hidden targets, including hidden file inputs, are excluded without exception. Instruction-driven execution is outside scope. Follow specification issue #1 and ADR-0004 where earlier proposals below differ.

@@ -125,7 +125,7 @@ export function releaseNotes({
     `- [Qualification run and retained evidence](${runUrl})`,
     `- Source: \`${sourceSha}\``,
     `- Bundle SHA-256: \`${bundleSha}\``,
-    "- Browser and Resolver images are pinned in `manifest.json`; credentials and database data are excluded.",
+    "- Browser and Resolver images are pinned in `manifest.json`; credentials are excluded.",
     "- Restore instructions: [release runbook](https://github.com/Mochib-Tech-Solutions/xpathed/blob/main/docs/releases.md).",
     "",
   );

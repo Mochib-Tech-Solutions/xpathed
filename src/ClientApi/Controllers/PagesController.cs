@@ -1,13 +1,11 @@
 using Microsoft.AspNetCore.Mvc;
-using Xpathed.ClientApi.Diagnostics;
 using Xpathed.ClientApi.Http;
-using Xpathed.Common.Contracts;
 
 namespace Xpathed.ClientApi.Controllers;
 
 [ApiController]
 [Route("api/pages")]
-public sealed class PagesController(IHttpClientFactory clients, ResolutionRecorder recorder) : ControllerBase
+public sealed class PagesController(IHttpClientFactory clients) : ControllerBase
 {
     [HttpGet("{id}")]
     public Task Get(string id) =>
@@ -34,8 +32,12 @@ public sealed class PagesController(IHttpClientFactory clients, ResolutionRecord
         );
 
     [HttpPost("{id}/resolve")]
-    public Task<ResolutionResult> Resolve(string id, ResolutionRequest request, CancellationToken cancellationToken) =>
-        recorder.ResolveAsync(id, request, cancellationToken);
+    public Task Resolve(string id) =>
+        HttpForwarder.ForwardAsync(
+            HttpContext,
+            clients.CreateClient("resolver"),
+            $"/pages/{Uri.EscapeDataString(id)}/resolve"
+        );
 
     [HttpPost("{id}/highlight")]
     public Task InspectAction(string id) =>

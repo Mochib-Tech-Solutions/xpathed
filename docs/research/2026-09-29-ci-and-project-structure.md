@@ -1,5 +1,7 @@
 # CI and project structure
 
+Storage references below describe the earlier design. Application persistence was removed on 2026-10-03; see [ADR-0013](../adr/0013-keep-workspace-state-in-memory.md) and the [current runtime](../runtime.md).
+
 Reviewed 2026-09-29. These choices fit the current four .NET projects and the React client; they do not require additional architecture layers.
 
 ## CI

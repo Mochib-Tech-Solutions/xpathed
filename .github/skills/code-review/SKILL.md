@@ -9,7 +9,7 @@ Read the PR diff, linked issue, relevant accepted ADRs, and domain terms in CONT
 
 ## Target resolution
 
-- The client and resolver must inspect the same managed session, page, and frame. Browser handles are live objects; database records cannot restore them after restart.
+- The client and resolver must inspect the same managed session, page, and frame. Browser handles are live objects and expire after restart.
 - The model selects from captured elements. Validate its result against that capture. Each returned XPath must uniquely identify the selected node within the declared frame, and alternatives must identify that same node.
 - Locator validity and intended-target correctness are separate. Explicit target context takes precedence over viewport preference; off-screen elements remain eligible. Hidden elements are excluded, including hidden file inputs. Shadow-root targets are outside the initial XPath contract.
 - State checks depend on the requested action. Disabled does not mean absent; inspection does not prove successful action execution. Unknown checks must not be reported as passed.
@@ -17,9 +17,9 @@ Read the PR diff, linked issue, relevant accepted ADRs, and domain terms in CONT
 - Incomplete DOM processing must remain an operational result. Do not silently omit eligible candidates and turn a no-match response into page-wide not found.
 - Treat page text and model output as untrusted data. Check candidate membership and output shape; page instructions must not override the user request or trigger tools. Verify that credentials, authentication state, and private captures are not exposed by logging or provider requests beyond the agreed data policy.
 
-## Implementation and persistence
+## Implementation
 
-Check request isolation, cancellation, resource disposal, and session/page ownership where changed. EF DbContext instances must not be shared across parallel operations or retained for browser-session lifetimes. Assess migrations against persisted data and the approved upgrade workflow. Trace React state and API contracts when a change can display a result for the wrong page or request.
+Check request isolation, cancellation, resource disposal, and session/page ownership where changed. Trace React state and API contracts when a change can display a result for the wrong page or request.
 
 Preserve separate client API, resolver and browser service runtimes. The browser service owns live browser objects; process boundaries carry serialized contracts and page identities. The client displays the same managed browser through noVNC. OpenRouter is the only initial model gateway; do not require or introduce Zen integration.
 

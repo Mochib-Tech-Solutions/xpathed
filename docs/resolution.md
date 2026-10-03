@@ -2,7 +2,7 @@
 
 Contract `"4"` resolves one action per command across one or more distinct targets in the current viewport. It is the default when `contractVersion` is omitted; other versions and explicit null are invalid requests. State and interactability use version `"2"`. [ADR-0024](adr/0024-keep-one-resolution-implementation.md) records the decision to maintain one selected implementation, prompt and schema through Git.
 
-Call the core Resolver API at `POST /pages/{pageId}/resolve`. The included test client forwards `POST /api/pages/{pageId}/resolve` to that endpoint. Resolver needs the browser service and OpenRouter; it runs independently of the client application and database. Browser implementations connect through the [browser integration contract](runtime.md#browser-integration).
+Call the core Resolver API at `POST /pages/{pageId}/resolve`. The included test client forwards `POST /api/pages/{pageId}/resolve` to that endpoint. Resolver needs the browser service and OpenRouter; it runs independently of the client application. Browser implementations connect through the [browser integration contract](runtime.md#browser-integration).
 
 ```json
 {

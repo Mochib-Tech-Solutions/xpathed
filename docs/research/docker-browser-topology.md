@@ -1,5 +1,7 @@
 # Docker topology and an embedded managed browser
 
+Storage references below describe the earlier design. Application persistence was removed on 2026-10-03; see [ADR-0013](../adr/0013-keep-workspace-state-in-memory.md) and the [current runtime](../runtime.md).
+
 Primary sources checked on 2026-09-29. The research below predates the accepted Q39–Q40 decisions: the resolver, client API and browser are standalone services, and the client uses noVNC. See ADR-0005 and specification issue #1. The earlier combined API/resolver recommendation below is superseded; retain the alternatives as research evidence, not implementation instructions.
 
 ## Containers follow runtime responsibilities

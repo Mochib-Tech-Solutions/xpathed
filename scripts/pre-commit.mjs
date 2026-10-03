@@ -86,7 +86,7 @@ export async function checkStaged(cwd = process.cwd()) {
     )
   )
     throw new Error("Source or index changed during checks; review, stage and retry the commit.");
-  console.log("Staged checks passed. PostgreSQL and deterministic browser integration run in CI.");
+  console.log("Staged checks passed. Deterministic browser integration runs in CI.");
 }
 
 if (import.meta.main) {

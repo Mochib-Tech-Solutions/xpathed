@@ -17,10 +17,7 @@ export async function checkRuntime(docker, web, contract, waitMs = 0) {
     try {
       for (const [url, expected] of [
         ["http://web:8080/release-contract.json", { version: 1, resolutionContract: contract }],
-        [
-          "http://web:8080/health",
-          { service: "client-api", database: "connected", resolutionContract: contract },
-        ],
+        ["http://web:8080/health", { service: "client-api", resolutionContract: contract }],
         ...(waitMs
           ? [
               ["http://web:8080/view/health", { service: "browser" }],
@@ -248,7 +245,7 @@ async function main() {
     await writeFile(receiptPath, JSON.stringify(receipt, null, 2) + "\n", { mode: 0o600 });
   }
   console.log(
-    "Exact approved Browser and Resolver images are active. Browser sessions were restarted; application credentials and database volumes were retained.",
+    "Exact approved Browser and Resolver images are active. Browser sessions were restarted; application credentials were retained.",
   );
 }
 if (import.meta.main)

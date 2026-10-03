@@ -7,7 +7,6 @@ test("activation requires the installed client contract and actual HTTP service 
     "http://web:8080/release-contract.json": { version: 1, resolutionContract: "4" },
     "http://web:8080/health": {
       service: "client-api",
-      database: "connected",
       resolutionContract: "4",
     },
     "http://web:8080/view/health": { service: "browser" },

@@ -15,4 +15,4 @@ Read `docs/resolution.md` for the affected contract and `tests/AGENTS.md` for te
 
 `pnpm test:resolution:live` is a separate paid check when the task calls for real provider evidence. Follow the current cheap-route/output-limit guidance in `docs/resolution.md`, preserve reported and estimated costs separately, and retain the measured result. Deterministic fixtures are the default.
 
-The runner owns an isolated Compose project and port; read `scripts/resolution-check.sh` before concurrent or alternate-checkout runs. Preserve the development stack and database volumes. This workflow does not execute the user's requested page actions.
+The runner owns an isolated Compose project and port; read `scripts/resolution-check.sh` before concurrent or alternate-checkout runs. Preserve unrelated development stacks. This workflow does not execute the user's requested page actions.

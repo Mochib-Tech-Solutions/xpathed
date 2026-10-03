@@ -12,7 +12,7 @@ Every release comparison includes all approved browser cases and all reviewed, e
 
 The requested restructuring targets live Resolver evaluation. Existing unit, integration, and UI tests remain in ordinary CI and are prerequisites rather than duplicated release-evaluation jobs. Group live cases by the resolver behavior they verify, sharing case definitions and release orchestration rather than flattening every case into one file.
 
-Live browser cases exercise the complete Resolver request: capture candidates, call the real model, construct and verify the XPath through Browser, and grade the final response against independent expectations. Normal browser verification remains in that path; there is no separate paid XPath algorithm suite. Chat, session, UI, diagnostic-recording, and deterministic XPath edge-case tests remain in ordinary CI.
+Live browser cases exercise the complete Resolver request: capture candidates, call the real model, construct and verify the XPath through Browser, and grade the final response against independent expectations. Normal browser verification remains in that path; there is no separate paid XPath algorithm suite. Chat, session, UI, forwarding and deterministic XPath edge-case tests remain in ordinary CI.
 
 The agreed branch flow is feature pull requests into `main` for normal checks, then a pull request from `main` into a persistent `release` branch for the complete live comparison. Merging that release pull request selects the exact tested candidate as the new approval. Local activation remains explicit; updates to `main` alone do not replace the approved baseline.
 

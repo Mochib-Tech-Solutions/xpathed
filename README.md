@@ -5,7 +5,6 @@
 [![CI](https://github.com/Mochib-Tech-Solutions/xpathed/actions/workflows/check.yml/badge.svg?branch=main&event=push)](https://github.com/Mochib-Tech-Solutions/xpathed/actions/workflows/check.yml)
 ![.NET 10](https://img.shields.io/badge/.NET-10-512BD4?logo=dotnet&logoColor=white&labelColor=161b22)
 ![React 19 and TypeScript 6](https://img.shields.io/badge/React_19-TypeScript_6-3178C6?logo=react&logoColor=61DAFB&labelColor=161b22)
-![PostgreSQL 18](https://img.shields.io/badge/PostgreSQL-18-4169E1?logo=postgresql&logoColor=white&labelColor=161b22)
 
 xpathed is a Resolver API that turns English instructions into verified XPath expressions for the current browser view. The Resolver is the core system. It uses a browser service through HTTP APIs; the included chat workspace is a client for manual testing and demonstrations.
 
@@ -48,7 +47,7 @@ pnpm dev
 
 Open **[localhost:8080](http://localhost:8080)**, enter a website address and submit an instruction. Manual browsing works without a key; live resolution uses your OpenRouter account.
 
-All five services run in Docker. Ctrl+C or `pnpm docker:down` removes development containers while preserving configuration and database data. A separate checkout needs its own `COMPOSE_PROJECT_NAME`, `XPATHED_PORT` and `.env`.
+All four services run in Docker. Ctrl+C or `pnpm docker:down` removes development containers while preserving configuration. A separate checkout needs its own `COMPOSE_PROJECT_NAME`, `XPATHED_PORT` and `.env`.
 
 ## Architecture
 
@@ -56,17 +55,16 @@ The Resolver accepts instructions from a client or evaluation runner, coordinate
 
 [![Service ownership and request paths](docs/diagrams/system-design.svg)](docs/diagrams/system-design.svg)
 
-The diagram includes the bundled test client and its diagnostic storage.
+The diagram includes the bundled test client.
 
 | Service                       | Responsibility                                                                |
 | ----------------------------- | ----------------------------------------------------------------------------- |
 | Resolver — ASP.NET Core       | Core resolution API, model selection and orchestration                        |
 | Browser — Playwright/Chromium | Browser API implementation: pages, capture, XPath verification and highlights |
 | Web — React/TypeScript        | Manual test client: chat, tabs and noVNC viewer                               |
-| ClientApi — ASP.NET Core      | Test-client requests and diagnostic recording                                 |
-| PostgreSQL                    | Test-client diagnostic records and retained evidence                          |
+| ClientApi — ASP.NET Core      | Test-client requests                                 |
 
-Resolver runs independently of Web, ClientApi and PostgreSQL. It addresses Browser through `BrowserUrl`, exchanging serializable records defined in `src/Common`. A replacement browser service must preserve the capture, identity, verification and lifecycle contracts; only the bundled implementation has been verified. The test client's viewer and Resolver address the same managed page.
+Resolver runs independently of Web and ClientApi. It addresses Browser through `BrowserUrl`, exchanging serializable records defined in `src/Common`. A replacement browser service must preserve the capture, identity, verification and lifecycle contracts; only the bundled implementation has been verified. The test client's viewer and Resolver address the same managed page.
 
 The repository follows these boundaries: `src/Resolver` contains the core system, `src/Browser` the browser implementation, `src/Common` the shared contracts, and `src/Web` plus `src/ClientApi` the test client. `evaluation/` evaluates the Resolver directly.
 
@@ -91,10 +89,6 @@ The development default is **`deepseek/deepseek-v4.1-flash` through OpenRouter's
 `main` keeps one selected implementation and one prompt/schema, updated in place through Git. Retired API versions and experiment runners are removed; historical experiments use their recorded revisions. See [ADR-0024](docs/adr/0024-keep-one-resolution-implementation.md).
 
 `ActionSelectionStrategy` owns the shared runtime/offline prompt, schema and selection validation. `OpenRouterGateway` pins the provider, disables reasoning and fallback, and limits output to 4,096 tokens. A configuration hash identifies effective settings. No model is trained here; changes to the pretrained model, prompt or context require evaluation. Runtime defaults and approved release configurations are separate.
-
-## Failure diagnostics
-
-PostgreSQL keeps resolution results and sanitized evidence so failures can be investigated after a tab closes. ClientApi records each attempt; chat stays in the browser workspace. See [diagnostics](docs/diagnostics.md) for investigation tools.
 
 Illustrative saved click result:
 
@@ -156,7 +150,7 @@ Release evaluation compares exact candidate and approved images on the complete 
 
 ## Read more
 
-- [System walkthrough](docs/how-it-works.md): request flow, storage and integration.
+- [System walkthrough](docs/how-it-works.md): request flow and integration.
 - [Engineering decisions](docs/engineering-journey.md): tradeoffs, quality and next steps.
 - [Demo guide](docs/demo.md): present the working system.
 - [Runtime](docs/runtime.md) and [resolution contract](docs/resolution.md): API and configuration reference.
