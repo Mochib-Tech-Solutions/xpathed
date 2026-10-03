@@ -208,7 +208,7 @@ pnpm evaluate:replay RUN_DIRECTORY       # regrade saved evidence
 
 Category commands accept `--case CASE_ID` and `--output DIRECTORY`. `pnpm evaluate -- --output DIRECTORY` stores each category beneath that directory. Live-browser Resolver with a controlled provider uses up to four isolated sessions; `--concurrency 1` selects serial timing. Category runs with live provider inference are serial. CI uses `evaluate:resolver` and stays provider-free. The other apps' unit and integration commands are unchanged.
 
-The fresh `v1.0.0` establishes its baseline after ordinary CI and complete live checks, retiring the old release. Subsequent release PRs run ordinary CI and the complete live comparison against the exact images published for the current `release` commit. Once checks pass and the PR merges, that commit becomes the release and next baseline. Publication retains the tested images and evidence. Nightly monitoring tests that release without changing the running app. See [release operations](docs/releases.md).
+The fresh `v1.0.0` establishes its baseline after ordinary CI and complete live checks, retiring the old release. Subsequent release PRs run ordinary CI and the complete live comparison against the exact images published for the current `release` commit. Evidence verifies Live-browser Resolver and Saved-page selection configurations separately within each arm. Once checks pass and the PR merges, that commit becomes the release and next baseline. Publication retains the tested images and evidence. Nightly monitoring tests that release without changing the running app. See [release operations](docs/releases.md).
 
 ## Read more
 

@@ -214,6 +214,7 @@ export async function evidence(options) {
     "Candidate profile differs",
   );
   const configurations = {};
+  const tracks = new Map(m.cases.map((spec) => [spec.id, spec.track ?? "browser"]));
   for (const trial of run.trials) {
     for (const [arm, profile] of [
       [trial, m.profiles[0]],
@@ -245,7 +246,7 @@ export async function evidence(options) {
           isDeepStrictEqual(request.reasoning, profile.reasoning),
         "Observed configuration differs from tested profile",
       );
-      const key = arm === trial ? profile.id : "release-baseline";
+      const key = `${arm === trial ? profile.id : "release-baseline"}:${tracks.get(trial.caseId)}`;
       ensure(
         !configurations[key] || isDeepStrictEqual(configurations[key], record),
         "Configuration changed within an arm",
