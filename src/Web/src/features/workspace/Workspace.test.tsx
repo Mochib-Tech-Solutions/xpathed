@@ -549,7 +549,6 @@ describe("Workspace resolution", () => {
 
   it.each([
     ["ready", [], "Verified: enabled, in view, unobstructed at the checked point."],
-    ["blocked", ["disabled", "off_screen"], "Interaction blocked."],
     ["unknown", [], "Interaction readiness unknown."],
     ["unsupported", ["custom_control_unverified"], "Interaction assessment unsupported."],
   ])(
@@ -596,13 +595,58 @@ describe("Workspace resolution", () => {
       expect(screen.getByText("Pay now", { selector: "bdi" })).toBeInTheDocument();
       expect(screen.getByText("Resolution time: 125 ms")).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Copy XPath 1" })).toBeInTheDocument();
-      if (status === "blocked")
-        expect(screen.getByText("This element is disabled.")).toBeInTheDocument();
       expect(
         screen.queryByText("Event delivery and action success were not tested."),
       ).not.toBeInTheDocument();
     },
   );
+
+  it.each([
+    ["click", ["disabled", "pointer_events_none", "disabled"], "This element is disabled."],
+    ["fill", ["readonly"], "This field is read-only."],
+    ["select", ["incompatible_control"], "This control does not support the requested action."],
+    [
+      "click",
+      ["obstructed_at_hit_point"],
+      "Another element or clipping blocks the inspected pointer point.",
+    ],
+  ])("shows one red explanation for blocked %s (%s)", async (action, reasons, explanation) => {
+    mockApi(() =>
+      Promise.resolve(
+        Response.json({
+          ...found,
+          action,
+          actions: [
+            {
+              ...found.actions[0],
+              action,
+              target: {
+                ...target,
+                interactability: {
+                  version: "2",
+                  action,
+                  status: "blocked",
+                  reasons,
+                  checks: { enabled: "fail", viewport: "pass", pointerReception: "fail" },
+                },
+              },
+            },
+          ],
+        }),
+      ),
+    );
+    const user = await openWorkspace();
+    await submitInstruction(user);
+    const response = await screen.findByRole("region", { name: "Target 1" });
+    expect(response).toHaveTextContent(`Cannot ${action} “Pay now”. ${explanation}`);
+    expect(response.querySelector("p")).toHaveClass("text-destructive");
+    expect(response.querySelectorAll("p")).toHaveLength(1);
+    expect(within(response).queryByRole("heading")).not.toBeInTheDocument();
+    expect(within(response).queryByRole("button")).not.toBeInTheDocument();
+    expect(response).not.toHaveTextContent(
+      /XPath|Verification|Verified:|Interaction blocked|Disabled/,
+    );
+  });
 
   it.each([
     {
@@ -623,8 +667,8 @@ describe("Workspace resolution", () => {
       action: "click",
       status: "blocked",
       checks: { enabled: "fail", viewport: "pass", pointerReception: "pass" },
-      message: "Verified: in view, unobstructed at the checked point.",
-      limit: "Interaction blocked.",
+      message: "Cannot click “Pay now”. The requested action is blocked.",
+      limit: null,
     },
     {
       action: "select",
@@ -674,7 +718,11 @@ describe("Workspace resolution", () => {
       );
       const user = await openWorkspace();
       await submitInstruction(user);
-      expect(await screen.findByText(message)).toBeVisible();
+      if (status === "blocked") {
+        expect(await screen.findByRole("region", { name: "Target 1" })).toHaveTextContent(message);
+      } else {
+        expect(await screen.findByText(message)).toBeVisible();
+      }
       if (limit) expect(screen.getByText(limit)).toBeVisible();
       expect(
         screen.queryByText(
