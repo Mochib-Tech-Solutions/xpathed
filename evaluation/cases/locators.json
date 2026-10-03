@@ -1,6 +1,6 @@
 [
   {
-    "id": "mutation-wrapper-v4",
+    "id": "locators-wrapper-insertion-preserves-current-view-target",
     "family": "profile",
     "split": "regression",
     "category": "locator",
@@ -126,10 +126,11 @@
     "deterministicOnly": true,
     "sourceSplit": "development",
     "sourceCatalogs": ["cases.json"],
-    "group": "locators"
+    "group": "locators",
+    "sourceIds": ["mutation-wrapper-v4"]
   },
   {
-    "id": "mutation-sibling-v4",
+    "id": "locators-sibling-insertion-preserves-current-view-target",
     "family": "profile",
     "split": "regression",
     "category": "locator",
@@ -255,10 +256,11 @@
     "deterministicOnly": true,
     "sourceSplit": "development",
     "sourceCatalogs": ["cases.json"],
-    "group": "locators"
+    "group": "locators",
+    "sourceIds": ["mutation-sibling-v4"]
   },
   {
-    "id": "mutation-class-v4",
+    "id": "locators-class-change-preserves-current-view-target",
     "family": "profile",
     "split": "regression",
     "category": "locator",
@@ -384,10 +386,11 @@
     "deterministicOnly": true,
     "sourceSplit": "development",
     "sourceCatalogs": ["cases.json"],
-    "group": "locators"
+    "group": "locators",
+    "sourceIds": ["mutation-class-v4"]
   },
   {
-    "id": "mutation-id-v4",
+    "id": "locators-id-change-preserves-current-view-target",
     "family": "profile",
     "split": "regression",
     "category": "locator",
@@ -513,10 +516,11 @@
     "deterministicOnly": true,
     "sourceSplit": "development",
     "sourceCatalogs": ["cases.json"],
-    "group": "locators"
+    "group": "locators",
+    "sourceIds": ["mutation-id-v4"]
   },
   {
-    "id": "mutation-duplicate-v4",
+    "id": "locators-duplicate-insertion-preserves-current-view-target",
     "family": "profile",
     "split": "regression",
     "category": "locator",
@@ -642,10 +646,11 @@
     "deterministicOnly": true,
     "sourceSplit": "development",
     "sourceCatalogs": ["cases.json"],
-    "group": "locators"
+    "group": "locators",
+    "sourceIds": ["mutation-duplicate-v4"]
   },
   {
-    "id": "mutation-rerender-v4",
+    "id": "locators-rerender-preserves-current-view-target",
     "family": "profile",
     "split": "regression",
     "category": "locator",
@@ -771,10 +776,11 @@
     "deterministicOnly": true,
     "sourceSplit": "development",
     "sourceCatalogs": ["cases.json"],
-    "group": "locators"
+    "group": "locators",
+    "sourceIds": ["mutation-rerender-v4"]
   },
   {
-    "id": "mutation-remove-v4",
+    "id": "locators-removed-target-is-absent-after-mutation",
     "family": "profile",
     "split": "regression",
     "category": "locator",
@@ -884,7 +890,7 @@
     "sourceIds": ["mutation-remove-v4", "mutation-remove"]
   },
   {
-    "id": "mutation-replacement-v4",
+    "id": "locators-replacement-target-is-absent-after-mutation",
     "family": "profile",
     "split": "regression",
     "category": "locator",
@@ -994,7 +1000,7 @@
     "sourceIds": ["mutation-replacement-v4", "mutation-replacement"]
   },
   {
-    "id": "mutation-wrapper",
+    "id": "locators-wrapper-insertion-preserves-target-identity",
     "family": "profile",
     "split": "regression",
     "category": "locator",
@@ -1116,7 +1122,7 @@
     "sourceIds": ["mutation-wrapper"]
   },
   {
-    "id": "mutation-sibling",
+    "id": "locators-sibling-insertion-preserves-target-identity",
     "family": "profile",
     "split": "regression",
     "category": "locator",
@@ -1238,7 +1244,7 @@
     "sourceIds": ["mutation-sibling"]
   },
   {
-    "id": "mutation-class",
+    "id": "locators-class-change-preserves-target-identity",
     "family": "profile",
     "split": "regression",
     "category": "locator",
@@ -1360,7 +1366,7 @@
     "sourceIds": ["mutation-class"]
   },
   {
-    "id": "mutation-id",
+    "id": "locators-id-change-preserves-target-identity",
     "family": "profile",
     "split": "regression",
     "category": "locator",
@@ -1482,7 +1488,7 @@
     "sourceIds": ["mutation-id"]
   },
   {
-    "id": "mutation-duplicate",
+    "id": "locators-duplicate-insertion-preserves-target-identity",
     "family": "profile",
     "split": "regression",
     "category": "locator",
@@ -1604,7 +1610,7 @@
     "sourceIds": ["mutation-duplicate"]
   },
   {
-    "id": "mutation-rerender",
+    "id": "locators-rerender-preserves-target-identity",
     "family": "profile",
     "split": "regression",
     "category": "locator",

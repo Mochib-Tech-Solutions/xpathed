@@ -18,8 +18,8 @@ test("comparison uses the shared current cases and explicit plural labels", () =
   const cases = selectCases();
   assert.equal(new Set(cases.map((c) => c.id)).size, cases.length);
   assert.ok(cases.every((c) => c.contractVersion === "4" && !c.mutation && !c.provider.fault));
-  assert.equal(selectCases("basic-save")[0].cardinality, "singleton");
-  assert.equal(selectCases("plural-visible-scope-v4")[0].cardinality, "all");
+  assert.equal(selectCases("targeting-save-button-by-name")[0].cardinality, "singleton");
+  assert.equal(selectCases("scope-all-approval-buttons-in-current-view")[0].cardinality, "all");
   assert.throws(() => selectCases("missing"));
 });
 
@@ -122,7 +122,7 @@ test("replay recomputes resolver contract grades and rejects invalid saved provi
   const directory = await mkdtemp(join(tmpdir(), "engineering-replay-"));
   t.after(() => rm(directory, { recursive: true, force: true }));
   await mkdir(join(directory, "trials"));
-  const spec = selectCases("basic-save")[0];
+  const spec = selectCases("targeting-save-button-by-name")[0];
   const planned = { caseId: spec.id, repetition: 1 };
   const trial = {
     ...planned,

@@ -6,7 +6,7 @@ import { setTimeout as delay } from "node:timers/promises";
 const client = "http://client-api:8080";
 const fixture = "http://resolution-fixture:8090";
 
-test("Client results preserve nested frame chains and expanded actions through the complete pipeline", async () => {
+test("frames-client-response-preserves-nested-frame-chains-and-actions", async () => {
   await json(`${fixture}/scenario`, "POST", {
     name: "batch",
     actions: [
@@ -77,7 +77,7 @@ test("Client results preserve nested frame chains and expanded actions through t
   }
 });
 
-test("A plural current-view prompt preserves found, blocked and missing targets", async () => {
+test("cardinality-client-response-preserves-found-blocked-and-missing-targets", async () => {
   await json(`${fixture}/scenario`, "POST", {
     name: "batch",
     actions: [
@@ -184,7 +184,7 @@ async function observeXpaths(run, xpaths) {
   assert.fail("Independent fixture observation did not arrive");
 }
 
-test("One click command resolves every confirmation in the requested list as separate targets", async () => {
+test("cardinality-one-click-command-resolves-every-confirmation-in-list", async () => {
   await json(`${fixture}/scenario`, "POST", {
     name: "batch",
     actions: [1, 0].map((index) => ({
@@ -230,7 +230,7 @@ test("One click command resolves every confirmation in the requested list as sep
   }
 });
 
-test("An independent plural oracle detects omitted actions despite valid returned XPaths", async () => {
+test("cardinality-independent-oracle-rejects-omitted-targets-despite-valid-xpaths", async () => {
   await json(`${fixture}/scenario`, "POST", {
     name: "batch",
     actions: [
@@ -283,7 +283,7 @@ async function json(url, method = "GET", body) {
   );
   return response.json();
 }
-test("instruction resolves through client, resolver, provider and managed browser to the independent fixture node", async () => {
+test("targeting-complete-pipeline-resolves-independently-labelled-node", async () => {
   await json(`${fixture}/scenario`, "POST", { name: "found" });
   const session = await json(`${client}/api/sessions`, "POST");
   const run = randomUUID();
@@ -331,7 +331,7 @@ test("instruction resolves through client, resolver, provider and managed browse
 });
 
 for (const contractVersion of ["4"])
-  test(`genuine absence preserves its inspected scope through ClientApi (version ${contractVersion})`, async () => {
+  test(`scope-client-response-preserves-current-view-absence`, async () => {
     await json(
       `${fixture}/scenario`,
       "POST",
@@ -376,7 +376,7 @@ for (const contractVersion of ["4"])
     }
   });
 
-test("ClientApi preserves disabled, off-screen and hover assessments and scopes hidden-only absence", async () => {
+test("state-client-response-preserves-readiness-and-scoped-absence", async () => {
   const session = await json(`${client}/api/sessions`, "POST");
   try {
     for (const [path, action, outcome, status] of [
@@ -413,7 +413,7 @@ test("ClientApi preserves disabled, off-screen and hover assessments and scopes 
   }
 });
 
-test("a fabricated model candidate remains an operational error through the client pipeline", async () => {
+test("robustness-fabricated-model-candidate-remains-operational-error", async () => {
   await json(`${fixture}/scenario`, "POST", { name: "unknown" });
   const session = await json(`${client}/api/sessions`, "POST");
   const run = randomUUID();
@@ -434,7 +434,7 @@ test("a fabricated model candidate remains an operational error through the clie
   }
 });
 
-test("private form values and browser secrets never reach the model while Unicode labels survive", async () => {
+test("robustness-model-input-excludes-secrets-and-preserves-unicode-labels", async () => {
   await json(`${fixture}/scenario`, "POST", { name: "found" });
   const session = await json(`${client}/api/sessions`, "POST");
   const run = randomUUID();
@@ -455,7 +455,7 @@ test("private form values and browser secrets never reach the model while Unicod
   }
 });
 
-test("duplicate test attributes and both quote types still yield one unique same-node XPath", async () => {
+test("xpath-duplicate-attributes-and-quotes-retain-unique-same-node-match", async () => {
   await json(`${fixture}/scenario`, "POST", { name: "found" });
   const session = await json(`${client}/api/sessions`, "POST");
   const run = randomUUID();
@@ -491,7 +491,7 @@ test("duplicate test attributes and both quote types still yield one unique same
   }
 });
 
-test("oversized capture returns an operational error before any provider call", async () => {
+test("scope-oversized-capture-fails-before-provider-call", async () => {
   await json(`${fixture}/scenario`, "POST", { name: "found" });
   const session = await json(`${client}/api/sessions`, "POST");
   const run = randomUUID();
@@ -512,7 +512,7 @@ test("oversized capture returns an operational error before any provider call", 
   }
 });
 
-test("fixture oracle commands and observations belong to one test run", async () => {
+test("fixtures-oracle-commands-and-observations-remain-isolated-by-run", async () => {
   const owner = randomUUID();
   const unrelated = randomUUID();
   const command = { xpaths: ["//button"] };
@@ -523,7 +523,7 @@ test("fixture oracle commands and observations belong to one test run", async ()
   assert.equal(await json(`${fixture}/observation?run=${unrelated}`), null);
 });
 
-test("ClientApi tab routes preserve active-page resolution and one stable session viewer", async () => {
+test("tabs-client-routes-preserve-active-page-resolution-and-stable-viewer", async () => {
   const session = await json(`${client}/api/sessions`, "POST");
   const sessionUrl = `${client}/api/sessions/${session.sessionId}`;
   const firstRun = randomUUID();

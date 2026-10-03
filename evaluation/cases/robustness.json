@@ -1,6 +1,6 @@
 [
   {
-    "id": "page-injection-v4",
+    "id": "robustness-page-prompt-injection-is-ignored",
     "family": "injection",
     "split": "regression",
     "category": "trust",
@@ -85,7 +85,7 @@
     ]
   },
   {
-    "id": "large-visible-prefix-v4",
+    "id": "robustness-visible-target-in-large-candidate-prefix",
     "family": "large",
     "split": "regression",
     "category": "size",
@@ -147,7 +147,7 @@
     "group": "robustness"
   },
   {
-    "id": "private-values",
+    "id": "robustness-private-form-values-are-excluded",
     "family": "privacy",
     "split": "regression",
     "category": "trust",
@@ -230,7 +230,7 @@
     "sourceIds": ["private-values", "private-values-contract-1"]
   },
   {
-    "id": "provider-malformed",
+    "id": "robustness-malformed-provider-response-is-error",
     "family": "profile",
     "split": "regression",
     "category": "provider-failure",
@@ -273,7 +273,7 @@
     "sourceIds": ["provider-malformed", "provider-malformed-contract-1"]
   },
   {
-    "id": "provider-unknown",
+    "id": "robustness-unknown-provider-target-is-error",
     "family": "profile",
     "split": "regression",
     "category": "provider-failure",
@@ -316,7 +316,7 @@
     "sourceIds": ["provider-unknown", "provider-unknown-contract-1"]
   },
   {
-    "id": "provider-rate_limit",
+    "id": "robustness-provider-rate-limit-is-error",
     "family": "profile",
     "split": "regression",
     "category": "provider-failure",
@@ -359,7 +359,7 @@
     "sourceIds": ["provider-rate_limit", "provider-rate_limit-contract-1"]
   },
   {
-    "id": "provider-timeout",
+    "id": "robustness-provider-timeout-is-error",
     "family": "profile",
     "split": "regression",
     "category": "provider-failure",
@@ -402,7 +402,7 @@
     "sourceIds": ["provider-timeout", "provider-timeout-contract-1"]
   },
   {
-    "id": "provider-refusal",
+    "id": "robustness-provider-refusal-is-error",
     "family": "profile",
     "split": "regression",
     "category": "provider-failure",
@@ -445,7 +445,7 @@
     "sourceIds": ["provider-refusal"]
   },
   {
-    "id": "provider-empty",
+    "id": "robustness-empty-provider-response-is-error",
     "family": "profile",
     "split": "regression",
     "category": "provider-failure",
@@ -488,7 +488,7 @@
     "sourceIds": ["provider-empty"]
   },
   {
-    "id": "provider-truncated",
+    "id": "robustness-truncated-provider-response-is-error",
     "family": "profile",
     "split": "regression",
     "category": "provider-failure",
@@ -531,7 +531,7 @@
     "sourceIds": ["provider-truncated"]
   },
   {
-    "id": "provider-missing-usage",
+    "id": "robustness-missing-provider-usage-preserves-result",
     "family": "profile",
     "split": "regression",
     "category": "provider-failure",

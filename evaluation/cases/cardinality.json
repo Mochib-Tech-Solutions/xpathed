@@ -1,6 +1,6 @@
 [
   {
-    "id": "single-action-plural-confirmations-v4",
+    "id": "cardinality-all-approval-buttons-include-disabled-target",
     "family": "batch",
     "split": "regression",
     "category": "semantics",
@@ -116,7 +116,7 @@
     "cardinality": "all"
   },
   {
-    "id": "named-found-missing-v4",
+    "id": "cardinality-named-targets-include-found-and-missing",
     "family": "profile",
     "split": "regression",
     "category": "language",
@@ -211,7 +211,7 @@
     "cardinality": "all"
   },
   {
-    "id": "mixed-interactions-v4",
+    "id": "cardinality-mixed-actions-are-unsupported",
     "family": "profile",
     "split": "regression",
     "category": "semantics",
@@ -275,7 +275,7 @@
     "sourceIds": ["mixed-interactions-v4", "mixed-interactions"]
   },
   {
-    "id": "sequential-workflow-v4",
+    "id": "cardinality-sequential-clicks-are-unsupported",
     "family": "profile",
     "split": "regression",
     "category": "semantics",

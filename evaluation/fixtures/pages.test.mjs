@@ -8,7 +8,7 @@ import { createFixtureServer } from "./server.mjs";
 import { renderFixture } from "./pages.mjs";
 import { validateCases } from "../run.mjs";
 
-test("qualification cases preserve family boundaries and render without oracle instructions", () => {
+test("fixtures-reviewed-cases-preserve-family-boundaries-without-oracle-instructions", () => {
   const suite = loadCases(new URL("../cases/index.json", import.meta.url));
   const cases = validateCases(suite);
   const exposed = cases.filter((c) => c.previousSplit === "held-out");
@@ -30,7 +30,7 @@ test("qualification cases preserve family boundaries and render without oracle i
   }
 });
 
-test("derived fixtures escape page text and reject executable tags, attributes and URLs", () => {
+test("fixtures-derived-pages-escape-text-and-reject-executable-content", () => {
   const fixture = {
     kind: "derived-static-dom",
     tree: { tag: "a", attributes: { href: "#" }, text: '<script>alert("secret")</script>' },
@@ -60,7 +60,7 @@ test("derived fixtures escape page text and reject executable tags, attributes a
   );
 });
 
-test("controlled page content excludes the external oracle and case plan", async (t) => {
+test("fixtures-page-content-excludes-oracle-labels-and-case-plan", async (t) => {
   const server = createFixtureServer();
   server.listen(0, "127.0.0.1");
   await once(server, "listening");
@@ -72,7 +72,7 @@ test("controlled page content excludes the external oracle and case plan", async
   const trial = await fetch(`${base}/trial`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ id: "trial-1", caseId: "basic-save" }),
+    body: JSON.stringify({ id: "trial-1", caseId: "targeting-save-button-by-name" }),
   });
   assert.equal(trial.status, 200);
   const page = await fetch(`${base}/fixture?trial=trial-1`);
@@ -81,11 +81,11 @@ test("controlled page content excludes the external oracle and case plan", async
   assert.match(html, /src="\/oracle.js"/);
   assert.doesNotMatch(
     html,
-    /expected-target|data-oracle|basic-save|expected|provider|oracleSentinels/,
+    /expected-target|data-oracle|targeting-save-button-by-name|expected|provider|oracleSentinels/,
   );
 });
 
-test("case families stay in one split and span declared evaluation risks without leaking labels", () => {
+test("fixtures-cases-preserve-splits-and-behavior-coverage-without-label-leakage", () => {
   const manifest = loadCases(new URL("../cases/index.json", import.meta.url));
   assert.equal(manifest.version, "1");
   const families = new Map();
@@ -137,7 +137,7 @@ test("case families stay in one split and span declared evaluation risks without
   );
 });
 
-test("provider plans select captured labels and preserve isolated trial evidence", async (t) => {
+test("provider-controlled-selection-preserves-labels-and-trial-isolation", async (t) => {
   const server = createFixtureServer();
   server.listen(0, "127.0.0.1");
   await once(server, "listening");
@@ -152,7 +152,7 @@ test("provider plans select captured labels and preserve isolated trial evidence
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
-  await post("/trial", { id: "first", caseId: "basic-save" });
+  await post("/trial", { id: "first", caseId: "targeting-save-button-by-name" });
   const input = {
     messages: [
       {
@@ -176,7 +176,7 @@ test("provider plans select captured labels and preserve isolated trial evidence
   });
   assert.equal(await (await fetch(base + "/command?trial=first")).json(), null);
   await post("/observation?trial=first", { id: "observe-1", matches: true });
-  await post("/trial", { id: "second", caseId: "basic-save" });
+  await post("/trial", { id: "second", caseId: "targeting-save-button-by-name" });
   assert.equal(await (await fetch(base + "/provider-request?trial=second")).json(), null);
   assert.deepEqual(await (await fetch(base + "/observation?trial=first")).json(), {
     id: "observe-1",
@@ -184,14 +184,14 @@ test("provider plans select captured labels and preserve isolated trial evidence
   });
 });
 
-test("provider doubles distinguish malformed output, invalid identities and upstream errors", async (t) => {
+test("provider-controlled-failures-preserve-distinct-response-outcomes", async (t) => {
   const baseline = loadCases(new URL("../cases/index.json", import.meta.url));
+  const providerCaseId = (fault) => baseline.cases.find((c) => c.provider?.fault === fault).id;
   const extra = ["refusal", "empty", "truncated", "missing_usage"].map((fault) => ({
-    ...baseline.cases.find((c) => c.id === "basic-save" || c.sourceIds?.includes("basic-save")),
-    id: `provider-${fault}`,
+    ...baseline.cases.find((c) => c.id === "targeting-save-button-by-name"),
+    id: providerCaseId(fault),
     provider: {
-      ...baseline.cases.find((c) => c.id === "basic-save" || c.sourceIds?.includes("basic-save"))
-        .provider,
+      ...baseline.cases.find((c) => c.id === "targeting-save-button-by-name").provider,
       fault,
     },
   }));
@@ -219,7 +219,7 @@ test("provider doubles distinguish malformed output, invalid identities and upst
     ["truncated", 200],
     ["missing_usage", 200],
   ]) {
-    await post("/trial", { id: fault, caseId: `provider-${fault}` });
+    await post("/trial", { id: fault, caseId: providerCaseId(fault) });
     const response = await post("/api/v1/chat/completions", {
       messages: [
         {
@@ -244,7 +244,10 @@ test("provider doubles distinguish malformed output, invalid identities and upst
     if (fault === "missing_usage") assert.equal(result.usage, undefined);
   }
   assert.equal((await fetch(base + "/cases.json?trial=unknown")).status, 404);
-  assert.equal((await post("/trial", { id: "unknown", caseId: "basic-save" })).status, 400);
+  assert.equal(
+    (await post("/trial", { id: "unknown", caseId: "targeting-save-button-by-name" })).status,
+    400,
+  );
   const malformed = await fetch(base + "/trial", {
     method: "POST",
     body: '{"secret":"not-for-errors"',
@@ -253,7 +256,7 @@ test("provider doubles distinguish malformed output, invalid identities and upst
   assert.doesNotMatch(await malformed.text(), /not-for-errors/);
 });
 
-test("the default deterministic CI suite exercises reviewed current-view scope and capability cases", async () => {
+test("selection-default-suite-covers-reviewed-current-view-behaviors", async () => {
   const suite = loadCases(new URL("../cases/index.json", import.meta.url));
   const cases = suite.cases.filter((entry) => entry.contractVersion === "4");
   for (const fixture of ["viewport-clipped", "viewport-plural", "offscreen", "qualification-color"])
@@ -264,7 +267,7 @@ test("the default deterministic CI suite exercises reviewed current-view scope a
   for (const entry of cases) assert.equal(entry.review.status, "reviewed");
 });
 
-test("concurrent provider calls use trace ownership, including fresh mutation calls", async (t) => {
+test("provider-concurrent-calls-preserve-trace-ownership-for-fresh-mutations", async (t) => {
   const cases = loadCases(new URL("../cases/index.json", import.meta.url)).cases;
   const server = createFixtureServer();
   server.listen(0, "127.0.0.1");
@@ -283,11 +286,23 @@ test("concurrent provider calls use trace ownership, including fresh mutation ca
   const traceA = "a".repeat(32),
     traceB = "b".repeat(32);
   assert.equal(
-    (await post("/trial", { id: "first", caseId: "basic-save", traceId: traceA })).status,
+    (
+      await post("/trial", {
+        id: "first",
+        caseId: "targeting-save-button-by-name",
+        traceId: traceA,
+      })
+    ).status,
     200,
   );
   assert.equal(
-    (await post("/trial", { id: "second", caseId: "provider-rate_limit", traceId: traceB })).status,
+    (
+      await post("/trial", {
+        id: "second",
+        caseId: "robustness-provider-rate-limit-is-error",
+        traceId: traceB,
+      })
+    ).status,
     200,
   );
   assert.equal(

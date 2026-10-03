@@ -1,6 +1,6 @@
 [
   {
-    "id": "release-holdout-window-28",
+    "id": "scope-visible-alert-dismiss-button",
     "family": "release-holdout-window",
     "split": "regression",
     "category": "current-view",
@@ -64,10 +64,11 @@
     "exposedAt": "2026-10-02T09:25:27Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "scope"
+    "group": "scope",
+    "sourceIds": ["release-holdout-window-28"]
   },
   {
-    "id": "release-holdout-window-29",
+    "id": "scope-offscreen-alert-archive-is-absent",
     "family": "release-holdout-window",
     "split": "regression",
     "category": "current-view",
@@ -118,10 +119,11 @@
     "exposedAt": "2026-10-02T09:25:27Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "scope"
+    "group": "scope",
+    "sourceIds": ["release-holdout-window-29"]
   },
   {
-    "id": "release-holdout-window-30",
+    "id": "scope-hidden-alert-recovery-is-absent",
     "family": "release-holdout-window",
     "split": "regression",
     "category": "current-view",
@@ -172,10 +174,11 @@
     "exposedAt": "2026-10-02T09:25:27Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "scope"
+    "group": "scope",
+    "sourceIds": ["release-holdout-window-30"]
   },
   {
-    "id": "release2-dialog-1",
+    "id": "scope-dialog-keep-draft-button",
     "family": "release2-dialog",
     "split": "regression",
     "category": "current-view",
@@ -239,10 +242,11 @@
     "exposedAt": "2026-10-02T10:26:06.108Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "scope"
+    "group": "scope",
+    "sourceIds": ["release2-dialog-1"]
   },
   {
-    "id": "release2-dialog-2",
+    "id": "scope-disabled-dialog-discard-is-blocked",
     "family": "release2-dialog",
     "split": "regression",
     "category": "current-view",
@@ -306,10 +310,11 @@
     "exposedAt": "2026-10-02T10:26:06.108Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "scope"
+    "group": "scope",
+    "sourceIds": ["release2-dialog-2"]
   },
   {
-    "id": "release2-dialog-3",
+    "id": "scope-dialog-return-link-for-hover",
     "family": "release2-dialog",
     "split": "regression",
     "category": "current-view",
@@ -373,10 +378,11 @@
     "exposedAt": "2026-10-02T10:26:06.108Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "scope"
+    "group": "scope",
+    "sourceIds": ["release2-dialog-3"]
   },
   {
-    "id": "release4-popover-1",
+    "id": "scope-visible-popover-guide-link",
     "family": "release4-popover",
     "split": "regression",
     "category": "current-view",
@@ -437,10 +443,11 @@
     },
     "sourceSplit": "held-out",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "scope"
+    "group": "scope",
+    "sourceIds": ["release4-popover-1"]
   },
   {
-    "id": "release4-popover-2",
+    "id": "scope-visible-popover-contact-button",
     "family": "release4-popover",
     "split": "regression",
     "category": "current-view",
@@ -501,10 +508,11 @@
     },
     "sourceSplit": "held-out",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "scope"
+    "group": "scope",
+    "sourceIds": ["release4-popover-2"]
   },
   {
-    "id": "release4-popover-3",
+    "id": "scope-missing-popover-warranty-is-absent",
     "family": "release4-popover",
     "split": "regression",
     "category": "current-view",
@@ -552,10 +560,11 @@
     },
     "sourceSplit": "held-out",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "scope"
+    "group": "scope",
+    "sourceIds": ["release4-popover-3"]
   },
   {
-    "id": "release4-horizontal-window-1",
+    "id": "scope-visible-horizontal-episode-link",
     "family": "release4-horizontal-window",
     "split": "regression",
     "category": "current-view",
@@ -616,10 +625,11 @@
     },
     "sourceSplit": "held-out",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "scope"
+    "group": "scope",
+    "sourceIds": ["release4-horizontal-window-1"]
   },
   {
-    "id": "release4-horizontal-window-2",
+    "id": "scope-all-episode-links-in-current-view",
     "family": "release4-horizontal-window",
     "split": "regression",
     "category": "current-view",
@@ -681,10 +691,11 @@
     "sourceSplit": "held-out",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
     "group": "scope",
-    "cardinality": "all"
+    "cardinality": "all",
+    "sourceIds": ["release4-horizontal-window-2"]
   },
   {
-    "id": "release4-horizontal-window-3",
+    "id": "scope-horizontally-offscreen-episode-is-absent",
     "family": "release4-horizontal-window",
     "split": "regression",
     "category": "current-view",
@@ -732,10 +743,11 @@
     },
     "sourceSplit": "held-out",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "scope"
+    "group": "scope",
+    "sourceIds": ["release4-horizontal-window-3"]
   },
   {
-    "id": "release4-inert-preview-1",
+    "id": "scope-control-outside-inert-preview",
     "family": "release4-inert-preview",
     "split": "regression",
     "category": "current-view",
@@ -796,10 +808,11 @@
     },
     "sourceSplit": "held-out",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "scope"
+    "group": "scope",
+    "sourceIds": ["release4-inert-preview-1"]
   },
   {
-    "id": "release4-inert-preview-2",
+    "id": "scope-inert-preview-payment-is-absent",
     "family": "release4-inert-preview",
     "split": "regression",
     "category": "current-view",
@@ -847,10 +860,11 @@
     },
     "sourceSplit": "held-out",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "scope"
+    "group": "scope",
+    "sourceIds": ["release4-inert-preview-2"]
   },
   {
-    "id": "release4-inert-preview-3",
+    "id": "scope-documentation-link-outside-inert-preview",
     "family": "release4-inert-preview",
     "split": "regression",
     "category": "current-view",
@@ -911,10 +925,11 @@
     },
     "sourceSplit": "held-out",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "scope"
+    "group": "scope",
+    "sourceIds": ["release4-inert-preview-3"]
   },
   {
-    "id": "scoped-save-v4",
+    "id": "scope-save-button-in-shipping-section",
     "family": "context",
     "split": "regression",
     "category": "context",
@@ -995,7 +1010,7 @@
     "sourceIds": ["scoped-save-v4", "scoped-save-v3", "scoped-save", "scoped-save-contract-1"]
   },
   {
-    "id": "true-absence-v4",
+    "id": "scope-missing-contact-button-is-absent",
     "family": "profile",
     "split": "regression",
     "category": "absence",
@@ -1056,7 +1071,7 @@
     "sourceIds": ["true-absence-v4", "true-absence-v3", "true-absence", "true-absence-contract-1"]
   },
   {
-    "id": "offscreen-help-v4",
+    "id": "scope-offscreen-target-is-absent",
     "family": "geometry",
     "split": "regression",
     "category": "absence",
@@ -1128,7 +1143,7 @@
     "group": "scope"
   },
   {
-    "id": "plural-visible-scope-v4",
+    "id": "scope-all-approval-buttons-in-current-view",
     "family": "plural-visible-scope",
     "category": "semantics",
     "fixture": "viewport-plural",
@@ -1192,7 +1207,7 @@
     "cardinality": "all"
   },
   {
-    "id": "covered-payment",
+    "id": "scope-covered-payment-button-is-blocked",
     "family": "covered",
     "split": "regression",
     "category": "geometry",
@@ -1260,7 +1275,7 @@
     "sourceIds": ["covered-payment", "covered-payment-contract-1"]
   },
   {
-    "id": "transparent-control",
+    "id": "scope-transparent-control-is-not-visually-rendered",
     "family": "transparent",
     "split": "regression",
     "category": "geometry",
@@ -1332,7 +1347,7 @@
     "sourceIds": ["transparent-control", "transparent-control-contract-1"]
   },
   {
-    "id": "zero-area-control",
+    "id": "scope-zero-area-control-is-absent",
     "family": "zero",
     "split": "regression",
     "category": "geometry",
@@ -1376,7 +1391,7 @@
     "sourceIds": ["zero-area-control", "zero-area-control-contract-1"]
   },
   {
-    "id": "hidden-absence",
+    "id": "scope-hidden-archive-control-is-absent",
     "family": "hidden",
     "split": "regression",
     "category": "absence",
@@ -1432,7 +1447,7 @@
     "sourceIds": ["hidden-absence", "hidden-absence-contract-1"]
   },
   {
-    "id": "large-page",
+    "id": "scope-offscreen-item-on-large-page-is-absent",
     "family": "large",
     "split": "regression",
     "category": "size",
@@ -1476,7 +1491,7 @@
     "sourceIds": ["large-page", "large-page-contract-1"]
   },
   {
-    "id": "capture-budget",
+    "id": "scope-capture-budget-exhaustion-is-error",
     "family": "oversized",
     "split": "regression",
     "category": "size",
@@ -1509,7 +1524,7 @@
     "sourceIds": ["capture-budget", "capture-budget-contract-1"]
   },
   {
-    "id": "library-missing",
+    "id": "scope-missing-library-renewal-is-absent",
     "family": "library-catalog",
     "split": "regression",
     "category": "absence",
