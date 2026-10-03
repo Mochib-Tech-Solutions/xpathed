@@ -1,28 +1,26 @@
 import assert from "node:assert/strict";
 import { readFileSync, writeFileSync } from "node:fs";
 
-const source = readFileSync(new URL("banner-painting.jpg", import.meta.url));
+const source = readFileSync(new URL("banner-painting.png", import.meta.url));
 const destination = new URL("banner.svg", import.meta.url);
-const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="2161" height="728" viewBox="0 0 2161 728" role="img" aria-labelledby="title description">
+const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1983" height="793" viewBox="0 0 1983 793" role="img" aria-labelledby="title description">
   <title id="title">xpathed</title>
-  <desc id="description">An old oil painting of a branching library, with a golden thread leading through its arches. A grainy ink bloom reveals the scene once.</desc>
-  <style>@media (prefers-reduced-motion: reduce) { .painting { mask: none; } }</style>
+  <desc id="description">An antique celestial map with torn edges. One golden path climbs a vast branching web tree to a single illuminated window. An ink bloom reveals the scene once.</desc>
+  <style>@media (prefers-reduced-motion: reduce) { .artwork { mask: none; } }</style>
   <defs>
-    <filter id="ink" filterUnits="userSpaceOnUse" x="-250" y="-250" width="2661" height="1228">
-      <feTurbulence type="fractalNoise" baseFrequency="0.012" numOctaves="3" seed="12" result="grain"/>
-      <feDisplacementMap in="SourceGraphic" in2="grain" scale="150" xChannelSelector="R" yChannelSelector="G"/>
-      <feGaussianBlur stdDeviation="0.65"/>
+    <filter id="ink" x="-20%" y="-20%" width="140%" height="140%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.012" numOctaves="3" seed="7" result="grain"/>
+      <feDisplacementMap in="SourceGraphic" in2="grain" scale="155" xChannelSelector="R" yChannelSelector="G"/>
     </filter>
-    <mask id="reveal" maskUnits="userSpaceOnUse" x="0" y="0" width="2161" height="728">
-      <circle cx="980" cy="365" r="1800" fill="white" filter="url(#ink)">
-        <animate attributeName="r" values="0;1800" dur="4.8s" begin="0s" fill="freeze" calcMode="spline" keyTimes="0;1" keySplines="0.45 0 0.3 1"/>
+    <mask id="reveal" maskUnits="userSpaceOnUse" x="0" y="0" width="1983" height="793">
+      <circle cx="991.5" cy="396.5" r="1500" fill="white" filter="url(#ink)">
+        <animate attributeName="r" values="0;0;1500" dur="11s" begin="0s" fill="freeze" calcMode="spline" keyTimes="0;0.0909;1" keySplines="0 0 1 1;0.22 0.61 0.36 1"/>
       </circle>
     </mask>
   </defs>
-  <rect width="2161" height="728" fill="#0d1117"/>
-  <image class="painting" width="2161" height="728" preserveAspectRatio="xMidYMid meet" mask="url(#reveal)" href="data:image/jpeg;base64,${source.toString("base64")}"/>
-  <g fill="#eee5ce">
-    <text x="118" y="349" font-family="Georgia, 'Times New Roman', serif" font-size="148" letter-spacing="-5">xpathed</text>
+  <g class="artwork" mask="url(#reveal)">
+    <image width="1983" height="793" preserveAspectRatio="xMidYMid meet" href="data:image/png;base64,${source.toString("base64")}"/>
+    <text x="120" y="414" fill="#eee5ce" font-family="Georgia, 'Times New Roman', serif" font-size="142" letter-spacing="-5">xpathed</text>
   </g>
 </svg>
 `;

@@ -1,4 +1,4 @@
-![xpathed — a golden thread finds one illuminated doorway in a branching, painted library](docs/assets/banner.svg)
+![xpathed — one golden path finds an illuminated target in a vast web tree on a torn celestial map](docs/assets/banner.svg)
 
 # Natural-language to XPath resolver
 
