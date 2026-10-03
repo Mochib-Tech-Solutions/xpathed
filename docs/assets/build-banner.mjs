@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync, writeFileSync } from "node:fs";
 
-const source = readFileSync(new URL("banner-painting.png", import.meta.url));
+const source = readFileSync(new URL("banner-painting.webp", import.meta.url));
 const destination = new URL("banner.svg", import.meta.url);
 const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1983" height="793" viewBox="0 0 1983 793" role="img" aria-labelledby="title description">
   <title id="title">xpathed</title>
@@ -19,7 +19,7 @@ const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1983" height="793" v
     </mask>
   </defs>
   <g class="artwork" mask="url(#reveal)">
-    <image width="1983" height="793" preserveAspectRatio="xMidYMid meet" href="data:image/png;base64,${source.toString("base64")}"/>
+    <image width="1983" height="793" preserveAspectRatio="xMidYMid meet" href="data:image/webp;base64,${source.toString("base64")}"/>
     <text x="120" y="414" fill="#eee5ce" font-family="Georgia, 'Times New Roman', serif" font-size="142" letter-spacing="-5">xpathed</text>
   </g>
 </svg>
