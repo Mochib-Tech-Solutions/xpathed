@@ -7,6 +7,54 @@ import { makeCase } from "./offline.mjs";
 
 const hash = (bytes) => createHash("sha256").update(bytes).digest("hex");
 const json = (path) => JSON.parse(readFileSync(path, "utf8"));
+const dispositions = new Set([
+  "validated",
+  "incorrect",
+  "ambiguous",
+  "evidence_insufficient",
+  "unresolved",
+]);
+
+export function validateLabelReview(spec, review = spec.labelReview) {
+  const candidates = spec.input?.candidates;
+  const actions = spec.expected?.actions;
+  if (
+    !review ||
+    review.caseId !== spec.id ||
+    !dispositions.has(review.disposition) ||
+    review.inputHash !== hash(JSON.stringify(spec.input)) ||
+    review.labelHash !== hash(JSON.stringify(spec.expected)) ||
+    typeof review.reason !== "string" ||
+    !review.reason.trim() ||
+    typeof review.reviewer !== "string" ||
+    !review.reviewer.trim() ||
+    !Number.isFinite(Date.parse(review.reviewedAt)) ||
+    spec.instruction !== spec.input?.instruction ||
+    !Array.isArray(candidates) ||
+    candidates.some((item) => !item || typeof item.id !== "string" || !item.id.trim()) ||
+    new Set(candidates.map((item) => item.id)).size !== candidates.length ||
+    !Array.isArray(actions) ||
+    actions.length !== 1 ||
+    actions[0]?.outcome !== "found" ||
+    typeof actions[0].target?.candidateId !== "string" ||
+    !actions[0].target.candidateId.trim() ||
+    !candidates.some((item) => item.id === actions[0].target?.candidateId)
+  )
+    throw new Error(
+      "Dataset label review is missing, invalid or does not bind the input and expected target",
+    );
+  return review;
+}
+
+export function labelExclusions(cases, caseId) {
+  return cases.flatMap((spec) => {
+    const review = validateLabelReview(spec);
+    if (review.disposition !== "validated")
+      return [{ caseId: spec.id, reason: `label ${review.disposition}: ${review.reason}` }];
+    return caseId && caseId !== spec.id ? [{ caseId: spec.id, reason: "case filter" }] : [];
+  });
+}
+
 export function readCollection(
   configPath = new URL("./collection.json", import.meta.url),
   root = process.env.XPATHED_WORKSPACE || process.cwd(),
@@ -31,7 +79,27 @@ export function readCollection(
     )
       throw new Error("Dataset input differs from its submission review");
   }
-  return collection.cases;
+  if (!config.labelReview?.path || !/^[a-f0-9]{64}$/.test(config.labelReview.sha256 ?? ""))
+    throw new Error("Dataset requires a pinned semantic label review");
+  const reviewBytes = readFileSync(resolve(root, config.labelReview.path));
+  if (hash(reviewBytes) !== config.labelReview.sha256)
+    throw new Error("Dataset label review digest mismatch");
+  const audit = JSON.parse(reviewBytes);
+  if (
+    audit.version !== 1 ||
+    audit.archiveSha256 !== config.sha256 ||
+    !Array.isArray(audit.cases) ||
+    audit.cases.length !== collection.cases.length ||
+    new Set(audit.cases.map((item) => item.caseId)).size !== audit.cases.length
+  )
+    throw new Error("Dataset label review inventory mismatch");
+  const reviews = new Map(audit.cases.map((item) => [item.caseId, item]));
+  if (collection.cases.some((spec) => !reviews.has(spec.id)))
+    throw new Error("Dataset label review inventory mismatch");
+  return collection.cases.map((spec) => ({
+    ...spec,
+    labelReview: validateLabelReview(spec, reviews.get(spec.id)),
+  }));
 }
 
 if (import.meta.main) {

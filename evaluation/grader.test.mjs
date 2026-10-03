@@ -68,6 +68,31 @@ test("the response requires one shared action and independently correct target i
   assert.equal(gradeTrial(spec, actual).passed, false);
 });
 
+test("unsupported results must match the independently labelled reason code", () => {
+  for (const code of ["unsupported_action", "current_state_dependency", "unsupported_scope"]) {
+    const action = code === "unsupported_action" ? "unsupported" : "click";
+    const spec = {
+      ...caseSpec,
+      expected: {
+        outcome: "unsupported",
+        actions: [{ step: 1, action, outcome: "unsupported", code }],
+      },
+    };
+    const actual = trial();
+    actual.result.outcome = "unsupported";
+    actual.result.action = action;
+    Object.assign(actual.result.actions[0], { action, outcome: "unsupported", target: null, code });
+    assert.equal(gradeTrial(spec, actual).passed, true);
+    for (const wrong of [undefined, "ambiguous"]) {
+      actual.result.actions[0].code = wrong;
+      const grade = gradeTrial(spec, actual);
+      assert.equal(grade.passed, false);
+      assert.ok(grade.failures.some(({ category }) => category === "outcome"));
+      assert.equal(grade.metrics.unsupportedCorrect, 0);
+    }
+  }
+});
+
 test("offline identity grading rejects wrong targets and fabricated browser evidence", () => {
   const spec = {
     ...caseSpec,

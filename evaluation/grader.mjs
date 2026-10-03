@@ -280,8 +280,11 @@ export function gradeTrial(caseSpec, trial) {
       }
       if (label && action.outcome !== label.outcome)
         fail("outcome", `Action ${index + 1} outcome differs from its label.`);
+      const reasonMatches = !label || !Object.hasOwn(label, "code") || action.code === label.code;
+      if (!reasonMatches)
+        fail("outcome", `Action ${index + 1} reason code differs from its label.`);
       if (label?.outcome === "found" && action.outcome === "not_found") metrics.falseNotFound++;
-      if (label?.outcome === "unsupported" && action.outcome === "unsupported")
+      if (label?.outcome === "unsupported" && action.outcome === "unsupported" && reasonMatches)
         metrics.unsupportedCorrect++;
       if (action.outcome === "found") {
         metrics.targetsReturned++;

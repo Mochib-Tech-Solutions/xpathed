@@ -59,6 +59,47 @@ test("fixtures-derived-pages-escape-text-and-reject-executable-content", () => {
   );
 });
 
+test("fixtures-case-names-and-mutation-identities-preserve-the-reviewed-meaning", () => {
+  const cases = loadCases().cases;
+  const mutations = new Map();
+  for (const spec of cases) {
+    if (spec.id.endsWith("-is-ready"))
+      assert.ok(
+        spec.expected.actions.every((action) => action.interactability?.status === "ready"),
+        spec.id,
+      );
+    if (!spec.mutation) continue;
+    const key = JSON.stringify({
+      fixture: spec.fixture,
+      instruction: spec.instruction,
+      viewport: spec.viewport,
+      setup: spec.setup,
+      kind: spec.mutation.kind,
+      target: spec.mutation.target,
+    });
+    assert.equal(
+      mutations.has(key),
+      false,
+      `Duplicate mutation: ${spec.id} and ${mutations.get(key)}`,
+    );
+    mutations.set(key, spec.id);
+  }
+  for (const kind of [
+    "wrapper-insertion",
+    "sibling-insertion",
+    "class-change",
+    "id-change",
+    "duplicate-insertion",
+    "rerender",
+  ]) {
+    const former = `locators-${kind}-preserves-target-identity`;
+    const matches = cases.filter((spec) => spec.sourceIds?.includes(former));
+    assert.equal(matches.length, 1, former);
+    assert.equal(matches[0].expected.actions[0].state.inViewport, true);
+    assert.equal(matches[0].mutation.afterExpected.actions[0].state.inViewport, true);
+  }
+});
+
 test("fixtures-page-content-excludes-oracle-labels-and-case-plan", async (t) => {
   const server = createFixtureServer();
   server.listen(0, "127.0.0.1");

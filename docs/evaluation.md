@@ -28,7 +28,7 @@ scripts/release/  # Images, evidence, release publication and monitoring
 
 Cases are organized by the behavior they check. Shared XPath/Resolver case IDs and browser/pipeline test titles use `<group>-<behavior>`, such as `targeting-save-button-by-name`, `scope-offscreen-target-is-absent` and `state-readonly-notes-fill-is-blocked`. Names describe the condition and expected result; historical case IDs remain in `sourceIds` for provenance. Saved runs retain their original case identities. The shared loader also serves deterministic CI. Injected-provider failures and saved-locator mutation cases remain engineering checks; selection records why they are excluded from live release inference. Unit, integration and UI tests keep their existing locations and ordinary CI ownership.
 
-Each release comparison freezes the complete eligible browser collection and every reviewed eligible imported case. Both candidate and release baseline receive the same case inputs and current grading rules, with one original attempt per arm. Browser state resets independently. New cases and improved checks are welcome: apply the same updated expectations to both arms. Changing the collection or grader after a run requires another comparison.
+Each release comparison freezes the complete eligible browser collection and every reviewed eligible imported case. Both candidate and release baseline receive the same case inputs and current grading rules, with one original attempt per arm. Browser state resets independently. New cases and improved checks are welcome: apply the same updated expectations to both arms. Changing the collection or grader after a run requires another comparison. Keep original collection counts, every label-review exclusion and the eligible inference denominator together; scores from differently audited collections are not directly comparable.
 
 ### Compare configurations on equal cases
 
@@ -50,7 +50,7 @@ Grading distinguishes capture coverage, intended-target identity, unique same-no
 
 ### Imported cases
 
-PhraseNode and adapted Mind2Web retain original source IDs, splits, family relationships, checksums, labels, transformation history and review evidence. Import support does not imply that every imported record is approved for live submission. Mind2Web contributes only after an eligible adaptation is independently reviewed; the presently prepared release collection contains reviewed PhraseNode inputs.
+PhraseNode and adapted Mind2Web retain original source IDs, splits, family relationships, checksums, labels, transformation history and review evidence. Import support does not imply that every imported record is valid for accuracy measurement. Submission/privacy review and semantic label review are separate. A source annotation must map correctly, the instruction must support its expected target, and the exact supplied input must distinguish that target from competing candidates. Mind2Web contributes only after an eligible adaptation is independently reviewed; the presently prepared release collection contains reviewed PhraseNode inputs.
 
 Offline cases use the Resolver's offline selection path and shared prompt/schema. Live runs make real model calls against these saved inputs and grade the selected target against its independent label. Historical data cannot establish current viewport membership, live XPath identity, pointer interception, readiness or plural completeness. One report includes both tracks with separate denominators and limitations. Original dataset splits describe provenance; they do not make repeatedly used evaluation cases an untouched holdout.
 
@@ -64,28 +64,28 @@ The category checks document-wide XPath uniqueness, intended-node identity, fram
 
 These examples come from the shared case files. The fixture establishes the page state; its independent expected selector is used only by the grader. Live Resolver E2E must discover the target from the instruction. XPath evaluation supplies the selection and tests Browser directly.
 
-| Case and source | Instruction and setup | Required result | Metric exercised |
-| --- | --- | --- | --- |
-| `targeting-save-button-by-name` — [targeting](../evaluation/cases/targeting.json), `form` fixture | “Click Save changes.” | `click` on `#save-profile`, one matching XPath and ready passive checks | Target identity, action correctness, XPath uniqueness |
-| `cardinality-all-approval-buttons-include-disabled-target` — [cardinality](../evaluation/cases/cardinality.json), `batch` fixture | “Click all Approve buttons in Approvals.” | Exactly `#approve-invoice` and `#approve-expense`; the latter remains found with blocked/disabled readiness | Whole-set completeness and per-target readiness |
-| `scope-offscreen-target-is-absent` — [scope](../evaluation/cases/scope.json), `offscreen` fixture | “Click Help.”; Help is below the viewport | `not_found`, with no invented target or scrolling | Current-view absence; Resolver E2E only |
-| `state-readonly-notes-fill-is-blocked` — [state](../evaluation/cases/state.json), `states` fixture | “Fill Notes.” | `fill` on `#notes`, found and readonly, with blocked readiness and failed writable check | Action/state separation |
-| `locators-wrapper-insertion-preserves-current-view-target` — [locators](../evaluation/cases/locators.json), `form` fixture | “Click Save changes in Profile.”; insert a wrapper after resolution | Saved XPath still matches `#save-profile`; fresh construction also identifies it | Locator reuse and reconstruction; deterministic evaluation |
+| Case and source                                                                                                                   | Instruction and setup                                               | Required result                                                                                             | Metric exercised                                           |
+| --------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| `targeting-save-button-by-name` — [targeting](../evaluation/cases/targeting.json), `form` fixture                                 | “Click Save changes.”                                               | `click` on `#save-profile`, one matching XPath and ready passive checks                                     | Target identity, action correctness, XPath uniqueness      |
+| `cardinality-all-approval-buttons-include-disabled-target` — [cardinality](../evaluation/cases/cardinality.json), `batch` fixture | “Click all Approve buttons in Approvals.”                           | Exactly `#approve-invoice` and `#approve-expense`; the latter remains found with blocked/disabled readiness | Whole-set completeness and per-target readiness            |
+| `scope-offscreen-target-is-absent` — [scope](../evaluation/cases/scope.json), `offscreen` fixture                                 | “Click Help.”; Help is below the viewport                           | `not_found`, with no invented target or scrolling                                                           | Current-view absence; Resolver E2E only                    |
+| `state-readonly-notes-fill-is-blocked` — [state](../evaluation/cases/state.json), `states` fixture                                | “Fill Notes.”                                                       | `fill` on `#notes`, found and readonly, with blocked readiness and failed writable check                    | Action/state separation                                    |
+| `locators-wrapper-insertion-preserves-current-view-target` — [locators](../evaluation/cases/locators.json), `form` fixture        | “Click Save changes in Profile.”; insert a wrapper after resolution | Saved XPath still matches `#save-profile`; fresh construction also identifies it                            | Locator reuse and reconstruction; deterministic evaluation |
 
 A real model-selection example is `phrasenode-db978249f30c2c27d84a36a8` in the [reviewed PhraseNode collection](../evaluation/datasets/collection.json): “click on site news”, with independently labelled target `n19`. The model receives the original instruction and saved candidates; the expected ID is retained separately for grading. A pass requires the selected set to contain exactly that labelled target. Selecting the label plus an extra candidate fails. This checks selection only; there is no live page on which to establish XPath or readiness. The complete candidate payload stays in the private reviewed archive. This excerpt describes the expected result, not a new measured run.
 
 ### Reading the measurements
 
-| Measurement | Calculation / boundary | What a pass establishes |
-| --- | --- | --- |
-| Model selection accuracy | Correct exact target sets / all planned eligible saved-input cases | Agreement with the imported independent target label |
-| XPath category pass rate | Cases passing all applicable Browser/oracle checks / selected XPath cases | Locator identity, frame/state checks and applicable mutations with controlled selections |
-| Resolver E2E pass rate | Cases passing all required final-response checks / all selected E2E cases | Correct action, target set or absence, XPath, readiness and response contract together |
-| Common comparison score | Correct action and full target set, with applicable safety checks / all shared comparison cases | Comparable action/target behavior across Basic, Improved and Stagehand |
-| Target-selection comparison score | Correct exact node sets or absence / shared cases with supported target expectations | Selection independently of action naming; operational and safety failures still fail |
-| Gains and regressions | Paired fail→pass and pass→fail on the same case | Which behaviors changed; a net gain can still contain regressions |
-| Latency | Median and p95 from the recorded request interval, separated by execution cohort | Observed timing under those conditions; failed attempts remain recorded |
-| Cost | Sum of reported charges, alongside estimates and counts of unreported charges | Known spend; an unavailable charge is never zero |
+| Measurement                       | Calculation / boundary                                                                          | What a pass establishes                                                                  |
+| --------------------------------- | ----------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| Model selection accuracy          | Correct exact target sets / all planned eligible saved-input cases                              | Agreement with the imported independent target label                                     |
+| XPath category pass rate          | Cases passing all applicable Browser/oracle checks / selected XPath cases                       | Locator identity, frame/state checks and applicable mutations with controlled selections |
+| Resolver E2E pass rate            | Cases passing all required final-response checks / all selected E2E cases                       | Correct action, target set or absence, XPath, readiness and response contract together   |
+| Common comparison score           | Correct action and full target set, with applicable safety checks / all shared comparison cases | Comparable action/target behavior across Basic, Improved and Stagehand                   |
+| Target-selection comparison score | Correct exact node sets or absence / shared cases with supported target expectations            | Selection independently of action naming; operational and safety failures still fail     |
+| Gains and regressions             | Paired fail→pass and pass→fail on the same case                                                 | Which behaviors changed; a net gain can still contain regressions                        |
+| Latency                           | Median and p95 from the recorded request interval, separated by execution cohort                | Observed timing under those conditions; failed attempts remain recorded                  |
+| Cost                              | Sum of reported charges, alongside estimates and counts of unreported charges                   | Known spend; an unavailable charge is never zero                                         |
 
 All planned failures remain in their category denominator. Category-specific exclusions are recorded before execution. The three-system comparison's common score is narrower than full Resolver E2E: Stagehand does not produce the xpathed readiness/coverage contract. See [case outcomes](research/engineering-comparison.md#case-examples) for examples of a shared pass, a gain and regressions.
 
@@ -139,7 +139,7 @@ Build a reviewed collection from imported inputs and explicit review files:
 pnpm datasets:collection pack IMPORT_DIRECTORY .artifacts/datasets/reviewed.json.gz REVIEW_FILE...
 ```
 
-Packing checks source/input identity, eligibility, submission review and duplicate case IDs. Record its emitted digest and inventory in the collection manifest. Publication is a separate authorized operation; packaging a file does not upload it.
+Packing checks source/input identity, eligibility, submission review and duplicate case IDs. Packing alone does not approve accuracy measurement: review the instructions, expected targets and competing candidates, record a disposition for every case, and pin that semantic audit before loading the collection. Record its emitted digest and inventory in the collection manifest. Publication is a separate authorized operation; packaging a file does not upload it.
 
 Obtain and verify the pinned private asset with:
 
@@ -147,7 +147,7 @@ Obtain and verify the pinned private asset with:
 pnpm datasets:collection fetch
 ```
 
-The private `evaluation-data/reviewed-72d140c1.json.gz` asset is published. A fresh download was checked against the pinned digest; the workflow performs the same verification before reading the collection. A missing or changed required dataset fails completeness checks; it must not silently reduce the release denominator.
+The private `evaluation-data/reviewed-72d140c1.json.gz` asset is published. Its original payloads and expected labels remain immutable. The collection manifest also pins `label-review.json`, which accounts for every archived case and binds each decision to both its input hash and expected-label hash. Only `validated` cases enter accuracy inference. Incorrect, ambiguous, evidence-insufficient and unresolved cases remain visible as explicit pre-run exclusions; they are never counted as model failures or silently relabelled. A missing, incomplete or changed audit blocks loading. The [label audit](research/2026-10-03-phrasenode-label-audit.md) records the source reconciliation, semantic decisions and limits. A fresh download was checked against the pinned digest; the workflow performs the same verification before reading the collection. A missing or changed required dataset fails completeness checks; it must not silently reduce the release denominator.
 
 Use `pnpm datasets:fetch` and `pnpm datasets:import` with the checked-in source manifests to prepare collection inputs. Reviewed offline cases run through the release evaluator. Keep imported, excluded, unsupported, ambiguous and unreconstructible records visible with reasons. Dataset terms and submission review remain required even when cost is unrestricted.
 

@@ -15,7 +15,7 @@
       "status": "reviewed",
       "reviewer": "independent-fixture-review",
       "reviewedAt": "2026-09-30T17:17:50Z",
-      "notes": "Current-view regression derived from mutation-wrapper; same independently labelled target and mutation. Original legacy case retained."
+      "notes": "Current-view mutation case; consolidated duplicate historical identity case while retaining its source IDs and the stronger current-view assertion."
     },
     "expected": {
       "outcome": "found",
@@ -125,7 +125,11 @@
     "sourceSplit": "development",
     "sourceCatalogs": ["cases.json"],
     "group": "locators",
-    "sourceIds": ["mutation-wrapper-v4"]
+    "sourceIds": [
+      "mutation-wrapper-v4",
+      "locators-wrapper-insertion-preserves-target-identity",
+      "mutation-wrapper"
+    ]
   },
   {
     "id": "locators-sibling-insertion-preserves-current-view-target",
@@ -143,7 +147,7 @@
       "status": "reviewed",
       "reviewer": "independent-fixture-review",
       "reviewedAt": "2026-09-30T17:17:50Z",
-      "notes": "Current-view regression derived from mutation-sibling; same independently labelled target and mutation. Original legacy case retained."
+      "notes": "Current-view mutation case; consolidated duplicate historical identity case while retaining its source IDs and the stronger current-view assertion."
     },
     "expected": {
       "outcome": "found",
@@ -253,7 +257,11 @@
     "sourceSplit": "development",
     "sourceCatalogs": ["cases.json"],
     "group": "locators",
-    "sourceIds": ["mutation-sibling-v4"]
+    "sourceIds": [
+      "mutation-sibling-v4",
+      "locators-sibling-insertion-preserves-target-identity",
+      "mutation-sibling"
+    ]
   },
   {
     "id": "locators-class-change-preserves-current-view-target",
@@ -271,7 +279,7 @@
       "status": "reviewed",
       "reviewer": "independent-fixture-review",
       "reviewedAt": "2026-09-30T17:17:50Z",
-      "notes": "Current-view regression derived from mutation-class; same independently labelled target and mutation. Original legacy case retained."
+      "notes": "Current-view mutation case; consolidated duplicate historical identity case while retaining its source IDs and the stronger current-view assertion."
     },
     "expected": {
       "outcome": "found",
@@ -381,7 +389,11 @@
     "sourceSplit": "development",
     "sourceCatalogs": ["cases.json"],
     "group": "locators",
-    "sourceIds": ["mutation-class-v4"]
+    "sourceIds": [
+      "mutation-class-v4",
+      "locators-class-change-preserves-target-identity",
+      "mutation-class"
+    ]
   },
   {
     "id": "locators-id-change-preserves-current-view-target",
@@ -399,7 +411,7 @@
       "status": "reviewed",
       "reviewer": "independent-fixture-review",
       "reviewedAt": "2026-09-30T17:17:50Z",
-      "notes": "Current-view regression derived from mutation-id; same independently labelled target and mutation. Original legacy case retained."
+      "notes": "Current-view mutation case; consolidated duplicate historical identity case while retaining its source IDs and the stronger current-view assertion."
     },
     "expected": {
       "outcome": "found",
@@ -509,7 +521,7 @@
     "sourceSplit": "development",
     "sourceCatalogs": ["cases.json"],
     "group": "locators",
-    "sourceIds": ["mutation-id-v4"]
+    "sourceIds": ["mutation-id-v4", "locators-id-change-preserves-target-identity", "mutation-id"]
   },
   {
     "id": "locators-duplicate-insertion-preserves-current-view-target",
@@ -527,7 +539,7 @@
       "status": "reviewed",
       "reviewer": "independent-fixture-review",
       "reviewedAt": "2026-09-30T17:17:50Z",
-      "notes": "Current-view regression derived from mutation-duplicate; same independently labelled target and mutation. Original legacy case retained."
+      "notes": "Current-view mutation case; consolidated duplicate historical identity case while retaining its source IDs and the stronger current-view assertion."
     },
     "expected": {
       "outcome": "found",
@@ -637,7 +649,11 @@
     "sourceSplit": "development",
     "sourceCatalogs": ["cases.json"],
     "group": "locators",
-    "sourceIds": ["mutation-duplicate-v4"]
+    "sourceIds": [
+      "mutation-duplicate-v4",
+      "locators-duplicate-insertion-preserves-target-identity",
+      "mutation-duplicate"
+    ]
   },
   {
     "id": "locators-rerender-preserves-current-view-target",
@@ -655,7 +671,7 @@
       "status": "reviewed",
       "reviewer": "independent-fixture-review",
       "reviewedAt": "2026-09-30T17:17:50Z",
-      "notes": "Current-view regression derived from mutation-rerender; same independently labelled target and mutation. Original legacy case retained."
+      "notes": "Current-view mutation case; consolidated duplicate historical identity case while retaining its source IDs and the stronger current-view assertion."
     },
     "expected": {
       "outcome": "found",
@@ -765,7 +781,11 @@
     "sourceSplit": "development",
     "sourceCatalogs": ["cases.json"],
     "group": "locators",
-    "sourceIds": ["mutation-rerender-v4"]
+    "sourceIds": [
+      "mutation-rerender-v4",
+      "locators-rerender-preserves-target-identity",
+      "mutation-rerender"
+    ]
   },
   {
     "id": "locators-removed-target-is-absent-after-mutation",
@@ -982,726 +1002,6 @@
     "sourceCatalogs": ["cases.json"],
     "group": "locators",
     "sourceIds": ["mutation-replacement-v4", "mutation-replacement"]
-  },
-  {
-    "id": "locators-wrapper-insertion-preserves-target-identity",
-    "family": "profile",
-    "split": "regression",
-    "category": "locator",
-    "fixture": "form",
-    "instruction": "Click Save changes in Profile.",
-    "viewport": {
-      "width": 1280,
-      "height": 800,
-      "tolerance": 1
-    },
-    "review": {
-      "status": "reviewed",
-      "reviewer": "independent-fixture-review",
-      "reviewedAt": "2026-09-30T17:17:50Z"
-    },
-    "expected": {
-      "outcome": "found",
-      "actions": [
-        {
-          "step": 1,
-          "action": "click",
-          "outcome": "found",
-          "target": {
-            "selector": "#save-profile",
-            "frames": []
-          },
-          "interactability": {
-            "status": "ready",
-            "reasons": [],
-            "checks": {
-              "compatibleControl": "pass",
-              "enabled": "pass",
-              "viewport": "pass",
-              "pointerReception": "pass",
-              "keyboard": "not_applicable",
-              "stability": "unknown",
-              "eventOutcome": "unknown"
-            }
-          }
-        }
-      ],
-      "summary": {
-        "processingComplete": true,
-        "semanticCompleteness": "unverified",
-        "total": 1,
-        "found": 1,
-        "notFound": 0,
-        "unsupported": 0,
-        "errors": 0,
-        "blocked": 0,
-        "readinessUnknown": 0,
-        "assessmentUnsupported": 0
-      }
-    },
-    "provider": {
-      "actions": [
-        {
-          "step": 1,
-          "action": "click",
-          "outcome": "found",
-          "label": "Save changes",
-          "scope": "Profile",
-          "tag": "button"
-        }
-      ]
-    },
-    "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
-    "mutation": {
-      "kind": "wrapper",
-      "target": {
-        "selector": "#save-profile",
-        "frames": []
-      },
-      "afterExpected": {
-        "outcome": "found",
-        "actions": [
-          {
-            "step": 1,
-            "action": "click",
-            "outcome": "found",
-            "target": {
-              "selector": "#save-profile",
-              "frames": []
-            },
-            "interactability": {
-              "status": "ready",
-              "reasons": [],
-              "checks": {
-                "compatibleControl": "pass",
-                "enabled": "pass",
-                "viewport": "pass",
-                "pointerReception": "pass",
-                "keyboard": "not_applicable",
-                "stability": "unknown",
-                "eventOutcome": "unknown"
-              }
-            }
-          }
-        ],
-        "summary": {
-          "processingComplete": true,
-          "semanticCompleteness": "unverified",
-          "total": 1,
-          "found": 1,
-          "notFound": 0,
-          "unsupported": 0,
-          "errors": 0,
-          "blocked": 0,
-          "readinessUnknown": 0,
-          "assessmentUnsupported": 0
-        }
-      }
-    },
-    "sourceSplit": "development",
-    "sourceCatalogs": ["cases.json"],
-    "group": "locators",
-    "sourceIds": ["mutation-wrapper"]
-  },
-  {
-    "id": "locators-sibling-insertion-preserves-target-identity",
-    "family": "profile",
-    "split": "regression",
-    "category": "locator",
-    "fixture": "form",
-    "instruction": "Click Save changes in Profile.",
-    "viewport": {
-      "width": 1280,
-      "height": 800,
-      "tolerance": 1
-    },
-    "review": {
-      "status": "reviewed",
-      "reviewer": "independent-fixture-review",
-      "reviewedAt": "2026-09-30T17:17:50Z"
-    },
-    "expected": {
-      "outcome": "found",
-      "actions": [
-        {
-          "step": 1,
-          "action": "click",
-          "outcome": "found",
-          "target": {
-            "selector": "#save-profile",
-            "frames": []
-          },
-          "interactability": {
-            "status": "ready",
-            "reasons": [],
-            "checks": {
-              "compatibleControl": "pass",
-              "enabled": "pass",
-              "viewport": "pass",
-              "pointerReception": "pass",
-              "keyboard": "not_applicable",
-              "stability": "unknown",
-              "eventOutcome": "unknown"
-            }
-          }
-        }
-      ],
-      "summary": {
-        "processingComplete": true,
-        "semanticCompleteness": "unverified",
-        "total": 1,
-        "found": 1,
-        "notFound": 0,
-        "unsupported": 0,
-        "errors": 0,
-        "blocked": 0,
-        "readinessUnknown": 0,
-        "assessmentUnsupported": 0
-      }
-    },
-    "provider": {
-      "actions": [
-        {
-          "step": 1,
-          "action": "click",
-          "outcome": "found",
-          "label": "Save changes",
-          "scope": "Profile",
-          "tag": "button"
-        }
-      ]
-    },
-    "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
-    "mutation": {
-      "kind": "sibling",
-      "target": {
-        "selector": "#save-profile",
-        "frames": []
-      },
-      "afterExpected": {
-        "outcome": "found",
-        "actions": [
-          {
-            "step": 1,
-            "action": "click",
-            "outcome": "found",
-            "target": {
-              "selector": "#save-profile",
-              "frames": []
-            },
-            "interactability": {
-              "status": "ready",
-              "reasons": [],
-              "checks": {
-                "compatibleControl": "pass",
-                "enabled": "pass",
-                "viewport": "pass",
-                "pointerReception": "pass",
-                "keyboard": "not_applicable",
-                "stability": "unknown",
-                "eventOutcome": "unknown"
-              }
-            }
-          }
-        ],
-        "summary": {
-          "processingComplete": true,
-          "semanticCompleteness": "unverified",
-          "total": 1,
-          "found": 1,
-          "notFound": 0,
-          "unsupported": 0,
-          "errors": 0,
-          "blocked": 0,
-          "readinessUnknown": 0,
-          "assessmentUnsupported": 0
-        }
-      }
-    },
-    "sourceSplit": "development",
-    "sourceCatalogs": ["cases.json"],
-    "group": "locators",
-    "sourceIds": ["mutation-sibling"]
-  },
-  {
-    "id": "locators-class-change-preserves-target-identity",
-    "family": "profile",
-    "split": "regression",
-    "category": "locator",
-    "fixture": "form",
-    "instruction": "Click Save changes in Profile.",
-    "viewport": {
-      "width": 1280,
-      "height": 800,
-      "tolerance": 1
-    },
-    "review": {
-      "status": "reviewed",
-      "reviewer": "independent-fixture-review",
-      "reviewedAt": "2026-09-30T17:17:50Z"
-    },
-    "expected": {
-      "outcome": "found",
-      "actions": [
-        {
-          "step": 1,
-          "action": "click",
-          "outcome": "found",
-          "target": {
-            "selector": "#save-profile",
-            "frames": []
-          },
-          "interactability": {
-            "status": "ready",
-            "reasons": [],
-            "checks": {
-              "compatibleControl": "pass",
-              "enabled": "pass",
-              "viewport": "pass",
-              "pointerReception": "pass",
-              "keyboard": "not_applicable",
-              "stability": "unknown",
-              "eventOutcome": "unknown"
-            }
-          }
-        }
-      ],
-      "summary": {
-        "processingComplete": true,
-        "semanticCompleteness": "unverified",
-        "total": 1,
-        "found": 1,
-        "notFound": 0,
-        "unsupported": 0,
-        "errors": 0,
-        "blocked": 0,
-        "readinessUnknown": 0,
-        "assessmentUnsupported": 0
-      }
-    },
-    "provider": {
-      "actions": [
-        {
-          "step": 1,
-          "action": "click",
-          "outcome": "found",
-          "label": "Save changes",
-          "scope": "Profile",
-          "tag": "button"
-        }
-      ]
-    },
-    "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
-    "mutation": {
-      "kind": "class",
-      "target": {
-        "selector": "#save-profile",
-        "frames": []
-      },
-      "afterExpected": {
-        "outcome": "found",
-        "actions": [
-          {
-            "step": 1,
-            "action": "click",
-            "outcome": "found",
-            "target": {
-              "selector": "#save-profile",
-              "frames": []
-            },
-            "interactability": {
-              "status": "ready",
-              "reasons": [],
-              "checks": {
-                "compatibleControl": "pass",
-                "enabled": "pass",
-                "viewport": "pass",
-                "pointerReception": "pass",
-                "keyboard": "not_applicable",
-                "stability": "unknown",
-                "eventOutcome": "unknown"
-              }
-            }
-          }
-        ],
-        "summary": {
-          "processingComplete": true,
-          "semanticCompleteness": "unverified",
-          "total": 1,
-          "found": 1,
-          "notFound": 0,
-          "unsupported": 0,
-          "errors": 0,
-          "blocked": 0,
-          "readinessUnknown": 0,
-          "assessmentUnsupported": 0
-        }
-      }
-    },
-    "sourceSplit": "development",
-    "sourceCatalogs": ["cases.json"],
-    "group": "locators",
-    "sourceIds": ["mutation-class"]
-  },
-  {
-    "id": "locators-id-change-preserves-target-identity",
-    "family": "profile",
-    "split": "regression",
-    "category": "locator",
-    "fixture": "form",
-    "instruction": "Click Save changes in Profile.",
-    "viewport": {
-      "width": 1280,
-      "height": 800,
-      "tolerance": 1
-    },
-    "review": {
-      "status": "reviewed",
-      "reviewer": "independent-fixture-review",
-      "reviewedAt": "2026-09-30T17:17:50Z"
-    },
-    "expected": {
-      "outcome": "found",
-      "actions": [
-        {
-          "step": 1,
-          "action": "click",
-          "outcome": "found",
-          "target": {
-            "selector": "#save-profile",
-            "frames": []
-          },
-          "interactability": {
-            "status": "ready",
-            "reasons": [],
-            "checks": {
-              "compatibleControl": "pass",
-              "enabled": "pass",
-              "viewport": "pass",
-              "pointerReception": "pass",
-              "keyboard": "not_applicable",
-              "stability": "unknown",
-              "eventOutcome": "unknown"
-            }
-          }
-        }
-      ],
-      "summary": {
-        "processingComplete": true,
-        "semanticCompleteness": "unverified",
-        "total": 1,
-        "found": 1,
-        "notFound": 0,
-        "unsupported": 0,
-        "errors": 0,
-        "blocked": 0,
-        "readinessUnknown": 0,
-        "assessmentUnsupported": 0
-      }
-    },
-    "provider": {
-      "actions": [
-        {
-          "step": 1,
-          "action": "click",
-          "outcome": "found",
-          "label": "Save changes",
-          "scope": "Profile",
-          "tag": "button"
-        }
-      ]
-    },
-    "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
-    "mutation": {
-      "kind": "id",
-      "target": {
-        "selector": "#save-profile",
-        "frames": []
-      },
-      "afterExpected": {
-        "outcome": "found",
-        "actions": [
-          {
-            "step": 1,
-            "action": "click",
-            "outcome": "found",
-            "target": {
-              "selector": "#save-profile-updated",
-              "frames": []
-            },
-            "interactability": {
-              "status": "ready",
-              "reasons": [],
-              "checks": {
-                "compatibleControl": "pass",
-                "enabled": "pass",
-                "viewport": "pass",
-                "pointerReception": "pass",
-                "keyboard": "not_applicable",
-                "stability": "unknown",
-                "eventOutcome": "unknown"
-              }
-            }
-          }
-        ],
-        "summary": {
-          "processingComplete": true,
-          "semanticCompleteness": "unverified",
-          "total": 1,
-          "found": 1,
-          "notFound": 0,
-          "unsupported": 0,
-          "errors": 0,
-          "blocked": 0,
-          "readinessUnknown": 0,
-          "assessmentUnsupported": 0
-        }
-      }
-    },
-    "sourceSplit": "development",
-    "sourceCatalogs": ["cases.json"],
-    "group": "locators",
-    "sourceIds": ["mutation-id"]
-  },
-  {
-    "id": "locators-duplicate-insertion-preserves-target-identity",
-    "family": "profile",
-    "split": "regression",
-    "category": "locator",
-    "fixture": "form",
-    "instruction": "Click Save changes in Profile.",
-    "viewport": {
-      "width": 1280,
-      "height": 800,
-      "tolerance": 1
-    },
-    "review": {
-      "status": "reviewed",
-      "reviewer": "independent-fixture-review",
-      "reviewedAt": "2026-09-30T17:17:50Z"
-    },
-    "expected": {
-      "outcome": "found",
-      "actions": [
-        {
-          "step": 1,
-          "action": "click",
-          "outcome": "found",
-          "target": {
-            "selector": "#save-profile",
-            "frames": []
-          },
-          "interactability": {
-            "status": "ready",
-            "reasons": [],
-            "checks": {
-              "compatibleControl": "pass",
-              "enabled": "pass",
-              "viewport": "pass",
-              "pointerReception": "pass",
-              "keyboard": "not_applicable",
-              "stability": "unknown",
-              "eventOutcome": "unknown"
-            }
-          }
-        }
-      ],
-      "summary": {
-        "processingComplete": true,
-        "semanticCompleteness": "unverified",
-        "total": 1,
-        "found": 1,
-        "notFound": 0,
-        "unsupported": 0,
-        "errors": 0,
-        "blocked": 0,
-        "readinessUnknown": 0,
-        "assessmentUnsupported": 0
-      }
-    },
-    "provider": {
-      "actions": [
-        {
-          "step": 1,
-          "action": "click",
-          "outcome": "found",
-          "label": "Save changes",
-          "scope": "Profile",
-          "tag": "button"
-        }
-      ]
-    },
-    "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
-    "mutation": {
-      "kind": "duplicate",
-      "target": {
-        "selector": "#save-profile",
-        "frames": []
-      },
-      "afterExpected": {
-        "outcome": "found",
-        "actions": [
-          {
-            "step": 1,
-            "action": "click",
-            "outcome": "found",
-            "target": {
-              "selector": "#save-profile",
-              "frames": []
-            },
-            "interactability": {
-              "status": "ready",
-              "reasons": [],
-              "checks": {
-                "compatibleControl": "pass",
-                "enabled": "pass",
-                "viewport": "pass",
-                "pointerReception": "pass",
-                "keyboard": "not_applicable",
-                "stability": "unknown",
-                "eventOutcome": "unknown"
-              }
-            }
-          }
-        ],
-        "summary": {
-          "processingComplete": true,
-          "semanticCompleteness": "unverified",
-          "total": 1,
-          "found": 1,
-          "notFound": 0,
-          "unsupported": 0,
-          "errors": 0,
-          "blocked": 0,
-          "readinessUnknown": 0,
-          "assessmentUnsupported": 0
-        }
-      }
-    },
-    "sourceSplit": "development",
-    "sourceCatalogs": ["cases.json"],
-    "group": "locators",
-    "sourceIds": ["mutation-duplicate"]
-  },
-  {
-    "id": "locators-rerender-preserves-target-identity",
-    "family": "profile",
-    "split": "regression",
-    "category": "locator",
-    "fixture": "form",
-    "instruction": "Click Save changes in Profile.",
-    "viewport": {
-      "width": 1280,
-      "height": 800,
-      "tolerance": 1
-    },
-    "review": {
-      "status": "reviewed",
-      "reviewer": "independent-fixture-review",
-      "reviewedAt": "2026-09-30T17:17:50Z"
-    },
-    "expected": {
-      "outcome": "found",
-      "actions": [
-        {
-          "step": 1,
-          "action": "click",
-          "outcome": "found",
-          "target": {
-            "selector": "#save-profile",
-            "frames": []
-          },
-          "interactability": {
-            "status": "ready",
-            "reasons": [],
-            "checks": {
-              "compatibleControl": "pass",
-              "enabled": "pass",
-              "viewport": "pass",
-              "pointerReception": "pass",
-              "keyboard": "not_applicable",
-              "stability": "unknown",
-              "eventOutcome": "unknown"
-            }
-          }
-        }
-      ],
-      "summary": {
-        "processingComplete": true,
-        "semanticCompleteness": "unverified",
-        "total": 1,
-        "found": 1,
-        "notFound": 0,
-        "unsupported": 0,
-        "errors": 0,
-        "blocked": 0,
-        "readinessUnknown": 0,
-        "assessmentUnsupported": 0
-      }
-    },
-    "provider": {
-      "actions": [
-        {
-          "step": 1,
-          "action": "click",
-          "outcome": "found",
-          "label": "Save changes",
-          "scope": "Profile",
-          "tag": "button"
-        }
-      ]
-    },
-    "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
-    "mutation": {
-      "kind": "rerender",
-      "target": {
-        "selector": "#save-profile",
-        "frames": []
-      },
-      "afterExpected": {
-        "outcome": "found",
-        "actions": [
-          {
-            "step": 1,
-            "action": "click",
-            "outcome": "found",
-            "target": {
-              "selector": "#save-profile",
-              "frames": []
-            },
-            "interactability": {
-              "status": "ready",
-              "reasons": [],
-              "checks": {
-                "compatibleControl": "pass",
-                "enabled": "pass",
-                "viewport": "pass",
-                "pointerReception": "pass",
-                "keyboard": "not_applicable",
-                "stability": "unknown",
-                "eventOutcome": "unknown"
-              }
-            }
-          }
-        ],
-        "summary": {
-          "processingComplete": true,
-          "semanticCompleteness": "unverified",
-          "total": 1,
-          "found": 1,
-          "notFound": 0,
-          "unsupported": 0,
-          "errors": 0,
-          "blocked": 0,
-          "readinessUnknown": 0,
-          "assessmentUnsupported": 0
-        }
-      }
-    },
-    "sourceSplit": "development",
-    "sourceCatalogs": ["cases.json"],
-    "group": "locators",
-    "sourceIds": ["mutation-rerender"]
   },
   {
     "id": "locators-nbsp-text-survives-wrapper",
