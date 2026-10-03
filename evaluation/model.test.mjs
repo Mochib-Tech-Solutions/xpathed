@@ -34,9 +34,31 @@ const spec = {
   },
 };
 
+spec.labelReview = {
+  caseId: spec.id,
+  inputHash: spec.review.inputHash,
+  labelHash: createHash("sha256").update(JSON.stringify(spec.expected)).digest("hex"),
+  disposition: "validated",
+  reason: "Source confirms the unique named Save button.",
+  reviewer: "fixture-source-review",
+  reviewedAt: spec.review.reviewedAt,
+};
+
 test("model selection requires reviewed unchanged inputs and rejects an empty filter", () => {
   assert.equal(selectModelCases(undefined, [spec]).length, 1);
   assert.throws(() => selectModelCases("missing", [spec]), /No matching/);
+  const excluded = { ...spec, labelReview: { ...spec.labelReview, disposition: "ambiguous" } };
+  assert.throws(() => selectModelCases(undefined, [excluded]), /No matching/);
+  assert.throws(
+    () =>
+      selectModelCases(undefined, [
+        {
+          ...spec,
+          expected: { ...spec.expected, actions: [{ ...spec.expected.actions[0], step: 2 }] },
+        },
+      ]),
+    /label review/,
+  );
   assert.throws(
     () => selectModelCases(undefined, [{ ...spec, input: { ...input, instruction: "changed" } }]),
     /reviewed/,
@@ -95,7 +117,14 @@ for (const invalidIdentity of [false, true])
     try {
       const code = await runModelEvaluation(
         { output, repetitions: 1, concurrency: 1, seed: 1, timeoutMs: 1000 },
-        [spec, { ...spec, id: "model-save-2" }],
+        [
+          spec,
+          {
+            ...spec,
+            id: "model-save-2",
+            labelReview: { ...spec.labelReview, caseId: "model-save-2" },
+          },
+        ],
         {
           profiles: [{ pricing: {} }],
           records,

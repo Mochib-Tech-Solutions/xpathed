@@ -223,7 +223,8 @@
         {
           "step": 1,
           "action": "unsupported",
-          "outcome": "unsupported"
+          "outcome": "unsupported",
+          "code": "unsupported_action"
         }
       ],
       "outcome": "unsupported",
@@ -285,7 +286,8 @@
         {
           "step": 1,
           "action": "click",
-          "outcome": "unsupported"
+          "outcome": "unsupported",
+          "code": "current_state_dependency"
         }
       ],
       "outcome": "unsupported",
