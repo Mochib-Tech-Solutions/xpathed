@@ -115,7 +115,7 @@ export async function continueComparison(output, { concurrency = 8, source } = {
       !(await files(join(source, "offline"))).some(
         (name) => name.endsWith(".request.json") || name.endsWith(".partial"),
       ),
-      "Original offline attempts must be drained before copying",
+      "Original Saved-page selection attempts must be drained before copying",
     );
     assert.ok(
       !(await files(join(source, "trials"))).some((name) => name.endsWith(".partial")),

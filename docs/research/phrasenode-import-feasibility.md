@@ -32,7 +32,7 @@ The original DOM extractor reads `xid` from `data-xid`. It records input values 
 
 Recommended tracks, inferred from those schemas:
 
-- **Offline target selection:** trustworthy unique source identity but no faithful browser restoration. Grade selected source node only. Browser XPath uniqueness, readiness, obstruction and viewport checks remain unavailable.
+- **Saved-page selection:** trustworthy unique source identity but no faithful browser restoration. Grade selected source node only. Browser XPath uniqueness, readiness, obstruction and viewport checks remain unavailable.
 - **Browser replay:** selected archived HTML with verified source-to-browser identity, sanitized scripts/requests, documented viewport and a reconstruction report. Grade XPath against the independent node mapping; qualify geometry/state only to the extent reconstruction supports it.
 - **Excluded or reconstruction-limited:** absent assets, duplicate/missing target IDs, unsupported frame context, ambiguous labels or privacy restrictions. Retain records and reasons in the denominator report.
 
@@ -48,7 +48,7 @@ Proposed repository treatment: keep source/derived page assets ignored and priva
 
 ## Decisions before implementation
 
-1. Recommended first slice: both accepted adapters, import/accounting tests and a local identity/reconstruction pilot with no inference fees. Support offline records honestly rather than promising all source records will run in a browser.
+1. Recommended first slice: both accepted adapters, import/accounting tests and a local identity/reconstruction pilot with no inference fees. Support saved-page records honestly rather than promising all source records will run in a browser.
 2. Review actual pilot payloads before deciding on paid external inference. Cost cannot be forecast from 51,663 commands alone: measure eligible counts, prompt/output tokens, repetitions and the selected route's prices. Downloads/imports incur local resource use but no model API charge.
 3. Keep qualification incomplete. Development examples used for adapter design stay development evidence; preserve untouched source test groups for a later frozen evaluation, with public-dataset training contamination still unknown.
 

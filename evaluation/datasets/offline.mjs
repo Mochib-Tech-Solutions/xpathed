@@ -14,7 +14,7 @@ export function normalize(result, attemptId) {
       attemptId,
     };
   if (!Array.isArray(result.actions) || !result.actions.length)
-    throw new Error("Offline selection has no target items");
+    throw new Error("Saved-page selection has no target items");
   const outcomes = new Set(result.actions.map((item) => item.outcome));
   return {
     outcome: outcomes.size === 1 ? result.actions[0].outcome : "partial",
@@ -37,7 +37,7 @@ export function normalize(result, attemptId) {
 // The host executes this request using the attested Resolver container, including old releases.
 export async function executeOffline(spec, trial, output, timeoutMs, baseline, workerId) {
   if (workerId !== undefined && (!Number.isInteger(workerId) || workerId < 0 || workerId > 15))
-    throw new Error("Invalid offline worker identity");
+    throw new Error("Invalid Saved-page selection worker identity");
   const directory = join(output, "offline");
   await mkdir(directory, { recursive: true, mode: 0o700 });
   const path = join(directory, trial.id);
@@ -48,9 +48,12 @@ export async function executeOffline(spec, trial, output, timeoutMs, baseline, w
       typeof expectedPreparedInputHash !== "string" ||
       !/^[a-f\d]{64}$/.test(expectedPreparedInputHash)
     )
-      throw Object.assign(new Error("Offline input requires a reviewed prepared input hash"), {
-        code: "unreviewed_prepared_input",
-      });
+      throw Object.assign(
+        new Error("Saved-page selection input requires a reviewed prepared input hash"),
+        {
+          code: "unreviewed_prepared_input",
+        },
+      );
     await writeFile(
       `${path}.partial`,
       JSON.stringify({
@@ -73,7 +76,7 @@ export async function executeOffline(spec, trial, output, timeoutMs, baseline, w
         if (error.code !== "ENOENT") throw error;
       }
       if (performance.now() - started > timeoutMs + 65000)
-        throw new Error("Offline Resolver did not return evidence");
+        throw new Error("Saved-page selection worker did not return evidence");
       if (!response) await delay(100);
     }
     const { prepared, result, elapsedMs } = response;

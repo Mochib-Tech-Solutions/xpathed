@@ -120,7 +120,7 @@ The request crosses six boundaries. Each step uses the previous step's evidence 
 | 5. Verify — Browser                  | Capture ID, selections and retained live nodes              | Unique same-node XPath, frame context, current-view checks and readiness |
 | 6. Return — Resolver                 | Verified Browser observations and provider usage            | API result with target outcomes, limitations, timings and cost           |
 
-Model selection covers steps 3–4. XPath construction and verification covers step 5. Resolver E2E covers the complete request. The model has no browser tools and returns element IDs; Browser constructs the XPath. The [walkthrough](docs/how-it-works.md#step-boundaries) explains the limits and failure conditions at each handoff.
+Saved-page selection evaluates steps 3–4 with saved inputs. XPath construction and verification covers step 5. Live-browser Resolver covers the complete request. The model has no browser tools and returns element IDs; Browser constructs the XPath. The [walkthrough](docs/how-it-works.md#step-boundaries) explains the limits and failure conditions at each handoff.
 
 ### Model and configuration
 
@@ -128,7 +128,7 @@ The development default is **`deepseek/deepseek-v4.1-flash` through OpenRouter's
 
 The repository keeps one implementation and one prompt/schema, updated in place. Git tracks their history; code has no manual prompt or behavior revision numbers. See [ADR-0024](docs/adr/0024-keep-one-resolution-implementation.md).
 
-`ActionSelectionStrategy` owns the shared runtime/offline prompt, schema and selection validation. `OpenRouterGateway` pins the provider, disables reasoning and fallback, and limits output to 4,096 tokens. A configuration hash identifies effective settings. No model is trained here; changes to the pretrained model, prompt or context require evaluation. Docker/environment variables supply OpenRouter credentials, endpoint, model and provider. Release artifacts do not override deployment configuration.
+`ActionSelectionStrategy` owns the shared runtime and saved-page prompt, schema and selection validation. `OpenRouterGateway` pins the provider, disables reasoning and fallback, and limits output to 4,096 tokens. A configuration hash identifies effective settings. No model is trained here; changes to the pretrained model, prompt or context require evaluation. Docker/environment variables supply OpenRouter credentials, endpoint, model and provider. Release artifacts do not override deployment configuration.
 
 Illustrative saved click result:
 
@@ -150,13 +150,13 @@ The **evaluation set** has three categories, scored separately:
 
 | Category                            | What it checks                                                                                                         | Command                       |
 | ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ----------------------------- |
-| Model selection                     | Real model selects the expected element from reviewed saved candidates, currently PhraseNode                           | `pnpm evaluate:model:live`    |
+| Saved-page selection                | Real model selects the expected element from reviewed saved candidates, currently PhraseNode                           | `pnpm evaluate:model:live`    |
 | XPath construction and verification | Controlled selections go directly to Browser; independent DOM labels check XPath identity, state and locator mutations | `pnpm evaluate:xpath`         |
-| Resolver E2E                        | Instruction → real browser capture → real model → verified XPath and final response                                    | `pnpm evaluate:resolver:live` |
+| Live-browser Resolver               | Instruction → real browser capture → real model → verified XPath and final response                                    | `pnpm evaluate:resolver:live` |
 
-`pnpm evaluate` runs all three and writes separate results plus a combined summary. **It makes paid model calls** for model selection and Resolver E2E; XPath evaluation needs no provider key. Live commands use `OPENROUTER_EVAL_API_KEY`. Fetch the reviewed inputs with `pnpm datasets:collection fetch` if they are not already available. Imported accuracy cases also require a pinned semantic review of the expected target against the supplied input; ambiguous or unanswerable labels remain documented exclusions. See the [dataset review contract](docs/evaluation.md#private-dataset-collection).
+`pnpm evaluate` runs all three and writes separate results plus a combined summary. **It makes paid model calls** for Saved-page selection and Live-browser Resolver; XPath evaluation needs no provider key. Commands using live provider inference use `OPENROUTER_EVAL_API_KEY`. Fetch the reviewed inputs with `pnpm datasets:collection fetch` if they are not already available. Imported accuracy cases also require a pinned semantic review of the expected target against the supplied input; ambiguous or unanswerable labels remain documented exclusions. See the [dataset review contract](docs/evaluation.md#private-dataset-collection).
 
-“Offline” describes the saved inputs used for model selection, which still calls a live model. XPath evaluation supplies known selections to isolate the stage after inference. E2E checks whether both stages work together. The chat UI is outside this boundary. A **regression** is a lost pass between compared runs. Reusing cases does not establish unseen-site accuracy.
+Saved-page selection calls a real model using saved page inputs. Live-browser Resolver uses a real Chromium page; its provider mode can be controlled (provider-free) or live (paid inference). XPath evaluation supplies known selections to isolate the stage after inference. Live-browser Resolver checks whether both stages work together. The chat UI is outside this boundary. A **regression** is a lost pass between compared runs. Reusing cases does not establish unseen-site accuracy.
 
 Shared XPath/Resolver case names and browser/pipeline test titles describe their group and behavior, for example `targeting-save-button-by-name` and `scope-offscreen-target-is-absent`. See the [evaluation guide](docs/evaluation.md#one-evaluation-set-grouped-by-behavior) for naming and provenance.
 
@@ -168,7 +168,7 @@ These are actual cases from the shared evaluation set. Expected selectors belong
 | ------------------------------------------------------ | --------------------------------------------------------------------- | ----------------------------------------------- |
 | “Click Save changes.”                                  | The labelled Save button, with a unique same-node XPath               | Target selection and XPath identity             |
 | “Click all Approve buttons in Approvals.”              | Both buttons, including the disabled one; its readiness is blocked    | Exact target-set completeness and readiness     |
-| “Click Help.” with Help off-screen                     | `not_found` in the current view                                       | Scoped absence in Resolver E2E                  |
+| “Click Help.” with Help off-screen                     | `not_found` in the current view                                       | Scoped absence in Live-browser Resolver         |
 | “Fill Notes.” with readonly Notes                      | Found target, `fill` action, blocked readiness with reason `readonly` | Action interpretation and passive state         |
 | “Click Save changes in Profile.” then insert a wrapper | The saved XPath still identifies the intended button                  | Locator reuse in deterministic XPath evaluation |
 
@@ -198,7 +198,7 @@ Improved gained **15 passes and lost 7**, a net increase of **4.4 percentage poi
 
 The target-selection score excludes eight unsupported-instruction cases and checks exact nodes/absence without requiring the action name. Stagehand uses stock `observe` with a current-view instruction; it does not provide xpathed's readiness contract. The [report](docs/research/engineering-comparison.md) explains these boundaries and separates the full resolver score, timing cohorts and failures.
 
-All **549 paid calls** are retained, with **$0.07312420** reported and no missing charges. These authored evaluation cases measure this setup. The [historical browser/offline report](docs/research/configuration-comparison.md) preserves the earlier collection and its separate offline results.
+All **549 paid calls** are retained, with **$0.07312420** reported and no missing charges. These authored evaluation cases measure this setup. The [historical browser and saved-page report](docs/research/configuration-comparison.md) preserves the earlier collection and its separate saved-page results.
 
 ```sh
 pnpm check                              # local checks
@@ -208,7 +208,7 @@ pnpm evaluate:xpath -- --case targeting-save-button-by-name # one XPath case, no
 pnpm evaluate:replay RUN_DIRECTORY       # regrade saved evidence
 ```
 
-Category commands accept `--case CASE_ID` and `--output DIRECTORY`. `pnpm evaluate -- --output DIRECTORY` stores each category beneath that directory. Controlled browser evaluation uses up to four isolated sessions; `--concurrency 1` selects serial timing. Live runs are serial. CI uses `evaluate:resolver` and stays provider-free. The other apps' unit and integration commands are unchanged.
+Category commands accept `--case CASE_ID` and `--output DIRECTORY`. `pnpm evaluate -- --output DIRECTORY` stores each category beneath that directory. Live-browser Resolver with a controlled provider uses up to four isolated sessions; `--concurrency 1` selects serial timing. Category runs with live provider inference are serial. CI uses `evaluate:resolver` and stays provider-free. The other apps' unit and integration commands are unchanged.
 
 The fresh `v1.0.0` establishes its baseline after ordinary CI and complete live checks, retiring the old release. Subsequent release PRs run ordinary CI and the complete live comparison against the exact images published for the current `release` commit. Once checks pass and the PR merges, that commit becomes the release and next baseline. Publication retains the tested images and evidence. Nightly monitoring tests that release without changing the running app. See [release operations](docs/releases.md).
 

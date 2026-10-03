@@ -41,7 +41,7 @@ Use at most two figures:
 
 Use text labels as well as color. Prefer a perceptually uniform sequential palette for rates; reserve a zero-centered diverging scale for signed changes. Avoid rainbow scales. [Matplotlib: Colormaps](https://matplotlib.org/stable/users/explain/colors/colormaps.html)
 
-Every figure needs its cohort, configuration and scoring rule. Keep dates and full run identity in the evidence report. Pair identical case inputs; separate browser and offline denominators. Preserve missing attempts, operational failures and unsupported cases. An aggregate gain must not hide a lost baseline pass.
+Every figure needs its cohort, configuration and scoring rule. Keep dates and full run identity in the evidence report. Pair identical case inputs; separate browser and saved-page denominators. Preserve missing attempts, operational failures and unsupported cases. An aggregate gain must not hide a lost baseline pass.
 
 Name the configurations and state which settings changed. Holding other factors fixed makes the comparison easier to interpret; changing several rules together measures the whole configuration. This applies NIST’s experimental-design guidance, while MLCommons emphasizes reproducible benchmarks with defined models, datasets and permitted changes. A paired run with fixed arm order does not control provider warmth or all timing effects. [NIST: Blocking](https://www.itl.nist.gov/div898/handbook/pri/section3/pri332.htm), [MLCommons: Benchmark goals](https://mlcommons.org/benchmarks/)
 

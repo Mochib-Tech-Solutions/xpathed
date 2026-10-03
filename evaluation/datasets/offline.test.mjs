@@ -7,7 +7,7 @@ import { tmpdir } from "node:os";
 import { setTimeout as delay } from "node:timers/promises";
 import { executeOffline } from "./offline.mjs";
 
-test("offline bridge sends only reviewed input, retains Resolver evidence and original errors", async (t) => {
+test("Saved-page selection bridge sends only reviewed input, retains Resolver evidence and original errors", async (t) => {
   const output = await mkdtemp(join(tmpdir(), "xpathed-offline-bridge-"));
   t.after(() => rm(output, { recursive: true, force: true }));
   const spec = {
@@ -71,7 +71,7 @@ test("offline bridge sends only reviewed input, retains Resolver evidence and or
   }
 });
 
-test("offline bridge rejects invalid worker routing before writing requests", async () => {
+test("Saved-page selection bridge rejects invalid worker routing before writing requests", async () => {
   for (const workerId of [-1, 16, 1.5, "1", null])
     await assert.rejects(
       executeOffline({}, {}, "/unused", 1000, false, workerId),
@@ -79,7 +79,7 @@ test("offline bridge rejects invalid worker routing before writing requests", as
     );
 });
 
-test("offline bridge rejects missing or invalid reviewed input hashes without dispatch", async (t) => {
+test("Saved-page selection bridge rejects missing or invalid reviewed input hashes without dispatch", async (t) => {
   const output = await mkdtemp(join(tmpdir(), "xpathed-offline-missing-review-"));
   t.after(() => rm(output, { recursive: true, force: true }));
   for (const preparedInputHash of [undefined, null, "invalid", 17]) {

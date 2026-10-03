@@ -16,7 +16,7 @@ Experimental candidates do not change the approved default. A complete compariso
 
 ## Consequences
 
-Existing runners, grading and ledger ownership remain intact; no additional provider SDK or production service is required. Evaluation adds isolated Resolver configurations and independent held-out fixture families. Report the local pricing-snapshot measurement difference from production network lookups. Historical page-wide captures have no computed color evidence. [ADR-0018](0018-scope-resolution-to-the-current-view.md) adds bounded CSS color evidence and a separately measured current-view baseline; it does not retroactively qualify those historical runs. External offline dataset scores cannot establish browser readiness or plural behavior.
+Existing runners, grading and ledger ownership remain intact; no additional provider SDK or production service is required. Evaluation adds isolated Resolver configurations and independent held-out fixture families. Report the local pricing-snapshot measurement difference from production network lookups. Historical page-wide captures have no computed color evidence. [ADR-0018](0018-scope-resolution-to-the-current-view.md) adds bounded CSS color evidence and a separately measured current-view baseline; it does not retroactively qualify those historical runs. Saved-page selection scores from external datasets cannot establish browser readiness or plural behavior.
 
 Adding Qwen3.8 Flash uses the same baseline prompt on an explicit standard Alibaba route with reasoning disabled. Previously exposed held-out families move to regression with original split/run provenance. Reassessing historical timings is retrospective analysis, not new qualification; new independent holdout families are required before promotion.
 

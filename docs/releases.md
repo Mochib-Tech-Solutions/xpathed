@@ -4,7 +4,7 @@
 
 ## Required checks before merge
 
-Open a trusted same-repository `main` → `release` PR. Ordinary CI must pass for the exact proposed source. Release Qualification then builds the candidate and restores the current release’s published images, records their exact image identities, and runs one complete paired live comparison. Both arms receive the same reviewed browser/offline cases and inference settings; original failures, accuracy, gains, lost passes, timing and reported/unknown costs are retained.
+Open a trusted same-repository `main` → `release` PR. Ordinary CI must pass for the exact proposed source. Release Qualification then builds the candidate and restores the current release’s published images, records their exact image identities, and runs one complete paired comparison with live provider inference. Both arms receive the same reviewed Live-browser Resolver and Saved-page selection cases and inference settings; original failures, accuracy, gains, lost passes, timing and reported/unknown costs are retained.
 
 Every baseline pass must remain a pass. Missing required results, provider failures, privacy violations and mismatched evidence fail the check. Timing and unavailable accounting remain descriptive. Changing the PR source or release baseline requires a fresh comparison. Configure required checks in GitHub before allowing merges; repository workflows do not themselves provide branch protection.
 
@@ -92,7 +92,7 @@ curl --fail -X POST http://localhost:8083/pages/PAGE_ID/resolve \
 curl --fail -X DELETE http://localhost:8082/sessions/SESSION_ID
 ```
 
-Replace the uppercase placeholders with the returned IDs. Each restart invalidates prior sessions. Browser creates the managed session and page; Resolver uses those same identities. The API contract and runnable request examples are in [runtime](runtime.md#browser-integration) and [resolution](resolution.md). Health endpoints confirm service availability; a live resolution additionally requires a valid OpenRouter route and key. Both APIs are loopback-only in this setup.
+Replace the uppercase placeholders with the returned IDs. Each restart invalidates prior sessions. Browser creates the managed session and page; Resolver uses those same identities. The API contract and runnable request examples are in [runtime](runtime.md#browser-integration) and [resolution](resolution.md). Health endpoints confirm service availability; resolution with live provider inference additionally requires a valid OpenRouter route and key. Both APIs are loopback-only in this setup.
 
 ## Local image and evidence checks
 
@@ -114,7 +114,7 @@ pnpm release:evaluate --bundle CANDIDATE_BUNDLE --sha256 CANDIDATE_DIGEST \
   --baseline-commit RELEASE_COMMIT --mode live --output NEW_RUN_DIRECTORY
 ```
 
-Use the candidate's exact source checkout. The launcher verifies and attests both bundles and starts the offline Resolver worker. Replay and evidence sealing validate results; they do not choose a release. Keep original attempts and charges, enforce original evidence expiry, and never infer success from a saved summary alone.
+Use the candidate's exact source checkout. The launcher verifies and attests both bundles and starts the Resolver worker for Saved-page selection. Replay and evidence sealing validate results; they do not choose a release. Keep original attempts and charges, enforce original evidence expiry, and never infer success from a saved summary alone.
 
 ## Nightly monitoring
 
@@ -122,4 +122,4 @@ Monitoring runs at 02:17 UTC or through manual dispatch. It resolves `release`, 
 
 `pnpm release:monitor` performs the same check locally. `pnpm release:monitor --notification-test` fails deliberately without inference. Original results and failures are retained as workflow artifacts. A schedule or failed job is not evidence that email was delivered.
 
-The maintainer requested retiring the old release and recreating `v1.0.0`. The one-time transition is tied to the retired release branch commit `a9a0d7caf0b7abc46902f9c7831aa3c1339298a6`: run the complete live collection once against the candidate, retain all outcomes and charges, and establish fresh measurements. Do not compare with or adapt the old implementation. After that merge, every release requires the paired comparison against published images; missing assets fail explicitly. Remove the old GitHub release/tag only when the replacement checks are ready. Monitoring starts after the new assets are published. Hosted publication and live execution must be verified separately from local deterministic tests.
+The maintainer requested retiring the old release and recreating `v1.0.0`. The one-time transition is tied to the retired release branch commit `a9a0d7caf0b7abc46902f9c7831aa3c1339298a6`: run the complete collection once with live provider inference against the candidate, retain all outcomes and charges, and establish fresh measurements. Do not compare with or adapt the old implementation. After that merge, every release requires the paired comparison against published images; missing assets fail explicitly. Remove the old GitHub release/tag only when the replacement checks are ready. Monitoring starts after the new assets are published. Hosted publication and execution with live provider inference must be verified separately from local deterministic tests.

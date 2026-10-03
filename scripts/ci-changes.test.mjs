@@ -25,11 +25,11 @@ const all = {
 };
 const sharedDotnet = { ...none, dotnet: projects, browser: true };
 
-test("Browser source changes require deterministic browser evaluation", () => {
+test("Browser source changes require controlled provider-free Live-browser Resolver evaluation", () => {
   assert.equal(classifyChanges(["src/Browser/Sessions/BrowserSessions.cs"]).browser, true);
 });
 
-test("deterministic evaluation selects its runtime, fixture, and runner dependencies", () => {
+test("controlled provider-free Live-browser Resolver evaluation selects its runtime, fixture, and runner dependencies", () => {
   for (const path of [
     "evaluation/run.mjs",
     "evaluation/cases/index.json",

@@ -23,7 +23,7 @@ Sources: [PhraseNode paper](https://aclanthology.org/D18-1540.pdf), [Mind2Web sc
 
 The original task is explicitly selection of one webpage element from a command. It already separates pages across train/development/test, and its analysis identifies duplicate plausible targets and annotation noise. Its rendered snapshots include geometry and visibility, with targets drawn from visible interactive elements. Preserve original page splits and manually review ambiguous examples against our explicit-instruction/viewport policy. The archived pages are older and do not constitute coverage of current frame behavior or all application state rules. [Paper](https://aclanthology.org/D18-1540.pdf)
 
-The project offers processed pages and command files separately; raw HTML/CSS is described as reference material. First validate that processed target identities map to browser-restorable nodes before committing to full XPath evaluation. Use an offline element-selection track if that mapping cannot be established. [Official resources](https://nlp.stanford.edu/projects/phrasenode/)
+The project offers processed pages and command files separately; raw HTML/CSS is described as reference material. First validate that processed target identities map to browser-restorable nodes before committing to full XPath evaluation. Use a saved-page selection track if that mapping cannot be established. [Official resources](https://nlp.stanford.edu/projects/phrasenode/)
 
 ### Mind2Web adaptation
 

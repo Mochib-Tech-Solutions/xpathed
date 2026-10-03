@@ -46,7 +46,9 @@ export function parseOptions(args) {
     options[name] = args[i + 1];
   }
   if (!["deterministic", "live"].includes(options.mode))
-    throw new Error("Mode must be deterministic or live");
+    throw new Error(
+      "Mode must be deterministic (controlled provider-free) or live (live provider inference)",
+    );
   for (const [name, min, max] of [
     ["repetitions", 1, 100],
     ["concurrency", 1, 4],
@@ -696,7 +698,9 @@ export async function main(args = process.argv.slice(2), track = "resolver") {
   const options = parseOptions(args);
   options.track = track;
   if (track === "xpath" && options.mode !== "deterministic")
-    throw new Error("XPath evaluation uses controlled selections and no model calls");
+    throw new Error(
+      "XPath construction and verification uses controlled provider-free selections and no model calls",
+    );
   if (!args.includes("--concurrency") && options.mode === "deterministic")
     options.concurrency = Math.min(4, availableParallelism());
   if (options.prune) {
@@ -714,7 +718,7 @@ export async function main(args = process.argv.slice(2), track = "resolver") {
   );
   if (process.env.XPATHED_EVALUATION_SUITE && options.mode !== "deterministic")
     throw new Error(
-      "External reconstructed suites use deterministic browser validation; use the budgeted dataset runner for inference",
+      "External reconstructed suites use controlled provider-free browser validation; use Saved-page selection for live provider inference",
     );
   let cases = validateCases(suite);
   let exclusions = [];
@@ -787,7 +791,7 @@ export async function main(args = process.argv.slice(2), track = "resolver") {
   const first = summary.firstAttempt;
   const readable =
     [
-      `Evaluation: ${track === "xpath" ? "XPath construction and verification" : "Resolver E2E"}; mode: ${options.mode}; qualification: ${summary.qualification}`,
+      `Evaluation: ${track === "xpath" ? "XPath construction and verification" : "Live-browser Resolver"}; inference mode: ${options.mode === "deterministic" ? "controlled provider-free" : "live provider inference"}; qualification: ${summary.qualification}`,
       `Trials: ${summary.completedTrials}/${summary.plannedTrials}; checks passed: ${first.passed}; failed: ${first.failed}`,
       `Intended targets: ${first.metrics.targetsCorrect}/${first.metrics.targetsExpected}; wrong targets: ${first.metrics.wrongTargets}`,
       `Saved XPath mutations: ${first.savedLocator.passed}/${first.savedLocator.trials}; fresh resolutions: ${first.freshResolution?.passed ?? 0}/${first.freshResolution?.trials ?? 0}`,

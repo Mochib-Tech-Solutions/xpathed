@@ -27,7 +27,7 @@ export function releaseNotes({
 }) {
   const lines = [
     mode === "deterministic"
-      ? "**Deterministic checks only. Live evaluation is pending.**"
+      ? "**Controlled provider-free checks only. Live provider inference is pending.**"
       : qualified
         ? "**Release checks passed.**"
         : "**Release checks did not pass.**",
@@ -38,11 +38,12 @@ export function releaseNotes({
     `- Model: \`${profile.model}\``,
     `- Provider: \`${profile.provider}\` through OpenRouter`,
     `- Reasoning: \`${JSON.stringify(profile.reasoning)}\`; output limit: ${profile.maxTokens} tokens`,
+    `- Inference mode: ${mode === "deterministic" ? "controlled provider-free" : "live provider inference"}.`,
     "- Acceptance: preserve every baseline pass; latency and cost are informational.",
     "",
     "## Evaluation results",
     "",
-    "| Group | Arm | Correct cases | Median latency | p95 latency |",
+    "| Evaluation category | Arm | Correct cases | Median latency | p95 latency |",
     "| --- | --- | --- | --- | --- |",
   ];
   for (const phase of phases) {
@@ -105,7 +106,7 @@ export function releaseNotes({
   }
   lines.push(
     "",
-    "Browser cases grade the complete Resolver response, including independently labelled targets, actions and verified XPath. Offline cases grade selection from saved candidates; they cannot establish live browser or XPath correctness. Browser latency covers the complete Resolver HTTP response; offline latency covers the inference process. Setup, preparation and independent grading are excluded. These regression results are not an unseen-data accuracy estimate.",
+    "Live-browser Resolver cases grade the complete Resolver response, including independently labelled targets, actions and verified XPath. Saved-page selection cases grade selection from saved candidates; they cannot establish browser or XPath correctness. Live-browser Resolver latency covers the complete Resolver HTTP response; Saved-page selection latency covers the inference process. Setup, preparation and independent grading are excluded. These regression results are not an unseen-data accuracy estimate.",
     "",
     "## Changelog",
     "",
@@ -150,7 +151,7 @@ export async function phaseNotes(directory, name, profileId) {
   const calls = [...records.values()].filter((record) => record.forwarded);
   const comparison = summary?.profiles?.[profileId]?.qualification?.comparison;
   const groups = Object.entries(comparison?.groups ?? {}).map(([track, comparison]) => ({
-    name: track === "browser" ? "Browser resolver" : "Offline selection",
+    name: track === "browser" ? "Live-browser Resolver" : "Saved-page selection",
     comparison,
   }));
   return {

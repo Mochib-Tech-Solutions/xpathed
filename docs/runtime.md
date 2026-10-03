@@ -76,13 +76,13 @@ To integrate another browser implementation:
 1. Implement the [capture and validation contract](resolution.md#capture-and-validation), including current-view eligibility, sanitized complete captures, opaque page/document/capture/frame identities, retained candidate-to-node identity, document-wide XPath uniqueness, readiness and highlights. Preserve error, invalidation and cancellation semantics. A URL change alone cannot adapt an arbitrary browser API.
 2. Give the caller page/document IDs issued by that same browser service. The bundled client and evaluation runners also use the session/page lifecycle routes described above; the test client's noVNC viewer additionally needs `/view/{sessionId}`. Resolver itself does not use the viewer.
 3. Point Resolver's `BrowserUrl` to the replacement. Point lifecycle callers at the same service. The bundled Compose configuration pins these URLs to `http://browser:8080`; replacing it requires a deployment configuration or Compose override, including the client's viewer proxy if retained.
-4. Verify the API contract and run the deterministic Resolver E2E cases before measuring live model behavior. Changes to browser capture or verification require fresh evaluation evidence.
+4. Verify the API contract and run the Live-browser Resolver cases with deterministic provider fixtures before measuring live provider inference. Changes to browser capture or verification require fresh evaluation evidence.
 
 Playwright/Chromium is the only implemented and verified browser service. There is no ready-made adapter for an external runner's browser or raw HTML submission. A compatible adapter owns its live browser objects and preserves the contract; it does not require a new Resolver strategy or browser plugin registry.
 
 ## Evaluation commands
 
-`pnpm evaluate` runs model selection, XPath construction/verification and Resolver E2E in separate isolated stacks and records one summary per category. It includes paid inference and requires `OPENROUTER_EVAL_API_KEY` plus the reviewed dataset collection. Use `evaluate:model:live`, `evaluate:xpath` and `evaluate:resolver:live` to run categories independently. XPath starts Browser and the fixture only; model selection starts Resolver and the evaluation runner only. Neither requires the test client.
+`pnpm evaluate` runs Saved-page selection, XPath construction and verification, and Live-browser Resolver in separate isolated stacks and records one summary per category. It includes paid inference and requires `OPENROUTER_EVAL_API_KEY` plus the reviewed dataset collection. Use `evaluate:model:live`, `evaluate:xpath` and `evaluate:resolver:live` to run categories independently. XPath construction and verification starts Browser and the fixture only; Saved-page selection starts Resolver and the evaluation runner only. Neither requires the test client. Live-browser Resolver uses real Chromium in both modes: `evaluate:resolver` uses deterministic provider fixtures, while `evaluate:resolver:live` uses live provider inference.
 
 `evaluate:resolver` preserves the provider-free pipeline suite used in ordinary CI. The unit and integration commands for other apps are unchanged. See [evaluation](evaluation.md#run-and-replay) for filters, evidence and replay.
 
@@ -105,19 +105,19 @@ Operation errors use `{code, message, traceId}`. Controller validation returns t
 
 ## Configuration
 
-| Setting                                    | Default / purpose                                                                                                         |
-| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------- |
-| `XPATHED_PORT`                             | Host web port, `8080`; export before Compose                                                                              |
-| `BrowserUrl`                               | Internal browser base URL, `http://browser:8080`                                                                          |
-| `ResolverUrl`                              | Client API resolver URL, `http://resolver:8080`                                                                           |
-| `OPENROUTER_API_KEY`                       | Ignored local `.env` key used only by Resolver; manual browsing requires no key                                           |
-| `OPENROUTER_EVAL_API_KEY`                  | Dedicated key for explicitly requested live evaluation; never replaces the application key                                |
-| `OPENROUTER_MODEL` / `OPENROUTER_PROVIDER` | Initial route `deepseek/deepseek-v4.1-flash` / `wafer`; see [resolution configuration](resolution.md#model-configuration) |
-| `OPENROUTER_BASE_URL` / `OPENROUTER_TIMEOUT_SECONDS` | OpenRouter endpoint (default `https://openrouter.ai/api/v1/`) and request timeout in seconds (default `30`) |
-| `ViewerOrigins`                            | Comma-separated exact allowed viewer origins; Compose includes localhost and 127.0.0.1                                    |
-| `MaxSessions`                              | Browser capacity, default 4; allowed 1–16                                                                                 |
-| `XPATHED_URL`                              | Vite API upstream destination                                                                                             |
-| `XPATHED_BROWSER_URL`                      | Separate Vite viewer upstream in development                                                                              |
+| Setting                                              | Default / purpose                                                                                                         |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `XPATHED_PORT`                                       | Host web port, `8080`; export before Compose                                                                              |
+| `BrowserUrl`                                         | Internal browser base URL, `http://browser:8080`                                                                          |
+| `ResolverUrl`                                        | Client API resolver URL, `http://resolver:8080`                                                                           |
+| `OPENROUTER_API_KEY`                                 | Ignored local `.env` key used only by Resolver; manual browsing requires no key                                           |
+| `OPENROUTER_EVAL_API_KEY`                            | Dedicated key for explicitly requested live provider inference in evaluation; never replaces the application key          |
+| `OPENROUTER_MODEL` / `OPENROUTER_PROVIDER`           | Initial route `deepseek/deepseek-v4.1-flash` / `wafer`; see [resolution configuration](resolution.md#model-configuration) |
+| `OPENROUTER_BASE_URL` / `OPENROUTER_TIMEOUT_SECONDS` | OpenRouter endpoint (default `https://openrouter.ai/api/v1/`) and request timeout in seconds (default `30`)               |
+| `ViewerOrigins`                                      | Comma-separated exact allowed viewer origins; Compose includes localhost and 127.0.0.1                                    |
+| `MaxSessions`                                        | Browser capacity, default 4; allowed 1–16                                                                                 |
+| `XPATHED_URL`                                        | Vite API upstream destination                                                                                             |
+| `XPATHED_BROWSER_URL`                                | Separate Vite viewer upstream in development                                                                              |
 
 `pnpm dev` applies `docker/compose.dev.yaml` over `docker/compose.yaml` and runs all four services in containers, with Vite and `dotnet watch` for development. `docker/compose.sh` keeps paths and `.env` relative to the canonical repository root. Compose synchronizes source files and rebuilds images when dependency manifests change. `pnpm docker:up` uses production runtime images. Only the web port is published on loopback in either mode. Stop the previous mode with `pnpm docker:down` before switching.
 
@@ -137,7 +137,7 @@ Pinned baseline: .NET SDK 10.0.401/runtime 10.0.12, Playwright .NET/browser imag
 
 ## Quality checks
 
-The selected resolver uses one prompt/schema for browser and offline selection. Retired experiment runners and legacy contracts remain in Git history; see [ADR-0024](adr/0024-keep-one-resolution-implementation.md). Configuration hashes identify the exact effective settings without selecting a second implementation.
+The selected resolver uses one prompt/schema for browser resolution and Saved-page selection. Retired experiment runners and legacy contracts remain in Git history; see [ADR-0024](adr/0024-keep-one-resolution-implementation.md). Configuration hashes identify the exact effective settings without selecting a second implementation.
 
 All .NET projects inherit nullable checks, the pinned `10.0-recommended` analyzer set, build/live analysis, code-style enforcement and warnings as errors from `Directory.Build.props`. `.editorconfig` defines formatting, braces, explicit accessibility, readonly fields and file-scoped namespaces. Pinned CSharpier owns C# whitespace/wrapping; native `dotnet format style` verifies semantic style. The root `pnpm format` and `pnpm format:check` commands apply the same split locally and in CI. The frontend uses strict TypeScript, React Strict Mode, ESLint with React Hooks/DOM/Refresh rules and Prettier with Tailwind class sorting. The dev proxy has a runnable same-origin HTTP/WebSocket check.
 
@@ -147,7 +147,7 @@ Ordinary PR/push CI runs independent, change-aware .NET, Web, tooling, Docker an
 
 ## Releases and deployment configuration
 
-The `release` branch identifies the release. A trusted `main` → `release` PR runs ordinary CI and the complete live comparison against the existing release commit. Both arms use the same reviewed cases and evaluation environment. One policy blocks every lost baseline pass; latency, costs and unavailable billing metadata are reported. Source-tree and artifact identity checks bind publication to the tested candidate.
+The `release` branch identifies the release. A trusted `main` → `release` PR runs ordinary CI and the complete comparison with live provider inference against the existing release commit. Both arms use the same reviewed cases and evaluation environment. One policy blocks every lost baseline pass; latency, costs and unavailable billing metadata are reported. Source-tree and artifact identity checks bind publication to the tested candidate.
 
 Merging the passing PR establishes the next baseline. Publication attaches the tested Browser/Resolver images, source and evidence to a commit-named GitHub release. Deployment supplies OpenRouter configuration through Docker/environment variables: `OPENROUTER_API_KEY`, `OPENROUTER_MODEL`, `OPENROUTER_PROVIDER`, `OPENROUTER_BASE_URL` and `OPENROUTER_TIMEOUT_SECONDS`. The release includes neither credentials nor a deployment configuration snapshot. Live CI uses its separate `OPENROUTER_EVAL_API_KEY`; its nonsecret settings are recorded only as evaluation evidence.
 

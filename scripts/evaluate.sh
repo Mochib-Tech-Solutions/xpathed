@@ -49,12 +49,12 @@ while [ "$#" -gt 0 ]; do
 done
 if [ "$xpath" = true ]; then
   if [ "$mode" != deterministic ] || [ "$model" = true ] || [ "$qualification" = true ] || [ "$comparison" = true ]; then
-    echo "XPath evaluation uses controlled selections without model, qualification or comparison modes" >&2; exit 2
+    echo "XPath construction and verification uses controlled provider-free selections without model, qualification or comparison modes" >&2; exit 2
   fi
 fi
 if [ "$model" = true ]; then
   if [ "$mode" != live ] || [ "$qualification" = true ] || [ "$comparison" = true ] || [ -n "$suite" ] || [ "$repetitions" != 1 ] || [ -n "$concurrency" ]; then
-    echo "Model selection requires live mode, one attempt and the reviewed collection; no comparison, qualification or concurrency options" >&2; exit 2
+    echo "Saved-page selection requires --mode live (live provider inference), one attempt and the reviewed collection; no comparison, qualification or concurrency options" >&2; exit 2
   fi
   node --input-type=module -e 'import { selectModelCases } from "./evaluation/model.mjs"; selectModelCases(process.argv[1] || undefined);' "$case_id"
 fi
@@ -76,7 +76,7 @@ if [ "$resume" = true ] && { [ "$comparison" != true ] || [ -z "$output" ] || [ 
 export XPATHED_COMPARISON_MODE=$mode
 export XPATHED_EVALUATION_SUITE=
 if [ -n "$suite" ]; then
-  if [ "$mode" != deterministic ] && [ "$qualification" != true ]; then echo "Custom suites support deterministic evaluation only" >&2; exit 2; fi
+  if [ "$mode" != deterministic ] && [ "$qualification" != true ]; then echo "Custom suites support controlled provider-free evaluation only (--mode deterministic)" >&2; exit 2; fi
   XPATHED_EVALUATION_SUITE=$(node --input-type=module -e '
     import { realpathSync, statSync } from "node:fs";
     import { relative, isAbsolute } from "node:path";
@@ -86,7 +86,7 @@ if [ -n "$suite" ]; then
     process.stdout.write("/workspace/" + rel);
   ' "$suite")
 fi
-if [ -n "$concurrency" ] && { [ "$qualification" = true ]; }; then echo "Concurrency is supported only by the direct browser evaluation runner" >&2; exit 2; fi
+if [ -n "$concurrency" ] && { [ "$qualification" = true ]; }; then echo "Concurrency is supported only by the direct Live-browser Resolver or XPath construction and verification runner" >&2; exit 2; fi
 set -- --mode "$mode" --repetitions "$repetitions" --seed "$seed" --timeout-ms "$timeout" --output /artifacts
 if [ -n "$case_id" ]; then set -- "$@" --case "$case_id"; fi
 if [ -n "$concurrency" ]; then set -- "$@" --concurrency "$concurrency"; fi

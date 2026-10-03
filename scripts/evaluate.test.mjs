@@ -84,7 +84,7 @@ test("live evaluation wrappers pass the dedicated file key and reject an app-onl
   }
 });
 
-test("deterministic evaluation removes the dedicated key before invoking Docker", (t) => {
+test("controlled provider-free evaluation removes the dedicated key before invoking Docker", (t) => {
   const result = runWrapper(t, "xpathed-evaluation-key", "web", ["--qualification"], {
     envText: "OPENROUTER_EVAL_API_KEY=fixture-eval\n",
     environment: { OPENROUTER_EVAL_API_KEY: "fixture-eval" },
@@ -118,7 +118,7 @@ test("custom dataset suites cannot enter live mode or read outside the checkout"
     cwd: resolve(import.meta.dirname, ".."),
   });
   assert.equal(live.status, 2);
-  assert.match(live.stderr, /deterministic evaluation only/);
+  assert.match(live.stderr, /controlled provider-free evaluation only/);
   const outside = spawnSync("sh", ["scripts/evaluate.sh", "--suite", path], {
     encoding: "utf8",
     cwd: resolve(import.meta.dirname, ".."),
@@ -152,7 +152,7 @@ test("release comparison accepts the unified collection and forwards its contain
   assert.match(result.calls, /suite=\/workspace\/evaluation\/cases\/index.json/);
 });
 
-test("browser concurrency is bounded and cannot leak into live or comparison runners", (t) => {
+test("Live-browser Resolver concurrency is bounded and cannot leak into live-inference or comparison runners", (t) => {
   for (const args of [
     ["--concurrency", "0"],
     ["--concurrency", "5"],

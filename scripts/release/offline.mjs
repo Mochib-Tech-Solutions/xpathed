@@ -7,7 +7,7 @@ import { setTimeout as delay } from "node:timers/promises";
 export function startOfflineWorker(state, docker) {
   const concurrency = state.concurrency ?? 1;
   if (!Number.isInteger(concurrency) || concurrency < 1 || concurrency > 8)
-    throw new Error("Offline concurrency must be between 1 and 8");
+    throw new Error("Saved-page selection concurrency must be between 1 and 8");
   let stopped = false,
     failure;
   const pending = new Set();
@@ -39,7 +39,7 @@ export function startOfflineWorker(state, docker) {
         (error, stdout) => {
           try {
             if (error?.killed || !stdout.trim())
-              throw new Error("Offline Resolver execution failed");
+              throw new Error("Saved-page selection worker execution failed");
             resolve(JSON.parse(stdout));
           } catch (error) {
             reject(error);
@@ -63,7 +63,7 @@ export function startOfflineWorker(state, docker) {
         !/^[a-f\d]{64}$/.test(request.expectedPreparedInputHash)
       )
         throw Object.assign(
-          new Error("Invalid offline request: missing reviewed prepared input hash"),
+          new Error("Invalid Saved-page selection request: missing reviewed prepared input hash"),
           { code: "unreviewed_prepared_input" },
         );
       if (
@@ -73,10 +73,10 @@ export function startOfflineWorker(state, docker) {
           (!Number.isInteger(request.workerId) || request.workerId < 0 || request.workerId > 15)) ||
         (request.baseline && !state.comparison)
       )
-        throw new Error("Invalid offline request");
+        throw new Error("Invalid Saved-page selection request");
       worker = request.workerId ?? "legacy";
       if (activeWorkers.has(worker))
-        throw new Error("Offline worker already has an active request");
+        throw new Error("Saved-page selection worker already has an active request");
       activeWorkers.add(worker);
       ownsWorker = true;
       const service = request.baseline ? "resolver-baseline" : state.service;
@@ -98,9 +98,10 @@ export function startOfflineWorker(state, docker) {
         container.Image !== artifact.images[1].id ||
         container.Config?.Labels?.["com.docker.compose.project.working_dir"] !== state.directory
       )
-        throw new Error("Offline Resolver artifact mismatch");
+        throw new Error("Saved-page selection Resolver artifact mismatch");
       prepared = await execute(id, request.input, true, request.workerId);
-      if (prepared.outcome === "error") throw new Error("Resolver rejected offline input");
+      if (prepared.outcome === "error")
+        throw new Error("Resolver rejected Saved-page selection input");
       const preparedInputHash = createHash("sha256")
         .update(JSON.stringify(JSON.parse(prepared.modelInput)))
         .digest("hex");

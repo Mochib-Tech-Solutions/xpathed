@@ -43,7 +43,7 @@ test("release notes show both arms, incomplete qualification and unknown charges
     policy: { version: "current" },
     phases: [
       {
-        name: "Browser",
+        name: "Live-browser Resolver",
         comparison: {
           candidate: { correct: 3, total: 5, p50: 979, p95: 1132 },
           baseline: { correct: 3, total: 5, p50: 967, p95: 1230 },
@@ -51,7 +51,7 @@ test("release notes show both arms, incomplete qualification and unknown charges
         },
         calls: [{ reportedUsd: 0.001 }, { reportedUsd: null }],
       },
-      { name: "Offline selection" },
+      { name: "Saved-page selection" },
     ],
     caseChanges: { added: ["new-case"], removed: [], changed: ["fixed-label"] },
     changelog: "- Add baseline comparisons (#67)",
@@ -78,6 +78,10 @@ test("release notes show both arms, incomplete qualification and unknown charges
   ])
     assert.ok(notes.includes(text), text);
   assert.ok(notes.includes("latency and cost are informational"));
+  assert.ok(notes.includes("Inference mode: live provider inference"));
+  const controlled = releaseNotes({ ...input, mode: "deterministic" });
+  assert.ok(controlled.includes("Inference mode: controlled provider-free"));
+  assert.ok(controlled.includes("Live provider inference is pending"));
   input.phases[0].comparison.gains = ["new-pass"];
   input.phases[0].comparison.regressions = ["lost-pass"];
   const overall = releaseNotes(input);
@@ -85,16 +89,16 @@ test("release notes show both arms, incomplete qualification and unknown charges
   assert.ok(overall.includes("lost baseline passes: `lost-pass`"));
   input.phases[0].groups = [
     {
-      name: "Browser resolver",
+      name: "Live-browser Resolver",
       comparison: { candidate: { correct: 2, total: 3 }, baseline: { correct: 1, total: 3 } },
     },
     {
-      name: "Offline selection",
+      name: "Saved-page selection",
       comparison: { candidate: { correct: 1, total: 2 }, baseline: { correct: 2, total: 2 } },
     },
   ];
   const grouped = releaseNotes(input);
-  assert.ok(grouped.includes("| Browser resolver | candidate | 2/3"));
-  assert.ok(grouped.includes("| Offline selection | baseline | 2/2"));
+  assert.ok(grouped.includes("| Live-browser Resolver | candidate | 2/3"));
+  assert.ok(grouped.includes("| Saved-page selection | baseline | 2/2"));
   assert.ok(grouped.includes("Retained provider calls: **2**"));
 });
