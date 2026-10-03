@@ -26,7 +26,7 @@ evaluation/
 scripts/release/  # Images, evidence, approval, activation and rollback
 ```
 
-Cases are organized by the behavior they check, rather than by the version that introduced them. The shared loader also serves deterministic CI. Injected-provider failures and saved-locator mutation cases remain engineering checks; selection records why they are excluded from live release inference. Unit, integration and UI tests keep their existing locations and ordinary CI ownership.
+Cases are organized by the behavior they check. Shared XPath/Resolver case IDs and browser/pipeline test titles use `<group>-<behavior>`, such as `targeting-save-button-by-name`, `scope-offscreen-target-is-absent` and `state-readonly-notes-fill-is-blocked`. Names describe the condition and expected result; historical case IDs remain in `sourceIds` for provenance. Saved runs retain their original case identities. The shared loader also serves deterministic CI. Injected-provider failures and saved-locator mutation cases remain engineering checks; selection records why they are excluded from live release inference. Unit, integration and UI tests keep their existing locations and ordinary CI ownership.
 
 Each release comparison freezes the complete eligible browser collection and every reviewed eligible imported case. Both candidate and approved baseline receive the same case inputs and current grading rules, with one original attempt per arm. Browser state resets independently. New cases and improved checks are welcome: apply the same updated expectations to both arms. Changing the collection or grader after a run requires another comparison.
 
@@ -67,9 +67,9 @@ From the repository root:
 ```sh
 pnpm evaluate -- --output .artifacts/evaluation/my-complete-run
 pnpm evaluate:model:live -- --case PHRASENODE_CASE_ID --output .artifacts/evaluation/my-model-check
-pnpm evaluate:xpath -- --case basic-save-v4 --output .artifacts/evaluation/my-xpath-check
-pnpm evaluate:resolver:live -- --case basic-save-v4 --output .artifacts/evaluation/my-e2e-check
-pnpm evaluate:resolver -- --case basic-save-v4 --output .artifacts/evaluation/my-controlled-check
+pnpm evaluate:xpath -- --case targeting-save-button-by-name --output .artifacts/evaluation/my-xpath-check
+pnpm evaluate:resolver:live -- --case targeting-save-button-by-name --output .artifacts/evaluation/my-e2e-check
+pnpm evaluate:resolver -- --case targeting-save-button-by-name --output .artifacts/evaluation/my-controlled-check
 pnpm evaluate:replay RUN_DIRECTORY
 ```
 
@@ -139,7 +139,7 @@ Use **Basic resolver**, **Improved resolver** and **Stagehand** in reports and c
 ```sh
 pnpm evaluate:compare -- \
   --basic-bundle BASIC_BUNDLE_DIRECTORY --basic-sha256 MANIFEST_SHA256 \
-  --case basic-save --output .artifacts/engineering-check
+  --case targeting-save-button-by-name --output .artifacts/engineering-check
 
 # Explicit paid comparison of every eligible shared browser case.
 pnpm evaluate:compare -- --mode live \

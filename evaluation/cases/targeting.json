@@ -1,6 +1,6 @@
 [
   {
-    "id": "basic-save-v4",
+    "id": "targeting-save-button-by-name",
     "family": "profile",
     "split": "regression",
     "category": "language",
@@ -84,7 +84,7 @@
     "sourceIds": ["basic-save-v4", "basic-save-v3", "basic-save", "basic-save-contract-1"]
   },
   {
-    "id": "unicode-quotes-v4",
+    "id": "targeting-button-name-with-unicode-and-quotes",
     "family": "unicode",
     "split": "regression",
     "category": "language",
@@ -169,7 +169,7 @@
     ]
   },
   {
-    "id": "action-families-1-v4",
+    "id": "targeting-textarea-by-label-for-fill",
     "family": "semantics",
     "split": "regression",
     "category": "semantics",
@@ -243,7 +243,7 @@
     "sourceIds": ["action-families-1-v4", "action-families-1-v3", "action-families-1"]
   },
   {
-    "id": "release-holdout-editor-19",
+    "id": "targeting-edition-title-for-type",
     "family": "release-holdout-editor",
     "split": "regression",
     "category": "current-view",
@@ -307,10 +307,11 @@
     "exposedAt": "2026-10-02T09:25:27Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "targeting"
+    "group": "targeting",
+    "sourceIds": ["release-holdout-editor-19"]
   },
   {
-    "id": "release-holdout-editor-20",
+    "id": "targeting-preview-edition-button",
     "family": "release-holdout-editor",
     "split": "regression",
     "category": "current-view",
@@ -374,10 +375,11 @@
     "exposedAt": "2026-10-02T09:25:27Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "targeting"
+    "group": "targeting",
+    "sourceIds": ["release-holdout-editor-20"]
   },
   {
-    "id": "release-holdout-editor-21",
+    "id": "targeting-schedule-edition-button",
     "family": "release-holdout-editor",
     "split": "regression",
     "category": "current-view",
@@ -441,10 +443,11 @@
     "exposedAt": "2026-10-02T09:25:27Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "targeting"
+    "group": "targeting",
+    "sourceIds": ["release-holdout-editor-21"]
   },
   {
-    "id": "release2-figures-1",
+    "id": "targeting-figure-export-by-name",
     "family": "release2-figures",
     "split": "regression",
     "category": "current-view",
@@ -508,10 +511,11 @@
     "exposedAt": "2026-10-02T10:26:06.108Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "targeting"
+    "group": "targeting",
+    "sourceIds": ["release2-figures-1"]
   },
   {
-    "id": "release2-figures-2",
+    "id": "targeting-all-figure-export-buttons",
     "family": "release2-figures",
     "split": "regression",
     "category": "current-view",
@@ -599,10 +603,11 @@
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
     "group": "targeting",
-    "cardinality": "all"
+    "cardinality": "all",
+    "sourceIds": ["release2-figures-2"]
   },
   {
-    "id": "release2-figures-3",
+    "id": "targeting-missing-figure-export-is-absent",
     "family": "release2-figures",
     "split": "regression",
     "category": "current-view",
@@ -653,10 +658,11 @@
     "exposedAt": "2026-10-02T10:26:06.108Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "targeting"
+    "group": "targeting",
+    "sourceIds": ["release2-figures-3"]
   },
   {
-    "id": "release2-linked-form-1",
+    "id": "targeting-external-form-submit-button",
     "family": "release2-linked-form",
     "split": "regression",
     "category": "current-view",
@@ -720,10 +726,11 @@
     "exposedAt": "2026-10-02T10:26:06.108Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "targeting"
+    "group": "targeting",
+    "sourceIds": ["release2-linked-form-1"]
   },
   {
-    "id": "release2-linked-form-2",
+    "id": "targeting-external-form-field-for-hover",
     "family": "release2-linked-form",
     "split": "regression",
     "category": "current-view",
@@ -787,10 +794,11 @@
     "exposedAt": "2026-10-02T10:26:06.108Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "targeting"
+    "group": "targeting",
+    "sourceIds": ["release2-linked-form-2"]
   },
   {
-    "id": "release2-linked-form-3",
+    "id": "targeting-external-form-reset-button",
     "family": "release2-linked-form",
     "split": "regression",
     "category": "current-view",
@@ -854,7 +862,8 @@
     "exposedAt": "2026-10-02T10:26:06.108Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "targeting"
+    "group": "targeting",
+    "sourceIds": ["release2-linked-form-3"]
   },
   {
     "viewport": {
@@ -875,7 +884,7 @@
       "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
       "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt10-reviewed-holdout-check"
     },
-    "id": "release3-menu-1",
+    "id": "targeting-menu-item-by-name",
     "family": "release3-menu",
     "split": "regression",
     "category": "current-view",
@@ -921,7 +930,8 @@
     "exposedAt": "2026-10-02T11:36:32.165Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "targeting"
+    "group": "targeting",
+    "sourceIds": ["release3-menu-1"]
   },
   {
     "viewport": {
@@ -942,7 +952,7 @@
       "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
       "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt10-reviewed-holdout-check"
     },
-    "id": "release3-menu-2",
+    "id": "targeting-menu-checkbox-for-inspection",
     "family": "release3-menu",
     "split": "regression",
     "category": "current-view",
@@ -988,7 +998,8 @@
     "exposedAt": "2026-10-02T11:36:32.165Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "targeting"
+    "group": "targeting",
+    "sourceIds": ["release3-menu-2"]
   },
   {
     "viewport": {
@@ -1009,7 +1020,7 @@
       "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
       "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt10-reviewed-holdout-check"
     },
-    "id": "release3-menu-3",
+    "id": "targeting-disabled-menu-item-is-blocked",
     "family": "release3-menu",
     "split": "regression",
     "category": "current-view",
@@ -1055,7 +1066,8 @@
     "exposedAt": "2026-10-02T11:36:32.165Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "targeting"
+    "group": "targeting",
+    "sourceIds": ["release3-menu-3"]
   },
   {
     "viewport": {
@@ -1076,7 +1088,7 @@
       "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
       "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt10-reviewed-holdout-check"
     },
-    "id": "release3-search-1",
+    "id": "targeting-search-field-for-type",
     "family": "release3-search",
     "split": "regression",
     "category": "current-view",
@@ -1122,7 +1134,8 @@
     "exposedAt": "2026-10-02T11:36:32.165Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "targeting"
+    "group": "targeting",
+    "sourceIds": ["release3-search-1"]
   },
   {
     "viewport": {
@@ -1143,7 +1156,7 @@
       "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
       "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt10-reviewed-holdout-check"
     },
-    "id": "release3-search-2",
+    "id": "targeting-search-submit-button",
     "family": "release3-search",
     "split": "regression",
     "category": "current-view",
@@ -1189,7 +1202,8 @@
     "exposedAt": "2026-10-02T11:36:32.165Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "targeting"
+    "group": "targeting",
+    "sourceIds": ["release3-search-2"]
   },
   {
     "viewport": {
@@ -1210,7 +1224,7 @@
       "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
       "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt10-reviewed-holdout-check"
     },
-    "id": "release3-search-3",
+    "id": "targeting-missing-search-reset-is-absent",
     "family": "release3-search",
     "split": "regression",
     "category": "current-view",
@@ -1243,7 +1257,8 @@
     "exposedAt": "2026-10-02T11:36:32.165Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "targeting"
+    "group": "targeting",
+    "sourceIds": ["release3-search-3"]
   },
   {
     "viewport": {
@@ -1264,7 +1279,7 @@
       "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
       "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt10-reviewed-holdout-check"
     },
-    "id": "release3-status-1",
+    "id": "targeting-progress-bar-for-inspection",
     "family": "release3-status",
     "split": "regression",
     "category": "current-view",
@@ -1310,7 +1325,8 @@
     "exposedAt": "2026-10-02T11:36:32.165Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "targeting"
+    "group": "targeting",
+    "sourceIds": ["release3-status-1"]
   },
   {
     "viewport": {
@@ -1331,7 +1347,7 @@
       "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
       "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt10-reviewed-holdout-check"
     },
-    "id": "release3-status-2",
+    "id": "targeting-usage-meter-for-inspection",
     "family": "release3-status",
     "split": "regression",
     "category": "current-view",
@@ -1377,7 +1393,8 @@
     "exposedAt": "2026-10-02T11:36:32.165Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "targeting"
+    "group": "targeting",
+    "sourceIds": ["release3-status-2"]
   },
   {
     "viewport": {
@@ -1398,7 +1415,7 @@
       "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
       "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt10-reviewed-holdout-check"
     },
-    "id": "release3-status-3",
+    "id": "targeting-status-region-for-inspection",
     "family": "release3-status",
     "split": "regression",
     "category": "current-view",
@@ -1444,10 +1461,11 @@
     "exposedAt": "2026-10-02T11:36:32.165Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "targeting"
+    "group": "targeting",
+    "sourceIds": ["release3-status-3"]
   },
   {
-    "id": "release4-image-links-1",
+    "id": "targeting-image-link-by-accessible-name",
     "family": "release4-image-links",
     "split": "regression",
     "category": "current-view",
@@ -1508,10 +1526,11 @@
     },
     "sourceSplit": "held-out",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "targeting"
+    "group": "targeting",
+    "sourceIds": ["release4-image-links-1"]
   },
   {
-    "id": "release4-image-links-2",
+    "id": "targeting-all-image-links-in-gallery",
     "family": "release4-image-links",
     "split": "regression",
     "category": "current-view",
@@ -1596,10 +1615,11 @@
     "sourceSplit": "held-out",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
     "group": "targeting",
-    "cardinality": "all"
+    "cardinality": "all",
+    "sourceIds": ["release4-image-links-2"]
   },
   {
-    "id": "release4-image-links-3",
+    "id": "targeting-missing-image-link-is-absent",
     "family": "release4-image-links",
     "split": "regression",
     "category": "current-view",
@@ -1647,10 +1667,11 @@
     },
     "sourceSplit": "held-out",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "targeting"
+    "group": "targeting",
+    "sourceIds": ["release4-image-links-3"]
   },
   {
-    "id": "release4-bidi-1",
+    "id": "targeting-invoice-link-in-bidirectional-text",
     "family": "release4-bidi",
     "split": "regression",
     "category": "current-view",
@@ -1711,10 +1732,11 @@
     },
     "sourceSplit": "held-out",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "targeting"
+    "group": "targeting",
+    "sourceIds": ["release4-bidi-1"]
   },
   {
-    "id": "release4-bidi-2",
+    "id": "targeting-all-invoice-links-in-bidirectional-text",
     "family": "release4-bidi",
     "split": "regression",
     "category": "current-view",
@@ -1799,10 +1821,11 @@
     "sourceSplit": "held-out",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
     "group": "targeting",
-    "cardinality": "all"
+    "cardinality": "all",
+    "sourceIds": ["release4-bidi-2"]
   },
   {
-    "id": "release4-bidi-3",
+    "id": "targeting-missing-invoice-language-is-absent",
     "family": "release4-bidi",
     "split": "regression",
     "category": "current-view",
@@ -1850,10 +1873,11 @@
     },
     "sourceSplit": "held-out",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "targeting"
+    "group": "targeting",
+    "sourceIds": ["release4-bidi-3"]
   },
   {
-    "id": "paraphrase-save",
+    "id": "targeting-save-button-from-paraphrase",
     "family": "profile",
     "split": "regression",
     "category": "language",
@@ -1929,7 +1953,7 @@
     "sourceIds": ["paraphrase-save", "paraphrase-save-contract-1"]
   },
   {
-    "id": "typo-save",
+    "id": "targeting-save-button-despite-typos",
     "family": "profile",
     "split": "regression",
     "category": "language",
@@ -2006,7 +2030,7 @@
     "sourceIds": ["typo-save"]
   },
   {
-    "id": "named-save-cancel",
+    "id": "targeting-two-distinct-named-buttons",
     "family": "profile",
     "split": "regression",
     "category": "language",
@@ -2115,7 +2139,7 @@
     "cardinality": "all"
   },
   {
-    "id": "duplicate-mentioned-target",
+    "id": "targeting-repeated-target-mention-is-deduplicated",
     "family": "profile",
     "split": "regression",
     "category": "language",
@@ -2192,7 +2216,7 @@
     "sourceIds": ["duplicate-mentioned-target"]
   },
   {
-    "id": "library-borrow",
+    "id": "targeting-borrow-button-by-book-description",
     "family": "library-catalog",
     "split": "regression",
     "category": "language",
@@ -2320,7 +2344,7 @@
     "sourceIds": ["library-borrow"]
   },
   {
-    "id": "museum-about-link",
+    "id": "targeting-link-name-with-accented-text",
     "family": "museum-navigation",
     "split": "regression",
     "category": "language",
@@ -2458,7 +2482,7 @@
     "sourceIds": ["museum-about-link"]
   },
   {
-    "id": "recipe-typo",
+    "id": "targeting-print-button-despite-typos",
     "family": "recipe-planning",
     "split": "regression",
     "category": "language",

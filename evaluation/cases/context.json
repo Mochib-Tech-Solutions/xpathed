@@ -1,6 +1,6 @@
 [
   {
-    "id": "release-holdout-warehouse-1",
+    "id": "context-dispatch-button-by-depot",
     "family": "release-holdout-warehouse",
     "split": "regression",
     "category": "current-view",
@@ -64,10 +64,11 @@
     "exposedAt": "2026-10-02T09:25:27Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "context"
+    "group": "context",
+    "sourceIds": ["release-holdout-warehouse-1"]
   },
   {
-    "id": "release-holdout-warehouse-2",
+    "id": "context-both-depot-dispatch-buttons",
     "family": "release-holdout-warehouse",
     "split": "regression",
     "category": "current-view",
@@ -156,10 +157,11 @@
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
     "group": "context",
-    "cardinality": "all"
+    "cardinality": "all",
+    "sourceIds": ["release-holdout-warehouse-2"]
   },
   {
-    "id": "release-holdout-warehouse-3",
+    "id": "context-warehouse-export-button",
     "family": "release-holdout-warehouse",
     "split": "regression",
     "category": "current-view",
@@ -223,10 +225,11 @@
     "exposedAt": "2026-10-02T09:25:27Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "context"
+    "group": "context",
+    "sourceIds": ["release-holdout-warehouse-3"]
   },
   {
-    "id": "release-holdout-clinic-4",
+    "id": "context-clinic-notes-for-type",
     "family": "release-holdout-clinic",
     "split": "regression",
     "category": "current-view",
@@ -290,10 +293,11 @@
     "exposedAt": "2026-10-02T09:25:27Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "context"
+    "group": "context",
+    "sourceIds": ["release-holdout-clinic-4"]
   },
   {
-    "id": "release-holdout-clinic-5",
+    "id": "context-clinic-visit-type-for-select",
     "family": "release-holdout-clinic",
     "split": "regression",
     "category": "current-view",
@@ -357,10 +361,11 @@
     "exposedAt": "2026-10-02T09:25:27Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "context"
+    "group": "context",
+    "sourceIds": ["release-holdout-clinic-5"]
   },
   {
-    "id": "release-holdout-clinic-6",
+    "id": "context-disabled-clinic-confirmation-is-blocked",
     "family": "release-holdout-clinic",
     "split": "regression",
     "category": "current-view",
@@ -424,10 +429,11 @@
     "exposedAt": "2026-10-02T09:25:27Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "context"
+    "group": "context",
+    "sourceIds": ["release-holdout-clinic-6"]
   },
   {
-    "id": "release-holdout-library-7",
+    "id": "context-link-in-catalogue-navigation",
     "family": "release-holdout-library",
     "split": "regression",
     "category": "current-view",
@@ -491,10 +497,11 @@
     "exposedAt": "2026-10-02T09:25:27Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "context"
+    "group": "context",
+    "sourceIds": ["release-holdout-library-7"]
   },
   {
-    "id": "release-holdout-library-8",
+    "id": "context-reading-list-for-hover",
     "family": "release-holdout-library",
     "split": "regression",
     "category": "current-view",
@@ -558,10 +565,11 @@
     "exposedAt": "2026-10-02T09:25:27Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "context"
+    "group": "context",
+    "sourceIds": ["release-holdout-library-8"]
   },
   {
-    "id": "release-holdout-library-9",
+    "id": "context-reserve-button-in-astronomy-section",
     "family": "release-holdout-library",
     "split": "regression",
     "category": "current-view",
@@ -625,10 +633,11 @@
     "exposedAt": "2026-10-02T09:25:27Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "context"
+    "group": "context",
+    "sourceIds": ["release-holdout-library-9"]
   },
   {
-    "id": "release-holdout-museum-10",
+    "id": "context-museum-audio-guide-button",
     "family": "release-holdout-museum",
     "split": "regression",
     "category": "current-view",
@@ -692,10 +701,11 @@
     "exposedAt": "2026-10-02T09:25:27Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "context"
+    "group": "context",
+    "sourceIds": ["release-holdout-museum-10"]
   },
   {
-    "id": "release-holdout-museum-11",
+    "id": "context-museum-large-print-button",
     "family": "release-holdout-museum",
     "split": "regression",
     "category": "current-view",
@@ -759,10 +769,11 @@
     "exposedAt": "2026-10-02T09:25:27Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "context"
+    "group": "context",
+    "sourceIds": ["release-holdout-museum-11"]
   },
   {
-    "id": "release-holdout-museum-12",
+    "id": "context-museum-map-for-hover",
     "family": "release-holdout-museum",
     "split": "regression",
     "category": "current-view",
@@ -826,10 +837,11 @@
     "exposedAt": "2026-10-02T09:25:27Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "context"
+    "group": "context",
+    "sourceIds": ["release-holdout-museum-12"]
   },
   {
-    "id": "release-holdout-travel-13",
+    "id": "context-quiet-carriage-for-uncheck",
     "family": "release-holdout-travel",
     "split": "regression",
     "category": "current-view",
@@ -893,10 +905,11 @@
     "exposedAt": "2026-10-02T09:25:27Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "context"
+    "group": "context",
+    "sourceIds": ["release-holdout-travel-13"]
   },
   {
-    "id": "release-holdout-travel-14",
+    "id": "context-bicycle-space-for-check",
     "family": "release-holdout-travel",
     "split": "regression",
     "category": "current-view",
@@ -960,10 +973,11 @@
     "exposedAt": "2026-10-02T09:25:27Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "context"
+    "group": "context",
+    "sourceIds": ["release-holdout-travel-14"]
   },
   {
-    "id": "release-holdout-travel-15",
+    "id": "context-journey-planning-button",
     "family": "release-holdout-travel",
     "split": "regression",
     "category": "current-view",
@@ -1027,10 +1041,11 @@
     "exposedAt": "2026-10-02T09:25:27Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "context"
+    "group": "context",
+    "sourceIds": ["release-holdout-travel-15"]
   },
   {
-    "id": "release-holdout-ledger-16",
+    "id": "context-receipt-download-button-by-associated-label",
     "family": "release-holdout-ledger",
     "split": "regression",
     "category": "current-view",
@@ -1094,10 +1109,11 @@
     "exposedAt": "2026-10-02T09:25:27Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "context"
+    "group": "context",
+    "sourceIds": ["release-holdout-ledger-16"]
   },
   {
-    "id": "release-holdout-ledger-17",
+    "id": "context-statement-download-button-by-associated-label",
     "family": "release-holdout-ledger",
     "split": "regression",
     "category": "current-view",
@@ -1161,10 +1177,11 @@
     "exposedAt": "2026-10-02T09:25:27Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "context"
+    "group": "context",
+    "sourceIds": ["release-holdout-ledger-17"]
   },
   {
-    "id": "release-holdout-ledger-18",
+    "id": "context-ledger-reminder-button",
     "family": "release-holdout-ledger",
     "split": "regression",
     "category": "current-view",
@@ -1228,10 +1245,11 @@
     "exposedAt": "2026-10-02T09:25:27Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "context"
+    "group": "context",
+    "sourceIds": ["release-holdout-ledger-18"]
   },
   {
-    "id": "release-holdout-inventory-22",
+    "id": "context-camera-inspection-button",
     "family": "release-holdout-inventory",
     "split": "regression",
     "category": "current-view",
@@ -1295,10 +1313,11 @@
     "exposedAt": "2026-10-02T09:25:27Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "context"
+    "group": "context",
+    "sourceIds": ["release-holdout-inventory-22"]
   },
   {
-    "id": "release-holdout-inventory-23",
+    "id": "context-tripod-inspection-button",
     "family": "release-holdout-inventory",
     "split": "regression",
     "category": "current-view",
@@ -1362,10 +1381,11 @@
     "exposedAt": "2026-10-02T09:25:27Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "context"
+    "group": "context",
+    "sourceIds": ["release-holdout-inventory-23"]
   },
   {
-    "id": "release-holdout-inventory-24",
+    "id": "context-disabled-equipment-retirement-is-blocked",
     "family": "release-holdout-inventory",
     "split": "regression",
     "category": "current-view",
@@ -1429,10 +1449,11 @@
     "exposedAt": "2026-10-02T09:25:27Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "context"
+    "group": "context",
+    "sourceIds": ["release-holdout-inventory-24"]
   },
   {
-    "id": "release-holdout-timetable-25",
+    "id": "context-timetable-booking-by-monday-morning-slot",
     "family": "release-holdout-timetable",
     "split": "regression",
     "category": "current-view",
@@ -1496,10 +1517,11 @@
     "exposedAt": "2026-10-02T09:25:27Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "context"
+    "group": "context",
+    "sourceIds": ["release-holdout-timetable-25"]
   },
   {
-    "id": "release-holdout-timetable-26",
+    "id": "context-timetable-booking-by-tuesday-morning-slot",
     "family": "release-holdout-timetable",
     "split": "regression",
     "category": "current-view",
@@ -1563,10 +1585,11 @@
     "exposedAt": "2026-10-02T09:25:27Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "context"
+    "group": "context",
+    "sourceIds": ["release-holdout-timetable-26"]
   },
   {
-    "id": "release-holdout-timetable-27",
+    "id": "context-timetable-booking-by-monday-afternoon-slot",
     "family": "release-holdout-timetable",
     "split": "regression",
     "category": "current-view",
@@ -1630,10 +1653,11 @@
     "exposedAt": "2026-10-02T09:25:27Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "context"
+    "group": "context",
+    "sourceIds": ["release-holdout-timetable-27"]
   },
   {
-    "id": "release2-breadcrumbs-1",
+    "id": "context-breadcrumb-link-by-name",
     "family": "release2-breadcrumbs",
     "split": "regression",
     "category": "current-view",
@@ -1697,10 +1721,11 @@
     "exposedAt": "2026-10-02T10:26:06.108Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "context"
+    "group": "context",
+    "sourceIds": ["release2-breadcrumbs-1"]
   },
   {
-    "id": "release2-breadcrumbs-2",
+    "id": "context-two-named-breadcrumb-links",
     "family": "release2-breadcrumbs",
     "split": "regression",
     "category": "current-view",
@@ -1788,10 +1813,11 @@
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
     "group": "context",
-    "cardinality": "all"
+    "cardinality": "all",
+    "sourceIds": ["release2-breadcrumbs-2"]
   },
   {
-    "id": "release2-breadcrumbs-3",
+    "id": "context-missing-breadcrumb-is-absent",
     "family": "release2-breadcrumbs",
     "split": "regression",
     "category": "current-view",
@@ -1842,10 +1868,11 @@
     "exposedAt": "2026-10-02T10:26:06.108Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "context"
+    "group": "context",
+    "sourceIds": ["release2-breadcrumbs-3"]
   },
   {
-    "id": "release2-fieldset-1",
+    "id": "context-disabled-fieldset-legend-button-is-ready",
     "family": "release2-fieldset",
     "split": "regression",
     "category": "current-view",
@@ -1909,10 +1936,11 @@
     "exposedAt": "2026-10-02T10:26:06.108Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "context"
+    "group": "context",
+    "sourceIds": ["release2-fieldset-1"]
   },
   {
-    "id": "release2-fieldset-2",
+    "id": "context-disabled-fieldset-descendant-is-blocked",
     "family": "release2-fieldset",
     "split": "regression",
     "category": "current-view",
@@ -1976,10 +2004,11 @@
     "exposedAt": "2026-10-02T10:26:06.108Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "context"
+    "group": "context",
+    "sourceIds": ["release2-fieldset-2"]
   },
   {
-    "id": "release2-fieldset-3",
+    "id": "context-notice-preview-outside-disabled-fieldset",
     "family": "release2-fieldset",
     "split": "regression",
     "category": "current-view",
@@ -2043,10 +2072,11 @@
     "exposedAt": "2026-10-02T10:26:06.108Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "context"
+    "group": "context",
+    "sourceIds": ["release2-fieldset-3"]
   },
   {
-    "id": "release2-tabs-1",
+    "id": "context-tab-by-name",
     "family": "release2-tabs",
     "split": "regression",
     "category": "current-view",
@@ -2110,10 +2140,11 @@
     "exposedAt": "2026-10-02T10:26:06.108Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "context"
+    "group": "context",
+    "sourceIds": ["release2-tabs-1"]
   },
   {
-    "id": "release2-tabs-2",
+    "id": "context-all-tabs-in-named-tablist",
     "family": "release2-tabs",
     "split": "regression",
     "category": "current-view",
@@ -2224,10 +2255,11 @@
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
     "group": "context",
-    "cardinality": "all"
+    "cardinality": "all",
+    "sourceIds": ["release2-tabs-2"]
   },
   {
-    "id": "release2-tabs-3",
+    "id": "context-missing-tab-is-absent",
     "family": "release2-tabs",
     "split": "regression",
     "category": "current-view",
@@ -2278,10 +2310,11 @@
     "exposedAt": "2026-10-02T10:26:06.108Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "context"
+    "group": "context",
+    "sourceIds": ["release2-tabs-3"]
   },
   {
-    "id": "release2-tree-1",
+    "id": "context-tree-folder-button-by-name",
     "family": "release2-tree",
     "split": "regression",
     "category": "current-view",
@@ -2345,10 +2378,11 @@
     "exposedAt": "2026-10-02T10:26:06.108Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "context"
+    "group": "context",
+    "sourceIds": ["release2-tree-1"]
   },
   {
-    "id": "release2-tree-2",
+    "id": "context-two-named-tree-folder-buttons",
     "family": "release2-tree",
     "split": "regression",
     "category": "current-view",
@@ -2436,10 +2470,11 @@
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
     "group": "context",
-    "cardinality": "all"
+    "cardinality": "all",
+    "sourceIds": ["release2-tree-2"]
   },
   {
-    "id": "release2-tree-3",
+    "id": "context-tree-restore-button-for-hover",
     "family": "release2-tree",
     "split": "regression",
     "category": "current-view",
@@ -2503,10 +2538,11 @@
     "exposedAt": "2026-10-02T10:26:06.108Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "context"
+    "group": "context",
+    "sourceIds": ["release2-tree-3"]
   },
   {
-    "id": "release2-accordion-1",
+    "id": "context-control-in-expanded-accordion",
     "family": "release2-accordion",
     "split": "regression",
     "category": "current-view",
@@ -2570,10 +2606,11 @@
     "exposedAt": "2026-10-02T10:26:06.108Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "context"
+    "group": "context",
+    "sourceIds": ["release2-accordion-1"]
   },
   {
-    "id": "release2-accordion-2",
+    "id": "context-control-in-collapsed-accordion-is-absent",
     "family": "release2-accordion",
     "split": "regression",
     "category": "current-view",
@@ -2624,10 +2661,11 @@
     "exposedAt": "2026-10-02T10:26:06.108Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "context"
+    "group": "context",
+    "sourceIds": ["release2-accordion-2"]
   },
   {
-    "id": "release2-accordion-3",
+    "id": "context-two-controls-in-expanded-accordion",
     "family": "release2-accordion",
     "split": "regression",
     "category": "current-view",
@@ -2715,10 +2753,11 @@
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
     "group": "context",
-    "cardinality": "all"
+    "cardinality": "all",
+    "sourceIds": ["release2-accordion-3"]
   },
   {
-    "id": "release2-timeline-1",
+    "id": "context-timeline-package-log-button",
     "family": "release2-timeline",
     "split": "regression",
     "category": "current-view",
@@ -2782,10 +2821,11 @@
     "exposedAt": "2026-10-02T10:26:06.108Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "context"
+    "group": "context",
+    "sourceIds": ["release2-timeline-1"]
   },
   {
-    "id": "release2-timeline-2",
+    "id": "context-disabled-timeline-restart-is-blocked",
     "family": "release2-timeline",
     "split": "regression",
     "category": "current-view",
@@ -2849,10 +2889,11 @@
     "exposedAt": "2026-10-02T10:26:06.108Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "context"
+    "group": "context",
+    "sourceIds": ["release2-timeline-2"]
   },
   {
-    "id": "release2-timeline-3",
+    "id": "context-timeline-compile-log-for-hover",
     "family": "release2-timeline",
     "split": "regression",
     "category": "current-view",
@@ -2916,7 +2957,8 @@
     "exposedAt": "2026-10-02T10:26:06.108Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "context"
+    "group": "context",
+    "sourceIds": ["release2-timeline-3"]
   },
   {
     "viewport": {
@@ -2937,7 +2979,7 @@
       "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
       "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt10-reviewed-holdout-check"
     },
-    "id": "release3-grid-1",
+    "id": "context-grid-cell-for-focus",
     "family": "release3-grid",
     "split": "regression",
     "category": "current-view",
@@ -2983,7 +3025,8 @@
     "exposedAt": "2026-10-02T11:36:32.165Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "context"
+    "group": "context",
+    "sourceIds": ["release3-grid-1"]
   },
   {
     "viewport": {
@@ -3004,7 +3047,7 @@
       "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
       "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt10-reviewed-holdout-check"
     },
-    "id": "release3-grid-2",
+    "id": "context-all-occupant-grid-cells",
     "family": "release3-grid",
     "split": "regression",
     "category": "current-view",
@@ -3074,7 +3117,8 @@
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
     "group": "context",
-    "cardinality": "all"
+    "cardinality": "all",
+    "sourceIds": ["release3-grid-2"]
   },
   {
     "viewport": {
@@ -3095,7 +3139,7 @@
       "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
       "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt10-reviewed-holdout-check"
     },
-    "id": "release3-grid-3",
+    "id": "context-missing-grid-cell-is-absent",
     "family": "release3-grid",
     "split": "regression",
     "category": "current-view",
@@ -3128,10 +3172,11 @@
     "exposedAt": "2026-10-02T11:36:32.165Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "context"
+    "group": "context",
+    "sourceIds": ["release3-grid-3"]
   },
   {
-    "id": "release4-annotations-1",
+    "id": "context-annotation-link-by-name",
     "family": "release4-annotations",
     "split": "regression",
     "category": "current-view",
@@ -3192,10 +3237,11 @@
     },
     "sourceSplit": "held-out",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "context"
+    "group": "context",
+    "sourceIds": ["release4-annotations-1"]
   },
   {
-    "id": "release4-annotations-2",
+    "id": "context-all-links-in-pronunciation-notes",
     "family": "release4-annotations",
     "split": "regression",
     "category": "current-view",
@@ -3280,10 +3326,11 @@
     "sourceSplit": "held-out",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
     "group": "context",
-    "cardinality": "all"
+    "cardinality": "all",
+    "sourceIds": ["release4-annotations-2"]
   },
   {
-    "id": "release4-annotations-3",
+    "id": "context-missing-annotation-link-is-absent",
     "family": "release4-annotations",
     "split": "regression",
     "category": "current-view",
@@ -3331,10 +3378,11 @@
     },
     "sourceSplit": "held-out",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "context"
+    "group": "context",
+    "sourceIds": ["release4-annotations-3"]
   },
   {
-    "id": "release4-contacts-1",
+    "id": "context-email-link-by-branch",
     "family": "release4-contacts",
     "split": "regression",
     "category": "current-view",
@@ -3395,10 +3443,11 @@
     },
     "sourceSplit": "held-out",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "context"
+    "group": "context",
+    "sourceIds": ["release4-contacts-1"]
   },
   {
-    "id": "release4-contacts-2",
+    "id": "context-all-branch-email-links",
     "family": "release4-contacts",
     "split": "regression",
     "category": "current-view",
@@ -3483,10 +3532,11 @@
     "sourceSplit": "held-out",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
     "group": "context",
-    "cardinality": "all"
+    "cardinality": "all",
+    "sourceIds": ["release4-contacts-2"]
   },
   {
-    "id": "release4-contacts-3",
+    "id": "context-disabled-branch-phone-link-is-blocked",
     "family": "release4-contacts",
     "split": "regression",
     "category": "current-view",
@@ -3547,10 +3597,11 @@
     },
     "sourceSplit": "held-out",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "context"
+    "group": "context",
+    "sourceIds": ["release4-contacts-3"]
   },
   {
-    "id": "plural-scoped-save",
+    "id": "context-all-save-buttons-in-shipping-section",
     "family": "context",
     "split": "regression",
     "category": "context",
@@ -3629,7 +3680,7 @@
     "cardinality": "all"
   },
   {
-    "id": "warehouse-scoped-plural",
+    "id": "context-all-release-buttons-in-cold-storage-section",
     "family": "warehouse-dispatch",
     "split": "regression",
     "category": "context",

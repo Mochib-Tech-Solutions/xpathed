@@ -15,7 +15,7 @@ async function json(url, method = "GET", body) {
   assert.equal(response.status, 200, `Service returned HTTP ${response.status}`);
   return response.json();
 }
-test("actual OpenRouter route resolves current-view plural frame targets and scoped absence", async () => {
+test("provider-live-inference-resolves-plural-frame-targets-and-scoped-absence", async () => {
   const session = await json(`${browser}/sessions`, "POST");
   const run = randomUUID();
   let knownReportedCostUsd = 0;
