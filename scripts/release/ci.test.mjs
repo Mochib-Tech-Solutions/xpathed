@@ -39,28 +39,49 @@ test("only private same-repository main to release PRs can use paid evaluation",
   }
 });
 
-test("release requires the latest ordinary CI decision on the exact tested revision", async () => {
-  const sha = "a".repeat(40),
-    repository = "owner/repo";
+test("release verifies the latest PR CI receipt for the exact merge source and run", async () => {
+  const identity = { sourceSha: "a".repeat(40), headSha: "b".repeat(40), pr: 87 };
+  const repository = "owner/repo";
   const good = {
     id: 1,
-    name: "Check",
-    app: { slug: "github-actions" },
+    run_attempt: 2,
+    pull_requests: [{ number: 87 }],
     status: "completed",
     conclusion: "success",
   };
-  const api = (checks) => (path) => {
-    assert.equal(path, `repos/${repository}/commits/${sha}/check-runs?per_page=100`);
-    return { check_runs: checks };
+  const gate = { passed: true, sha: identity.sourceSha, runId: "1", runAttempt: "2" };
+  const api = (runs) => (path) => {
+    assert.equal(
+      path,
+      `repos/${repository}/actions/workflows/check.yml/runs?event=pull_request&head_sha=${identity.headSha}&per_page=100`,
+    );
+    return { workflow_runs: runs };
   };
-  await requireCI(repository, sha, 0, api([good]));
-  for (const checks of [
+  await requireCI(repository, identity, 0, api([good]), async (repo, run) => {
+    assert.equal(repo, repository);
+    assert.deepEqual(run, good);
+    return gate;
+  });
+  for (const runs of [
     [],
-    [{ ...good, app: { slug: "other" } }],
+    [{ ...good, pull_requests: [{ number: 88 }] }],
     [good, { ...good, id: 2, conclusion: "failure" }],
     [good, { ...good, id: 2, status: "in_progress", conclusion: null }],
   ])
-    await assert.rejects(requireCI(repository, sha, 0, api(checks)), /Ordinary CI/);
+    await assert.rejects(
+      requireCI(repository, identity, 0, api(runs), async () => gate),
+      /Ordinary CI/,
+    );
+  for (const change of [
+    { passed: false },
+    { sha: identity.headSha },
+    { runId: "2" },
+    { runAttempt: "1" },
+  ])
+    await assert.rejects(
+      requireCI(repository, identity, 0, api([good]), async () => ({ ...gate, ...change })),
+      /Ordinary CI receipt/,
+    );
 });
 
 test("case changes report additions, removals and changed assertions without counting review metadata", () => {

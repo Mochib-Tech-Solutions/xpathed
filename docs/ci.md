@@ -56,7 +56,7 @@ Stack checks reuse [dotnet format verification](https://learn.microsoft.com/en-u
 
 ## Aggregate gate
 
-After its checks succeed, each selected job writes a receipt containing the actual checkout SHA, workflow run and attempt, job identity and workflow/package/SDK fingerprints. Each .NET matrix member has its own receipt. The final `Check` job requires exactly the selected receipts and successful job results. Missing, unexpected, stale, skipped, cancelled or failed selected jobs fail the gate; unselected jobs must be skipped.
+After its checks succeed, each selected job writes a receipt containing the actual checkout SHA, workflow run and attempt, job identity and workflow/package/SDK fingerprints. Each .NET matrix member has its own receipt. The final `Check` job requires exactly the selected receipts and successful job results. Missing, unexpected, stale, skipped, cancelled or failed selected jobs fail the gate; unselected jobs must be skipped. Release qualification locates the latest CI run for the PR head and verifies its aggregate receipt against the exact tested merge commit, run and attempt. GitHub attaches PR checks to the head commit even though CI checks out the merge commit.
 
 The browser job runs `pnpm evaluate:resolver --mode deterministic --concurrency 4` with a fresh output directory and isolated Compose project. It builds only Browser, Resolver and the controlled evaluation fixture. It has no OpenRouter key, reads no local `.env`, and uses the fixture model endpoint with response reuse disabled. The shared case catalog includes current-view resolution, deterministic provider failures and saved-locator mutation coverage in one run.
 
