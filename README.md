@@ -118,6 +118,8 @@ The **evaluation set** has three categories, scored separately:
 
 “Offline” describes the saved inputs used for model selection, which still calls a live model. XPath evaluation supplies known selections to isolate the stage after inference. E2E checks whether both stages work together. The chat UI is outside this boundary. A **regression** is a lost pass between compared runs. Reusing cases does not establish unseen-site accuracy.
 
+Shared XPath/Resolver case names and browser/pipeline test titles describe their group and behavior, for example `targeting-save-button-by-name` and `scope-offscreen-target-is-absent`. See the [evaluation guide](docs/evaluation.md#one-evaluation-set-grouped-by-behavior) for naming and provenance.
+
 ### Basic resolver, Improved resolver and Stagehand
 
 The [engineering comparison](docs/research/engineering-comparison.md) uses **183 shared browser cases**, the same DeepSeek V4.1 Flash/Wafer route, and one original attempt per system. Three isolated workers run concurrently. Earlier resolver code stays in saved images; the application keeps one implementation.
@@ -140,7 +142,7 @@ All **549 paid calls** are retained, with **$0.07312420** reported and no missin
 pnpm check                              # local checks
 pnpm evaluate                           # all three categories, including paid model calls
 pnpm evaluate:resolver                  # complete pipeline with controlled model responses
-pnpm evaluate:xpath -- --case basic-save-v4 # one XPath case, no model call
+pnpm evaluate:xpath -- --case targeting-save-button-by-name # one XPath case, no model call
 pnpm evaluate:replay RUN_DIRECTORY       # regrade saved evidence
 ```
 

@@ -6,19 +6,19 @@ import { resolveXPathTrial, selectXPathCases } from "./xpath.mjs";
 import { gradeTrial } from "./grader.mjs";
 import { loadCases } from "./cases/load.mjs";
 
-test("XPath cases retain mutation checks and exclude model-only and provider-failure expectations", () => {
+test("xpath-selection-retains-mutations-and-excludes-cases-without-verifiable-targets", () => {
   const { cases, exclusions } = selectXPathCases(loadCases().cases);
   assert.ok(cases.some((item) => item.mutation));
-  assert.ok(exclusions.some((item) => item.caseId === "capture-budget"));
+  assert.ok(exclusions.some((item) => item.caseId === "scope-capture-budget-exhaustion-is-error"));
   assert.ok(cases.every((item) => !item.provider.fault && !item.expected.summary));
   assert.ok(
     cases.every((item) => item.expected.actions.some((action) => action.outcome === "found")),
   );
 });
 
-test("XPath verification calls only Browser and rejects a unique XPath for the wrong node", async (t) => {
+test("xpath-browser-verification-rejects-unique-match-for-wrong-node", async (t) => {
   const spec = selectXPathCases(loadCases().cases).cases.find(
-    (item) => item.id === "basic-save-v4",
+    (item) => item.id === "targeting-save-button-by-name",
   );
   const requests = [];
   let observation,

@@ -32,7 +32,7 @@ const example = {
   },
 };
 
-test("durable run configuration keeps effective settings but excludes page content and credentials", () => {
+test("evidence-effective-configuration-excludes-page-content-and-credentials", () => {
   const record = configurationRecord({
     result: {
       configurationId: "config",
@@ -72,7 +72,7 @@ test("durable run configuration keeps effective settings but excludes page conte
   assert.doesNotMatch(JSON.stringify(record), /PRIVATE_PAGE|PRIVATE_KEY/);
 });
 
-test("the run rejects family leakage before contacting the browser", () => {
+test("selection-family-leakage-is-rejected-before-browser-contact", () => {
   assert.throws(
     () =>
       validateCases({
@@ -231,8 +231,8 @@ async function runWithServices(
   return { attempts, trial: JSON.parse(await readFile(trialPath, "utf8")), output, trialPath };
 }
 
-test("authored static DOM fixtures retain their complete identity in CI evidence", async (t) => {
-  const { output } = await runWithServices(t, "above-reference-v4", {
+test("evidence-authored-dom-fixtures-retain-complete-identity", async (t) => {
+  const { output } = await runWithServices(t, "appearance-button-above-named-control", {
     contractVersion: "4",
     captureScope: "viewport",
   });
@@ -241,16 +241,22 @@ test("authored static DOM fixtures retain their complete identity in CI evidence
   assert.equal(manifest.cases[0].fixture.sha256, undefined);
 });
 
-test("a failed coverage capture still records the resolver's capture-budget result", async (t) => {
-  const { trial, attempts } = await runWithServices(t, "capture-budget", { captureFailure: true });
+test("capture-coverage-failure-retains-resolver-budget-error", async (t) => {
+  const { trial, attempts } = await runWithServices(t, "scope-capture-budget-exhaustion-is-error", {
+    captureFailure: true,
+  });
   assert.equal(attempts.length, 1);
   assert.equal(trial.captureObservation.error.code, "http_502");
   assert.equal(trial.result.diagnostics.code, "capture_incomplete");
   assert.equal(trial.error.code, "capture_scope_unverified");
 });
 
-test("a failed fresh resolution persists its own attempt without replacing the original result", async (t) => {
-  const { trial, attempts } = await runWithServices(t, "mutation-wrapper", { freshFailure: true });
+test("locators-failed-fresh-resolution-retains-original-attempt", async (t) => {
+  const { trial, attempts } = await runWithServices(
+    t,
+    "locators-wrapper-insertion-preserves-target-identity",
+    { freshFailure: true },
+  );
   assert.equal(attempts.length, 2);
   assert.equal(trial.result.outcome, "found");
   assert.equal(trial.error, undefined);
@@ -261,36 +267,48 @@ test("a failed fresh resolution persists its own attempt without replacing the o
   assert.ok(Number.isFinite(Date.parse(trial.mutation.fresh.createdAt)));
 });
 
-test("fresh mutation results with the wrong attempt identity fail closed", async (t) => {
-  const { trial } = await runWithServices(t, "mutation-wrapper", { freshIdentityMismatch: true });
+test("locators-fresh-resolution-rejects-wrong-attempt-identity", async (t) => {
+  const { trial } = await runWithServices(
+    t,
+    "locators-wrapper-insertion-preserves-target-identity",
+    { freshIdentityMismatch: true },
+  );
   assert.match(trial.mutation.fresh.error?.message ?? "", /identity mismatch/i);
 });
 
-test("the fresh mutation provider input is checked for oracle labels independently", async (t) => {
-  const { trial } = await runWithServices(t, "mutation-wrapper", { freshOracleLeak: true });
+test("locators-fresh-model-input-is-checked-for-oracle-leakage", async (t) => {
+  const { trial } = await runWithServices(
+    t,
+    "locators-wrapper-insertion-preserves-target-identity",
+    { freshOracleLeak: true },
+  );
   assert.equal(trial.observation.oracleLeak, false);
   assert.equal(trial.mutation.fresh.observation.oracleLeak, true);
 });
 
-test("viewport observations retain tolerated geometry and reject larger drift", async (t) => {
-  const { trial } = await runWithServices(t, "basic-save-v4", {
+test("scope-viewport-observations-allow-declared-tolerance", async (t) => {
+  const { trial } = await runWithServices(t, "targeting-save-button-by-name", {
     viewport: { width: 1279, height: 799 },
   });
   assert.equal(trial.error, undefined);
   assert.deepEqual(trial.observation.viewport, { width: 1279, height: 799 });
 });
 
-test("viewport drift beyond the declared tolerance fails the trial", async (t) => {
-  const { trial } = await runWithServices(t, "basic-save-v4", {
+test("scope-viewport-drift-beyond-tolerance-fails-trial", async (t) => {
+  const { trial } = await runWithServices(t, "targeting-save-button-by-name", {
     viewport: { width: 1278, height: 800 },
   });
   assert.match(trial.error?.message ?? "", /viewport/i);
 });
 
-test("replay counts a missing planned trial as a failure rather than dropping it", async (t) => {
-  const { output, trialPath } = await runWithServices(t, "capture-budget", {
-    captureFailure: true,
-  });
+test("replay-missing-planned-trial-remains-failure", async (t) => {
+  const { output, trialPath } = await runWithServices(
+    t,
+    "scope-capture-budget-exhaustion-is-error",
+    {
+      captureFailure: true,
+    },
+  );
   await rm(trialPath);
   const report = await replay(output);
   assert.equal(report.passed, false);
@@ -299,7 +317,7 @@ test("replay counts a missing planned trial as a failure rather than dropping it
   assert.equal(report.missingTrials, 1);
 });
 
-test("the same seed plans every case and repetition once without retries", () => {
+test("planning-same-seed-schedules-every-case-once-without-retries", () => {
   const cases = [example, { ...example, id: "cancel" }];
   const plan = buildPlan(cases, { seed: 23, repetitions: 2, timeoutMs: 30000 });
   assert.deepEqual(plan, buildPlan(cases, { seed: 23, repetitions: 2, timeoutMs: 30000 }));
@@ -309,7 +327,7 @@ test("the same seed plans every case and repetition once without retries", () =>
   assert.equal(plan.concurrency, 1);
 });
 
-test("invalid or ambiguous command options cannot accidentally make paid calls", () => {
+test("options-invalid-or-ambiguous-arguments-are-rejected-before-paid-calls", () => {
   assert.equal(parseOptions([]).mode, "deterministic");
   assert.throws(() => parseOptions(["--mode", "lve"]));
   assert.throws(() => parseOptions(["--repetitions", "0"]));
@@ -317,7 +335,7 @@ test("invalid or ambiguous command options cannot accidentally make paid calls",
   assert.throws(() => parseOptions(["--unknown", "value"]));
 });
 
-test("importable artifacts keep model input only inside expiring evidence", () => {
+test("evidence-model-input-remains-inside-expiring-artifacts", () => {
   const trial = {
     id: "a".repeat(32),
     caseId: "save",
@@ -340,7 +358,7 @@ test("importable artifacts keep model input only inside expiring evidence", () =
   );
 });
 
-test("artifact cleanup erases browser and offline inputs at 30 days without discarding outcomes", async () => {
+test("retention-expired-inputs-are-erased-without-discarding-outcomes", async () => {
   const path = await mkdtemp(join(tmpdir(), "evaluation-retention-"));
   try {
     await mkdir(join(path, "trials"));
@@ -410,7 +428,7 @@ test("artifact cleanup erases browser and offline inputs at 30 days without disc
   }
 });
 
-test("context retention expires prepared requests and preflight evidence, then removes records", async () => {
+test("retention-prepared-requests-and-preflight-evidence-expire-before-records", async () => {
   const path = await mkdtemp(join(tmpdir(), "context-retention-"));
   try {
     for (const sub of ["trials", "preflight", "provider"]) await mkdir(join(path, sub));
@@ -455,15 +473,15 @@ test("context retention expires prepared requests and preflight evidence, then r
   }
 });
 
-test("current-view runs request scoped capture and reject a legacy-scope response", async (t) => {
-  const { trial } = await runWithServices(t, "control-states-1-v4", {
+test("scope-current-view-capture-rejects-wrong-scope-response", async (t) => {
+  const { trial } = await runWithServices(t, "state-disabled-settings-button-is-blocked", {
     captureScope: "page",
   });
   assert.match(trial.captureObservation.error.message, /wrong scope/);
   assert.equal(trial.error.code, "capture_scope_unverified");
 });
 
-test("browser workers overlap, respect the cap, retain plan order and never retry", async () => {
+test("workers-concurrency-preserves-cap-plan-order-and-original-attempts", async () => {
   let active = 0,
     peak = 0;
   const started = [],
@@ -491,7 +509,7 @@ test("browser workers overlap, respect the cap, retain plan order and never retr
   assert.equal(buildPlan([example], { seed: 1, repetitions: 1, concurrency: 3 }).concurrency, 3);
 });
 
-test("workers finish pending cleanup before reporting an infrastructure failure", async () => {
+test("workers-pending-cleanup-completes-before-infrastructure-failure-is-reported", async () => {
   let finished = false;
   await assert.rejects(
     runTrials({ trials: [0, 1], concurrency: 2 }, async (trial) => {
@@ -507,8 +525,12 @@ test("workers finish pending cleanup before reporting an infrastructure failure"
   assert.throws(() => parseOptions(["--mode", "live", "--concurrency", "2"]), /Live evaluation/);
 });
 
-test("serial execution preserves the unbound fixture protocol used by comparison proxies", async (t) => {
-  const { trial, attempts } = await runWithServices(t, "mutation-wrapper", { concurrency: 1 });
+test("workers-serial-execution-preserves-comparison-fixture-protocol", async (t) => {
+  const { trial, attempts } = await runWithServices(
+    t,
+    "locators-wrapper-insertion-preserves-target-identity",
+    { concurrency: 1 },
+  );
   assert.equal(attempts.length, 2);
   assert.equal(trial.error, undefined);
   assert.equal(trial.mutation.fresh.error, undefined);

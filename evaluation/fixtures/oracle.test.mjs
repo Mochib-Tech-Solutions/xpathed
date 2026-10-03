@@ -41,7 +41,7 @@ async function observe(html, command, mutate, setup) {
 }
 const action = (xpath) => ({ target: { xpaths: [xpath] } });
 
-test("oracle reports target-set identities independently while preserving positional intended", async () => {
+test("oracle-target-set-identities-are-independent-of-returned-locators", async () => {
   const [baseline, result] = await observe(
     '<button id="a">A</button><button id="b">B</button><button id="wrong">Wrong</button>',
     {
@@ -68,7 +68,7 @@ test("oracle reports target-set identities independently while preserving positi
   assert.equal(result.passiveStateUnchanged, true);
 });
 
-test("oracle excludes hidden nodes but keeps disabled and offscreen nodes, detecting field edits", async () => {
+test("oracle-excludes-hidden-nodes-and-detects-field-edits", async () => {
   const [, result] = await observe(
     '<div aria-hidden="true"><button id="hidden">Hidden</button></div><button id="disabled" disabled>Disabled</button><button id="offscreen" style="position:absolute;top:5000px">Far</button><input value="secret">',
     {
@@ -90,7 +90,7 @@ test("oracle excludes hidden nodes but keeps disabled and offscreen nodes, detec
   assert.equal(JSON.stringify(result).includes("secret"), false);
 });
 
-test("baseline parity detects form property changes without retaining plaintext values", async () => {
+test("oracle-form-state-parity-detects-changes-without-plaintext-values", async () => {
   const html =
     '<input id="text" value="PRIVATE_ORIGINAL"><textarea id="area">PRIVATE_AREA</textarea><input id="check" type="checkbox"><select id="select"><option>A</option><option>B</option></select><select id="multi" multiple><option selected>A</option><option>B</option></select><div id="edit" contenteditable>PRIVATE_EDIT</div>';
   const [original] = await observe(html, { expected: [], actions: [] });
@@ -146,7 +146,7 @@ test("baseline parity detects form property changes without retaining plaintext 
   assert.equal(JSON.stringify(original).includes("PRIVATE_"), false);
 });
 
-test("passivity detects secondary multi-select changes when value and first index stay unchanged", async () => {
+test("oracle-multiselect-changes-are-detected-despite-unchanged-first-value", async () => {
   const [, result] = await observe(
     "<select multiple><option selected>A</option><option>B</option></select>",
     { expected: [], actions: [] },

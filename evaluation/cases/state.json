@@ -18,7 +18,7 @@
       "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
       "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt10-reviewed-holdout-check"
     },
-    "id": "release3-radio-1",
+    "id": "state-custom-radio-check-is-unverified",
     "family": "release3-radio",
     "split": "regression",
     "category": "current-view",
@@ -65,7 +65,8 @@
     "exposedAt": "2026-10-02T11:36:32.165Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "state"
+    "group": "state",
+    "sourceIds": ["release3-radio-1"]
   },
   {
     "viewport": {
@@ -86,7 +87,7 @@
       "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
       "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt10-reviewed-holdout-check"
     },
-    "id": "release3-radio-2",
+    "id": "state-custom-radio-for-inspection",
     "family": "release3-radio",
     "split": "regression",
     "category": "current-view",
@@ -132,7 +133,8 @@
     "exposedAt": "2026-10-02T11:36:32.165Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "state"
+    "group": "state",
+    "sourceIds": ["release3-radio-2"]
   },
   {
     "viewport": {
@@ -153,7 +155,7 @@
       "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
       "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt10-reviewed-holdout-check"
     },
-    "id": "release3-radio-3",
+    "id": "state-disabled-custom-radio-click-is-blocked",
     "family": "release3-radio",
     "split": "regression",
     "category": "current-view",
@@ -199,7 +201,8 @@
     "exposedAt": "2026-10-02T11:36:32.165Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "state"
+    "group": "state",
+    "sourceIds": ["release3-radio-3"]
   },
   {
     "viewport": {
@@ -220,7 +223,7 @@
       "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
       "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt10-reviewed-holdout-check"
     },
-    "id": "release3-listbox-1",
+    "id": "state-listbox-option-for-click",
     "family": "release3-listbox",
     "split": "regression",
     "category": "current-view",
@@ -266,7 +269,8 @@
     "exposedAt": "2026-10-02T11:36:32.165Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "state"
+    "group": "state",
+    "sourceIds": ["release3-listbox-1"]
   },
   {
     "viewport": {
@@ -287,7 +291,7 @@
       "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
       "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt10-reviewed-holdout-check"
     },
-    "id": "release3-listbox-2",
+    "id": "state-all-listbox-options-for-inspection",
     "family": "release3-listbox",
     "split": "regression",
     "category": "current-view",
@@ -380,7 +384,8 @@
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
     "group": "state",
-    "cardinality": "all"
+    "cardinality": "all",
+    "sourceIds": ["release3-listbox-2"]
   },
   {
     "viewport": {
@@ -401,7 +406,7 @@
       "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
       "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt10-reviewed-holdout-check"
     },
-    "id": "release3-listbox-3",
+    "id": "state-missing-listbox-option-is-absent",
     "family": "release3-listbox",
     "split": "regression",
     "category": "current-view",
@@ -434,7 +439,8 @@
     "exposedAt": "2026-10-02T11:36:32.165Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "state"
+    "group": "state",
+    "sourceIds": ["release3-listbox-3"]
   },
   {
     "viewport": {
@@ -455,7 +461,7 @@
       "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
       "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt10-reviewed-holdout-check"
     },
-    "id": "release3-spin-1",
+    "id": "state-spinbutton-fill-readiness-is-unknown",
     "family": "release3-spin",
     "split": "regression",
     "category": "current-view",
@@ -501,7 +507,8 @@
     "exposedAt": "2026-10-02T11:36:32.165Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "state"
+    "group": "state",
+    "sourceIds": ["release3-spin-1"]
   },
   {
     "viewport": {
@@ -522,7 +529,7 @@
       "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
       "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt10-reviewed-holdout-check"
     },
-    "id": "release3-spin-2",
+    "id": "state-disabled-spinbutton-click-is-blocked",
     "family": "release3-spin",
     "split": "regression",
     "category": "current-view",
@@ -568,7 +575,8 @@
     "exposedAt": "2026-10-02T11:36:32.165Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "state"
+    "group": "state",
+    "sourceIds": ["release3-spin-2"]
   },
   {
     "viewport": {
@@ -589,7 +597,7 @@
       "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
       "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt10-reviewed-holdout-check"
     },
-    "id": "release3-spin-3",
+    "id": "state-spinbutton-focus-readiness-is-unknown",
     "family": "release3-spin",
     "split": "regression",
     "category": "current-view",
@@ -635,7 +643,8 @@
     "exposedAt": "2026-10-02T11:36:32.165Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "state"
+    "group": "state",
+    "sourceIds": ["release3-spin-3"]
   },
   {
     "viewport": {
@@ -656,7 +665,7 @@
       "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
       "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt10-reviewed-holdout-check"
     },
-    "id": "release3-switch-1",
+    "id": "state-switch-for-click",
     "family": "release3-switch",
     "split": "regression",
     "category": "current-view",
@@ -702,7 +711,8 @@
     "exposedAt": "2026-10-02T11:36:32.165Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "state"
+    "group": "state",
+    "sourceIds": ["release3-switch-1"]
   },
   {
     "viewport": {
@@ -723,7 +733,7 @@
       "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
       "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt10-reviewed-holdout-check"
     },
-    "id": "release3-switch-2",
+    "id": "state-all-switches-for-inspection",
     "family": "release3-switch",
     "split": "regression",
     "category": "current-view",
@@ -793,7 +803,8 @@
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
     "group": "state",
-    "cardinality": "all"
+    "cardinality": "all",
+    "sourceIds": ["release3-switch-2"]
   },
   {
     "viewport": {
@@ -814,7 +825,7 @@
       "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
       "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt10-reviewed-holdout-check"
     },
-    "id": "release3-switch-3",
+    "id": "state-missing-switch-is-absent",
     "family": "release3-switch",
     "split": "regression",
     "category": "current-view",
@@ -847,7 +858,8 @@
     "exposedAt": "2026-10-02T11:36:32.165Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "state"
+    "group": "state",
+    "sourceIds": ["release3-switch-3"]
   },
   {
     "viewport": {
@@ -868,7 +880,7 @@
       "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
       "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt10-reviewed-holdout-check"
     },
-    "id": "release3-richtext-1",
+    "id": "state-richtext-fill-readiness-is-unknown",
     "family": "release3-richtext",
     "split": "regression",
     "category": "current-view",
@@ -914,7 +926,8 @@
     "exposedAt": "2026-10-02T11:36:32.165Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "state"
+    "group": "state",
+    "sourceIds": ["release3-richtext-1"]
   },
   {
     "viewport": {
@@ -935,7 +948,7 @@
       "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
       "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt10-reviewed-holdout-check"
     },
-    "id": "release3-richtext-2",
+    "id": "state-richtext-clear-readiness-is-unknown",
     "family": "release3-richtext",
     "split": "regression",
     "category": "current-view",
@@ -981,7 +994,8 @@
     "exposedAt": "2026-10-02T11:36:32.165Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "state"
+    "group": "state",
+    "sourceIds": ["release3-richtext-2"]
   },
   {
     "viewport": {
@@ -1002,7 +1016,7 @@
       "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
       "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt10-reviewed-holdout-check"
     },
-    "id": "release3-richtext-3",
+    "id": "state-richtext-focus-readiness-is-unknown",
     "family": "release3-richtext",
     "split": "regression",
     "category": "current-view",
@@ -1048,7 +1062,8 @@
     "exposedAt": "2026-10-02T11:36:32.165Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "state"
+    "group": "state",
+    "sourceIds": ["release3-richtext-3"]
   },
   {
     "viewport": {
@@ -1069,7 +1084,7 @@
       "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
       "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt10-reviewed-holdout-check"
     },
-    "id": "release3-slider-1",
+    "id": "state-slider-focus-readiness-is-unknown",
     "family": "release3-slider",
     "split": "regression",
     "category": "current-view",
@@ -1115,7 +1130,8 @@
     "exposedAt": "2026-10-02T11:36:32.165Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "state"
+    "group": "state",
+    "sourceIds": ["release3-slider-1"]
   },
   {
     "viewport": {
@@ -1136,7 +1152,7 @@
       "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
       "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt10-reviewed-holdout-check"
     },
-    "id": "release3-slider-2",
+    "id": "state-disabled-slider-click-is-blocked",
     "family": "release3-slider",
     "split": "regression",
     "category": "current-view",
@@ -1182,7 +1198,8 @@
     "exposedAt": "2026-10-02T11:36:32.165Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "state"
+    "group": "state",
+    "sourceIds": ["release3-slider-2"]
   },
   {
     "viewport": {
@@ -1203,7 +1220,7 @@
       "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
       "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt10-reviewed-holdout-check"
     },
-    "id": "release3-slider-3",
+    "id": "state-all-sliders-include-disabled-for-inspection",
     "family": "release3-slider",
     "split": "regression",
     "category": "current-view",
@@ -1273,10 +1290,11 @@
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
     "group": "state",
-    "cardinality": "all"
+    "cardinality": "all",
+    "sourceIds": ["release3-slider-3"]
   },
   {
-    "id": "release4-optgroups-1",
+    "id": "state-grouped-select-focus-readiness-is-unknown",
     "family": "release4-optgroups",
     "split": "regression",
     "category": "current-view",
@@ -1337,10 +1355,11 @@
     },
     "sourceSplit": "held-out",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "state"
+    "group": "state",
+    "sourceIds": ["release4-optgroups-1"]
   },
   {
-    "id": "release4-optgroups-2",
+    "id": "state-disabled-select-is-ready-for-inspection",
     "family": "release4-optgroups",
     "split": "regression",
     "category": "current-view",
@@ -1401,10 +1420,11 @@
     },
     "sourceSplit": "held-out",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "state"
+    "group": "state",
+    "sourceIds": ["release4-optgroups-2"]
   },
   {
-    "id": "release4-optgroups-3",
+    "id": "state-missing-select-is-absent",
     "family": "release4-optgroups",
     "split": "regression",
     "category": "current-view",
@@ -1452,10 +1472,11 @@
     },
     "sourceSplit": "held-out",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "state"
+    "group": "state",
+    "sourceIds": ["release4-optgroups-3"]
   },
   {
-    "id": "release4-native-radios-1",
+    "id": "state-native-radio-check-is-ready",
     "family": "release4-native-radios",
     "split": "regression",
     "category": "current-view",
@@ -1516,10 +1537,11 @@
     },
     "sourceSplit": "held-out",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "state"
+    "group": "state",
+    "sourceIds": ["release4-native-radios-1"]
   },
   {
-    "id": "release4-native-radios-2",
+    "id": "state-disabled-native-radio-check-is-blocked",
     "family": "release4-native-radios",
     "split": "regression",
     "category": "current-view",
@@ -1580,10 +1602,11 @@
     },
     "sourceSplit": "held-out",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "state"
+    "group": "state",
+    "sourceIds": ["release4-native-radios-2"]
   },
   {
-    "id": "release4-native-radios-3",
+    "id": "state-native-radio-for-inspection",
     "family": "release4-native-radios",
     "split": "regression",
     "category": "current-view",
@@ -1644,10 +1667,11 @@
     },
     "sourceSplit": "held-out",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "state"
+    "group": "state",
+    "sourceIds": ["release4-native-radios-3"]
   },
   {
-    "id": "release4-media-1",
+    "id": "state-video-for-inspection",
     "family": "release4-media",
     "split": "regression",
     "category": "current-view",
@@ -1708,10 +1732,11 @@
     },
     "sourceSplit": "held-out",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "state"
+    "group": "state",
+    "sourceIds": ["release4-media-1"]
   },
   {
-    "id": "release4-media-2",
+    "id": "state-all-videos-for-inspection",
     "family": "release4-media",
     "split": "regression",
     "category": "current-view",
@@ -1796,10 +1821,11 @@
     "sourceSplit": "held-out",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
     "group": "state",
-    "cardinality": "all"
+    "cardinality": "all",
+    "sourceIds": ["release4-media-2"]
   },
   {
-    "id": "release4-media-3",
+    "id": "state-missing-video-is-absent",
     "family": "release4-media",
     "split": "regression",
     "category": "current-view",
@@ -1847,10 +1873,11 @@
     },
     "sourceSplit": "held-out",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "state"
+    "group": "state",
+    "sourceIds": ["release4-media-3"]
   },
   {
-    "id": "control-states-1-v4",
+    "id": "state-disabled-settings-button-is-blocked",
     "family": "states",
     "split": "regression",
     "category": "state",
@@ -1937,7 +1964,7 @@
     "group": "state"
   },
   {
-    "id": "control-states-2-v4",
+    "id": "state-readonly-notes-fill-is-blocked",
     "family": "states",
     "split": "regression",
     "category": "state",
@@ -2017,7 +2044,7 @@
     "sourceIds": ["control-states-2-v4", "control-states-2-v3", "control-states-2"]
   },
   {
-    "id": "control-states-3-v4",
+    "id": "state-native-newsletter-checkbox-check-is-ready",
     "family": "states",
     "split": "regression",
     "category": "state",
@@ -2101,7 +2128,7 @@
     "sourceIds": ["control-states-3-v4", "control-states-3-v3", "control-states-3"]
   },
   {
-    "id": "control-states-4",
+    "id": "state-native-country-select-is-ready",
     "family": "states",
     "split": "regression",
     "category": "state",
@@ -2175,7 +2202,7 @@
     "sourceIds": ["control-states-4"]
   },
   {
-    "id": "control-states-5",
+    "id": "state-native-date-fill-is-ready",
     "family": "states",
     "split": "regression",
     "category": "state",
@@ -2247,7 +2274,7 @@
     "sourceIds": ["control-states-5"]
   },
   {
-    "id": "control-states-6",
+    "id": "state-custom-checkbox-check-is-unverified",
     "family": "states",
     "split": "regression",
     "category": "state",
@@ -2317,7 +2344,7 @@
     "sourceIds": ["control-states-6"]
   },
   {
-    "id": "action-families-2",
+    "id": "state-textarea-type-is-ready",
     "family": "semantics",
     "split": "regression",
     "category": "semantics",
@@ -2386,7 +2413,7 @@
     "sourceIds": ["action-families-2"]
   },
   {
-    "id": "action-families-3",
+    "id": "state-textarea-clear-is-ready",
     "family": "semantics",
     "split": "regression",
     "category": "semantics",
@@ -2455,7 +2482,7 @@
     "sourceIds": ["action-families-3"]
   },
   {
-    "id": "action-families-4",
+    "id": "state-textarea-focus-is-ready",
     "family": "semantics",
     "split": "regression",
     "category": "semantics",
@@ -2524,7 +2551,7 @@
     "sourceIds": ["action-families-4"]
   },
   {
-    "id": "action-families-5",
+    "id": "state-textarea-blur-is-ready",
     "family": "semantics",
     "split": "regression",
     "category": "semantics",
@@ -2593,7 +2620,7 @@
     "sourceIds": ["action-families-5"]
   },
   {
-    "id": "action-families-6",
+    "id": "state-textarea-keypress-is-ready",
     "family": "semantics",
     "split": "regression",
     "category": "semantics",
@@ -2662,7 +2689,7 @@
     "sourceIds": ["action-families-6"]
   },
   {
-    "id": "action-families-7",
+    "id": "state-attachment-upload-is-ready",
     "family": "semantics",
     "split": "regression",
     "category": "semantics",
@@ -2731,7 +2758,7 @@
     "sourceIds": ["action-families-7"]
   },
   {
-    "id": "action-families-8",
+    "id": "state-button-inspection-is-ready",
     "family": "semantics",
     "split": "regression",
     "category": "semantics",
@@ -2800,7 +2827,7 @@
     "sourceIds": ["action-families-8"]
   },
   {
-    "id": "action-families-9",
+    "id": "state-button-double-click-is-ready",
     "family": "semantics",
     "split": "regression",
     "category": "semantics",
@@ -2869,7 +2896,7 @@
     "sourceIds": ["action-families-9"]
   },
   {
-    "id": "action-families-10",
+    "id": "state-button-right-click-is-ready",
     "family": "semantics",
     "split": "regression",
     "category": "semantics",
@@ -2938,7 +2965,7 @@
     "sourceIds": ["action-families-10"]
   },
   {
-    "id": "rail-disabled-reservation",
+    "id": "state-disabled-reservation-by-row-is-blocked",
     "family": "rail-timetable",
     "split": "regression",
     "category": "state",
@@ -3103,7 +3130,7 @@
     "sourceIds": ["rail-disabled-reservation"]
   },
   {
-    "id": "clinic-readonly-clear",
+    "id": "state-readonly-summary-clear-is-blocked",
     "family": "clinic-consultation",
     "split": "regression",
     "category": "state",
@@ -3221,7 +3248,7 @@
     "sourceIds": ["clinic-readonly-clear"]
   },
   {
-    "id": "clinic-fill-question",
+    "id": "state-followup-question-fill-is-ready",
     "family": "clinic-consultation",
     "split": "regression",
     "category": "semantics",
@@ -3340,7 +3367,7 @@
     "sourceIds": ["clinic-fill-question"]
   },
   {
-    "id": "museum-hover-access",
+    "id": "state-accessibility-link-hover-is-ready",
     "family": "museum-navigation",
     "split": "regression",
     "category": "semantics",
@@ -3478,7 +3505,7 @@
     "sourceIds": ["museum-hover-access"]
   },
   {
-    "id": "greenhouse-uncheck",
+    "id": "state-checked-watering-checkbox-uncheck-is-ready",
     "family": "greenhouse-controls",
     "split": "regression",
     "category": "state",
@@ -3608,7 +3635,7 @@
     "sourceIds": ["greenhouse-uncheck"]
   },
   {
-    "id": "studio-select-codec",
+    "id": "state-codec-select-is-ready",
     "family": "studio-export",
     "split": "regression",
     "category": "semantics",
@@ -3750,7 +3777,7 @@
     "sourceIds": ["studio-select-codec"]
   },
   {
-    "id": "warehouse-mixed",
+    "id": "state-mixed-click-and-inspect-is-unsupported",
     "family": "warehouse-dispatch",
     "split": "regression",
     "category": "semantics",
@@ -3885,7 +3912,7 @@
     "sourceIds": ["warehouse-mixed"]
   },
   {
-    "id": "parcel-radio",
+    "id": "state-packaging-radio-check-is-ready",
     "family": "parcel-packaging",
     "split": "regression",
     "category": "state",
@@ -4018,7 +4045,7 @@
     "sourceIds": ["parcel-radio"]
   },
   {
-    "id": "laboratory-upload",
+    "id": "state-micrograph-upload-is-ready",
     "family": "laboratory-submission",
     "split": "regression",
     "category": "semantics",
@@ -4140,7 +4167,7 @@
     "sourceIds": ["laboratory-upload"]
   },
   {
-    "id": "laboratory-future-workflow",
+    "id": "state-future-confirmation-workflow-is-unsupported",
     "family": "laboratory-submission",
     "split": "regression",
     "category": "semantics",
@@ -4244,7 +4271,7 @@
     "sourceIds": ["laboratory-future-workflow"]
   },
   {
-    "id": "recipe-named-targets",
+    "id": "state-two-named-recipe-buttons-are-ready",
     "family": "recipe-planning",
     "split": "regression",
     "category": "semantics",
@@ -4400,7 +4427,7 @@
     "cardinality": "all"
   },
   {
-    "id": "plural-partial",
+    "id": "state-mixed-actions-with-wait-are-unsupported",
     "family": "batch",
     "split": "regression",
     "category": "semantics",
@@ -4447,7 +4474,7 @@
     "cardinality": "all"
   },
   {
-    "id": "control-states",
+    "id": "state-mixed-control-actions-are-unsupported",
     "family": "states",
     "split": "regression",
     "category": "state",
@@ -4494,7 +4521,7 @@
     "sourceIds": ["control-states"]
   },
   {
-    "id": "action-families",
+    "id": "state-sequential-action-chain-is-unsupported",
     "family": "semantics",
     "split": "regression",
     "category": "semantics",

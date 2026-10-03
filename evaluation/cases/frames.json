@@ -1,6 +1,6 @@
 [
   {
-    "id": "clipped-frame-v4",
+    "id": "frames-target-clipped-by-frame-is-absent",
     "family": "clipped-frame",
     "category": "geometry",
     "fixture": "viewport-clipped",
@@ -55,7 +55,7 @@
     "group": "frames"
   },
   {
-    "id": "nested-frame-v4",
+    "id": "frames-target-in-nested-named-frames",
     "family": "frames",
     "split": "regression",
     "category": "integration",
@@ -130,7 +130,7 @@
     "sourceIds": ["nested-frame-v4", "nested-frame", "nested-frame-contract-1"]
   },
   {
-    "id": "shadow-unsupported",
+    "id": "frames-shadow-root-target-is-unsupported",
     "family": "shadow",
     "split": "regression",
     "category": "integration",

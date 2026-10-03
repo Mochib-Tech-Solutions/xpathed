@@ -1,6 +1,6 @@
 [
   {
-    "id": "color-only-reference-v4",
+    "id": "appearance-button-by-color",
     "family": "color-layout",
     "split": "regression",
     "category": "appearance",
@@ -92,7 +92,7 @@
     "group": "appearance"
   },
   {
-    "id": "release2-palette-1",
+    "id": "appearance-toolbar-button-by-leftmost-position",
     "family": "release2-palette",
     "split": "regression",
     "category": "current-view",
@@ -156,10 +156,11 @@
     "exposedAt": "2026-10-02T10:26:06.108Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "appearance"
+    "group": "appearance",
+    "sourceIds": ["release2-palette-1"]
   },
   {
-    "id": "release2-palette-2",
+    "id": "appearance-toolbar-button-by-name",
     "family": "release2-palette",
     "split": "regression",
     "category": "current-view",
@@ -223,10 +224,11 @@
     "exposedAt": "2026-10-02T10:26:06.108Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "appearance"
+    "group": "appearance",
+    "sourceIds": ["release2-palette-2"]
   },
   {
-    "id": "release2-palette-3",
+    "id": "appearance-toolbar-clear-button-for-hover",
     "family": "release2-palette",
     "split": "regression",
     "category": "current-view",
@@ -290,10 +292,11 @@
     "exposedAt": "2026-10-02T10:26:06.108Z",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
-    "group": "appearance"
+    "group": "appearance",
+    "sourceIds": ["release2-palette-3"]
   },
   {
-    "id": "above-reference-v4",
+    "id": "appearance-button-above-named-control",
     "family": "spatial-layout",
     "split": "regression",
     "category": "geometry",

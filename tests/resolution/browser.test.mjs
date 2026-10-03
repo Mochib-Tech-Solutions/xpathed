@@ -137,30 +137,26 @@ async function withFramebuffer(session, check) {
   }
 }
 
-test(
-  "Repeated session teardown releases display resources before reusing the slot",
-  { timeout: 300000 },
-  async () => {
-    // The old forced x11vnc shutdown exhausted the default 4096 System V segments before 128 sessions.
-    for (let index = 0; index < 128; index++) {
-      const session = await request("/sessions");
-      try {
-        if (index === 127) {
-          await withFramebuffer(session, async (readFrame) => {
-            const frame = await readFrame();
-            assert.equal(frame.width, 1280);
-            assert.equal(frame.height, 800);
-          });
-        }
-      } finally {
-        await request(`/sessions/${session.sessionId}`, undefined, "DELETE");
+test("session-teardown-releases-display-before-slot-reuse", { timeout: 300000 }, async () => {
+  // The old forced x11vnc shutdown exhausted the default 4096 System V segments before 128 sessions.
+  for (let index = 0; index < 128; index++) {
+    const session = await request("/sessions");
+    try {
+      if (index === 127) {
+        await withFramebuffer(session, async (readFrame) => {
+          const frame = await readFrame();
+          assert.equal(frame.width, 1280);
+          assert.equal(frame.height, 800);
+        });
       }
-      assert.equal((await fetch(`${browserUrl}/sessions/${session.sessionId}`)).status, 404);
+    } finally {
+      await request(`/sessions/${session.sessionId}`, undefined, "DELETE");
     }
-  },
-);
+    assert.equal((await fetch(`${browserUrl}/sessions/${session.sessionId}`)).status, 404);
+  }
+});
 
-test("Viewer disconnect completes its WebSocket close handshake and can reconnect", async () => {
+test("viewer-disconnect-completes-close-handshake-and-allows-reconnect", async () => {
   await withFixture(targetMarkup, async (session) => {
     for (let attempt = 0; attempt < 2; attempt++) {
       const socket = new WebSocket(`${browserUrl.replace("http", "ws")}${session.viewPath}`, {
@@ -177,7 +173,7 @@ test("Viewer disconnect completes its WebSocket close handshake and can reconnec
   });
 });
 
-test("Target descriptions preserve roles and image names without substituting descendant content", async () => {
+test("targeting-descriptions-preserve-roles-and-accessible-image-names", async () => {
   await withFixture(
     `<input id="submit" type="submit" value="Search">
      <img id="photo" alt="Product photo" width="50" height="50">
@@ -224,7 +220,7 @@ test("Target descriptions preserve roles and image names without substituting de
   );
 });
 
-test("Browser captures labels containing comment nodes and validates each action target", async () => {
+test("targeting-labels-with-comment-nodes-retain-action-targets", async () => {
   await withFixture(
     `<section aria-label="Videos"><a id="expected-target" href="#first">First<!-- PRIVATE_COMMENT_SENTINEL --> video</a>
       <button aria-labelledby="video-name">Play</button><span id="video-name" hidden>Second<!-- comment --> video</span></section>`,
@@ -251,7 +247,7 @@ test("Browser captures labels containing comment nodes and validates each action
   );
 });
 
-test("An action batch verifies distinct retained nodes and inspects one target without executing", async () => {
+test("cardinality-distinct-targets-are-verified-and-inspected-without-execution", async () => {
   await withFixture(
     `<button id="expected-target">Approval</button><button id="second-target" data-oracle="second-target" disabled>Approval</button>`,
     async (session, page) => {
@@ -423,7 +419,7 @@ async function withFixture(markup, check) {
   }
 }
 
-test("Browser captures and highlights the independently identified target without executing it", async () => {
+test("targeting-independent-target-is-captured-and-highlighted-without-execution", async () => {
   await withFixture(targetMarkup, async (session, page) => {
     assert.equal(typeof page.documentId, "string");
     const capture = await request(`/pages/${session.pageId}/capture`, {
@@ -459,7 +455,7 @@ test("Browser captures and highlights the independently identified target withou
   });
 });
 
-test("Current-view capture retains partial and blocked targets, safe naming and CSS layout evidence", async () => {
+test("scope-capture-retains-partial-and-blocked-targets-with-safe-layout-evidence", async () => {
   await withFixture(
     `<style>body{margin:0}button{width:100px;height:30px;background:rgb(255,0,0);color:rgb(255,255,255);border:2px solid rgb(0,0,0)}
     #partial{position:fixed;top:790px;left:10px}#edge{position:fixed;top:800px}#covered{position:absolute;top:100px;left:0}
@@ -527,7 +523,7 @@ test("Current-view capture retains partial and blocked targets, safe naming and 
   );
 });
 
-test("Current-view budgets exclude large offscreen lists but never silently truncate an in-scope set", async () => {
+test("scope-capture-budgets-exclude-offscreen-lists-and-reject-incomplete-visible-sets", async () => {
   await withFixture(
     `<button id="expected-target">Visible approval</button><div style="position:absolute;top:2000px">${"<button>Outside approval</button>".repeat(2200)}</div>`,
     async (session, page) => {
@@ -557,7 +553,7 @@ test("Current-view budgets exclude large offscreen lists but never silently trun
   );
 });
 
-test("Current-view CSS evidence reports uncertainty without image pixels, resource URLs or style text", async () => {
+test("appearance-css-evidence-reports-uncertainty-without-pixels-or-private-styles", async () => {
   await withFixture(
     `<style>#pseudo::before{content:'decorative';background:red}</style>
     <button style="background:linear-gradient(red,blue)">Gradient</button>
@@ -596,7 +592,7 @@ test("Current-view CSS evidence reports uncertainty without image pixels, resour
   );
 });
 
-test("Current-view selection rejects a changed viewport even when a selected fixed target remains visible", async () => {
+test("scope-viewport-change-invalidates-selection-even-for-visible-fixed-target", async () => {
   await withFixture(
     `<style>body{height:2400px}#expected-target{position:fixed;left:10px;top:10px}</style><button id="expected-target">Approval</button><button style="position:absolute;top:850px">Another approval</button>`,
     async (session, page) => {
@@ -621,7 +617,7 @@ test("Current-view selection rejects a changed viewport even when a selected fix
   );
 });
 
-test("Current-view selection rejects a changed nested scroll container", async () => {
+test("scope-nested-scroll-change-invalidates-selection", async () => {
   await withFixture(
     `<div id="list" style="height:100px;overflow:auto"><button id="expected-target">Approval</button><div style="height:150px"></div><button>Another approval</button></div>`,
     async (session, page) => {
@@ -647,7 +643,7 @@ test("Current-view selection rejects a changed nested scroll container", async (
 });
 
 for (const change of ["leave", "enter", "insert"])
-  test(`Current-view absence rejects changed target membership (${change})`, async () => {
+  test(`scope-changed-target-membership-invalidates-absence-${change}`, async () => {
     await withFixture(
       `<style>body{min-height:3000px}</style><button id="expected-target" style="position:absolute;top:${change === "leave" ? 10 : 2000}px">Approval</button>
       <script>window.mutateXpathFixture = () => {
@@ -680,7 +676,7 @@ for (const change of ["leave", "enter", "insert"])
     );
   });
 
-test("Current-view XPath remains unique across offscreen duplicates and ignores offscreen-only changes", async () => {
+test("xpath-offscreen-duplicates-preserve-document-wide-uniqueness", async () => {
   await withFixture(
     `<style>body{min-height:3000px}</style>
     <section aria-label="Profile"><button id="expected-target">Save</button></section>
@@ -715,7 +711,7 @@ test("Current-view XPath remains unique across offscreen duplicates and ignores 
 });
 
 for (const location of ["main", "scroll-container", "frame"])
-  test(`Current-view selection rejects a target moved outside its clipped viewport (${location})`, async () => {
+  test(`scope-target-outside-clipped-viewport-invalidates-selection-${location}`, async () => {
     const content = `<style>body{margin:0;min-height:3000px}</style>
       ${location === "scroll-container" ? '<div style="height:80px;overflow:hidden">' : ""}
       <input id="expected-target" aria-label="Notes" style="display:block;margin-top:10px" value="UNCHANGED">
@@ -758,7 +754,7 @@ for (const location of ["main", "scroll-container", "frame"])
     );
   });
 
-test("Current-view revalidation shares its DOM scan budget across frames", async () => {
+test("scope-revalidation-shares-dom-scan-budget-across-frames", async () => {
   await withFixture(
     (path) =>
       path === "/fixture"
@@ -792,7 +788,7 @@ test("Current-view revalidation shares its DOM scan budget across frames", async
   );
 });
 
-test("Current-view capture skips offscreen frame contents and preserves ancestor appearance uncertainty", async () => {
+test("frames-offscreen-content-is-excluded-and-ancestor-appearance-limits-are-retained", async () => {
   await withFixture(
     (path) =>
       path === "/fixture"
@@ -814,7 +810,7 @@ test("Current-view capture skips offscreen frame contents and preserves ancestor
   );
 });
 
-test("Disabled click and hover keep the same target with different action readiness", async () => {
+test("state-disabled-target-has-distinct-click-and-hover-readiness", async () => {
   await withFixture(
     '<button id="expected-target" disabled>Disabled action</button>',
     async (session, page) => {
@@ -850,7 +846,7 @@ test("Disabled click and hover keep the same target with different action readin
   );
 });
 
-test("An offscreen target becomes eligible only after manual scrolling and recapture", async () => {
+test("scope-offscreen-target-requires-manual-scroll-and-recapture", async () => {
   await withFixture(
     '<style>body{height:3200px}</style><button id="expected-target" style="position:absolute;top:2200px;width:240px;height:100px">Footer gallery</button>',
     async (session, page) => {
@@ -879,7 +875,7 @@ test("An offscreen target becomes eligible only after manual scrolling and recap
   );
 });
 
-test("The public viewer keeps a target highlight through scrolling and clears it on a new capture", async () => {
+test("highlights-persist-through-scroll-and-clear-on-new-capture", async () => {
   await withFixture(
     '<style>body { margin:0; background:white; height:3200px; } button { position:absolute; top:100px; left:100px; width:240px; height:100px; background:white; border:0; }</style><button id="expected-target">Footer gallery</button>',
     async (session, page) => {
@@ -966,7 +962,7 @@ async function selectHighlights(page, plural = false, scope = "current_view") {
   return batch;
 }
 
-test("Viewer outlines leave every target pixel unchanged", async () => {
+test("highlights-outlines-leave-target-pixels-unchanged", async () => {
   await withFixture(
     `<style>body{margin:0;background:#888}button{position:absolute;left:100px;top:100px;width:240px;height:100px;border:2px solid #c23;background:white;color:black}button+button{left:340px;width:8px;height:8px;padding:0}</style>
     <button>Readable target</button><button aria-label="Tiny target"></button>
@@ -996,7 +992,7 @@ test("Viewer outlines leave every target pixel unchanged", async () => {
   );
 });
 
-test("Viewer outlines contrast on light, dark, blue and patterned surfaces", async () => {
+test("highlights-outlines-contrast-across-background-colors-and-patterns", async () => {
   await withFixture(
     `<style>body{margin:0;background:white}section{position:absolute;top:60px;width:280px;height:200px}button{position:absolute;left:20px;top:40px;width:240px;height:100px;border:0;background:inherit;color:inherit}</style>
     ${[
@@ -1036,7 +1032,7 @@ test("Viewer outlines contrast on light, dark, blue and patterned surfaces", asy
   );
 });
 
-test("Clipped targets keep outlines outside their visible bounds", async () => {
+test("highlights-clipped-target-outlines-stay-outside-visible-bounds", async () => {
   await withFixture(
     '<style>body{margin:0;background:white}button{position:absolute;left:-40px;top:-40px;width:240px;height:100px;border:0;background:white}section{position:absolute;left:100px;top:200px;width:80px;height:60px;overflow:hidden}</style><button aria-label="Viewport target"></button><section><button aria-label="Clipped target"></button></section>',
     async (session, page) => {
@@ -1071,7 +1067,7 @@ test("Clipped targets keep outlines outside their visible bounds", async () => {
 });
 
 for (const reducedMotion of [false, true])
-  test(`Small target spotlight respects reduced motion (${reducedMotion}) and preserves outlines`, async () => {
+  test(`highlights-small-target-spotlight-preserves-outlines-with-motion-${reducedMotion}`, async () => {
     await withFixture(
       `<style>body{margin:0;background:white}button{position:absolute;left:100px;top:100px;width:8px;height:8px;padding:0;border:0;background:white}</style><button id="expected-target" aria-label="Tiny target"></button><button style="left:300px;width:240px;height:100px" aria-label="Large target"></button>
     ${reducedMotion ? `<script>const nativeMatchMedia = matchMedia; window.matchMedia = query => query === '(prefers-reduced-motion: reduce)' ? {matches:true} : nativeMatchMedia(query);</script>` : ""}`,
@@ -1117,7 +1113,7 @@ for (const reducedMotion of [false, true])
     );
   });
 
-test("Viewer highlights every selected target simultaneously", async () => {
+test("highlights-all-selected-targets-are-shown-together", async () => {
   await withFixture(highlightFixture, async (session, page) => {
     await selectHighlights(page, true);
     await observe({ staleInput: true });
@@ -1134,7 +1130,7 @@ test("Viewer highlights every selected target simultaneously", async () => {
   });
 });
 
-test("Current-view completed highlights persist during scrolling while another selection is stale", async () => {
+test("highlights-completed-selection-persists-while-pending-selection-becomes-stale", async () => {
   await withFixture(
     `${highlightFixture}<style>body{height:2400px}</style>`,
     async (session, page) => {
@@ -1163,7 +1159,7 @@ test("Current-view completed highlights persist during scrolling while another s
   );
 });
 
-test("Viewer preserves highlights on mouse movement and clears them on click or key input", async () => {
+test("highlights-mouse-movement-preserves-and-click-or-key-input-clears", async () => {
   await withFixture(highlightFixture, async (session, page) => {
     const batch = await selectHighlights(page);
     await withFramebuffer(session, async (frame, input) => {
@@ -1191,7 +1187,7 @@ test("Viewer preserves highlights on mouse movement and clears them on click or 
 });
 
 for (const crossOrigin of [false, true])
-  test(`Viewer highlights main and ${crossOrigin ? "cross-origin" : "same-origin"} frame targets and clears all on frame input`, async () => {
+  test(`highlights-main-and-${crossOrigin ? "cross-origin" : "same-origin"}-frame-targets-clear-on-frame-input`, async () => {
     await withFixture(
       (path) =>
         path === "/fixture"
@@ -1239,7 +1235,7 @@ for (const crossOrigin of [false, true])
     );
   });
 
-test("Input in an unsupported transformed frame invalidates main-document highlights", async () => {
+test("highlights-input-in-unsupported-transformed-frame-clears-main-targets", async () => {
   await withFixture(
     (path) =>
       path === "/fixture"
@@ -1261,7 +1257,7 @@ test("Input in an unsupported transformed frame invalidates main-document highli
 });
 
 for (const mode of ["popover", "dialog"])
-  test(`Highlights paint above a transformed ${mode} without changing its state`, async () => {
+  test(`highlights-render-above-transformed-${mode}-without-state-changes`, async () => {
     await withFixture(
       `<style>body{margin:0;background:white}::backdrop{background:rgb(255,0,0)}#surface{position:fixed;left:100px;top:100px;margin:0;width:600px;height:300px;border:0;padding:0;background:white;transform:translate(30px,20px)}button{position:absolute;left:50px;top:50px;width:240px;height:100px;background:white;border:0}</style>
     <${mode === "dialog" ? "dialog" : 'div popover="manual"'} id="surface"><button id="expected-target">Surface action</button></${mode === "dialog" ? "dialog" : "div"}>
@@ -1287,7 +1283,7 @@ for (const mode of ["popover", "dialog"])
     );
   });
 
-test("Accessibility eligibility keeps exposed visual limitations and computes safe hidden names", async () => {
+test("scope-accessibility-exposure-preserves-visual-limits-and-safe-hidden-names", async () => {
   await withFixture(
     `<style>.sr-only { position:absolute; width:1px; height:1px; clip:rect(0,0,0,0); overflow:hidden; }</style>
     <button id="expected-target" aria-labelledby="hidden-name" aria-label="Wrong name">Visible duplicate</button>
@@ -1349,7 +1345,7 @@ test("Accessibility eligibility keeps exposed visual limitations and computes sa
   );
 });
 
-test("Action readiness explains readonly, incompatible, covered, pointer and custom controls without interaction", async () => {
+test("state-readiness-reports-control-limitations-without-interaction", async () => {
   await withFixture(
     `<input aria-label="Readonly field" readonly value="PRIVATE_VALUE">
     <input type="checkbox" aria-label="Check choice"><input type="radio" aria-label="Radio choice">
@@ -1401,7 +1397,7 @@ test("Action readiness explains readonly, incompatible, covered, pointer and cus
   );
 });
 
-test("Chromium exposure exceptions preserve focus, modal controls and supported role fallback", async () => {
+test("scope-accessibility-exceptions-preserve-focus-modal-controls-and-role-fallback", async () => {
   await withFixture(
     `<div id="focused-parent"><button id="expected-target">Focused hidden exception</button></div>
     <input type="search" aria-label="Search"><div role="invalid textbox" aria-label="Role fallback" aria-readonly="true" tabindex="0" style="height:30px"></div>
@@ -1435,7 +1431,7 @@ test("Chromium exposure exceptions preserve focus, modal controls and supported 
   );
 });
 
-test("Native semantics retain normalized inputs, presentation conflicts and descendant names", async () => {
+test("targeting-native-semantics-preserve-normalized-inputs-and-descendant-names", async () => {
   await withFixture(
     `<input type="unknown" aria-label="Normalized text"><input readonly type="checkbox" aria-label="Readonly inapplicable">
     <input role="presentation" aria-label="Native presentation"><button id="expected-target"><span aria-label="Save"><span>Icon text</span></span></button>
@@ -1475,7 +1471,7 @@ test("Native semantics retain normalized inputs, presentation conflicts and desc
   );
 });
 
-test("The last opened modal determines exposure even in reverse DOM order", async () => {
+test("scope-last-opened-modal-controls-exposure-independent-of-dom-order", async () => {
   await withFixture(
     `<dialog id="first"><button>Active modal</button></dialog><dialog id="second"><button>Older modal</button></dialog>
     <script>document.querySelector('#second').showModal();document.querySelector('#first').showModal();</script>`,
@@ -1489,7 +1485,7 @@ test("The last opened modal determines exposure even in reverse DOM order", asyn
   );
 });
 
-test("Capture preserves control labels, Unicode, scope and observed state without sending form values", async () => {
+test("robustness-capture-preserves-unicode-labels-and-state-without-form-values", async () => {
   await withFixture(
     `${targetMarkup}
     <fieldset><legend>Équipe القاهرة</legend>
@@ -1569,7 +1565,7 @@ test("Capture preserves control labels, Unicode, scope and observed state withou
 });
 
 for (const scope of ["current_view"])
-  test(`The single preferred XPath escapes both quote types and uses meaningful context for duplicate attributes (${scope})`, async () => {
+  test(`xpath-quotes-are-escaped-and-duplicate-attributes-use-context-${scope}`, async () => {
     await withFixture(
       `<section aria-label="Employee"><button data-oracle="expected-target" data-testid="shared">OK</button></section>
     <section aria-label="Other"><button data-testid="shared">OK</button></section>
@@ -1629,7 +1625,7 @@ for (const scope of ["current_view"])
   });
 
 for (const scope of ["current_view"])
-  test(`Saved semantic XPaths survive generated IDs, wrappers and reordered duplicate controls (${scope})`, async () => {
+  test(`locators-semantic-xpath-survives-generated-ids-wrappers-and-reordering-${scope}`, async () => {
     await withFixture(
       `<label for="a1b2c3d4-e5f6-47a8-b9c0-d1e2f3a4b5c6">Country</label><input id="a1b2c3d4-e5f6-47a8-b9c0-d1e2f3a4b5c6" data-oracle="country">
     <div id="contacts"><input name="contact" placeholder="Email" data-oracle="email"><input name="contact" placeholder="Phone"><input name="backup" placeholder="Email"></div>
@@ -1689,7 +1685,7 @@ for (const scope of ["current_view"])
   });
 
 for (const scope of ["current_view"])
-  test(`Saved user-facing XPaths survive ID changes and scoped duplicates but reject changed meaning (${scope})`, async () => {
+  test(`locators-user-facing-xpath-survives-id-changes-and-rejects-changed-meaning-${scope}`, async () => {
     await withFixture(
       `<section aria-label="Profile"><button id="save-profile" data-oracle="save">Save changes</button>
     <label for="country">Country</label><input id="country" data-oracle="country"></section>
@@ -1739,7 +1735,7 @@ for (const scope of ["current_view"])
   });
 
 for (const scope of ["current_view"])
-  test(`Positional XPath is a verified last fallback when identical elements have no distinguishing context (${scope})`, async () => {
+  test(`xpath-indistinguishable-elements-use-verified-positional-fallback-${scope}`, async () => {
     await withFixture(
       `<div><span data-oracle="expected-target">Same</span><span>Same</span></div>`,
       async (session, page) => {
@@ -1761,7 +1757,7 @@ for (const scope of ["current_view"])
     );
   });
 
-test("Hundreds of multilingual controls retain complete capture and a verified target", async () => {
+test("targeting-large-multilingual-capture-retains-complete-set-and-verified-target", async () => {
   await withFixture(
     Array.from(
       { length: 500 },
@@ -1789,7 +1785,7 @@ test("Hundreds of multilingual controls retain complete capture and a verified t
   );
 });
 
-test("Incomplete captures report operating-budget errors instead of returning truncated candidates", async () => {
+test("scope-incomplete-capture-reports-budget-error", async () => {
   for (const markup of [
     "<style>button{position:fixed;left:0;top:0}</style>" + "<button>Target</button>".repeat(2001),
     "<div></div>".repeat(20001),
@@ -1811,7 +1807,7 @@ test("Incomplete captures report operating-budget errors instead of returning tr
   }
 });
 
-test("Superseded captures, fabricated candidates, replaced nodes and manual reloads cannot validate a result", async () => {
+test("scope-stale-captures-fabricated-candidates-and-replaced-nodes-are-rejected", async () => {
   await withFixture(targetMarkup, async (session, page) => {
     const capturePath = `/pages/${session.pageId}/capture`;
     const selectionPath = `/pages/${session.pageId}/selection`;
@@ -1878,7 +1874,7 @@ test("Superseded captures, fabricated candidates, replaced nodes and manual relo
   });
 });
 
-test("Native date and time controls support passive fill and clear without typing or mutation", async () => {
+test("state-native-date-and-time-fill-and-clear-remain-passive", async () => {
   const types = [
     ["date", "2030-06-15"],
     ["month", "2030-06"],
@@ -1935,7 +1931,7 @@ test("Native date and time controls support passive fill and clear without typin
 });
 
 for (const framed of [false, true])
-  test(`Expanded action observations preserve identity, selected state and never execute (${framed ? "iframe" : "main"})`, async () => {
+  test(`state-action-observations-preserve-identity-and-selected-state-${framed ? "iframe" : "main"}`, async () => {
     const markup = `<input id="expected-target" aria-label="Notes" readonly value="PRIVATE_VALUE">
      <input type="file" aria-label="Upload document"><input type="file" hidden aria-label="Hidden upload">
      <select aria-label="Countries" multiple><option selected>PRIVATE_SELECTION</option><option selected>PRIVATE_OTHER</option></select>
@@ -1993,7 +1989,7 @@ for (const framed of [false, true])
     );
   });
 
-test("Nested frame targets retain document XPath identity and main viewport geometry", async () => {
+test("frames-nested-target-retains-document-xpath-and-viewport-geometry", async () => {
   await withFixture(
     (path) =>
       path === "/fixture"
@@ -2072,7 +2068,7 @@ test("Nested frame targets retain document XPath identity and main viewport geom
   );
 });
 
-test("Cross-origin frame clipping and ancestor obstruction remain passive and frame navigation invalidates capture", async () => {
+test("frames-cross-origin-clipping-and-obstruction-are-passive-and-navigation-invalidates-capture", async () => {
   await withFixture(
     (path) =>
       path === "/fixture"
@@ -2126,7 +2122,7 @@ test("Cross-origin frame clipping and ancestor obstruction remain passive and fr
   );
 });
 
-test("Exposed frames are captured while hidden frames and shadow contents stay excluded", async () => {
+test("frames-exposed-content-is-captured-and-hidden-or-shadow-content-is-excluded", async () => {
   await withFixture(
     `${targetMarkup}<iframe srcdoc="<button>FRAME_SECRET</button>"></iframe>
     <iframe hidden srcdoc="<button>HIDDEN_FRAME</button>"></iframe><div id="shadow"></div>
@@ -2151,7 +2147,7 @@ test("Exposed frames are captured while hidden frames and shadow contents stay e
   );
 });
 
-test("Scaled clipping and section context survive iframe boundaries while reflections stay unsupported", async () => {
+test("frames-scaled-clipping-preserves-section-context-and-reflections-are-unsupported", async () => {
   await withFixture(
     (path) =>
       path === "/fixture"
@@ -2210,7 +2206,7 @@ for (const [name, ancestorStyle, position, modal, visible] of [
     true,
   ],
 ]) {
-  test(`Native viewport observations: ${name}`, async () => {
+  test(`scope-native-viewport-observation-${name}`, async () => {
     await withFixture(
       `<div style="overflow:hidden;width:0;height:0;${ancestorStyle}">
         ${modal ? "<dialog>" : `<header style="position:${position};left:20px;top:20px">`}
@@ -2253,7 +2249,7 @@ for (const [name, ancestorStyle, position, modal, visible] of [
   });
 }
 
-test("Slow frame geometry reports explicit capture and validation budget failures", async () => {
+test("frames-slow-geometry-reports-capture-and-validation-budget-errors", async () => {
   await withFixture(
     '<button>Save</button><iframe srcdoc="<button>Child</button>"></iframe>',
     async (session, page) => {
@@ -2283,7 +2279,7 @@ test("Slow frame geometry reports explicit capture and validation budget failure
   );
 });
 
-test("Frame exposure, unsupported transforms and aggregate budgets preserve honest capture coverage", async () => {
+test("frames-exposure-transforms-and-budgets-preserve-coverage-limits", async () => {
   await withFixture(
     (path) =>
       path === "/fixture"
@@ -2323,7 +2319,7 @@ test("Frame exposure, unsupported transforms and aggregate budgets preserve hone
   );
 });
 
-test("Relational scope distinguishes table rows and header/footer duplicates without values", async () => {
+test("context-table-rows-and-header-footer-scopes-distinguish-duplicates", async () => {
   await withFixture(
     '<header><button>Help</button></header><table><tr><td>Employee Alice</td><td><button>Approve</button><input value="ROW_SECRET"></td></tr><tr><td>Employee Bob</td><td><button>Approve</button></td></tr></table><footer><button>Help</button></footer>',
     async (session, page) => {
@@ -2341,7 +2337,7 @@ test("Relational scope distinguishes table rows and header/footer duplicates wit
   );
 });
 
-test("Native input button labels are captured while editable input values remain private", async () => {
+test("robustness-input-button-labels-are-captured-without-editable-values", async () => {
   await withFixture(
     `<input type="submit" value="Save changes" data-oracle="expected-target">
     <input type="button" value="Preview"><input type="reset" value="Clear form">
@@ -2388,7 +2384,7 @@ test("Native input button labels are captured while editable input values remain
   );
 });
 
-test("Icon buttons and labelled images remain identifiable without visible text", async () => {
+test("targeting-icon-buttons-and-labelled-images-are-found-without-visible-text", async () => {
   await withFixture(
     `<button title="Download" style="width:40px;height:30px"></button>
     <img alt="Logo" width="50" height="30" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==" data-oracle="expected-target">
@@ -2421,7 +2417,7 @@ test("Icon buttons and labelled images remain identifiable without visible text"
   );
 });
 
-test("Simultaneous workspaces have unique sessions and closing one preserves the other", async () => {
+test("session-concurrent-workspaces-remain-isolated-after-one-closes", async () => {
   await withFixture(targetMarkup, async (first, firstPage) => {
     const second = await request("/sessions");
     let replacement;
@@ -2481,7 +2477,7 @@ test("Simultaneous workspaces have unique sessions and closing one preserves the
   });
 });
 
-test("Closing all tabs releases the session for repeated fresh captures and selections", async () => {
+test("session-close-all-tabs-allows-fresh-captures-and-selections", async () => {
   await withFixture(targetMarkup, async (initialSession, initialPage) => {
     let session = initialSession;
     let page = initialPage;
@@ -2540,7 +2536,7 @@ test("Closing all tabs releases the session for repeated fresh captures and sele
   });
 });
 
-test("Browser tabs create, activate, close and replace the last page without changing the viewer", async () => {
+test("tabs-create-activate-close-and-replace-last-page-with-stable-viewer", async () => {
   await withFixture(targetMarkup, async (session, page) => {
     const sessionPath = `/sessions/${session.sessionId}`;
     const initial = await request(sessionPath, undefined, "GET");
@@ -2588,7 +2584,7 @@ test("Browser tabs create, activate, close and replace the last page without cha
   });
 });
 
-test("Native new-window links and feature popups become fullscreen tabs with their opener and shared cookies", async () => {
+test("tabs-native-links-and-popups-preserve-opener-and-shared-cookies", async () => {
   await withFixture(
     (path) =>
       `${targetMarkup}${path === "/fixture" ? '<a id="new-tab" href="/link-tab" target="_blank" rel="opener">Open linked tab</a>' : ""}`,
@@ -2675,7 +2671,7 @@ test("Native new-window links and feature popups become fullscreen tabs with the
   );
 });
 
-test("Only the active tab can capture or validate, and switching away invalidates its previous capture", async () => {
+test("tabs-only-active-page-can-resolve-and-switching-invalidates-capture", async () => {
   await withFixture(
     (path) =>
       path === "/second"
@@ -2754,7 +2750,7 @@ test("Only the active tab can capture or validate, and switching away invalidate
   );
 });
 
-test("Tab limits reject extra pages and popups, and closing a tab releases capacity", async () => {
+test("tabs-limits-reject-excess-pages-and-closing-restores-capacity", async () => {
   await withFixture(targetMarkup, async (session, first) => {
     const sessionPath = `/sessions/${session.sessionId}`;
     let state;

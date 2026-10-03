@@ -507,7 +507,10 @@ export async function main(args = process.argv.slice(2)) {
       let gates = [];
       if (resume) gates = await json(join(output, "compatibility.json"));
       else {
-        for (const id of ["basic-save", "single-action-plural-confirmations"]) {
+        for (const id of [
+          "targeting-save-button-by-name",
+          "cardinality-all-approval-buttons-include-disabled-target",
+        ]) {
           const spec = selectCases().find((c) => c.id === id || c.sourceIds?.includes(id));
           if (!spec) throw new Error(`Missing compatibility case: ${id}`);
           gates.push(
