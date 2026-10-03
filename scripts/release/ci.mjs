@@ -1,6 +1,8 @@
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { profiles, selectQualificationCases, readRun } from "../../evaluation/compare.mjs";
 import { validateCases } from "../../evaluation/run.mjs";
@@ -35,15 +37,46 @@ export function trustedReleasePR(event, repository) {
     pr.base.repo?.full_name === repository
   );
 }
-export async function requireCI(repository, sha, waitMs = 0, api = gh) {
+async function readCIGate(repository, run) {
+  const directory = await mkdtemp(join(tmpdir(), "xpathed-ci-gate-"));
+  try {
+    execFileSync("gh", [
+      "run",
+      "download",
+      String(run.id),
+      "--repo",
+      repository,
+      "--name",
+      `ci-gate-${run.run_attempt}`,
+      "--dir",
+      directory,
+    ]);
+    return JSON.parse(await readFile(join(directory, "gate.json"), "utf8"));
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+}
+export async function requireCI(repository, identity, waitMs = 0, api = gh, readGate = readCIGate) {
   const deadline = Date.now() + waitMs;
   do {
-    const checks = api(`repos/${repository}/commits/${sha}/check-runs?per_page=100`).check_runs;
-    const check = checks
-      .filter((check) => check.name === "Check" && check.app?.slug === "github-actions")
+    const runs = api(
+      `repos/${repository}/actions/workflows/check.yml/runs?event=pull_request&head_sha=${identity.headSha}&per_page=100`,
+    ).workflow_runs;
+    const run = runs
+      .filter((run) => run.pull_requests.some((pr) => pr.number === identity.pr))
       .sort((a, b) => b.id - a.id)[0];
-    if (check?.conclusion === "success") return;
-    if (check?.status === "completed" || Date.now() >= deadline)
+    if (run?.conclusion === "success") {
+      const gate = await readGate(repository, run);
+      if (
+        gate.passed !== true ||
+        gate.sha !== identity.sourceSha ||
+        gate.runId !== String(run.id) ||
+        gate.runAttempt !== String(run.run_attempt)
+      )
+        throw new Error("Ordinary CI receipt differs from the exact tested source or run");
+      return;
+    }
+    if (run?.status === "completed" || Date.now() >= deadline)
       throw new Error(
         "Ordinary CI must pass for the exact tested source before release evaluation",
       );
@@ -97,7 +130,15 @@ async function main() {
     git("status", "--porcelain", "--untracked-files=all")
   )
     throw new Error("Evaluation requires the exact clean PR revision");
-  await requireCI(env.GITHUB_REPOSITORY, env.GITHUB_SHA, 30 * 60000);
+  await requireCI(
+    env.GITHUB_REPOSITORY,
+    {
+      sourceSha: env.GITHUB_SHA,
+      headSha: event.pull_request.head.sha,
+      pr: event.number,
+    },
+    30 * 60000,
+  );
   const root = ".artifacts/release-ci";
   await mkdir(root, { recursive: true, mode: 0o700 });
   const suite = loadCases();
