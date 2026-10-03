@@ -137,6 +137,18 @@ test("a baseline reservation failure retains the completed candidate and partial
   assert.deepEqual(saved.baseline, { id: "baseline", result: null });
 });
 
+test("a changed prepared input is retained without starting the paired baseline", async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), "xpathed-rejected-preparation-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const trial = {
+    id: "candidate",
+    error: { code: "unreviewed_prepared_input" },
+    evidence: { modelInput: "retained" },
+  };
+  await savePairedTrial(directory, trial, () => assert.fail("Baseline inference must not start"));
+  assert.deepEqual(JSON.parse(await readFile(join(directory, "candidate.json"), "utf8")), trial);
+});
+
 test("release selection reuses every reviewed current case without a phase or split gate", () => {
   const options = parseQualificationOptions([]);
   assert.deepEqual(options.profileIds, ["deepseek"]);
@@ -165,6 +177,7 @@ test("release selection reuses every reviewed current case without a phase or sp
     caseId: offline.id,
     inputHash: createHash("sha256").update(JSON.stringify(offline.input)).digest("hex"),
     labelHash: createHash("sha256").update(JSON.stringify(offline.expected)).digest("hex"),
+    preparedInputHash: createHash("sha256").update(JSON.stringify(offline.input)).digest("hex"),
     disposition: "validated",
     reason: "Source target verified.",
     reviewer: "fixture-review",

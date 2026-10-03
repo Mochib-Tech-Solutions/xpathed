@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { mkdtemp, mkdir, writeFile, readFile, rm } from "node:fs/promises";
@@ -5,6 +6,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { startOfflineWorker } from "./offline.mjs";
+
+const inputHash = (input) => createHash("sha256").update(JSON.stringify(input)).digest("hex");
 
 test("polling failures remain observed until shutdown reports them", async () => {
   const root = await mkdtemp(join(tmpdir(), "xpathed-offline-poll-failure-"));
@@ -34,7 +37,10 @@ test("offline worker sends only model input to pinned images and retains executi
 const fs = require("node:fs");
 const args = process.argv.slice(2), input = JSON.parse(fs.readFileSync(0, "utf8"));
 fs.appendFileSync(${JSON.stringify(log)}, JSON.stringify({args,input,host:process.env.DOCKER_HOST,context:process.env.DOCKER_CONTEXT})+"\\n");
-if (args.includes("--prepare-only")) console.log(JSON.stringify({prepared:true}));
+if (args.includes("--prepare-only")) {
+  if (input.instruction === "changed input") input.candidates[0].text = "Changed name";
+  console.log(JSON.stringify({modelInput:JSON.stringify(input, null, 2)}));
+}
 else if (input.instruction === "malformed") console.log("invalid JSON");
 else if (input.instruction === "provider failure") { console.log(JSON.stringify({outcome:"error",diagnostics:{code:"provider_timeout"}})); process.exitCode=1; }
 else console.log(JSON.stringify({outcome:"found"}));
@@ -72,12 +78,19 @@ else console.log(JSON.stringify({outcome:"found"}));
   process.env.PATH = `${bin}:${originalPath}`;
   const stop = startOfflineWorker(state, docker);
   let sequence = 0;
-  async function request(instruction, baseline = false, workerId) {
+  async function request(instruction, baseline = false, workerId, options = {}) {
     const name = (++sequence).toString(16).padStart(32, "0");
     const input = { instruction, candidates: [{ id: "target" }] };
     await writeFile(
       join(output, "offline", `${name}.request.json`),
-      JSON.stringify({ baseline, input, workerId, expected: "private-oracle-label" }),
+      JSON.stringify({
+        baseline,
+        input,
+        workerId,
+        expectedPreparedInputHash: inputHash(input),
+        expected: "private-oracle-label",
+        ...options,
+      }),
     );
     const deadline = Date.now() + 5000;
     while (Date.now() < deadline) {
@@ -92,7 +105,10 @@ else console.log(JSON.stringify({outcome:"found"}));
   }
   try {
     const result = await request("select target");
-    assert.deepEqual(result.prepared, { prepared: true });
+    assert.deepEqual(JSON.parse(result.prepared.modelInput), {
+      instruction: "select target",
+      candidates: [{ id: "target" }],
+    });
     assert.deepEqual(result.result, { outcome: "found" });
     assert.ok(Number.isFinite(result.elapsedMs) && result.elapsedMs >= 0);
     const failed = await request("provider failure", true);
@@ -100,14 +116,44 @@ else console.log(JSON.stringify({outcome:"found"}));
       outcome: "error",
       diagnostics: { code: "provider_timeout" },
     });
-    assert.deepEqual(failed.prepared, { prepared: true });
+    assert.deepEqual(JSON.parse(failed.prepared.modelInput), {
+      instruction: "provider failure",
+      candidates: [{ id: "target" }],
+    });
     assert.match((await request("malformed")).error, /JSON/);
     const before = await readFile(log, "utf8");
     assert.match((await request("select target", false, 16)).error, /Invalid offline request/);
     assert.equal(await readFile(log, "utf8"), before);
+    for (const baseline of [false, true]) {
+      for (const expectedPreparedInputHash of [undefined, null, "invalid"]) {
+        assert.match(
+          (await request("select target", baseline, undefined, { expectedPreparedInputHash }))
+            .error,
+          /Invalid offline request/,
+        );
+        assert.equal(await readFile(log, "utf8"), before);
+      }
+    }
+    for (const baseline of [false, true]) {
+      const previousCalls = (await readFile(log, "utf8")).trim().split("\n").length;
+      const rejected = await request("changed input", baseline);
+      assert.match(rejected.error, /reviewed input hash/);
+      assert.deepEqual(JSON.parse(rejected.prepared.modelInput).candidates, [
+        { id: "target", text: "Changed name" },
+      ]);
+      assert.equal(rejected.result, undefined);
+      const newCalls = (await readFile(log, "utf8"))
+        .trim()
+        .split("\n")
+        .map(JSON.parse)
+        .slice(previousCalls);
+      assert.equal(newCalls.length, 1, "changed input must not trigger a final inference call");
+      assert.ok(newCalls[0].args.includes("--prepare-only"));
+    }
+    const afterRejected = await readFile(log, "utf8");
     wrongImage = true;
     assert.match((await request("select target")).error, /artifact mismatch/);
-    assert.equal(await readFile(log, "utf8"), before);
+    assert.equal(await readFile(log, "utf8"), afterRejected);
     const calls = before.trim().split("\n").map(JSON.parse);
     assert.equal(calls.length, 6);
     assert.equal(before.includes("private-oracle-label"), false);
@@ -147,7 +193,7 @@ test("parallel offline requests isolate routing, bound execution, drain and neve
     `#!${process.execPath}
 const fs = require("node:fs");
 const args = process.argv.slice(2), input = JSON.parse(fs.readFileSync(0, "utf8"));
-if (args.includes("--prepare-only")) console.log(JSON.stringify({prepared:true}));
+if (args.includes("--prepare-only")) console.log(JSON.stringify({modelInput:JSON.stringify(input)}));
 else {
   fs.appendFileSync(${JSON.stringify(log)}, JSON.stringify({args,input})+"\\n");
   const timer = setInterval(() => {
@@ -184,7 +230,12 @@ else {
   const send = (index) =>
     writeFile(
       join(directory, `${name(index)}.request.json`),
-      JSON.stringify({ baseline: false, workerId: index, input: { worker: index } }),
+      JSON.stringify({
+        baseline: false,
+        workerId: index,
+        input: { worker: index },
+        expectedPreparedInputHash: inputHash({ worker: index }),
+      }),
     );
   const calls = async () =>
     (await readFile(log, "utf8")).trim().split("\n").filter(Boolean).map(JSON.parse);

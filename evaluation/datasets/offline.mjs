@@ -43,11 +43,20 @@ export async function executeOffline(spec, trial, output, timeoutMs, baseline, w
   const path = join(directory, trial.id);
   const started = performance.now();
   try {
+    const expectedPreparedInputHash = spec.labelReview?.preparedInputHash;
+    if (
+      typeof expectedPreparedInputHash !== "string" ||
+      !/^[a-f\d]{64}$/.test(expectedPreparedInputHash)
+    )
+      throw Object.assign(new Error("Offline input requires a reviewed prepared input hash"), {
+        code: "unreviewed_prepared_input",
+      });
     await writeFile(
       `${path}.partial`,
       JSON.stringify({
         baseline,
         input: spec.input,
+        expectedPreparedInputHash,
         ...(workerId === undefined ? {} : { workerId }),
       }),
       {
@@ -67,20 +76,24 @@ export async function executeOffline(spec, trial, output, timeoutMs, baseline, w
         throw new Error("Offline Resolver did not return evidence");
       if (!response) await delay(100);
     }
-    if (response.error) throw new Error(response.error);
     const { prepared, result, elapsedMs } = response;
-    trial.evidence = {
-      availability: "available",
-      modelInput: prepared.modelInput,
-      systemPrompt: prepared.prompt,
-      outputSchema: JSON.stringify(prepared.schema),
-      configurationJson: JSON.stringify({
-        Model: prepared.effective.request.model,
-        Provider: prepared.effective.request.provider.only[0],
-        Strategy: prepared.effective.strategy,
-        effective: prepared.effective,
-      }),
-    };
+    if (prepared)
+      trial.evidence = {
+        availability: "available",
+        modelInput: prepared.modelInput,
+        systemPrompt: prepared.prompt,
+        outputSchema: JSON.stringify(prepared.schema),
+        configurationJson: prepared.effective
+          ? JSON.stringify({
+              Model: prepared.effective.request.model,
+              Provider: prepared.effective.request.provider.only[0],
+              Strategy: prepared.effective.strategy,
+              effective: prepared.effective,
+            })
+          : undefined,
+      };
+    if (response.error)
+      throw Object.assign(new Error(response.error), { code: response.errorCode });
     trial.result = normalize(result, trial.id);
     trial.elapsedMs = elapsedMs;
     trial.observation = {
@@ -94,7 +107,10 @@ export async function executeOffline(spec, trial, output, timeoutMs, baseline, w
       },
     };
   } catch (error) {
-    trial.error = { code: "offline_execution_failed", message: error.message };
+    trial.error = {
+      code: error.code === "unreviewed_prepared_input" ? error.code : "offline_execution_failed",
+      message: error.message,
+    };
     trial.elapsedMs = performance.now() - started;
   }
 }

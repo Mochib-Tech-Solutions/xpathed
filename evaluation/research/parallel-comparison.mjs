@@ -321,6 +321,8 @@ export async function continueComparison(output, { concurrency = 8, source } = {
       trial.provider = calls.map(({ request, response, ...metadata }) => metadata);
       trial.evidence = { ...trial.evidence, provider: calls };
       trial.grade = gradeTrial(task.spec, trial);
+      if (trial.error?.code === "unreviewed_prepared_input")
+        stopReason ??= "Prepared input review integrity violation";
       return trial;
     };
     try {

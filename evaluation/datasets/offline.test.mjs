@@ -1,6 +1,7 @@
+import { createHash } from "node:crypto";
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdtemp, readFile, writeFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, writeFile, readdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { setTimeout as delay } from "node:timers/promises";
@@ -13,6 +14,9 @@ test("offline bridge sends only reviewed input, retains Resolver evidence and or
     input: { instruction: "Click Save", candidates: [{ id: "n1", tag: "button", text: "Save" }] },
     expected: { actions: [{ target: { candidateId: "n1" } }] },
     review: { reviewer: "private reviewer" },
+  };
+  spec.labelReview = {
+    preparedInputHash: createHash("sha256").update(JSON.stringify(spec.input)).digest("hex"),
   };
   for (const failed of [false, true]) {
     const trial = { id: failed ? "failed" : "success" };
@@ -30,6 +34,7 @@ test("offline bridge sends only reviewed input, retains Resolver evidence and or
     assert.deepEqual(request, {
       baseline: failed,
       input: spec.input,
+      expectedPreparedInputHash: spec.labelReview.preparedInputHash,
       ...(failed ? { workerId: 3 } : {}),
     });
     const result = {
@@ -37,27 +42,25 @@ test("offline bridge sends only reviewed input, retains Resolver evidence and or
       configurationId: "configuration",
       actions: [{ step: 1, action: "click", outcome: "found", candidateId: "n1" }],
     };
+    const prepared = {
+      modelInput: JSON.stringify(spec.input),
+      prompt: "Select a target",
+      schema: {},
+      effective: {
+        strategy: "single",
+        request: { model: "model", provider: { only: ["provider"] } },
+      },
+    };
     const response = failed
-      ? { error: "Resolver artifact mismatch" }
-      : {
-          result,
-          elapsedMs: 123,
-          prepared: {
-            modelInput: JSON.stringify(spec.input),
-            prompt: "Select a target",
-            schema: {},
-            effective: {
-              strategy: "single",
-              request: { model: "model", provider: { only: ["provider"] } },
-            },
-          },
-        };
+      ? { error: "Prepared input mismatch", prepared }
+      : { result, elapsedMs: 123, prepared };
     await writeFile(`${path}.response.json`, JSON.stringify(response));
     await running;
     if (failed) {
       assert.equal(trial.error.code, "offline_execution_failed");
-      assert.equal(trial.error.message, "Resolver artifact mismatch");
+      assert.equal(trial.error.message, "Prepared input mismatch");
       assert.equal(trial.result, undefined);
+      assert.equal(trial.evidence.modelInput, prepared.modelInput);
     } else {
       assert.equal(trial.result.actions[0].target.candidateId, "n1");
       assert.equal(trial.result.summary, undefined);
@@ -74,4 +77,22 @@ test("offline bridge rejects invalid worker routing before writing requests", as
       executeOffline({}, {}, "/unused", 1000, false, workerId),
       /worker identity/,
     );
+});
+
+test("offline bridge rejects missing or invalid reviewed input hashes without dispatch", async (t) => {
+  const output = await mkdtemp(join(tmpdir(), "xpathed-offline-missing-review-"));
+  t.after(() => rm(output, { recursive: true, force: true }));
+  for (const preparedInputHash of [undefined, null, "invalid", 17]) {
+    const trial = { id: "not-dispatched" };
+    await executeOffline(
+      { input: { candidates: [{ id: "target" }] }, labelReview: { preparedInputHash } },
+      trial,
+      output,
+      1000,
+      false,
+    );
+    assert.equal(trial.error.code, "unreviewed_prepared_input");
+    assert.match(trial.error.message, /reviewed prepared input hash/);
+    assert.deepEqual(await readdir(join(output, "offline")), []);
+  }
 });

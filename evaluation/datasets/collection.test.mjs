@@ -34,6 +34,7 @@ test("reviewed collection binds package bytes, inventory, and each submitted inp
     caseId: spec.id,
     inputHash: hash(JSON.stringify(input)),
     labelHash: hash(JSON.stringify(spec.expected)),
+    preparedInputHash: hash(JSON.stringify(input)),
     disposition: "validated",
     reason: "Unique named button matches the instruction and source target.",
     reviewer: "fixture-source-review",
@@ -102,6 +103,8 @@ test("reviewed collection binds package bytes, inventory, and each submitted inp
   for (const mutation of [
     { inputHash: "0".repeat(64) },
     { labelHash: "0".repeat(64) },
+    { preparedInputHash: undefined },
+    { preparedInputHash: "invalid" },
     { caseId: "other" },
     { disposition: "guessed" },
     { reviewer: "" },

@@ -31,7 +31,7 @@ const save = (path, value) =>
 export async function savePairedTrial(directory, trial, runBaseline) {
   const path = join(directory, `${trial.id}.json`);
   await save(path, trial);
-  if (!runBaseline) return;
+  if (!runBaseline || trial.error?.code === "unreviewed_prepared_input") return;
   const update = async () => {
     await writeFile(`${path}.partial`, JSON.stringify(trial, null, 2) + "\n", { mode: 0o600 });
     await rename(`${path}.partial`, path);
@@ -457,6 +457,8 @@ export async function main(args = process.argv.slice(2)) {
       console.log(
         `${trial.grade.passed ? "PASS" : "FAIL"} ${trial.profileId} ${trial.caseId} ${Math.round(trial.elapsedMs ?? 0)}ms`,
       );
+      if ([trial, trial.baseline].some((arm) => arm?.error?.code === "unreviewed_prepared_input"))
+        throw new Error("Prepared input review integrity violation");
       if (
         [...(trial.provider ?? []), ...(trial.baseline?.provider ?? [])].some(
           (call) => call.identityValid === false || call.responseCacheHit,
