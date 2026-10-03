@@ -248,10 +248,9 @@ export function assertProviderIntegrity(trial) {
   for (const record of trial.provider ?? []) {
     const evidence = trial.evidence?.provider?.find((item) => item.id === record.id);
     const { request, response, ...metadata } = evidence ?? {};
-    const failedTransport =
+    const failedBodyTimeout =
       (trial.error || trial.result?.outcome === "error") &&
-      typeof record.error === "string" &&
-      record.error.length > 0 &&
+      record.error === "The operation was aborted due to timeout" &&
       record.identityValid === undefined &&
       record.observedIdentity === undefined &&
       evidence &&
@@ -263,7 +262,7 @@ export function assertProviderIntegrity(trial) {
         (record.status >= 200 &&
           record.status < 300 &&
           record.identityValid !== true &&
-          !failedTransport))
+          !failedBodyTimeout))
     )
       throw new Error("Provider identity mismatch or response cache hit; comparison stopped");
   }

@@ -87,7 +87,7 @@ test("provider identity and cache violations are rejected even on the final atte
   );
 });
 
-test("ended response-body transport failures remain failed attempts without stopping later cases", () => {
+test("ended response-body timeouts remain failed attempts without stopping later cases", () => {
   const record = {
     id: "body-timeout",
     forwarded: true,
@@ -112,6 +112,7 @@ test("ended response-body transport failures remain failed attempts without stop
     { identityValid: false },
     { responseCacheHit: true },
     { response: "malformed response" },
+    { response: null, error: "Cannot read properties of null (reading 'usage')" },
     { observedIdentity: { model: "unexpected-model" } },
   ]) {
     const evidence = { ...trial.evidence.provider[0], ...changed };
