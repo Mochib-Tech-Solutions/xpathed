@@ -10,7 +10,7 @@ RUN dotnet restore src/ClientApi/ClientApi.csproj --locked-mode
 FROM dependencies AS development
 COPY --chown=app:app src/Common/ src/Common/
 COPY --chown=app:app src/ClientApi/ src/ClientApi/
-RUN chown -R app:app /source /opt/nuget
+RUN mkdir -p /opt/nuget && chown -R app:app /source /opt/nuget
 ENV DOTNET_CLI_HOME=/tmp/dotnet
 USER app
 CMD ["dotnet", "watch", "--non-interactive", "--project", "src/ClientApi", "run", "--no-restore", "--no-launch-profile"]
