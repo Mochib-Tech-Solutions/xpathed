@@ -1734,6 +1734,44 @@ for (const scope of ["current_view"])
     );
   });
 
+test("locators-hidden-text-fragments-survive-wrappers-and-reject-added-label-text", async () => {
+  await withFixture(
+    `<button data-oracle="save"><span style="display:none">PRIVATE_CSS_VALUE</span>Save <em>changes</em><textarea>PRIVATE_TEXTAREA_VALUE</textarea></button>
+    <script>let mutation = 0; window.mutateXpathFixture = () => {
+      const target = document.querySelector('button');
+      if (++mutation === 1) {
+        const wrapper = document.createElement('div'); target.before(wrapper); wrapper.append(target);
+        const labelWrapper = document.createElement('span');
+        const label = target.childNodes[1]; label.before(labelWrapper); labelWrapper.append(label);
+      } else target.append(' and delete account');
+    };</script>`,
+    async (session, page) => {
+      const before = await observe();
+      const capture = await request(`/pages/${page.pageId}/capture`, {
+        documentId: page.documentId,
+      });
+      const candidate = capture.candidates.find((entry) => entry.tag === "button");
+      assert.equal(candidate.label, "Save changes");
+      const selection = await request(`/pages/${page.pageId}/selection`, {
+        documentId: page.documentId,
+        captureId: capture.captureId,
+        candidateId: candidate.id,
+        action: "click",
+      });
+      assert.doesNotMatch(JSON.stringify({ capture, selection }), /PRIVATE_/);
+      assert.equal(selection.target.xpaths.length, 1);
+      const paths = selection.target.xpaths;
+      const initial = await verify(paths);
+      assert.deepEqual(initial.matches, [["save"]]);
+      assert.equal(initial.scrollY, before.scrollY);
+      assert.equal(initial.activeElement, before.activeElement);
+      assert.deepEqual(initial.values, before.values);
+      assert.deepEqual((await observe({ xpaths: paths, mutateXpath: true })).matches, [["save"]]);
+      assert.deepEqual((await observe({ xpaths: paths, mutateXpath: true })).matches, [[]]);
+    },
+  );
+});
+
 for (const scope of ["current_view"])
   test(`xpath-indistinguishable-elements-use-verified-positional-fallback-${scope}`, async () => {
     await withFixture(
