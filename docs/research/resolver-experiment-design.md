@@ -64,7 +64,7 @@ A small screening sample should touch each available instruction family; it is n
 
 ### One action across multiple current-page targets
 
-The latest accepted basic scope is one interaction per command, applied to one or more distinct targets. The workspace now uses contract version 3; version 2 remains a compatibility route for historical multi-action callers. Evaluation must grade the shared action and complete intended target set rather than treating the first match as the command's success. See [ADR-0014](../adr/0014-resolve-one-action-across-current-page-targets.md).
+The latest accepted basic scope is one interaction per command, applied to one or more distinct targets. The workspace uses a shared-action response; retired multi-action implementations remain in Git history under [ADR-0024](../adr/0024-keep-one-resolution-implementation.md). Evaluation must grade the shared action and complete intended target set rather than treating the first match as the command's success. See [ADR-0014](../adr/0014-resolve-one-action-across-current-page-targets.md).
 
 | Instruction                                                | Independently expected result                                                                                             |
 | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |

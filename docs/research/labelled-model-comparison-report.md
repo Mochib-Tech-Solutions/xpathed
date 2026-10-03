@@ -4,7 +4,7 @@
 
 ## Comparison contract
 
-The declared sample is **191 original PhraseNode development cases from 40 page families**, once per model: Qwen3.8 Flash/Alibaba, Gemini 3.8 Flash/Google AI Studio, GPT-6 Luna/OpenAI and DeepSeek V4.1 Flash/Wafer. All receive the same baseline version-7 system prompt, output schema and per-case instruction/candidate payload. No prompt variants, repeated trials, retries or model-based case selection are included. Nine pilot cases count toward the total; the remaining 182 are disjoint. The 764 attempts represent 191 shared source cases, not 764 independent cases.
+The declared sample is **191 original PhraseNode development cases from 40 page families**, once per model: Qwen3.8 Flash/Alibaba, Gemini 3.8 Flash/Google AI Studio, GPT-6 Luna/OpenAI and DeepSeek V4.1 Flash/Wafer. All receive the same baseline system prompt, output schema and per-case instruction/candidate payload. No prompt variants, repeated trials, retries or model-based case selection are included. Nine pilot cases count toward the total; the remaining 182 are disjoint. The 764 attempts represent 191 shared source cases, not 764 independent cases.
 
 Standard routes and their explicit supported reasoning/cache settings remain in the recorded profiles: Qwen and DeepSeek disable reasoning, Luna requests `none`, and Gemini requests `low`. Provider infrastructure and required settings differ, so results compare those served model configurations rather than isolating architecture from all serving effects. Each retains the 4,096-token completion ceiling, schema validation, disabled fallback and response-cache checks. [Route research](model-qualification-availability.md), [Qwen route research](qwen-flash-qualification-availability.md)
 
@@ -90,7 +90,7 @@ Repeated instructions share page families, development data is exposed, serving 
 
 ## Historical threshold reassessment
 
-Regrading the retained 2026-09-30 raw fixture observations reproduces their original correctness counts. Applying policy 2 timing boundaries retrospectively to the 80-attempt confirmation gives:
+Regrading the retained 2026-09-30 raw fixture observations reproduces their original correctness counts. Applying the later recorded timing boundaries retrospectively to the 80-attempt confirmation gives:
 
 | Historical profile | Correct | Correct below 1 s | Correct within 2 s |
 | ------------------ | ------: | ----------------: | -----------------: |

@@ -14,13 +14,40 @@ All three systems received the same frozen browser evaluation cases and independ
 
 Basic → Improved: **15 gained passes and 7 lost passes**.
 
-Regressions: `duplicate-mentioned-target`, `release-holdout-clinic-5`, `release2-accordion-2`, `release4-annotations-3`, `release3-listbox-1`, `action-families-7`, `clinic-readonly-clear`.
+## What each system uses
 
-## What changed
+The comparison holds the instruction, fixture state, browser environment, model/provider route and output allowance constant. Each system prepares its own model context and interprets its own output.
 
-Basic resolver is the archived earlier setup. Improved resolver uses the current implementation: one shared prompt and schema, explicit rules for requested controls versus surrounding context, scoped absence, and current-view membership revalidation. These changes are measured together; the comparison does not isolate the effect of each change.
+| Boundary | Basic resolver | Improved resolver — selected in `main` | Stagehand |
+| --- | --- | --- | --- |
+| Page input | Browser-owned current-view capture, including supported nested frames | Same current-view capture architecture | SDK-owned page snapshot for stock `observe` |
+| Model context | Sanitized candidate IDs, names/text, roles, section/row context, compact state, geometry, supported CSS colors and frame labels | Same evidence types, with one shared runtime/offline prompt and schema | Stagehand's snapshot representation, observation prompt and schema; receives the instruction prefixed with a current-viewport constraint |
+| Selection rules | Initial current-view prompt already supports one shared action, plural targets, scoped absence and unsupported instructions | Adds explicit distinctions between requested controls and scope containers/repeated text; clarifies missing candidates, empty captures and enumeration completeness | Stock observation proposes methods, arguments and element IDs; SDK maps those IDs to selectors |
+| Locator construction | Browser builds semantic XPath from retained DOM nodes and verifies uniqueness and same-node identity | Same Browser-owned construction, plus revalidation of current-view candidate membership and rejection of newly off-screen targets | SDK returns generated selectors; our adapter splits supported frame paths into document XPaths and the independent grader checks target identity |
+| Result | Shared action, target outcomes, XPath, frame context, passive readiness and request cost | Same response contract | Suggested actions/selectors; no xpathed readiness, coverage or per-missing-target explanation contract |
+| Execution | Passive resolution and highlights | Passive resolution and highlights | `observe` only; `act`, self-healing and response reuse disabled |
+| Reproduction | Verified archived Browser/Resolver image bundle | Tested source and exact image identities in the run manifest | Pinned SDK adapter and lockfile in the run manifest |
 
-Stagehand uses stock `observe`, with caching and self-healing disabled, a current-view instruction, and the same DeepSeek V4.1 Flash/Wafer route, 4,096-token output limit and disabled reasoning. Its DOM representation and prompt differ from ours. The browser binaries, viewport, document, initial state, language and time zone are checked for parity.
+All three used DeepSeek V4.1 Flash through Wafer, reasoning disabled, no provider fallback and a 4,096-token output limit. No system received the grader's expected selectors. Basic already had model selection and browser verification; Improved changes their rules and validation. These changes were measured together, so the scores cannot attribute an improvement to an individual rule. Stagehand's own representation and prompt make this a comparison of complete systems.
+
+The [archived Basic source](https://github.com/Mochib-Tech-Solutions/xpathed/tree/d533377945f67f99dbb2d23ab9b2ea04eef61569), [selected prompt](../../src/Resolver/Services/ActionSelectionStrategy.cs), [candidate serializer](../../src/Resolver/Services/CandidateInput.cs), [Stagehand adapter](../../evaluation/research/stagehand-server.mjs) and [selector normalization](../../evaluation/research/stagehand.mjs) define these boundaries. Recorded image/source identities in the aggregate identify what actually ran.
+
+## Case examples
+
+These are original outcomes from the saved comparison, displayed under today's behavior-based case names. `sourceIds` links each name to its original evidence ID. Pass/fail below refers to the common action-and-target score.
+
+| Case / instruction | Expected result | Basic | Improved | Stagehand |
+| --- | --- | --- | --- | --- |
+| `targeting-save-button-by-name` — “Click Save changes.” | Click the labelled Save button | Pass | Pass | Pass |
+| `cardinality-all-approval-buttons-include-disabled-target` — “Click all Approve buttons in Approvals.” | Both Approve buttons, including the disabled one | Pass | Pass | Pass |
+| `scope-offscreen-target-is-absent` — “Click Help.” | No current-view target | Pass | Pass | Fail: target set differs |
+| `state-disabled-spinbutton-click-is-blocked` — “Click Reserved copies.” | Select the disabled spinbutton; readiness remains blocked | Fail: no usable resolution | Pass | Pass on action/target selection |
+| `state-listbox-option-for-click` — “Click the Greek option in Available languages.” | Select the Greek option and preserve `click` | Pass | Fail: correct target, wrong action | Pass |
+| `context-control-in-collapsed-accordion-is-absent` — “Click Express courier.” | Scoped absence while the accordion is collapsed | Pass | Fail: unsupported result | Pass |
+
+The plural common-score pass does not establish Stagehand readiness. The full Resolver score additionally requires the disabled button to be found with blocked readiness. Likewise, the Greek-option example passes target selection for all three systems while failing the common score for Improved.
+
+All seven Basic→Improved regressions remain visible: `targeting-repeated-target-mention-is-deduplicated`, `context-clinic-visit-type-for-select`, `context-control-in-collapsed-accordion-is-absent`, `context-missing-annotation-link-is-absent`, `state-listbox-option-for-click`, `state-attachment-upload-is-ready`, `state-readonly-summary-clear-is-blocked`. The [aggregate evidence](../assets/evaluation/engineering-comparison.json) retains every original outcome and failure reason. The [evaluation guide](../evaluation.md#example-cases-and-metrics) adds XPath mutation examples and category-specific metric boundaries.
 
 ## What the score means
 
@@ -38,4 +65,4 @@ Run: `b74b6e9f-695c-42f8-bc90-d826992a062d`; started `2026-10-02T19:54:47.421Z`.
 
 The initial runner stopped after one case per arm because it reused an attempt ID. Those three original outcomes remain included. Continuation ran only the remaining cases after the bookkeeping fix. Docker build-attestation wrappers changed during restart; saved build logs verify identical platform manifests and runtime configurations. Original and continuation image identities and the original manifest are retained in the evidence. No failed model attempt was retried.
 
-This research comparison does not approve or activate a release. See [evaluation commands](../evaluation.md#engineering-comparison) to reproduce it.
+This research comparison does not approve or activate a release. See [evaluation commands](../evaluation.md#resolver-comparison) to reproduce it.

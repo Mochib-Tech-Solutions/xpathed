@@ -48,7 +48,7 @@ All 80 attempts per profile have capture/model/end-to-end timings. Validation is
 
 ## Why nothing qualifies
 
-Policy version 1 was frozen before held-out inference: a 2-second goal, at least 95% correct and complete within 3 seconds overall and in each required split, at least 95% correctness, an 80% family correctness floor, and no critical/invariant failures or unresolved capability gaps. No threshold changed after results were observed.
+The original acceptance policy was frozen before held-out inference: a 2-second goal, at least 95% correct and complete within 3 seconds overall and in each required split, at least 95% correctness, an 80% family correctness floor, and no critical/invariant failures or unresolved capability gaps. No threshold changed after results were observed.
 
 - **Every profile:** the development color-only reference remains unreliable: Luna, Gemini and concise passed 0/3; DeepSeek baseline passed 1/3. Capture includes geometry but not computed color, so an occasional correct guess does not establish that capability. Gemini's otherwise strong result cannot erase this missing capability.
 - **Luna:** confirmation failed both repetitions of mixed and future-dependent commands, plus one transparent-control observation. Two `provider_malformed_response` and two `decomposition_incomplete` errors were model-output contract failures, not observed gateway outages. Held-out correctness was 87.5%.
@@ -59,7 +59,7 @@ Gemini is the strongest measured candidate on these fixtures, not an approved de
 
 ## Method, serving and budget
 
-The baseline profiles share prompt version 7, contract 3, schema, capture and grader. `deepseek-concise` is a separate predeclared prompt variant, version `7-concise-1`. Each profile runs its own actual Resolver service. [Availability research](model-qualification-availability.md) records exact model IDs, canonical revisions, route prices and official sources; [profile configuration](../../evaluation/qualification-profiles.json) records the effective settings. Luna uses reasoning `none`, Gemini `low`, and both DeepSeek profiles disable reasoning. All use a 4,096-token output allowance, pinned standard providers and no fallback or response healing.
+The baseline profiles share the baseline prompt, shared-action contract, schema, capture and grader. `deepseek-concise` is a separate predeclared concise prompt variant. Each profile runs its own actual Resolver service. [Availability research](model-qualification-availability.md) records exact model IDs, canonical revisions, route prices and official sources; the archived `evaluation/qualification-profiles.json` at the recorded source revision records the effective settings. Luna uses reasoning `none`, Gemini `low`, and both DeepSeek profiles disable reasoning. All use a 4,096-token output allowance, pinned standard providers and no fallback or response healing.
 
 The runner uses seed 1, rotating model order, concurrency 1, no retries and a 45-second timeout. A slow failure can run beyond the 3-second qualification deadline; the deadline is a grading threshold, not a claim that every request is forcibly stopped at 3 seconds. Each trial creates a fresh browser session. Before payment, 44 deterministic compatibility checks cover positive, absent, scoped/plural and malformed/unknown-ID/rate-limit/timeout/refusal/empty/truncated/missing-usage outcomes across the four profiles. These checks warm service processes; there are no discarded paid warmups.
 

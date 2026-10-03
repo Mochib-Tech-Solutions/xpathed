@@ -2,11 +2,11 @@
   "schema_version": 1,
   "diagram_type": "architecture",
   "meta": {
-    "title": "Resolver: selection and XPath verification",
+    "title": "Resolver steps and boundaries",
     "quality_profile": "showcase",
     "viewBox": [
-      1160,
-      650
+      1260,
+      550
     ],
     "legend": {
       "mode": "hidden"
@@ -15,166 +15,193 @@
   "components": [
     {
       "id": "request",
-      "type": "external",
-      "label": "Instruction + page",
-      "sublabel": "Resolver API input",
+      "type": "backend",
+      "label": "1. Accept request",
+      "sublabel": "Resolver \u00b7 active page + document",
       "pos": [
-        50,
-        100
+        60,
+        120
       ],
       "size": [
-        210,
-        70
+        280,
+        76
       ]
     },
     {
       "id": "capture",
       "type": "backend",
-      "label": "Capture candidates",
-      "sublabel": "Browser: current view",
+      "label": "2. Capture current view",
+      "sublabel": "Browser \u00b7 live DOM + frame documents",
       "pos": [
-        430,
-        100
+        480,
+        120
       ],
       "size": [
-        240,
-        70
+        280,
+        76
       ]
     },
     {
-      "id": "selection",
+      "id": "select",
       "type": "external",
-      "label": "1. Model selection",
-      "sublabel": "Choose candidate IDs",
+      "label": "3. Select targets",
+      "sublabel": "Model \u00b7 instruction + sanitized candidates",
       "pos": [
-        840,
-        100
+        900,
+        120
       ],
       "size": [
-        260,
-        70
+        280,
+        76
       ]
     },
     {
-      "id": "validation",
+      "id": "validate",
       "type": "backend",
-      "label": "Validate selection",
-      "sublabel": "Resolver: schema + IDs",
+      "label": "4. Validate selection",
+      "sublabel": "Resolver \u00b7 schema + captured ID set",
       "pos": [
-        840,
-        330
+        900,
+        380
       ],
       "size": [
-        260,
-        70
-      ]
-    },
-    {
-      "id": "xpath",
-      "type": "backend",
-      "label": "2. Construct XPath",
-      "sublabel": "Browser: DOM + semantics",
-      "pos": [
-        430,
-        330
-      ],
-      "size": [
-        240,
-        70
+        280,
+        76
       ]
     },
     {
       "id": "verify",
       "type": "backend",
-      "label": "Verify XPath",
-      "sublabel": "Unique match + same node",
+      "label": "5. Build and verify XPath",
+      "sublabel": "Browser \u00b7 retained nodes + live document",
       "pos": [
-        50,
-        330
+        480,
+        380
       ],
       "size": [
-        240,
-        70
+        280,
+        76
       ]
     },
     {
       "id": "result",
       "type": "backend",
-      "label": "Return result",
-      "sublabel": "Target + XPath + readiness",
+      "label": "6. Return resolution",
+      "sublabel": "Resolver \u00b7 verified observations + usage",
       "pos": [
-        50,
-        550
+        60,
+        380
       ],
       "size": [
         280,
-        70
+        76
       ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "Request boundary",
+      "wraps": [
+        "request"
+      ],
+      "pad": 22
+    },
+    {
+      "kind": "region",
+      "label": "Capture boundary",
+      "wraps": [
+        "capture"
+      ],
+      "pad": 22
+    },
+    {
+      "kind": "region",
+      "label": "Inference boundary",
+      "wraps": [
+        "select"
+      ],
+      "pad": 22
+    },
+    {
+      "kind": "region",
+      "label": "Output validation boundary",
+      "wraps": [
+        "validate"
+      ],
+      "pad": 22
+    },
+    {
+      "kind": "region",
+      "label": "Browser verification boundary",
+      "wraps": [
+        "verify"
+      ],
+      "pad": 22
+    },
+    {
+      "kind": "region",
+      "label": "Response boundary",
+      "wraps": [
+        "result"
+      ],
+      "pad": 22
     }
   ],
   "connections": [
     {
       "from": "request",
       "to": "capture",
-      "label": "capture API"
+      "label": "page + document IDs"
     },
     {
       "from": "capture",
-      "to": "selection",
-      "label": "sanitized context"
+      "to": "select",
+      "label": "sanitized candidates"
     },
     {
-      "from": "selection",
-      "to": "validation",
-      "label": "action + IDs",
-      "fromSide": "bottom",
-      "toSide": "top",
+      "from": "select",
+      "to": "validate",
+      "label": "action + candidate IDs",
       "labelAt": [
-        970,
-        245
+        1040,
+        286
       ]
     },
     {
-      "from": "validation",
-      "to": "xpath",
-      "label": "selections API"
-    },
-    {
-      "from": "xpath",
+      "from": "validate",
       "to": "verify",
-      "label": "candidate XPath"
+      "label": "capture ID + selections"
     },
     {
       "from": "verify",
       "to": "result",
-      "label": "recheck view + state",
-      "fromSide": "bottom",
-      "toSide": "top"
+      "label": "XPath + state + frame"
     }
   ],
   "cards": [
     {
       "dot": "violet",
-      "title": "Model selection evaluation",
+      "title": "Model selection",
       "items": [
-        "Saved candidates and independent labels",
-        "Does the model choose the right element?"
+        "Needs: saved candidates + independent target label",
+        "Steps 3\u20134: selected IDs match independent labels"
       ]
     },
     {
       "dot": "emerald",
-      "title": "XPath evaluation",
+      "title": "XPath construction and verification",
       "items": [
-        "Controlled selection in a real browser",
-        "Does its XPath identify the intended node?"
+        "Needs: live fixture + controlled candidate selection",
+        "Step 5: unique same-node XPath, state and mutations"
       ]
     },
     {
       "dot": "cyan",
-      "title": "Resolver E2E evaluation",
+      "title": "Resolver E2E",
       "items": [
-        "Real model and browser through the API",
-        "Does the complete request return the right result?"
+        "Needs: live page + instruction + provider response",
+        "Checks: the complete API result across all six steps"
       ]
     }
   ]

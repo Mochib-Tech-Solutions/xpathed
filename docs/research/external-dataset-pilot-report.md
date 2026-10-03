@@ -17,7 +17,7 @@ Mind2Web authors used task intent and current-page semantic controls with target
 
 A sanitized derivative of one actual PhraseNode training page preserved the independent source-node mapping. The source `xid=12` maps to one reconstructed anchor. The real Browser and Resolver returned an XPath that identified that exact node: **1/1 target correct**, zero wrong targets. No page action was executed. The controlled `click` is a browser identity probe, not a source-annotated PhraseNode action label.
 
-The fixture removes scripts, network assets and form values; styles and some document wrappers change. Its results prove identity in the derivative document, not historical geometry or readiness. The durable run manifest retains fixture/source hashes without the fixture tree. A separate real-browser version-3 scenario verified both intended approval buttons, including the disabled button, with one shared action and one XPath per target.
+The fixture removes scripts, network assets and form values; styles and some document wrappers change. Its results prove identity in the derivative document, not historical geometry or readiness. The durable run manifest retains fixture/source hashes without the fixture tree. A separate real-browser shared-action scenario verified both intended approval buttons, including the disabled button, with one shared action and one XPath per target.
 
 Private evidence: `.artifacts/evaluation/phrasenode-derived-pilot` and `.artifacts/evaluation/v3-plural-reviewed`.
 
@@ -25,7 +25,7 @@ Private evidence: `.artifacts/evaluation/phrasenode-derived-pilot` and `.artifac
 
 The diagnostic lexical baseline selected 4/30 PhraseNode targets and 0/1 adapted Mind2Web target. Both runs exited nonzero and retain every attempted case. They validate failure accounting and report plumbing, not model quality. These are the final sanitized imports; earlier development runs are not the reported baseline.
 
-Three reviewed PhraseNode training inputs from one public page family were sent to standard `deepseek/deepseek-v4.1-flash` through the pinned `wafer` route. Prompt 7, schema, 4,096 maximum output tokens, reasoning disabled, provider fallbacks disabled and provider price caps were recorded. There were no retries.
+Three reviewed PhraseNode training inputs from one public page family were sent to standard `deepseek/deepseek-v4.1-flash` through the pinned `wafer` route. The baseline prompt, schema, 4,096 maximum output tokens, reasoning disabled, provider fallbacks disabled and provider price caps were recorded. There were no retries.
 
 | Observed measure                      |                  Value |
 | ------------------------------------- | ---------------------: |
@@ -59,4 +59,4 @@ The live launch was the following explicit command. Repeating it bills another a
 pnpm evaluate:dataset --import .artifacts/datasets/phrasenode-private-import --output .artifacts/datasets/phrasenode-live-pilot --split train --mode live --limit 3 --budget-usd 5 --reviewed-inputs .artifacts/datasets/phrasenode-private-reviewed-inputs.json
 ```
 
-Saved live aggregates were replayed exactly without another provider call. Correctness/latency qualification thresholds remain unset, so qualification is incomplete even for the three passing requests. No default model was changed. Multi-target quality cannot be inferred from these single-target source labels; the separate controlled version-3 tests cover the application contract. Color-relative commands remain a representation gap until appearance information is explicitly supported and evaluated.
+Saved live aggregates were replayed exactly without another provider call. Correctness/latency qualification thresholds remain unset, so qualification is incomplete even for the three passing requests. No default model was changed. Multi-target quality cannot be inferred from these single-target source labels; the separate controlled shared-action tests cover the application contract. Color-relative commands remain a representation gap until appearance information is explicitly supported and evaluated.

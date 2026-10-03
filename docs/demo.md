@@ -28,7 +28,7 @@ Use the diagrams in [How it works](how-it-works.md):
 4. Browser builds XPath, verifies identity and rechecks the current view.
 5. The workspace keeps the result in the active tab’s chat history until it is cleared or the tab closes.
 
-Explain the five local Docker services, model settings and single-table schema. Distinguish candidate selection, locator correctness and observed readiness.
+Explain the four local Docker services, model settings and client-owned chat history. Distinguish candidate selection, locator correctness and observed readiness.
 
 A test platform can call Resolver directly for a page owned by the configured browser service. The browser implementation is replaceable through the [HTTP contract](runtime.md#browser-integration); an external browser needs a compatible adapter, and its runner owns execution and postconditions. The chat workspace is one test client of the core API.
 

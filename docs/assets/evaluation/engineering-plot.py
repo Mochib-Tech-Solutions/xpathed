@@ -18,6 +18,9 @@ root = Path(__file__).resolve().parent
 run = Path(sys.argv[1]).resolve()
 manifest = json.loads((run / "manifest.json").read_text())
 summary = json.loads((run / "summary.json").read_text())
+report_path = root.parent.parent / "research" / "engineering-comparison.md"
+report = report_path.read_text()
+assert manifest["id"] in report, "Prepare the report for this run before refreshing its results"
 assert manifest["mode"] == summary["mode"] == "live", "Scripted responses cannot measure accuracy"
 assert summary["complete"], "Keep incomplete runs separate"
 arms = ["basic", "improved", "stagehand"]
@@ -97,7 +100,7 @@ fig.savefig(Path(gettempdir()) / "xpathed-engineering-comparison.png", dpi=160)
 plt.close(fig)
 
 lines = ["# Basic resolver, Improved resolver and Stagehand", "", "## Results", "",
-         "All three systems received the same frozen browser cases and independent target labels, with one original attempt per case and no retries. These are authored regression cases, not an estimate of accuracy on unseen websites.", "",
+         "All three systems received the same frozen browser cases and independent target labels, with one original attempt per case and no retries. This authored evaluation set measures performance on these cases; it does not estimate accuracy on unseen websites.", "",
          "| System | Action + targets | Target selection only | Full resolver contract | Parallel median / p95 | Known cost | Unreported charges |",
          "| --- | ---: | ---: | ---: | ---: | ---: | ---: |"]
 for arm in arms:
@@ -109,19 +112,8 @@ for arm in arms:
     selection = f"{target['passed']}/{target['total']} ({100*target['passed']/target['total']:.1f}%)"
     lines.append(f"| {a['label']} | {a['passed']}/{a['total']} ({100*a['passed']/a['total']:.1f}%) | {selection} | {full} | {timing} | ${a['knownReportedUsd']:.8f} | {a['unreportedCharges']} |")
 lines += ["", "![Accuracy by behavior](../assets/evaluation/engineering-category-results.svg)", "",
-          f"Basic → Improved: **{len(summary['changes']['gained'])} gained passes and {len(summary['changes']['lost'])} lost passes**.", "",
-          "Regressions: " + (", ".join(f"`{c}`" for c in summary["changes"]["lost"]) or "none observed") + ".", "",
-          "## What changed", "",
-          "Basic resolver is the archived earlier setup. Improved resolver uses the current implementation: one shared prompt and schema, explicit rules for requested controls versus surrounding context, scoped absence, and current-view membership revalidation. These changes are measured together; the comparison does not isolate the effect of each change.", "",
-          "Stagehand uses stock `observe`, with caching and self-healing disabled, a current-view instruction, and the same DeepSeek V4.1 Flash/Wafer route, 4,096-token output limit and disabled reasoning. Its DOM representation and prompt differ from ours. The browser binaries, viewport, document, initial state, language and time zone are checked for parity.", "",
-          "## What the score means", "",
-          "The common score requires the correct interaction and complete set of independently labelled nodes. Each XPath must identify one eligible node. Singleton grading keeps the first Stagehand suggestion; plural grading checks the whole returned set. Wrong, missing, extra and duplicate targets fail. Operational errors remain in the denominator. Correct rejection of unsupported instructions is included; an adapter selector-conversion failure is not a correct instruction refusal.", "",
-          "The target-selection column separately checks exact node sets and correct absence, without requiring the interaction name. Its denominator excludes the explicitly unsupported-instruction cases, which do not have a supported target set. All errors within that subset still fail. This helps distinguish selecting the wrong element from interpreting the action differently.", "",
-          "Stagehand returns targets without xpathed's absence explanations or readiness contract. For an empty result, action interpretation is unavailable; the common score accepts correct absence. For a partly absent request, the common score checks the complete found set. The separate full resolver score also checks outcome details, capture coverage, readiness and summary fields. Neither system executes actions.", "",
-          "## Timing and evidence", "",
-          "Each system has its own serial worker; the three workers run concurrently with isolated browser sessions and provider accounting. Stagehand waits for the corresponding Basic browser observation to establish parity. Browser setup and independent grading are outside the measured inference interval. Timings above describe the parallel phase; retained serial attempts have separate timing fields in the aggregate. Provider caching and host contention can affect timings. Costs are reported amounts, with missing billing records kept separate.", "",
-          f"Run: `{manifest['id']}`; started `{manifest['createdAt']}`. The [aggregate evidence](../assets/evaluation/engineering-comparison.json) records source and image identities, case outcomes and original evidence hashes. Private request/response payloads remain in the local run directory.", "",
-          "The initial runner stopped after one case per arm because it reused an attempt ID. Those three original outcomes remain included. Continuation ran only the remaining cases after the bookkeeping fix. Docker build-attestation wrappers changed during restart; saved build logs verify identical platform manifests and runtime configurations. Original and continuation image identities and the original manifest are retained in the evidence. No failed model attempt was retried.", "",
-          "This research comparison does not approve or activate a release. See [evaluation commands](../evaluation.md#engineering-comparison) to reproduce it.", ""]
-(root.parent.parent / "research" / "engineering-comparison.md").write_text("\n".join(lines))
+          f"Basic → Improved: **{len(summary['changes']['gained'])} gained passes and {len(summary['changes']['lost'])} lost passes**.", "", ""]
+start = report.index("## Results\n")
+end = report.index("## What each system uses\n", start)
+report_path.write_text(report[:start] + "\n".join(lines[2:]) + report[end:])
 print(f"Exported {len(trials)} original attempts across {len(groups)} categories.")
