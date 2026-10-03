@@ -17,7 +17,7 @@ The progression below explains what changed and why. **Basic** is the archived e
 | Consolidate the implementation | Share one prompt and schema between browser resolution and Saved-page selection; remove retired runtime paths | Keep future changes in one place, with earlier implementations recoverable through Git and image archives |
 | Compare the result             | Run Basic, Improved and Stagehand against the same independently labelled browser cases                       | Measure the combined effect, expose regressions and separate action interpretation from target selection  |
 
-We measured Basic and Improved as complete systems. There is no isolated accuracy measurement for each intermediate step. The [comparison report](research/engineering-comparison.md) contains the category graph, paired gains and losses, costs and original evidence identities.
+We measured Basic and Improved as complete systems. There is no isolated accuracy measurement for each intermediate step. The [comparison report](research/clean-evaluation-comparison.md) contains category results, paired gains and losses, costs and original evidence identities.
 
 ## Give the model a bounded job
 
@@ -57,13 +57,11 @@ The recorded Basic resolver and Improved resolver comparison uses the same DeepS
 - Report missing targets within the current view. Completeness describes whether every requested target is represented, including absent targets.
 - Recheck viewport membership after inference before returning found or absent results.
 
-The [current comparison](research/engineering-comparison.md) evaluates the archived Basic resolver, the current Improved resolver and Stagehand on the same 183 browser cases. The common action-and-target score is **161/183**, **169/183** and **103/183**, respectively. Improved gains 15 passes and loses 7: scope and targeting improve most, while state cases lose one net pass. These are combined system changes, so the run cannot attribute the gain to one prompt rule.
+The [current comparison](research/clean-evaluation-comparison.md) measures Basic and Improved on the same admitted saved-page inputs, and all three systems on the same final browser cases. Its tables and charts are generated from complete original attempts, with separate denominators for saved-page selection, browser action-and-target correctness, target selection alone and the full resolver contract.
 
-Action interpretation matters separately from selecting the right element. Without requiring the action name, exact target selection on the 175 supported-instruction cases is **160/175**, **169/175** and **136/175**. Stagehand's stock `observe` does not return the full readiness or absence contract; the report keeps these capabilities separate. All failures remain visible.
+Action interpretation matters separately from selecting the right element. Stagehand's stock `observe` does not return xpathed's full readiness or absence contract and requires a live page, so it has no saved-page score. Failures, gains and regressions remain visible. Aggregate improvement does not override the release gate's no-regression requirement, and one attempt per case leaves model variation unresolved.
 
-The seven regressions include three malformed model responses, two changed action interpretations, one incorrect unsupported result and one wrong target for an absent request. The aggregate improvement does not satisfy the release gate's no-regression requirement. One attempt per case also leaves model variation unresolved.
-
-Three isolated workers run concurrently, one per system. Original evidence, charges, source identities, image identities and timing cohorts are preserved. The application carries one selected implementation; archived images and Git preserve Basic. Git commits and saved prompt bytes preserve reproducibility.
+Isolated workers run concurrently. Original evidence, charges, source identities, image identities and timing cohorts are preserved. The application carries one selected implementation; archived images and Git preserve Basic. Git commits and saved prompt bytes preserve reproducibility.
 
 ## Keep one implementation
 

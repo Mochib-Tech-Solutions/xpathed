@@ -1,5 +1,7 @@
 # Basic resolver, Improved resolver and Stagehand
 
+For measurements on the final audited dataset, use the [current comparison](clean-evaluation-comparison.md). This report preserves its original historical evidence.
+
 **Historical comparison — 2 October 2026.** These results retain their original source and case definitions. Later review clarified one instruction and added required reason codes to five cases. They are not a fresh measurement of the current evaluation set.
 
 ## Results
@@ -38,14 +40,14 @@ The [archived Basic source](https://github.com/Mochib-Tech-Solutions/xpathed/tre
 
 These are original outcomes from the saved comparison, displayed under today's behavior-based case names. `sourceIds` links each name to its original evidence ID. Pass/fail below refers to the common action-and-target score.
 
-| Case / instruction | Expected result | Basic | Improved | Stagehand |
-| --- | --- | --- | --- | --- |
-| `targeting-save-button-by-name` — “Click Save changes.” | Click the labelled Save button | Pass | Pass | Pass |
-| `cardinality-all-approval-buttons-include-disabled-target` — “Click all Approve buttons in Approvals.” | Both Approve buttons, including the disabled one | Pass | Pass | Pass |
-| `scope-offscreen-target-is-absent` — “Click Help.” | No current-view target | Pass | Pass | Fail: target set differs |
-| `state-disabled-spinbutton-click-is-blocked` — “Click Reserved copies.” | Select the disabled spinbutton; readiness remains blocked | Fail: no usable resolution | Pass | Pass on action/target selection |
-| `state-listbox-option-for-click` — “Click the Greek option in Available languages.” | Select the Greek option and preserve `click` | Pass | Fail: correct target, wrong action | Pass |
-| `context-control-in-collapsed-accordion-is-absent` — “Click Express courier.” | Scoped absence while the accordion is collapsed | Pass | Fail: unsupported result | Pass |
+| Case / instruction                                                                                     | Expected result                                           | Basic                      | Improved                           | Stagehand                       |
+| ------------------------------------------------------------------------------------------------------ | --------------------------------------------------------- | -------------------------- | ---------------------------------- | ------------------------------- |
+| `targeting-save-button-by-name` — “Click Save changes.”                                                | Click the labelled Save button                            | Pass                       | Pass                               | Pass                            |
+| `cardinality-all-approval-buttons-include-disabled-target` — “Click all Approve buttons in Approvals.” | Both Approve buttons, including the disabled one          | Pass                       | Pass                               | Pass                            |
+| `scope-offscreen-target-is-absent` — “Click Help.”                                                     | No current-view target                                    | Pass                       | Pass                               | Fail: target set differs        |
+| `state-disabled-spinbutton-click-is-blocked` — “Click Reserved copies.”                                | Select the disabled spinbutton; readiness remains blocked | Fail: no usable resolution | Pass                               | Pass on action/target selection |
+| `state-listbox-option-for-click` — “Click the Greek option in Available languages.”                    | Select the Greek option and preserve `click`              | Pass                       | Fail: correct target, wrong action | Pass                            |
+| `context-control-in-collapsed-accordion-is-absent` — “Click Express courier.”                          | Scoped absence while the accordion is collapsed           | Pass                       | Fail: unsupported result           | Pass                            |
 
 The plural common-score pass does not establish Stagehand readiness. The full Resolver score additionally requires the disabled button to be found with blocked readiness. Likewise, the Greek-option example passes target selection for all three systems while failing the common score for Improved.
 

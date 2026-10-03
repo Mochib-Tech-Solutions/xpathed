@@ -87,7 +87,7 @@ A Saved-page selection example is `phrasenode-db978249f30c2c27d84a36a8` in the [
 | Latency                           | Median and p95 from the recorded request interval, separated by execution cohort                | Observed timing under those conditions; failed attempts remain recorded                  |
 | Cost                              | Sum of reported charges, alongside estimates and counts of unreported charges                   | Known spend; an unavailable charge is never zero                                         |
 
-All planned failures remain in their category denominator. Category-specific exclusions are recorded before execution. The three-system comparison's common score is narrower than full Live-browser Resolver: Stagehand does not produce the xpathed readiness/coverage contract. See [historical case outcomes](research/engineering-comparison.md#case-examples) for examples from the earlier three-system comparison. Its recorded case set and source remain distinct from the current collection.
+All planned failures remain in their category denominator. Category-specific exclusions are recorded before execution. The three-system comparison's common score is narrower than full Live-browser Resolver: Stagehand does not produce the xpathed readiness/coverage contract. The [current audited-set comparison](research/clean-evaluation-comparison.md) reports all category scores, failures, costs and source identities from the final dataset. Earlier reports retain their historical case definitions separately.
 
 ## Run and replay
 
@@ -169,6 +169,8 @@ Authentication, transport failures, provider rejection and missing resolution re
 
 ### Resolver comparison
 
+The [current report](research/clean-evaluation-comparison.md) and [figure data](assets/evaluation/clean-comparison.json) use the final audited dataset. The figure exporter verifies current category membership and paired input/label identities before producing scores.
+
 Use **Basic resolver**, **Improved resolver** and **Stagehand** in reports and charts. Git commits and image identities belong in saved evidence. For a new comparison, Basic must be a verified bundle implementing the same current API contract; Improved is built from the current checkout, with its source fingerprint and exact image IDs recorded. To reproduce the published historical Basic comparison, check out the recorded runner revision from its evidence first: the current runner does not adapt retired numbered contracts or bundle formats. The application keeps one implementation.
 
 ```sh
@@ -182,8 +184,9 @@ pnpm evaluate:compare -- --mode live \
   --output .artifacts/resolver-comparison-live
 
 pnpm evaluate:compare:replay .artifacts/resolver-comparison-live
-# Refresh the recorded report after setting its run identity and narrative.
-uv run docs/assets/evaluation/engineering-plot.py .artifacts/resolver-comparison-live
+# Export the final browser, paired saved-page and controlled XPath measurements.
+uv run docs/assets/evaluation/clean-comparison-plot.py \
+  BROWSER_RUN BASIC_SAVED_RUN IMPROVED_SAVED_RUN XPATH_RUN
 ```
 
 The launcher verifies and restores the archived bundle, builds the current resolver and pinned Stagehand adapter, and starts an isolated evaluation stack. `--resume` with the original output directory continues only unattempted arms using the original image IDs; it rejects changed cases, evaluation code, plan, timeout settings or runtime images and unrecorded provider attempts. Replay verifies both graders and recomputes the shared and full resolver scores from original observations. Provider identity or response-cache violations retain the affected attempt and stop further calls. A fresh run gives its images unique local retention tags recorded in `image-tags.json`; keep those tags available for continuation. Set `XPATHED_EVALUATION_PROJECT=xpathed-evaluation-UNIQUE_NAME` for concurrent checkouts. A live run uses `OPENROUTER_EVAL_API_KEY`; scripted singleton and plural compatibility checks must pass before any paid calls.
