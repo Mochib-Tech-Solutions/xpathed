@@ -63,6 +63,22 @@ internal static partial class BrowserEvidence
                 "The browser returned inconsistent candidates or coverage."
             );
         }
+        var preceding = new Dictionary<string, CandidateElement>(StringComparer.Ordinal);
+        foreach (var candidate in capture.Candidates)
+        {
+            if (
+                candidate.ParentId is { } parentId
+                && (!preceding.TryGetValue(parentId, out var parent) || !SameFrame(parent.Frame, candidate.Frame))
+            )
+            {
+                throw new ApiException(
+                    502,
+                    "invalid_browser_capture",
+                    "The browser returned an invalid parent identity."
+                );
+            }
+            preceding.Add(candidate.Id, candidate);
+        }
     }
 
     internal static ActionSelectionValidation ValidateSelection(

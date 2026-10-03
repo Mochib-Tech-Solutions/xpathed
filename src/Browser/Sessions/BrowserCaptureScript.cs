@@ -21,6 +21,7 @@ internal static class BrowserCaptureScript
           let labelCache = new WeakMap();
           let exposureCache = new WeakMap();
           let intersections = new WeakMap();
+          let siblingShapes = new WeakMap();
           let modalityUnknown = false;
           const currentModal = () => {
             const modals = [...document.querySelectorAll('dialog:modal')];
@@ -179,7 +180,7 @@ internal static class BrowserCaptureScript
           };
           const reset = budgetMs => {
             deadline = performance.now() + budgetMs;
-            styleCache = new WeakMap(); textCache = new WeakMap(); labelCache = new WeakMap(); exposureCache = new WeakMap();
+            styleCache = new WeakMap(); textCache = new WeakMap(); labelCache = new WeakMap(); exposureCache = new WeakMap(); siblingShapes = new WeakMap();
             modal = currentModal();
           };
           const state = element => {
@@ -234,12 +235,38 @@ internal static class BrowserCaptureScript
             const readiness = [checks.compatibleControl, checks.enabled, checks.writable, checks.viewport, checks.pointerReception, checks.keyboard];
             return { action, status: readiness.includes('fail') ? 'blocked' : custom ? 'unsupported' : readiness.includes('unknown') ? 'unknown' : 'ready', reasons, checks };
           };
+          const shape = element => `${element.localName}:${[...element.children].map(child => child.localName).join(',')}`;
+          const repeatedItem = element => {
+            if (!element.matches('div,section,article,li,figure') || element.children.length < 2 || !element.parentElement) return false;
+            const parent = element.parentElement;
+            if (!siblingShapes.has(parent)) {
+              const counts = new Map();
+              for (const sibling of parent.children) {
+                checkBudget();
+                const key = shape(sibling);
+                counts.set(key, (counts.get(key) ?? 0) + 1);
+              }
+              siblingShapes.set(parent, counts);
+            }
+            if (siblingShapes.get(parent).get(shape(element)) < 2) return false;
+            // Retain repeated content items, not every layout wrapper or a copy of one control.
+            const names = new Set();
+            for (const child of element.querySelectorAll('a[href],button,img[alt],h1,h2,h3,h4,h5,h6,[role=button],[role=heading]')) {
+              checkBudget();
+              if (!accessibilityExposed(child)) continue;
+              const name = label(child) || text(child);
+              if (name) names.add(name);
+              if (names.size >= 2) return true;
+            }
+            return false;
+          };
           const eligible = element => {
             if (!accessibilityExposed(element)) return false;
             const container = element.closest(valueContainer);
             if (container && container !== element) return false;
             return element.matches('a[href],button,input,select,textarea,summary,img[alt],[aria-label],[aria-labelledby],[role],[tabindex],[contenteditable]:not([contenteditable="false"])') ||
-              (!element.closest('button,a,textarea,select,[contenteditable]:not([contenteditable="false"])') && [...element.childNodes].some(node => node.nodeType === Node.TEXT_NODE && normalize(node.textContent)));
+              (!element.closest('button,a,textarea,select,[contenteditable]:not([contenteditable="false"])') &&
+                ([...element.childNodes].some(node => node.nodeType === Node.TEXT_NODE && normalize(node.textContent)) || repeatedItem(element)));
           };
           const complexEffects = element => {
             if (environment.complexEffects) return true;
@@ -282,9 +309,16 @@ internal static class BrowserCaptureScript
             id: `${frame.id}:c${index + 1}`, frame, tag: element.localName, role: role(element), text: text(element),
             label: label(element), placeholder: normalize(element.getAttribute('placeholder')), scope: [...new Set([...scope(element), ...(environment.scope ?? [])])],
             state: { ...state(element), checked: null, selected: null, selectedOptionCount: null }, geometry: geometry(element),
-            appearance: appearance(element)
+            appearance: appearance(element), isRepeatedItem: repeatedItem(element)
           });
           const nodes = [];
+          const nodeIds = new Map();
+          const parentIdFor = element => {
+            for (let ancestor = element.parentElement; ancestor; ancestor = ancestor.parentElement) {
+              checkBudget();
+              if (nodeIds.has(ancestor) && !ancestor.matches('a[href],button,input,select,textarea,summary,[role=button],[role=link]')) return nodeIds.get(ancestor);
+            }
+          };
           const frameElements = [];
           const shadowHosts = [];
           const candidates = [];
@@ -327,9 +361,11 @@ internal static class BrowserCaptureScript
                 if (!inView(element) && !relevantAncestors.has(element)) scrollContainers.splice(index, 1);
               }
               if (nodes.length > 2000) throw budgetExceeded;
+              nodes.forEach((element, index) => nodeIds.set(element, `${frame.id}:c${index + 1}`));
               for (const element of nodes) {
                 checkBudget();
                 const candidate = describe(element, candidates.length);
+                candidate.parentId = parentIdFor(element);
                 bytes += new TextEncoder().encode(JSON.stringify(candidate)).length + 1;
                 if (bytes > 512000) { complete = false; break; }
                 candidates.push(candidate);
@@ -482,6 +518,15 @@ internal static class BrowserCaptureScript
                 if (!viewUnchanged()) return { errorCode: 'stale_capture' };
                 const visible = observed.filter(inView);
                 if (visible.length !== capturedView.size || visible.some(element => !capturedView.has(element))) return { errorCode: 'stale_capture' };
+                for (let index = 0; index < nodes.length; index++) {
+                  checkBudget();
+                  const candidate = candidates[index], node = nodes[index];
+                  if (parentIdFor(node) !== candidate.parentId) return { errorCode: 'stale_capture' };
+                  if (candidate.isRepeatedItem) {
+                    const current = geometry(node);
+                    if (Object.keys(current).some(key => current[key] !== candidate.geometry[key])) return { errorCode: 'stale_capture' };
+                  }
+                }
                 return { scannedCount: scanned };
               } catch (error) { if (error === budgetExceeded) return { errorCode: 'validation_budget_exceeded' }; throw error; }
             },

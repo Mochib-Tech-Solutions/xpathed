@@ -45,6 +45,12 @@ The identification of the intended target element from the instruction and the c
 **Candidate element**:
 A web element proposed as a possible target for an instruction. Being a candidate does not establish that it is the intended target.
 
+**Item container**:
+A page element grouping one repeated content item, such as a product card, together with its name and controls. The container and its controls are distinct possible targets.
+
+**Spatial neighbor**:
+A distinct peer in a named visual direction. Nearness and alignment describe page layout, not reading order or successful interaction.
+
 **Resolution strategy**:
 An approach for proposing target elements and their XPath expressions from an instruction and page context. Different strategies address the same resolution task.
 

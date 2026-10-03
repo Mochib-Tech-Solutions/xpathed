@@ -50,6 +50,9 @@ export function renderDerivedBody(fixture) {
 export function renderFixture(key, trial, frame) {
   const pages = {
     ...currentViewFixtures,
+    "spatial-product-grid-reordered":
+      currentViewFixtures["spatial-product-grid"] +
+      "<style>#backpack-card{order:0}#fleece-card{order:1}#bike-light-card{order:2}#bolt-shirt-card{order:3}</style>",
     "viewport-clipped": `<main><h1>Clipped panel</h1><div style="height:100px;overflow:hidden"><iframe id="clipped-panel" title="Clipped panel" src="/frame?trial=${encodeURIComponent(trial)}&name=viewport-clipped-child" style="display:block"></iframe></div></main>`,
     "viewport-clipped-child":
       '<button id="frame-upper">Upper action</button><div style="margin-top:220px"><button id="frame-lower">Lower action</button></div>',

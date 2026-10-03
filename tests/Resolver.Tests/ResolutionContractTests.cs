@@ -810,6 +810,90 @@ public sealed class ResolutionContractTests
         Assert.Equal("0123456789abcdef0123456789abcdef", body.GetProperty("traceId").GetString());
     }
 
+    [Fact]
+    public async Task ModelInputRetainsItemParentsAndNearestVisualNeighborsWithoutDroppingControls()
+    {
+        var capture = JsonNode.Parse(new DeterministicServicesHandler().CaptureBody)!;
+        var button = capture["candidates"]![0]!.DeepClone();
+        button["parentId"] = "card";
+        JsonNode Card(string id, double x, double y)
+        {
+            var card = button.DeepClone();
+            card.AsObject().Remove("parentId");
+            card["id"] = id;
+            card["tag"] = "div";
+            card["role"] = "";
+            card["label"] = "";
+            card["text"] = "Item Save";
+            card["isRepeatedItem"] = true;
+            card["geometry"] = JsonSerializer.SerializeToNode(
+                new
+                {
+                    x,
+                    y,
+                    width = 200,
+                    height = 200,
+                }
+            );
+            return card;
+        }
+        capture["candidates"] = new JsonArray(
+            Card("card", 0, 0),
+            button,
+            Card("right", 220, 0),
+            Card("below", 0, 220),
+            Card("tied-below", 120, 220)
+        );
+        capture["coverage"]!["scannedCount"] = 10;
+        capture["coverage"]!["eligibleCount"] = 5;
+        capture["coverage"]!["capturedCount"] = 5;
+        var handler = new DeterministicServicesHandler { CaptureBody = capture.ToJsonString() };
+        await using var application = CreateApplication(handler);
+        using var client = application.CreateClient();
+        using var response = await client.PostAsJsonAsync(
+            "/pages/page-1/resolve",
+            new { instruction = "Click Save", documentId = "document-1" }
+        );
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var input = JsonDocument.Parse(
+            handler.ModelRequest.GetProperty("messages")[1].GetProperty("content").GetString()!
+        );
+        var candidates = input.RootElement.GetProperty("candidates");
+        Assert.Equal(5, candidates.GetArrayLength());
+        Assert.Equal("card", candidates[1].GetProperty("parentId").GetString());
+        Assert.Equal("button-save", candidates[1].GetProperty("id").GetString());
+        Assert.Equal("right", candidates[0].GetProperty("neighbors").GetProperty("right")[0].GetString());
+        var below = candidates[0].GetProperty("neighbors").GetProperty("below");
+        Assert.Equal(2, below.GetArrayLength());
+        Assert.Equal("below", below[0].GetString());
+        Assert.Equal("tied-below", below[1].GetString());
+        Assert.False(candidates[1].TryGetProperty("neighbors", out _));
+        Assert.Equal(1, handler.ProviderRequestCount);
+        var layout = input.RootElement.GetProperty("layout");
+        Assert.Equal(4, layout.GetArrayLength());
+        Assert.Equal("Save", layout[0].GetProperty("description").GetString());
+        Assert.Equal("below", layout[0].GetProperty("neighbors").GetProperty("below")[0].GetProperty("id").GetString());
+    }
+
+    [Theory]
+    [InlineData("button-save")]
+    [InlineData("missing-parent")]
+    public async Task InvalidCandidateParentsFailBeforeProviderInference(string parentId)
+    {
+        var capture = JsonNode.Parse(new DeterministicServicesHandler().CaptureBody)!;
+        capture["candidates"]![0]!["parentId"] = parentId;
+        var handler = new DeterministicServicesHandler { CaptureBody = capture.ToJsonString() };
+        await using var application = CreateApplication(handler);
+        using var client = application.CreateClient();
+        using var response = await client.PostAsJsonAsync(
+            "/pages/page-1/resolve",
+            new { instruction = "Click Save", documentId = "document-1" }
+        );
+        var result = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("invalid_browser_capture", result.GetProperty("diagnostics").GetProperty("code").GetString());
+        Assert.Equal(0, handler.ProviderRequestCount);
+    }
+
     [Theory]
     [InlineData("API_KEY=violet-cactus-782")]
     [InlineData("Bearer violet-cactus-782")]
