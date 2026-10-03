@@ -28,15 +28,22 @@ Release images contain the code and prompt. They do not contain secrets or insta
 
 ## Run the published Browser and Resolver
 
-Prerequisites: Docker with Compose, Node 24.16.0, pnpm 12.8.1 and authenticated `gh` access to the repository. The hosted release is built on Linux ARM64; the loader verifies that the Docker daemon has the same architecture. For another architecture, build the source locally.
+Prerequisites: Docker with Compose and authenticated `gh` access to the repository. Hosted images target Linux ARM64; use a matching Docker daemon. For another architecture, build the source locally.
 
-From a clone of this repository:
+No clone or Node installation is needed:
 
 ```sh
-pnpm release:download --output .artifacts/deployment
-cd .artifacts/deployment
+gh release download v1.0.0 --repo Mochib-Tech-Solutions/xpathed --dir xpathed-release
+cd xpathed-release
+cat browser-resolver-images.tar.gz.part-* | gzip -dc > images.tar
+shasum -a 256 -c SHA256SUMS
+docker image load --input images.tar
 cp release.env.example .env
 ```
+
+Proceed only when each command succeeds. Linux users can use `sha256sum --check SHA256SUMS`. Use the desired tag from GitHub Releases and a fresh directory; checksums cover the reconstructed archive and all downloaded payload files. The published `images.env` names the exact Browser/Resolver IDs.
+
+An existing source clone with Node 24.16.0 and pnpm 12.8.1 can instead run `pnpm release:download --output .artifacts/deployment`, then enter that directory and copy `release.env.example` to `.env`. This command resolves the current `release` commit, verifies metadata, platform and image identity, and loads the images automatically. Its bundle files live under `bundle/`; the standalone download keeps them in the deployment directory.
 
 Edit `.env` with your key, model and provider. The downloader does not create or overwrite your runtime settings. Then:
 
@@ -57,9 +64,10 @@ docker compose --env-file .env --env-file images.env -f compose.release.yaml log
 | `compose.release.yaml` | Browser and Resolver services; no build definitions |
 | `browser-seccomp.json` | Browser sandbox policy from the tested source |
 | `release.env.example` | Template for the operator's `.env` |
-| `images.env` | Generated exact Browser and Resolver image IDs; contains no provider settings |
+| `SHA256SUMS` | Checksums for all standalone payload files and reconstructed `images.tar` |
+| `images.env` | Exact Browser and Resolver image IDs; contains no provider settings |
 | `monitoring-baseline.json` | Original measurements for nightly comparison |
-| `candidate.json`, `release-evidence.json.gz` | Published evaluation provenance and original evidence, downloaded separately when needed |
+| `candidate.json`, `release-evidence.json.gz` | Published evaluation provenance and original evidence, included in the standalone download; fetched separately when using the clone-based downloader |
 
 Docker image names are `xpathed/browser:TESTED_COMMIT` and `xpathed/resolver:TESTED_COMMIT`; Compose pins the immutable image IDs in `images.env`. Browser uses 1 GiB shared memory, the recorded seccomp policy and its nonroot image user. Resolver addresses `http://browser:8080` inside the network. Host ports bind to loopback; `.env` can change `BROWSER_PORT`, `RESOLVER_PORT`, `VIEWER_ORIGINS` and `BROWSER_MAX_SESSIONS`. Keep each deployment in its own directory and use `-p PROJECT_NAME` plus distinct ports for parallel deployments.
 
