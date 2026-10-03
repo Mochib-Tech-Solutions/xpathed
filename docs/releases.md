@@ -8,6 +8,8 @@ Open a trusted same-repository `main` → `release` PR. Ordinary CI must pass fo
 
 Every baseline pass must remain a pass. Missing required results, provider failures, privacy violations and mismatched evidence fail the check. Timing and unavailable accounting remain descriptive. Changing the PR source or release baseline requires a fresh comparison. Configure required checks in GitHub before allowing merges; repository workflows do not themselves provide branch protection.
 
+Evidence sealing checks configuration consistency separately for Live-browser Resolver and Saved-page selection cases in each arm. Their scope identities and serialized schema metadata can differ; configuration drift within either category fails the check.
+
 CI needs `OPENROUTER_EVAL_API_KEY` as a secret. Optional `OPENROUTER_MODEL` and `OPENROUTER_PROVIDER` repository variables configure inference; otherwise the documented development defaults apply. Reviewed datasets are fetched by digest. Keep ordinary CI provider-free and preserve the complete comparison denominator.
 
 ## Publish the merged commit
