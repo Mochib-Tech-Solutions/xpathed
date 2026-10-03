@@ -4,6 +4,15 @@ This context covers identifying a web element from a natural-language test instr
 
 ## Language
 
+**Resolver**:
+The core system that interprets an instruction against a current browser view and returns intended targets, verified XPath expressions and observed readiness.
+
+**Browser service**:
+The component that supplies live page observations and verifies target locations for the Resolver. Its implementation can be replaced while preserving the browser contract.
+
+**Test client**:
+A consumer used to exercise and inspect Resolver results. The included chat workspace supports manual testing and demonstrations.
+
 **Test instruction**:
 A natural-language request describing an interaction and the element it concerns, such as “Hover over OK under Employee.”
 A basic test instruction requests one interaction across one or more targets, such as “Click all Approval buttons.”
@@ -40,7 +49,7 @@ A web element proposed as a possible target for an instruction. Being a candidat
 An approach for proposing target elements and their XPath expressions from an instruction and page context. Different strategies address the same resolution task.
 
 **XPath expression**:
-An expression that locates nodes within a document. In this assignment, the output is intended to locate the target element on the current page.
+An expression that locates nodes within a document. A resolved XPath is intended to locate the target element on the current page.
 
 **Browser session**:
 A managed browsing instance containing related tabs and their shared browsing state. The client and resolver refer to the same session.
@@ -95,6 +104,22 @@ The performance of the requested interaction on a resolved target element.
 
 ## Evaluation
 
+**Evaluation set**:
+The collection of independently labelled cases used to assess model selection, XPath construction and verification, and the complete Resolver request. Each category has its own score.
+_Avoid_: Regression evaluation set
+
+**Resolver E2E evaluation**:
+Assessment of the complete resolution request, from browser capture through target selection, XPath verification and readiness to the final result.
+
+**XPath construction and verification evaluation**:
+Assessment of the stage after selection: known selected elements must produce XPath expressions that uniquely identify the intended nodes in a real browser, with accurate state observations.
+
+**Model-selection evaluation**:
+Assessment of target selection from saved page inputs and independent labels. Offline describes the page inputs; inference can use a live model.
+
+**Regression**:
+A case that passes in a reference run and fails in the compared run. It describes a comparison outcome, rather than a kind of evaluation set.
+
 **Evaluation case**:
 A test instruction paired with a specified page state and independently defined expected resolution and target state.
 
@@ -135,7 +160,7 @@ The approved resolver release retained as the comparison reference while a candi
 The assessment of a candidate and the approved baseline on the same frozen collection. A lost baseline pass is a case that the baseline passes and the candidate fails.
 
 **Approved evaluation collection**:
-The cases and expected observations frozen when a resolver release is approved. Repeating them measures regression and drift; it does not establish unseen-data generalization.
+The evaluation set and expected observations frozen when a resolver release is approved. Repeating them detects lost passes and model drift; it does not establish unseen-data generalization.
 
 **Model drift**:
 A change in the observed behavior of an approved resolver configuration when its frozen cases are repeated against the hosted model.

@@ -1,6 +1,7 @@
 import { createServer } from "node:http";
 import { readFileSync } from "node:fs";
 import { renderFixture } from "./pages.mjs";
+import { controlledActions } from "./selection.mjs";
 
 import { loadCases } from "../cases/load.mjs";
 const manifest = loadCases(
@@ -66,29 +67,7 @@ export function createFixtureServer({
           return send(504, { error: { message: "Controlled provider timeout" } });
         const input = JSON.parse(body.messages.find((message) => message.role === "user").content);
         const candidates = input.candidates ?? [];
-        const actions = current.entry.provider.actions.map((plan) => {
-          const candidate = candidates.filter(
-            (item) =>
-              (!plan.label || item.label === plan.label || item.text === plan.label) &&
-              (!plan.tag || item.tag === plan.tag) &&
-              (!plan.scope || item.scope?.includes(plan.scope)) &&
-              (!plan.frameLabel || item.frame?.labels?.includes(plan.frameLabel)),
-          )[plan.index ?? 0];
-          const outcome = plan.outcome === "found" && !candidate ? "not_found" : plan.outcome;
-          return {
-            step: plan.step,
-            instruction: `${plan.action} ${plan.label ?? "requested target"}`,
-            action: plan.action,
-            outcome,
-            candidateId:
-              outcome === "found"
-                ? fault === "unknown"
-                  ? "unknown-candidate"
-                  : candidate.id
-                : null,
-            limitation: plan.limitation ?? "none",
-          };
-        });
+        const actions = controlledActions(current.entry.provider, candidates);
         return send(200, {
           id: `deterministic-${trialId}`,
           model: body.model ?? "deepseek/deepseek-v4.1-flash",

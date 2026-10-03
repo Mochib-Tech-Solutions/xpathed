@@ -2,7 +2,7 @@
 
 ## Results
 
-All three systems received the same frozen browser cases and independent target labels, with one original attempt per case and no retries. These are authored regression cases, not an estimate of accuracy on unseen websites.
+All three systems received the same frozen browser evaluation cases and independent target labels, with one original attempt per case and no retries. This authored evaluation set measures performance on these cases; it does not estimate accuracy on unseen websites.
 
 | System            | Action + targets | Target selection only | Full resolver contract | Parallel median / p95 |  Known cost | Unreported charges |
 | ----------------- | ---------------: | --------------------: | ---------------------: | --------------------: | ----------: | -----------------: |

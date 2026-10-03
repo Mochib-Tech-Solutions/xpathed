@@ -6,17 +6,25 @@
 
 [![Service ownership and request paths](diagrams/system-design.svg)](diagrams/system-design.svg)
 
-Web owns chat, tabs and the noVNC viewer. ClientApi accepts requests and stores diagnostics. Resolver coordinates capture, model selection and verification. Browser owns Playwright, Chromium and live page state. PostgreSQL retains diagnostic records. `Common` defines the records exchanged between services.
+Resolver is the core system: it accepts instructions through its API and coordinates capture, model selection and verification. Browser supplies live page operations through HTTP; the bundled implementation owns Playwright and Chromium. `Common` defines the records exchanged at this boundary. Web and ClientApi form the manual test client, with PostgreSQL retaining that client's diagnostic records.
 
 Each managed session owns a Chromium process, browser context and display. Operations are serialized within the session. Viewer and resolver share the active page ID; navigation changes its document ID, and a capture identifies one temporary element inventory. Tab switches invalidate captures.
+
+## The two internal stages
+
+[![Model target selection followed by browser XPath construction and verification](diagrams/resolver-internals.svg)](diagrams/resolver-internals.html)
+
+The model receives candidates and chooses IDs. Browser code turns selected IDs into XPath expressions and verifies those expressions against retained nodes. Resolver coordinates both stages, validates their contracts and returns the combined result. Model-selection evaluation checks the first stage, XPath evaluation isolates the second, and Resolver E2E exercises both together.
 
 ## Follow one command
 
 [![Capture, selection, browser verification and response](diagrams/resolution-flow.svg)](diagrams/resolution-flow.svg)
 
+The diagram follows a request from the bundled test client. Resolver's API is also the entry point for other callers and evaluation runners.
+
 ### 1. Capture the current view
 
-Web sends the instruction, active `pageId`, `documentId` and contract version to ClientApi. After opening a diagnostic attempt, ClientApi calls Resolver, which requests a Browser capture.
+A caller sends the instruction, active `pageId`, `documentId` and contract version to Resolver. Resolver requests a Browser capture. In the manual test client, Web forwards through ClientApi, which opens a diagnostic attempt; evaluation runners call Resolver directly.
 
 Browser retains live nodes locally and assigns temporary candidate IDs. The model-visible descriptions contain sanitized names, roles, section/row context, state, geometry, supported CSS colors and frame context. In our example, the Employee heading distinguishes its OK button from other OK buttons.
 
@@ -52,7 +60,7 @@ Before returning, Browser rechecks document/frame identities and current-view me
 
 Readiness checks depend on the interaction. Hover includes viewport membership and pointer reception at a sampled point; nested frames require that point to reach the target through each containing document. A covered target can be found with a valid XPath and blocked readiness. These observations do not dispatch events or establish a business outcome.
 
-Browser highlights found targets. Web shows the shared action, then each target's identity, XPath, verification, limitations and cost. Highlights persist during mouse movement and scrolling; input or invalidation clears them. Chat results stay in each tab's client memory.
+Browser highlights found targets and Resolver returns the shared action, target identities, XPath, verification, limitations and cost to its caller. The test client renders these results in chat; evaluation runners grade and save them. Highlights persist during mouse movement and scrolling; input or invalidation clears them. Chat results stay in each tab's client memory.
 
 Estimated and provider-reported cost remain separate; missing accounting is unknown. Cancelled requests may still incur charges. Two seconds is a latency measurement, not a total-response cutoff.
 
@@ -66,15 +74,16 @@ Follow the attempt/trace ID, configuration, stage and reason code to distinguish
 
 | Change                      | Implementation boundary                                        |
 | --------------------------- | -------------------------------------------------------------- |
+| Browser implementation      | `BrowserUrl` and the capture/verification HTTP contract        |
 | Model or route              | `OPENROUTER_MODEL`, `OPENROUTER_PROVIDER`, `OpenRouterGateway` |
 | Prompt or interpretation    | `ActionSelectionStrategy`                                      |
-| Model-visible context       | `CandidateSelectionStrategy.PrepareInput`                      |
+| Model-visible context       | `CandidateInput`                                               |
 | Capture, XPath or readiness | `BrowserPageCapture`, `BrowserCaptureScript`                   |
 | Diagnostic persistence      | `ResolutionRecorder`, `DiagnosticStore`, `AppDbContext`        |
 
-These are source boundaries. `candidate-selection-v1` is the only runtime strategy; the optional context planner is evaluation-only. Changes require corresponding target, contract, privacy and browser checks.
+The selected Resolver has one prompt/schema and implementation, updated in place. Browser replacement uses the service contract, independently of model selection. Changes require corresponding target, contract, privacy and browser checks.
 
-A caller can resolve against an xpathed-owned page with `POST /api/pages/{pageId}/resolve`, supplying `instruction`, `documentId` and `contractVersion: "4"`. Connecting an external runner's browser requires an adapter that preserves page, document and target identities; today's API cannot attach raw HTML or an external browser session.
+A caller uses `POST /pages/{pageId}/resolve`, supplying `instruction`, `documentId` and `contractVersion: "4"` for a page owned by the configured browser service. The test client exposes its forwarding route at `POST /api/pages/{pageId}/resolve`. See [browser integration](runtime.md#browser-integration) for the contract and configuration required to replace the bundled browser. Only Playwright/Chromium is currently verified.
 
 The consuming runner would own revalidation immediately before execution and checks of the resulting state. The integration must define browser ownership, cancellation, authentication and evidence retention. No action executor or external-runner adapter is implemented.
 

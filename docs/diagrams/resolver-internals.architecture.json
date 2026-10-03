@@ -1,0 +1,181 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Resolver: selection and XPath verification",
+    "quality_profile": "showcase",
+    "viewBox": [
+      1160,
+      650
+    ],
+    "legend": {
+      "mode": "hidden"
+    }
+  },
+  "components": [
+    {
+      "id": "request",
+      "type": "external",
+      "label": "Instruction + page",
+      "sublabel": "Resolver API input",
+      "pos": [
+        50,
+        100
+      ],
+      "size": [
+        210,
+        70
+      ]
+    },
+    {
+      "id": "capture",
+      "type": "backend",
+      "label": "Capture candidates",
+      "sublabel": "Browser: current view",
+      "pos": [
+        430,
+        100
+      ],
+      "size": [
+        240,
+        70
+      ]
+    },
+    {
+      "id": "selection",
+      "type": "external",
+      "label": "1. Model selection",
+      "sublabel": "Choose candidate IDs",
+      "pos": [
+        840,
+        100
+      ],
+      "size": [
+        260,
+        70
+      ]
+    },
+    {
+      "id": "validation",
+      "type": "backend",
+      "label": "Validate selection",
+      "sublabel": "Resolver: schema + IDs",
+      "pos": [
+        840,
+        330
+      ],
+      "size": [
+        260,
+        70
+      ]
+    },
+    {
+      "id": "xpath",
+      "type": "backend",
+      "label": "2. Construct XPath",
+      "sublabel": "Browser: DOM + semantics",
+      "pos": [
+        430,
+        330
+      ],
+      "size": [
+        240,
+        70
+      ]
+    },
+    {
+      "id": "verify",
+      "type": "backend",
+      "label": "Verify XPath",
+      "sublabel": "Unique match + same node",
+      "pos": [
+        50,
+        330
+      ],
+      "size": [
+        240,
+        70
+      ]
+    },
+    {
+      "id": "result",
+      "type": "backend",
+      "label": "Return result",
+      "sublabel": "Target + XPath + readiness",
+      "pos": [
+        50,
+        550
+      ],
+      "size": [
+        280,
+        70
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "from": "request",
+      "to": "capture",
+      "label": "capture API"
+    },
+    {
+      "from": "capture",
+      "to": "selection",
+      "label": "sanitized context"
+    },
+    {
+      "from": "selection",
+      "to": "validation",
+      "label": "action + IDs",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        970,
+        245
+      ]
+    },
+    {
+      "from": "validation",
+      "to": "xpath",
+      "label": "selections API"
+    },
+    {
+      "from": "xpath",
+      "to": "verify",
+      "label": "candidate XPath"
+    },
+    {
+      "from": "verify",
+      "to": "result",
+      "label": "recheck view + state",
+      "fromSide": "bottom",
+      "toSide": "top"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "violet",
+      "title": "Model selection evaluation",
+      "items": [
+        "Saved candidates and independent labels",
+        "Does the model choose the right element?"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "XPath evaluation",
+      "items": [
+        "Controlled selection in a real browser",
+        "Does its XPath identify the intended node?"
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "Resolver E2E evaluation",
+      "items": [
+        "Real model and browser through the API",
+        "Does the complete request return the right result?"
+      ]
+    }
+  ]
+}
