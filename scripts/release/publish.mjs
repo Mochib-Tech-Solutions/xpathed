@@ -2,6 +2,7 @@ import { execFileSync, spawn } from "node:child_process";
 import { mkdir, readFile, writeFile, readdir } from "node:fs/promises";
 import { trustedReleasePR, requireCI } from "./ci.mjs";
 import { verify } from "./bundle.mjs";
+import { createReadStream } from "node:fs";
 import { createHash } from "node:crypto";
 import { releaseTag } from "./notes.mjs";
 import { deploymentFiles, hash } from "./download.mjs";
@@ -20,6 +21,21 @@ export function verifyMerge(pr, receipt, tree) {
     tree !== receipt.sourceTree
   )
     throw new Error("Merged source differs from the evaluated release PR; run a new comparison");
+}
+
+async function fileDigest(path) {
+  const digest = createHash("sha256");
+  for await (const chunk of createReadStream(path)) digest.update(chunk);
+  return digest.digest("hex");
+}
+
+export async function writeChecksums(directory, files, imageArchiveDigest) {
+  if (!/^[a-f\d]{64}$/.test(imageArchiveDigest)) throw new Error("Invalid image archive digest");
+  const lines = [`${imageArchiveDigest}  images.tar`];
+  for (const path of files) lines.push(`${await fileDigest(path)}  ${path.split("/").at(-1)}`);
+  const output = `${directory}/SHA256SUMS`;
+  await writeFile(output, lines.join("\n") + "\n");
+  return output;
 }
 
 export async function publishAssets(
@@ -55,10 +71,7 @@ export async function publishAssets(
   for (const path of files) {
     const name = path.split("/").at(-1);
     const asset = uploaded.assets.find((asset) => asset.name === name);
-    const digest = createHash("sha256");
-    const { createReadStream } = await import("node:fs");
-    for await (const chunk of createReadStream(path)) digest.update(chunk);
-    if (asset?.digest !== `sha256:${digest.digest("hex")}`)
+    if (asset?.digest !== `sha256:${await fileDigest(path)}`)
       throw new Error(`Published asset integrity mismatch: ${name}`);
   }
   // Preserve the exact tested synthetic commit for future replay and monitoring.
@@ -173,6 +186,12 @@ if (import.meta.main) {
       await writeFile(`${directory}/${name}`, bytes);
       release.deploymentFiles[name] = hash(bytes);
     }
+    const imagesEnvironment =
+      bundle.manifest.images
+        .map((image) => `XPATHED_${image.component.toUpperCase()}_IMAGE=${image.id}`)
+        .join("\n") + "\n";
+    await writeFile(`${directory}/images.env`, imagesEnvironment);
+    release.deploymentFiles["images.env"] = hash(imagesEnvironment);
     await writeFile(`${directory}/release.json`, JSON.stringify(release, null, 2) + "\n");
     // GitHub assets are limited to 2 GiB; split the unchanged tested image archive.
     const gzip = spawn("gzip", ["-n", "-1c", `${directory}/bundle/images.tar`]);
@@ -203,22 +222,29 @@ if (import.meta.main) {
         `- Release identity: \`${tag}\``,
       ) + `\nReleased commit: ${pr.merge_commit_sha}\n`;
     await writeFile(`${directory}/release-notes.md`, notes);
+    const files = [
+      `${directory}/release.json`,
+      `${directory}/monitoring-baseline.json`,
+      `${directory}/bundle/manifest.json`,
+      `${directory}/bundle/source.tar`,
+      `${directory}/candidate.json`,
+      `${directory}/release-evidence.json.gz`,
+      `${directory}/images.env`,
+      ...deploymentFiles.map((name) => `${directory}/${name}`),
+      ...parts.map((name) => `${directory}/${name}`),
+    ];
+    const checksums = await writeChecksums(
+      directory,
+      files,
+      bundle.manifest.files["images.tar"].sha256,
+    );
     await publishAssets({
       repository,
       tag,
       commit: pr.merge_commit_sha,
       testedCommit: receipt.sourceSha,
       notes: `${directory}/release-notes.md`,
-      files: [
-        `${directory}/release.json`,
-        `${directory}/monitoring-baseline.json`,
-        `${directory}/bundle/manifest.json`,
-        `${directory}/bundle/source.tar`,
-        `${directory}/candidate.json`,
-        `${directory}/release-evidence.json.gz`,
-        ...deploymentFiles.map((name) => `${directory}/${name}`),
-        ...parts.map((name) => `${directory}/${name}`),
-      ],
+      files: [...files, checksums],
     });
   } catch (error) {
     console.error(error.message);

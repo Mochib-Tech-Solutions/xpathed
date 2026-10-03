@@ -55,11 +55,14 @@ All four services run in Docker. Ctrl+C or `pnpm docker:down` removes developmen
 
 ## Run the published Docker release
 
-The release contains **Browser** and **Resolver** images. Install Docker with Compose, Node and `gh`, authenticate `gh` for this private repository, then use the cloned repository's download command:
+The release contains **Browser** and **Resolver** images for **Linux ARM64**, matching CI. Install Docker with Compose and authenticate `gh` for this private repository. Download the release assets, reassemble and verify the image archive, then supply your runtime settings:
 
 ```sh
-pnpm release:download --output .artifacts/deployment
-cd .artifacts/deployment
+gh release download v1.0.0 --repo Mochib-Tech-Solutions/xpathed --dir xpathed-release
+cd xpathed-release
+cat browser-resolver-images.tar.gz.part-* | gzip -dc > images.tar
+shasum -a 256 -c SHA256SUMS
+docker image load --input images.tar
 cp release.env.example .env
 # Edit .env: supply OPENROUTER_API_KEY, OPENROUTER_MODEL and OPENROUTER_PROVIDER.
 docker compose --env-file .env --env-file images.env -f compose.release.yaml up -d --no-build --pull never
@@ -67,7 +70,9 @@ curl --fail http://localhost:8082/health  # Browser
 curl --fail http://localhost:8083/health  # Resolver
 ```
 
-The command resolves the current `release` commit, downloads its published assets, verifies the bundle and loads both images. `images.env` pins their exact Docker IDs. Compose starts those images without rebuilding; `pnpm dev` builds the current local checkout instead. Published images currently target **Linux ARM64**, matching CI; the downloader rejects a different Docker architecture. Local source builds support the Docker host's architecture.
+Run each step only after the previous one succeeds. On Linux, `sha256sum --check SHA256SUMS` is equivalent to `shasum`. The [GitHub Releases page](https://github.com/Mochib-Tech-Solutions/xpathed/releases) lists available tags; use a fresh download directory for each deployment. No repository clone, Node or pnpm is needed for this path. `images.env` pins the exact Docker IDs. Compose starts those images without rebuilding; `pnpm dev` builds the current local checkout instead. Local source builds support the Docker host's architecture.
+
+From an existing clone, `pnpm release:download --output .artifacts/deployment` performs download, integrity checks and image loading for the current `release` commit automatically, then supplies the same Compose files.
 
 Browser listens on `localhost:8082`; Resolver on `localhost:8083`, and connects to Browser over the Compose network. These are API services; the chat workspace is available through the source setup above. See the [API example](docs/releases.md#use-the-apis) and [release files and configuration](docs/releases.md#run-the-published-browser-and-resolver).
 
