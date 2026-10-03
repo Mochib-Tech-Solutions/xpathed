@@ -1,5 +1,5 @@
 import { retiredReleaseCommit } from "./release-transition.mjs";
-import { readCollection } from "./datasets/collection.mjs";
+import { readCollection, validateLabelReview } from "./datasets/collection.mjs";
 import { loadCases } from "./cases/load.mjs";
 import { executeOffline } from "./datasets/offline.mjs";
 import { createHash, randomUUID } from "node:crypto";
@@ -118,14 +118,17 @@ export function selectQualificationCases(cases, options = {}) {
   const selected = [],
     exclusions = [];
   for (const item of cases) {
+    const review = item.track === "offline-selection" ? validateLabelReview(item) : undefined;
     const reason =
-      options.caseId && options.caseId !== item.id
-        ? "case filter"
-        : item.mutation
-          ? "saved-locator CI coverage"
-          : item.provider?.fault || item.deterministicOnly || item.expected?.outcome === "error"
-            ? "deterministic fault coverage"
-            : null;
+      review && review.disposition !== "validated"
+        ? `label ${review.disposition}: ${review.reason}`
+        : options.caseId && options.caseId !== item.id
+          ? "case filter"
+          : item.mutation
+            ? "saved-locator CI coverage"
+            : item.provider?.fault || item.deterministicOnly || item.expected?.outcome === "error"
+              ? "deterministic fault coverage"
+              : null;
     if (reason) exclusions.push({ caseId: item.id, reason });
     else selected.push(item);
   }

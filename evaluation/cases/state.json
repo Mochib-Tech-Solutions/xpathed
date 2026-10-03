@@ -2068,7 +2068,7 @@
     "sourceIds": ["control-states-3-v4", "control-states-3-v3", "control-states-3"]
   },
   {
-    "id": "state-native-country-select-is-ready",
+    "id": "state-native-country-select-readiness-is-unknown",
     "family": "states",
     "split": "regression",
     "category": "state",
@@ -2137,10 +2137,10 @@
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
     "group": "state",
-    "sourceIds": ["control-states-4"]
+    "sourceIds": ["control-states-4", "state-native-country-select-is-ready"]
   },
   {
-    "id": "state-native-date-fill-is-ready",
+    "id": "state-native-date-fill-readiness-is-unknown",
     "family": "states",
     "split": "regression",
     "category": "state",
@@ -2207,7 +2207,7 @@
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
     "group": "state",
-    "sourceIds": ["control-states-5"]
+    "sourceIds": ["control-states-5", "state-native-date-fill-is-ready"]
   },
   {
     "id": "state-custom-checkbox-check-is-unverified",
@@ -2278,7 +2278,7 @@
     "sourceIds": ["control-states-6"]
   },
   {
-    "id": "state-textarea-type-is-ready",
+    "id": "state-textarea-type-readiness-is-unknown",
     "family": "semantics",
     "split": "regression",
     "category": "semantics",
@@ -2342,10 +2342,10 @@
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
     "group": "state",
-    "sourceIds": ["action-families-2"]
+    "sourceIds": ["action-families-2", "state-textarea-type-is-ready"]
   },
   {
-    "id": "state-textarea-clear-is-ready",
+    "id": "state-textarea-clear-readiness-is-unknown",
     "family": "semantics",
     "split": "regression",
     "category": "semantics",
@@ -2409,10 +2409,10 @@
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
     "group": "state",
-    "sourceIds": ["action-families-3"]
+    "sourceIds": ["action-families-3", "state-textarea-clear-is-ready"]
   },
   {
-    "id": "state-textarea-focus-is-ready",
+    "id": "state-textarea-focus-readiness-is-unknown",
     "family": "semantics",
     "split": "regression",
     "category": "semantics",
@@ -2476,10 +2476,10 @@
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
     "group": "state",
-    "sourceIds": ["action-families-4"]
+    "sourceIds": ["action-families-4", "state-textarea-focus-is-ready"]
   },
   {
-    "id": "state-textarea-blur-is-ready",
+    "id": "state-textarea-blur-readiness-is-unknown",
     "family": "semantics",
     "split": "regression",
     "category": "semantics",
@@ -2543,10 +2543,10 @@
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
     "group": "state",
-    "sourceIds": ["action-families-5"]
+    "sourceIds": ["action-families-5", "state-textarea-blur-is-ready"]
   },
   {
-    "id": "state-textarea-keypress-is-ready",
+    "id": "state-textarea-keypress-readiness-is-unknown",
     "family": "semantics",
     "split": "regression",
     "category": "semantics",
@@ -2610,10 +2610,10 @@
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
     "group": "state",
-    "sourceIds": ["action-families-6"]
+    "sourceIds": ["action-families-6", "state-textarea-keypress-is-ready"]
   },
   {
-    "id": "state-attachment-upload-is-ready",
+    "id": "state-attachment-upload-readiness-is-unknown",
     "family": "semantics",
     "split": "regression",
     "category": "semantics",
@@ -2677,7 +2677,7 @@
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
     "group": "state",
-    "sourceIds": ["action-families-7"]
+    "sourceIds": ["action-families-7", "state-attachment-upload-is-ready"]
   },
   {
     "id": "state-button-inspection-is-ready",
@@ -3160,7 +3160,7 @@
     "sourceIds": ["clinic-readonly-clear"]
   },
   {
-    "id": "state-followup-question-fill-is-ready",
+    "id": "state-followup-question-fill-readiness-is-unknown",
     "family": "clinic-consultation",
     "split": "regression",
     "category": "semantics",
@@ -3274,7 +3274,7 @@
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
     "group": "state",
-    "sourceIds": ["clinic-fill-question"]
+    "sourceIds": ["clinic-fill-question", "state-followup-question-fill-is-ready"]
   },
   {
     "id": "state-accessibility-link-hover-is-ready",
@@ -3541,7 +3541,7 @@
     "sourceIds": ["greenhouse-uncheck"]
   },
   {
-    "id": "state-codec-select-is-ready",
+    "id": "state-codec-select-readiness-is-unknown",
     "family": "studio-export",
     "split": "regression",
     "category": "semantics",
@@ -3678,7 +3678,7 @@
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
     "group": "state",
-    "sourceIds": ["studio-select-codec"]
+    "sourceIds": ["studio-select-codec", "state-codec-select-is-ready"]
   },
   {
     "id": "state-mixed-click-and-inspect-is-unsupported",
@@ -3772,7 +3772,8 @@
         {
           "step": 1,
           "action": "unsupported",
-          "outcome": "unsupported"
+          "outcome": "unsupported",
+          "code": "unsupported_action"
         }
       ],
       "outcome": "unsupported",
@@ -3945,7 +3946,7 @@
     "sourceIds": ["parcel-radio"]
   },
   {
-    "id": "state-micrograph-upload-is-ready",
+    "id": "state-micrograph-upload-readiness-is-unknown",
     "family": "laboratory-submission",
     "split": "regression",
     "category": "semantics",
@@ -4062,7 +4063,7 @@
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
     "group": "state",
-    "sourceIds": ["laboratory-upload"]
+    "sourceIds": ["laboratory-upload", "state-micrograph-upload-is-ready"]
   },
   {
     "id": "state-future-confirmation-workflow-is-unsupported",
@@ -4125,7 +4126,8 @@
         {
           "step": 1,
           "action": "click",
-          "outcome": "unsupported"
+          "outcome": "unsupported",
+          "code": "current_state_dependency"
         }
       ],
       "outcome": "unsupported",

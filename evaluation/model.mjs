@@ -2,7 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import { once } from "node:events";
 import { join } from "node:path";
-import { readCollection } from "./datasets/collection.mjs";
+import { readCollection, validateLabelReview, labelExclusions } from "./datasets/collection.mjs";
 import { executeOffline } from "./datasets/offline.mjs";
 import {
   parseOptions,
@@ -33,12 +33,15 @@ export function selectModelCases(caseId, collection = readCollection()) {
     )
   )
     throw new Error("Model evaluation requires reviewed offline selection inputs");
-  const selected = caseId ? cases.filter((item) => item.id === caseId) : cases;
+  const eligible = cases.filter((item) => validateLabelReview(item).disposition === "validated");
+  const selected = caseId ? eligible.filter((item) => item.id === caseId) : eligible;
   if (!selected.length) throw new Error("No matching model-selection cases");
   return selected;
 }
 
 export async function runModelEvaluation(options, cases, proxy) {
+  if (selectModelCases(undefined, cases).length !== cases.length)
+    throw new Error("Model evaluation cannot execute quarantined labels");
   const output = options.output;
   const plan = buildPlan(cases, options);
   plan.trials = plan.trials.map((trial) => ({ ...trial, id: randomUUID().replaceAll("-", "") }));
@@ -50,6 +53,8 @@ export async function runModelEvaluation(options, cases, proxy) {
     createdAt: new Date().toISOString(),
     mode: "live",
     cases,
+    exclusions: options.labelExclusions ?? [],
+    sourceCases: options.sourceCases ?? cases.length,
     plan,
     code: await fingerprints(),
     sourceManifestHash: hash(cases),
@@ -123,7 +128,10 @@ export async function main(args = process.argv.slice(2)) {
     throw new Error(
       "Model evaluation requires live mode and one attempt per case; use evaluate:replay for saved results",
     );
-  const cases = selectModelCases(options.caseId);
+  const collection = readCollection();
+  options.sourceCases = collection.length;
+  options.labelExclusions = labelExclusions(collection, options.caseId);
+  const cases = selectModelCases(options.caseId, collection);
   await mkdir(join(options.output, "provider"), { recursive: true, mode: 0o700 });
   const proxy = await createBudgetProxy({
     profiles,

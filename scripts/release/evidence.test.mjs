@@ -92,12 +92,27 @@ async function workspace(t, { qualificationPolicy = "current", bootstrapBaseline
       actions: [{ step: 1, action: "click", outcome: "found", target: { candidateId: "c1" } }],
     },
   };
+  offline.labelReview = {
+    caseId: offline.id,
+    inputHash: hash(input),
+    labelHash: hash(offline.expected),
+    disposition: "validated",
+    reason: "Unique named source target verified.",
+    reviewer: "fixture-source-review",
+    reviewedAt: time(-5000),
+  };
   const dataset = gzipSync(JSON.stringify({ version: 1, cases: [offline] }));
+  const audit = { version: 1, archiveSha256: hash(dataset), cases: [offline.labelReview] };
+  write("evaluation/datasets/labels.json", audit);
   writeFileSync(join(cwd, ".artifacts/datasets/reviewed.json.gz"), dataset);
   write("evaluation/datasets/collection.json", {
     path: ".artifacts/datasets/reviewed.json.gz",
     sha256: hash(dataset),
     cases: 1,
+    labelReview: {
+      path: "evaluation/datasets/labels.json",
+      sha256: hash(readFileSync(join(cwd, "evaluation/datasets/labels.json"))),
+    },
   });
   cases.push(offline);
   const git = (...args) => execFileSync("git", args, { cwd, encoding: "utf8" }).trim();

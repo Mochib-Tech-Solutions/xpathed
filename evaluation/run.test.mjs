@@ -249,7 +249,7 @@ test("capture-coverage-failure-retains-resolver-budget-error", async (t) => {
 test("locators-failed-fresh-resolution-retains-original-attempt", async (t) => {
   const { trial, attempts } = await runWithServices(
     t,
-    "locators-wrapper-insertion-preserves-target-identity",
+    "locators-wrapper-insertion-preserves-current-view-target",
     { freshFailure: true },
   );
   assert.equal(attempts.length, 2);
@@ -265,7 +265,7 @@ test("locators-failed-fresh-resolution-retains-original-attempt", async (t) => {
 test("locators-fresh-resolution-rejects-wrong-attempt-identity", async (t) => {
   const { trial } = await runWithServices(
     t,
-    "locators-wrapper-insertion-preserves-target-identity",
+    "locators-wrapper-insertion-preserves-current-view-target",
     { freshIdentityMismatch: true },
   );
   assert.match(trial.mutation.fresh.error?.message ?? "", /identity mismatch/i);
@@ -274,7 +274,7 @@ test("locators-fresh-resolution-rejects-wrong-attempt-identity", async (t) => {
 test("locators-fresh-model-input-is-checked-for-oracle-leakage", async (t) => {
   const { trial } = await runWithServices(
     t,
-    "locators-wrapper-insertion-preserves-target-identity",
+    "locators-wrapper-insertion-preserves-current-view-target",
     { freshOracleLeak: true },
   );
   assert.equal(trial.observation.oracleLeak, false);
@@ -523,7 +523,7 @@ test("workers-pending-cleanup-completes-before-infrastructure-failure-is-reporte
 test("workers-serial-execution-preserves-comparison-fixture-protocol", async (t) => {
   const { trial, attempts } = await runWithServices(
     t,
-    "locators-wrapper-insertion-preserves-target-identity",
+    "locators-wrapper-insertion-preserves-current-view-target",
     { concurrency: 1 },
   );
   assert.equal(attempts.length, 2);

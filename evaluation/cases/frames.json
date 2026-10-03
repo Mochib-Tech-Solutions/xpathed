@@ -148,7 +148,8 @@
         {
           "step": 1,
           "action": "click",
-          "outcome": "unsupported"
+          "outcome": "unsupported",
+          "code": "unsupported_scope"
         }
       ],
       "summary": {

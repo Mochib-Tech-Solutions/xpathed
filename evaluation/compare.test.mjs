@@ -150,10 +150,42 @@ test("release selection reuses every reviewed current case without a phase or sp
   const cases = [
     { id: "new", split: "held-out" },
     { id: "regression", split: "regression" },
-    { id: "offline", track: "offline-selection" },
+    {
+      id: "offline",
+      track: "offline-selection",
+      instruction: "Find Save",
+      input: { instruction: "Find Save", candidates: [{ id: "c1" }] },
+      expected: { actions: [{ outcome: "found", target: { candidateId: "c1" } }] },
+    },
     { id: "mutation", mutation: {} },
     { id: "fault", provider: { fault: "timeout" } },
   ];
+  const offline = cases.find((item) => item.id === "offline");
+  offline.labelReview = {
+    caseId: offline.id,
+    inputHash: createHash("sha256").update(JSON.stringify(offline.input)).digest("hex"),
+    labelHash: createHash("sha256").update(JSON.stringify(offline.expected)).digest("hex"),
+    disposition: "validated",
+    reason: "Source target verified.",
+    reviewer: "fixture-review",
+    reviewedAt: "2026-10-03T00:00:00Z",
+  };
+  const quarantined = {
+    ...offline,
+    labelReview: {
+      ...offline.labelReview,
+      disposition: "ambiguous",
+      reason: "Two equally matching targets.",
+    },
+  };
+  assert.match(
+    selectQualificationCases([cases[0], quarantined]).exclusions[0].reason,
+    /label ambiguous/,
+  );
+  assert.throws(
+    () => selectQualificationCases([{ ...offline, labelReview: undefined }]),
+    /label review/,
+  );
   const selected = selectQualificationCases(cases, options);
   assert.deepEqual(
     selected.cases.map((c) => c.id),
