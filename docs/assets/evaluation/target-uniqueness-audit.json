@@ -1,0 +1,631 @@
+{
+  "kind": "prepared-input-target-uniqueness-audit",
+  "reviewedAt": "2026-10-03T17:05:22.791Z",
+  "source": "a8e0d560f4a170b248dcd5aadeb508274df30bf1",
+  "archiveSha256": "72d140c1c5d4ef9032277ce9422f6f4039c6c864f166b3a6572078576db82d86",
+  "originalCases": 1084,
+  "previouslyAdmitted": 665,
+  "reviewed": 665,
+  "admitted": 573,
+  "excluded": 511,
+  "dispositions": {
+    "validated": 573,
+    "evidence_insufficient": 288,
+    "ambiguous": 218,
+    "incorrect": 5
+  },
+  "reviewDispositions": {
+    "validated": 573,
+    "ambiguous": 80,
+    "evidence_insufficient": 12
+  },
+  "families": 171,
+  "splits": {
+    "dev": 546,
+    "test": 24,
+    "train": 3
+  },
+  "privateEvidenceSha256": "56270df51c850fa0b0b0070b10aacb93207a6378ca21b59591f9de99db12c485",
+  "reviewFiles": [
+    {
+      "name": "ambiguity-reaudit-first.json",
+      "sha256": "b651c8004ed020b7ade105f05fbcfc1c8637befd72aa3e18f913e43139eec13c"
+    },
+    {
+      "name": "ambiguity-reaudit-second.json",
+      "sha256": "571a594ec25ac48eb9516f340156eca73483729c9439a38316bd88fb04bdd2e9"
+    },
+    {
+      "name": "ambiguity-reaudit-third.json",
+      "sha256": "5aba77134bcdaab9d895c28f6b77d8b8a23faecf6f2e5c0fb92174e9d7cac304"
+    },
+    {
+      "name": "ambiguity-reaudit-root.json",
+      "sha256": "6174ae321bbcce23681e05408d788a1e698feb20afbaa68f84afc9b9b8ea4026"
+    },
+    {
+      "name": "ambiguity-reaudit-fourth-tail.json",
+      "sha256": "e8845eda675f36d59f2944fd16587633a63512a27fd83bc0e05877937d864a8f"
+    },
+    {
+      "name": "ambiguity-reaudit-fifth-tail.json",
+      "sha256": "d658423816cb625cb04b21fd420686b0a7a13bb9563ba01b66e36242b688827a"
+    }
+  ],
+  "newlyQuarantined": [
+    {
+      "caseId": "phrasenode-0352ed99f9919d373680d451",
+      "disposition": "ambiguous",
+      "competingCandidateIds": ["n124", "n38", "n195"],
+      "evidenceHash": "a109caddc3317cd4745a3aaa164a44c4d44116920e5a73b139e7237ab307126c"
+    },
+    {
+      "caseId": "phrasenode-048df7c1293afd44a80652b9",
+      "disposition": "ambiguous",
+      "competingCandidateIds": ["n179"],
+      "evidenceHash": "600021605edda70173178a869da980db12f66f41c06c0eb790776a29822e90fc"
+    },
+    {
+      "caseId": "phrasenode-05544f1fcf5a582b791660b9",
+      "disposition": "ambiguous",
+      "competingCandidateIds": ["n192"],
+      "evidenceHash": "2d5c22aaff70d3ee540d659728f57a7769bc7475dc28adce7b73e96cafe61446"
+    },
+    {
+      "caseId": "phrasenode-09494398fc3806dd7553c98a",
+      "disposition": "ambiguous",
+      "competingCandidateIds": ["n112"],
+      "evidenceHash": "9b891311d8c6fe60e4f04bcc2f92340f90ea96a23df80125e72a8b22b07d474f"
+    },
+    {
+      "caseId": "phrasenode-0a858db34e74bedf1e9e6f24",
+      "disposition": "ambiguous",
+      "competingCandidateIds": ["n25", "n26"],
+      "evidenceHash": "e8da31040fc23567b2d5c266755eaa51bc223c84594bbdc3462ae830b53a3c81"
+    },
+    {
+      "caseId": "phrasenode-0e98fc02f3c850ce0e6bfb7d",
+      "disposition": "ambiguous",
+      "competingCandidateIds": ["n226"],
+      "evidenceHash": "ace267f7616eaa7d7fbd7b6bb285d483d0b338b609f4398e5eb8908e4cf156aa"
+    },
+    {
+      "caseId": "phrasenode-1175ec4b31f933de85e3bfdd",
+      "disposition": "ambiguous",
+      "competingCandidateIds": ["n149", "n152"],
+      "evidenceHash": "0201be388ddf5bc9e36b073b335fd8dfe2ab9619a7b22952edb53a6f188d8efc"
+    },
+    {
+      "caseId": "phrasenode-13d9c9fc16bb1649c58dae08",
+      "disposition": "evidence_insufficient",
+      "competingCandidateIds": ["n65"],
+      "evidenceHash": "dad0a6d79ff1f85e8b1c6566105690253bf44042518aad4d80990a3f2ce1c9b1"
+    },
+    {
+      "caseId": "phrasenode-14e30b47a9f179a42c4a338d",
+      "disposition": "ambiguous",
+      "competingCandidateIds": ["n38", "n158"],
+      "evidenceHash": "122785c1cdcdff580b4079704ecbefdd3100923557990533a8ae526d0f768ae5"
+    },
+    {
+      "caseId": "phrasenode-15ed8f287fabeadd8dec3cc0",
+      "disposition": "ambiguous",
+      "competingCandidateIds": ["n53", "n336"],
+      "evidenceHash": "fe87239f6abe6808271a6a231f8acaf61836766e5c0c4f6d241ba9efed3ff052"
+    },
+    {
+      "caseId": "phrasenode-17323ce7bb05c26bd6c8b8bc",
+      "disposition": "ambiguous",
+      "competingCandidateIds": ["n134", "n199"],
+      "evidenceHash": "8e38c2fee159935852fa628b72f7c13364d8320e486dcf237af84fca0435b862"
+    },
+    {
+      "caseId": "phrasenode-19cc55dc3d79f73f0c319910",
+      "disposition": "ambiguous",
+      "competingCandidateIds": ["n88", "n47"],
+      "evidenceHash": "e2c74317b1b1333ee58142ce350037c0db245a5a4508e43ebb3d3c6387a6a23a"
+    },
+    {
+      "caseId": "phrasenode-1cbcf11eff0e7deb066ce621",
+      "disposition": "ambiguous",
+      "competingCandidateIds": ["n25", "n165"],
+      "evidenceHash": "fe3ae8fe015f5e3cfa6f406fa63abb0d40650038719b8c62ae1d9cf18bc59e64"
+    },
+    {
+      "caseId": "phrasenode-1fd3d8d1341d204a94295a0e",
+      "disposition": "evidence_insufficient",
+      "competingCandidateIds": [
+        "n76",
+        "n96",
+        "n115",
+        "n134",
+        "n153",
+        "n172",
+        "n192",
+        "n211",
+        "n230"
+      ],
+      "evidenceHash": "c181f96b15e8bd54b124773f65009c388ec691b3bfd44138cb5323301faa5ea7"
+    },
+    {
+      "caseId": "phrasenode-23c4a2685cc651d4b907f4a1",
+      "disposition": "ambiguous",
+      "competingCandidateIds": ["n387"],
+      "evidenceHash": "628fa68523187a878a05c2d59972d578f9ad90df9092e93dbc685b39ac6cccbc"
+    },
+    {
+      "caseId": "phrasenode-24d6c85b26f60aac747ce3b9",
+      "disposition": "ambiguous",
+      "competingCandidateIds": ["n73"],
+      "evidenceHash": "2734baf91eeafa53aec9568784210d90aee5e122ce24894ab2bdfbc8a43215c4"
+    },
+    {
+      "caseId": "phrasenode-25aa93f037572d698fd29859",
+      "disposition": "ambiguous",
+      "competingCandidateIds": ["n14", "n148", "n150"],
+      "evidenceHash": "f364f1b5510c01450d0a2cd38270eb37e1df1c9aeae1ca752091a5fe1369c949"
+    },
+    {
+      "caseId": "phrasenode-26262c9a63d56cdfb2f2a4eb",
+      "disposition": "ambiguous",
+      "competingCandidateIds": ["n38"],
+      "evidenceHash": "ad1aa67937c2fecf8ef68677b8545da0bb6fd5b62104e856f16bb1bfc1cce40d"
+    },
+    {
+      "caseId": "phrasenode-262fe9958b74a8553ab8c84f",
+      "disposition": "ambiguous",
+      "competingCandidateIds": ["n18"],
+      "evidenceHash": "f4f5c4e448df44e24c87b4c348a8fbefd6a43957844d79dc402adab048326ef8"
+    },
+    {
+      "caseId": "phrasenode-27ada9e8c1eefc1295bd9fa2",
+      "disposition": "ambiguous",
+      "competingCandidateIds": ["n188"],
+      "evidenceHash": "dcef237585b1356478e6d0166169b2c2418c4a36254979519854c8cd24f0978e"
+    },
+    {
+      "caseId": "phrasenode-2abea3b88406f8d96ba3d0c5",
+      "disposition": "ambiguous",
+      "competingCandidateIds": ["n24", "n25"],
+      "evidenceHash": "fa76c9275d7d6f321b7beebc51a9d26ec524707be7500c9bbb6016957b8b25c9"
+    },
+    {
+      "caseId": "phrasenode-2e924177d18692477484253c",
+      "disposition": "ambiguous",
+      "competingCandidateIds": ["n120", "n126"],
+      "evidenceHash": "3e2d930c0d92c2d3256304fa76c21ce9cf8c080f65d5125ea9f19cb97c7d6096"
+    },
+    {
+      "caseId": "phrasenode-30cb211115aeecd209cd3e24",
+      "disposition": "ambiguous",
+      "competingCandidateIds": ["n44", "n50", "n52"],
+      "evidenceHash": "f3379c36d8382489a68ac2092437edb2f1727de0a782cc1f143d634d8d635ed1"
+    },
+    {
+      "caseId": "phrasenode-31c506bee48ca135d3e42e90",
+      "disposition": "evidence_insufficient",
+      "competingCandidateIds": ["n79"],
+      "evidenceHash": "d0ec23b5c56112024f27091d4e56824fd01b3116163041cdbab2055931419acd"
+    },
+    {
+      "caseId": "phrasenode-322a054aa65d1760d5f09b6a",
+      "disposition": "ambiguous",
+      "competingCandidateIds": ["n331", "n333"],
+      "evidenceHash": "c64c48bf88bcd075c0dd1132c32de428eb12d7621501463091be3404a7e96b4d"
+    },
+    {
+      "caseId": "phrasenode-34844497917c7e0fc4c1c827",
+      "disposition": "ambiguous",
+      "competingCandidateIds": ["n25"],
+      "evidenceHash": "7f5e8c52a9d9f4793c67e12ce7b2eb448c307bdb5a08893b37c3302e0a4926cc"
+    },
+    {
+      "caseId": "phrasenode-349e4dd7158c09b69a2592d2",
+      "disposition": "ambiguous",
+      "competingCandidateIds": ["n68"],
+      "evidenceHash": "4bc18bf89f3a7d63c0a7a7a180e6ad7da10cdcabfd092fd1cc96da306496d1fc"
+    },
+    {
+      "caseId": "phrasenode-34eaa68cc0f5c33da540d731",
+      "disposition": "ambiguous",
+      "competingCandidateIds": ["n60", "n32", "n536"],
+      "evidenceHash": "236ea7860977b4dd309afd4b84451fa1872edcf29f82782887907cd7a378a2d1"
+    },
+    {
+      "caseId": "phrasenode-36d6e5c3b22703ea75dcb8f0",
+      "disposition": "ambiguous",
+      "competingCandidateIds": ["n55"],
+      "evidenceHash": "4392257e54660c17d3743a96585cbabd5592c5a1c36d0c920f764106ab9d3c27"
+    },
+    {
+      "caseId": "phrasenode-377eb4ef6c2ef5cd8ccddbaa",
+      "disposition": "evidence_insufficient",
+      "competingCandidateIds": [],
+      "evidenceHash": "60e06255364365763f5703b5eada1e83fcc580f53a4da4063dd38437520b0e12"
+    },
+    {
+      "caseId": "phrasenode-390d9c249ceca69261be7a6b",
+      "disposition": "ambiguous",
+      "competingCandidateIds": ["n157", "n236"],
+      "evidenceHash": "1c48225490bc9f810e439a37c7ac95bdddfd037f6513e931d92f286518fedea4"
+    },
+    {
+      "caseId": "phrasenode-394913df8368f7ad2c6019d9",
+      "disposition": "ambiguous",
+      "competingCandidateIds": ["n843", "n852"],
+      "evidenceHash": "5bc034e5aea7fc775a99ea9f3d464affa992010d25c92345ed3e521231f9054d"
+    },
+    {
+      "caseId": "phrasenode-39ccb5d5c55675eb3c0aacb7",
+      "disposition": "ambiguous",
+      "competingCandidateIds": ["n171"],
+      "evidenceHash": "c38dc0d560e543d2d09eca608d4d51619ff30d721ecefa452057882d30dcd6a2"
+    },
+    {
+      "caseId": "phrasenode-39eed46e37d25e0a184224ca",
+      "disposition": "ambiguous",
+      "competingCandidateIds": ["n61", "n64", "n24", "n28", "n32", "n40", "n44"],
+      "evidenceHash": "68468a194e5277bfb136360227eb688bbd5889169d3200381a3561fa871e4b31"
+    },
+    {
+      "caseId": "phrasenode-40936e84691047286f9ef569",
+      "disposition": "ambiguous",
+      "competingCandidateIds": ["n16", "n75"],
+      "evidenceHash": "6759a77f620235148b6531d74b100bcf09befb9ef33e2b63c70af8026b1fad72"
+    },
+    {
+      "caseId": "phrasenode-5a4eb5e955ff4da87f5c8043",
+      "disposition": "ambiguous",
+      "competingCandidateIds": ["n892", "n895"],
+      "evidenceHash": "1aa5fa6c18b708835882d6b746a663949ad7af6806146a4ee7645a83bf017888"
+    },
+    {
+      "caseId": "phrasenode-5c1f072b05b95049fb38f20d",
+      "disposition": "ambiguous",
+      "competingCandidateIds": ["n44"],
+      "evidenceHash": "a9c3aeff1b9cdd2431045d3b1857f79a0eadce46d6ff2e2a78886cd8414848d4"
+    },
+    {
+      "caseId": "phrasenode-5fb5e5d86c1524ec31e39a39",
+      "disposition": "ambiguous",
+      "competingCandidateIds": ["n49", "n66"],
+      "evidenceHash": "4e42b6015e5813d3b9fd8c8e4107a7c4ad6874b4378baf35642544ff27f5b86e"
+    },
+    {
+      "caseId": "phrasenode-60f6971e0b3f9903d2311ad4",
+      "disposition": "ambiguous",
+      "competingCandidateIds": ["n431", "n515"],
+      "evidenceHash": "ecc4f78cc89511be50194f08eadfe361b685529e262835d1dd3ca9a6d1994795"
+    },
+    {
+      "caseId": "phrasenode-666b58ee9a666ff03924034d",
+      "disposition": "ambiguous",
+      "competingCandidateIds": ["n551", "n553"],
+      "evidenceHash": "f477af991dd248939a0181f007f932c06ed5f9e0d2dd37fcb8e7e452fe96da1d"
+    },
+    {
+      "caseId": "phrasenode-748ed2820c246fd57129bc72",
+      "disposition": "ambiguous",
+      "competingCandidateIds": ["n60", "n32", "n536"],
+      "evidenceHash": "857133bc0b9e564921a61814fe71d17fbf11e5a87ba96dd2afe771c186316f19"
+    },
+    {
+      "caseId": "phrasenode-7548a5d121befbff813c0e1c",
+      "disposition": "ambiguous",
+      "competingCandidateIds": ["n233", "n234", "n243", "n244"],
+      "evidenceHash": "2323491461cc4c463af29deaedafbf39e17fb0ac5444125bae1f02e4579bff85"
+    },
+    {
+      "caseId": "phrasenode-77d66a56e02bd0af296a6b8f",
+      "disposition": "evidence_insufficient",
+      "competingCandidateIds": ["n46", "n81"],
+      "evidenceHash": "84ec92bdfec6e2763899b7084d4961c517cf872fe377e551e5ef5eb867bf3560"
+    },
+    {
+      "caseId": "phrasenode-7bed0ea6e32eae18e03fd67b",
+      "disposition": "ambiguous",
+      "competingCandidateIds": ["n431", "n515"],
+      "evidenceHash": "87c297cc065e656a090a60a82d841f69c33bb6ec39883267eca7f6e4d99a0e60"
+    },
+    {
+      "caseId": "phrasenode-7c8f4f8054427cb6128634c5",
+      "disposition": "ambiguous",
+      "competingCandidateIds": ["n8"],
+      "evidenceHash": "7e1ad2a3af857ed6cc2ef452f60a822541661f0666b1ced11a822f17cae0c59a"
+    },
+    {
+      "caseId": "phrasenode-7d21c23a2eb02190265c9b07",
+      "disposition": "ambiguous",
+      "competingCandidateIds": ["n47"],
+      "evidenceHash": "22b38fd8a8cb702dceefdfb72fed4cf3ec3a465ac5ed228cbd659511e2fd193a"
+    },
+    {
+      "caseId": "phrasenode-7fd8c1756635b69735ffe33b",
+      "disposition": "ambiguous",
+      "competingCandidateIds": ["n210"],
+      "evidenceHash": "9c836fc08f747a9106fb9bc0046c76a1a393156fd4429db07f64c0e2a8d3f2f0"
+    },
+    {
+      "caseId": "phrasenode-824a5bc13c15acfd18583b51",
+      "disposition": "ambiguous",
+      "competingCandidateIds": ["n21"],
+      "evidenceHash": "b674c57b3d351c2e077eda5c23fa4458dbca71e5eb68f028d91b0bb75add6977"
+    },
+    {
+      "caseId": "phrasenode-8871ba2e2d588bd8d70f1d34",
+      "disposition": "ambiguous",
+      "competingCandidateIds": ["n179", "n199"],
+      "evidenceHash": "fbb6f2b70c447bae476550e1725351e9d37eafd14006b886eba96bad39533cd8"
+    },
+    {
+      "caseId": "phrasenode-8a0be541d94b69472f176255",
+      "disposition": "ambiguous",
+      "competingCandidateIds": ["n97", "n41", "n51"],
+      "evidenceHash": "2ae81044f7b5a9625a47454434cd826922333edec1348246d2e8639abd985fc0"
+    },
+    {
+      "caseId": "phrasenode-8d0895a3698402e48f42f43b",
+      "disposition": "ambiguous",
+      "competingCandidateIds": ["n326"],
+      "evidenceHash": "5a07d3d75602ec755b759506d29f29f0168194c1e801cb21fc2c6e1df4e16ae1"
+    },
+    {
+      "caseId": "phrasenode-8d6110b9a30550283a122280",
+      "disposition": "ambiguous",
+      "competingCandidateIds": ["n99"],
+      "evidenceHash": "7ce9b9bf05f487f4bcb3dd46c390211d0c2a3f9429da9f4a495b207548cb691f"
+    },
+    {
+      "caseId": "phrasenode-94abc33d99a2ba897465eb9e",
+      "disposition": "ambiguous",
+      "competingCandidateIds": ["n1345", "n1351", "n1867", "n1869"],
+      "evidenceHash": "1f30ef91b56f4b8e5ce6d5ea2ec6a0075a30aef9ba9aad85228fb0c61c792cca"
+    },
+    {
+      "caseId": "phrasenode-9864df025b3611de2c4524b5",
+      "disposition": "evidence_insufficient",
+      "competingCandidateIds": ["n829", "n895"],
+      "evidenceHash": "c55b0e7d66393b65b76d44110762bb522d5cd4b3748ce64c907466c1d12feb7b"
+    },
+    {
+      "caseId": "phrasenode-9ad1a253ba200f6d7ec68784",
+      "disposition": "ambiguous",
+      "competingCandidateIds": ["n65", "n68"],
+      "evidenceHash": "21917aa9b89f116c23e57ca93a1d51fb84f03c76cb8383759f944442b290144b"
+    },
+    {
+      "caseId": "phrasenode-addfe288c067a6469f357ded",
+      "disposition": "evidence_insufficient",
+      "competingCandidateIds": ["n25", "n27"],
+      "evidenceHash": "e9250c25d73b0184122e2a7ed3af14abb964c6ff7c97ecae7d0fb6da00260a6a"
+    },
+    {
+      "caseId": "phrasenode-b0256ec066bb2d7bd0dc1178",
+      "disposition": "ambiguous",
+      "competingCandidateIds": ["n358", "n359"],
+      "evidenceHash": "e94162313c6c74503358c061721b159bc5dcbea0864a866218342aae6a343cbc"
+    },
+    {
+      "caseId": "phrasenode-b40ce0934cfff6493a929956",
+      "disposition": "ambiguous",
+      "competingCandidateIds": ["n40", "n59", "n63"],
+      "evidenceHash": "5307900cb9466b85bdc2a994a07e44af609176ad43cd42e8852e566ba959a919"
+    },
+    {
+      "caseId": "phrasenode-b5d5f7d194d6958eb0e6f4b1",
+      "disposition": "ambiguous",
+      "competingCandidateIds": ["n298", "n299", "n303", "n306"],
+      "evidenceHash": "9b07fe035ed6af7f027bbb0f474ba17b97df96f45a8320bd94e635d58d133495"
+    },
+    {
+      "caseId": "phrasenode-b94fc2e997125c8f83d942d6",
+      "disposition": "evidence_insufficient",
+      "competingCandidateIds": ["n24", "n26"],
+      "evidenceHash": "15519d740e6ccf7f081a894f757eb9ce961f0fd32f7963b83a4cb927a2c938c5"
+    },
+    {
+      "caseId": "phrasenode-bf9b7dd6a06ef5fca2feca47",
+      "disposition": "ambiguous",
+      "competingCandidateIds": ["n106", "n129"],
+      "evidenceHash": "9091d60d4bcc26a1e952669f792d47f3e837c59d1af39e31ab5ec79629214ded"
+    },
+    {
+      "caseId": "phrasenode-bf9dbfb7b1615f35c2c10ed1",
+      "disposition": "ambiguous",
+      "competingCandidateIds": ["n154", "n164", "n412", "n413"],
+      "evidenceHash": "4486075bc0b631d8dd8220396d97aac8ab82feea5c03de6ad3f2e2bb1026b117"
+    },
+    {
+      "caseId": "phrasenode-c1e94986466499371792ebcc",
+      "disposition": "ambiguous",
+      "competingCandidateIds": ["n109", "n153"],
+      "evidenceHash": "5ca04abffdb33b3b15f05e570ce8f12637cc76b056bcd0ed7ad97f9131f55b4a"
+    },
+    {
+      "caseId": "phrasenode-c46c125e3c437b01bdef9e2c",
+      "disposition": "ambiguous",
+      "competingCandidateIds": ["n40", "n121"],
+      "evidenceHash": "28d981788f1680454514f4cb4176b2937810c5195be5e3852bb97334308f2884"
+    },
+    {
+      "caseId": "phrasenode-ce1aca04343bb684d3ae1c4a",
+      "disposition": "evidence_insufficient",
+      "competingCandidateIds": ["n25", "n27"],
+      "evidenceHash": "cdcbd6559d3d12927b279a0a10239cdbe2c1cd2f989bdcf527e8c91a109d4fd5"
+    },
+    {
+      "caseId": "phrasenode-d217bb87169e8d8cb4f33dba",
+      "disposition": "ambiguous",
+      "competingCandidateIds": ["n56", "n60", "n16", "n64", "n329"],
+      "evidenceHash": "53143d27471176df7818fd3c44046352c11e3ec0295556fc001569b0f9e24337"
+    },
+    {
+      "caseId": "phrasenode-d737cc177188f1082c320d07",
+      "disposition": "ambiguous",
+      "competingCandidateIds": ["n824", "n836", "n838"],
+      "evidenceHash": "6f067e8299d725f8ba27533fd1ac480521dbc280b41fe7ac3ece0531f3a3af56"
+    },
+    {
+      "caseId": "phrasenode-d849af8deb12e8446e123c75",
+      "disposition": "ambiguous",
+      "competingCandidateIds": ["n54", "n15"],
+      "evidenceHash": "03570821bf972b1422d5fec2b44f8673335d9bfb5fadee076e2b30fc93406f96"
+    },
+    {
+      "caseId": "phrasenode-dc7f8bc7d80a847bc8fefa74",
+      "disposition": "ambiguous",
+      "competingCandidateIds": ["n298", "n517", "n627"],
+      "evidenceHash": "ba2a108345e0b833b9e2c0b4ce0542d17c6e38cec44dea34f0da32078f96ddab"
+    },
+    {
+      "caseId": "phrasenode-e24d514760df613449dbf112",
+      "disposition": "ambiguous",
+      "competingCandidateIds": ["n18", "n326"],
+      "evidenceHash": "597f2ee510ed20054e387fae51513c8e4425bcc0fa47bbae5b24fd7bacaaf902"
+    },
+    {
+      "caseId": "phrasenode-e4cbca1a305adf767eb209c8",
+      "disposition": "ambiguous",
+      "competingCandidateIds": ["n56", "n60", "n16", "n64", "n329"],
+      "evidenceHash": "c88ef45b24cc144344c4c49928139b1634f429d7d7989d8db188dacefd9ae226"
+    },
+    {
+      "caseId": "phrasenode-e630b92ed9da66a67f75550e",
+      "disposition": "ambiguous",
+      "competingCandidateIds": ["n45", "n47"],
+      "evidenceHash": "d7e7cad290ad5509e67748df4883862ed9293998df9a899b16ac06038f2da303"
+    },
+    {
+      "caseId": "phrasenode-4618664ae765b4557750a668",
+      "disposition": "ambiguous",
+      "competingCandidateIds": ["n134"],
+      "evidenceHash": "9bbcb49a374f99846834134a193a45ec88c8d852e325c0233f7ae76911909903"
+    },
+    {
+      "caseId": "phrasenode-46569f31c78668e073957804",
+      "disposition": "ambiguous",
+      "competingCandidateIds": ["n2231"],
+      "evidenceHash": "6a0edd9f9017cbf3fca41ad98c0799fb7d0b86d984e460c7ef4608667e6b64a1"
+    },
+    {
+      "caseId": "phrasenode-4903eacaeb4eb0cb36101922",
+      "disposition": "ambiguous",
+      "competingCandidateIds": ["n16"],
+      "evidenceHash": "90da83c5a9e535e08808e8cc435b151ba4d304e63b5df6e12fd462e14f0c30b5"
+    },
+    {
+      "caseId": "phrasenode-4c587606a8d9c383d7b7ff33",
+      "disposition": "ambiguous",
+      "competingCandidateIds": ["n24"],
+      "evidenceHash": "2691c798dd56ed4de136b39ff046fca1cefc75d76c1bce9a30ae94956f2ad74e"
+    },
+    {
+      "caseId": "phrasenode-4ca4d9366387936115ec8e4e",
+      "disposition": "ambiguous",
+      "competingCandidateIds": ["n181"],
+      "evidenceHash": "1e4e3913fab151b7993a26a236102027f221f1947629575796cbc8d6b3b2c506"
+    },
+    {
+      "caseId": "phrasenode-52d72f2f632e271e744c17db",
+      "disposition": "ambiguous",
+      "competingCandidateIds": ["n11"],
+      "evidenceHash": "ab9ba9bcc98c128a3f17fe6e33aef9e8f438ef075428ff38527615805630ebf3"
+    },
+    {
+      "caseId": "phrasenode-548309af284b539f9e8e6250",
+      "disposition": "ambiguous",
+      "competingCandidateIds": ["n80"],
+      "evidenceHash": "0e2ef4848e4aa5831e3e85917387e287a7bfb16d246712c5173fcb3784def53e"
+    },
+    {
+      "caseId": "phrasenode-9c602c5d091b3c3a070b5701",
+      "disposition": "ambiguous",
+      "competingCandidateIds": ["n65", "n68"],
+      "evidenceHash": "c90101d67a5b7b057ab901c9dd9643e8e7857b18449bbb57b1368785d92ecaf1"
+    },
+    {
+      "caseId": "phrasenode-9d22e662e5da244fdc9329c3",
+      "disposition": "ambiguous",
+      "competingCandidateIds": ["n138"],
+      "evidenceHash": "02db8f64d76130c0d58a8e6e6871be16059ef23d4845aa9a3f2d1b6588876d14"
+    },
+    {
+      "caseId": "phrasenode-f3a0a56c1de594f6d70297f6",
+      "disposition": "ambiguous",
+      "competingCandidateIds": ["n46", "n30"],
+      "evidenceHash": "dc210a039496284f17cec35a42c9bdced6d7c062059f421b10b8804c1db56ed1"
+    },
+    {
+      "caseId": "phrasenode-f742a2b0c3ebf4cc0bce301b",
+      "disposition": "ambiguous",
+      "competingCandidateIds": ["n157", "n52"],
+      "evidenceHash": "24b2ee82938f25eabe157f5d5f610f62a4a18ac4cad83394d41182e4a357110b"
+    },
+    {
+      "caseId": "phrasenode-fb7a1d3650e053fed8e70172",
+      "disposition": "ambiguous",
+      "competingCandidateIds": ["n32", "n120", "n122", "n124", "n126", "n128"],
+      "evidenceHash": "dd0f6380df7dc1f1af971a2ab2768e0772dab1e594c531f61e7957c8fdb68d45"
+    },
+    {
+      "caseId": "phrasenode-fbc08fb3e69c84085bf9ca5c",
+      "disposition": "evidence_insufficient",
+      "competingCandidateIds": ["n40", "n113", "n358"],
+      "evidenceHash": "4febf1a23deb0cde6ea7b0e84207ba179235b53fceb36ad456619d2de501eea8"
+    },
+    {
+      "caseId": "phrasenode-fca0db9c9c1ae4da22da7c96",
+      "disposition": "ambiguous",
+      "competingCandidateIds": ["n60", "n64", "n329"],
+      "evidenceHash": "88f7ec3eed1aefa5d2ed4bfcb54d91ffcf5de22478ce68ce19528f8fee349e55"
+    },
+    {
+      "caseId": "phrasenode-a025581e80e65e7ec6d787c9",
+      "disposition": "evidence_insufficient",
+      "competingCandidateIds": ["n92"],
+      "evidenceHash": "3bd2c6540a9bbb3be8f9511be54e1e8fc47a3895010355615d87a16d210b04d7"
+    },
+    {
+      "caseId": "phrasenode-a270b9f5816529bcf0653e7a",
+      "disposition": "ambiguous",
+      "competingCandidateIds": ["n616", "n719"],
+      "evidenceHash": "88af7553452b2e53f5372330eb261b535bdf100b50c44844c41bbf8c70eaca47"
+    },
+    {
+      "caseId": "phrasenode-a4f02650fbdf4bad346ac06c",
+      "disposition": "ambiguous",
+      "competingCandidateIds": ["n53"],
+      "evidenceHash": "32b0ce43e0f83da0b1a724ea8ce7c3b4f475cc08b1f8cf3c84903d045a04e567"
+    },
+    {
+      "caseId": "phrasenode-a59dd1311a801ff5016096ea",
+      "disposition": "ambiguous",
+      "competingCandidateIds": ["n23"],
+      "evidenceHash": "3416fdbdf0dea3364a6f4ee7cb21c3fb9e7b80b99c4c30bf6ca0a40ad85668e0"
+    },
+    {
+      "caseId": "phrasenode-a6acefbc5cda58c355ef7ae6",
+      "disposition": "evidence_insufficient",
+      "competingCandidateIds": ["n231", "n292", "n503"],
+      "evidenceHash": "6359f808c5acbd8237cee247b7f257ac1e4136849ee3dcdb2aefbb05ee2ce6f9"
+    },
+    {
+      "caseId": "phrasenode-a6fc491558b7471d0982a8f2",
+      "disposition": "ambiguous",
+      "competingCandidateIds": ["n905", "n907"],
+      "evidenceHash": "dcbed1f05f8fe7e93cb56916331b6e91ccd1c79851b3040f3ab054581d87d8ae"
+    }
+  ],
+  "retainedOriginalRuns": [
+    {
+      "path": "selection-hints-audited-live",
+      "attempted": 949,
+      "planned": 2562
+    },
+    {
+      "path": "selection-hints-prepared-live",
+      "attempted": 1971,
+      "planned": 2544
+    }
+  ]
+}
