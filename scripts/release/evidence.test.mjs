@@ -102,20 +102,28 @@ async function workspace(t, { qualificationPolicy = "current", bootstrapBaseline
     reviewer: "fixture-source-review",
     reviewedAt: time(-5000),
   };
-  const dataset = gzipSync(JSON.stringify({ version: 1, cases: [offline] }));
-  const audit = { version: 1, archiveSha256: hash(dataset), cases: [offline.labelReview] };
+  const secondOffline = structuredClone(offline);
+  secondOffline.id = "offline-save-second";
+  secondOffline.labelReview.caseId = secondOffline.id;
+  const offlineCases = [offline, secondOffline];
+  const dataset = gzipSync(JSON.stringify({ version: 1, cases: offlineCases }));
+  const audit = {
+    version: 1,
+    archiveSha256: hash(dataset),
+    cases: offlineCases.map((spec) => spec.labelReview),
+  };
   write("evaluation/datasets/labels.json", audit);
   writeFileSync(join(cwd, ".artifacts/datasets/reviewed.json.gz"), dataset);
   write("evaluation/datasets/collection.json", {
     path: ".artifacts/datasets/reviewed.json.gz",
     sha256: hash(dataset),
-    cases: 1,
+    cases: offlineCases.length,
     labelReview: {
       path: "evaluation/datasets/labels.json",
       sha256: hash(readFileSync(join(cwd, "evaluation/datasets/labels.json"))),
     },
   });
-  cases.push(offline);
+  cases.push(...offlineCases);
   const git = (...args) => execFileSync("git", args, { cwd, encoding: "utf8" }).trim();
   git("init", "--quiet");
   git("add", ".");
@@ -201,7 +209,7 @@ async function workspace(t, { qualificationPolicy = "current", bootstrapBaseline
           },
         ],
         result: {
-          configurationId: "c".repeat(64),
+          configurationId: (spec.track === "offline-selection" ? "e" : "c").repeat(64),
           action: "click",
           outcome: spec.expected.outcome,
           summary: { processingComplete: true },
@@ -240,13 +248,13 @@ async function workspace(t, { qualificationPolicy = "current", bootstrapBaseline
         evidence: {
           ...(spec.track === "offline-selection" ? { modelInput: JSON.stringify(spec.input) } : {}),
           systemPrompt: "Synthetic fixture prompt",
-          outputSchema: "{}",
+          outputSchema: spec.track === "offline-selection" ? "{ }" : "{}",
           configurationJson: JSON.stringify({
             Model: profile.model,
             Provider: profile.provider,
             Strategy: "candidate-selection",
             effective: {
-              scope: "current_view",
+              scope: spec.track === "offline-selection" ? "offline" : "current_view",
               responseCache: false,
               request: {
                 model: profile.model,
@@ -403,7 +411,7 @@ async function workspace(t, { qualificationPolicy = "current", bootstrapBaseline
   return { cwd, write, run, seal, sha, evaluation, bindArtifact };
 }
 
-test("seal, replay and archive bind one complete evaluation to exact tested artifacts", async (t) => {
+test("seal, replay and archive bind distinct category configurations to exact tested artifacts", async (t) => {
   const work = await workspace(t);
   const bound = work.bindArtifact();
   const sealed = bound.seal();
@@ -415,6 +423,12 @@ test("seal, replay and archive bind one complete evaluation to exact tested arti
   assert.equal(candidate.defaultActivated, undefined);
   assert.equal(candidate.pilot, undefined);
   assert.equal(candidate.evaluation, work.evaluation.path);
+  assert.deepEqual(Object.keys(candidate.configurations).sort(), [
+    "deepseek:browser",
+    "deepseek:offline-selection",
+    "release-baseline:browser",
+    "release-baseline:offline-selection",
+  ]);
   assert.equal(work.run("verify", path, "--sha256", hash(bytes)).status, 0);
   const archive = ".artifacts/evidence.json.gz";
   const runArchive = (...args) =>
@@ -440,6 +454,10 @@ test("sealing rejects missing results, changed policy, lost passes, artifacts an
     "missing",
     "regression",
     "offline-regression",
+    "browser-configuration",
+    "offline-configuration",
+    "baseline-browser-configuration",
+    "baseline-offline-configuration",
     "receipt",
     "bundle",
     "policy",
@@ -472,6 +490,19 @@ test("sealing rejects missing results, changed policy, lost passes, artifacts an
         );
         offlineTrial.result.actions[0].target.candidateId = "c2";
         work.write(`${work.evaluation.path}/trials/${offlineTrial.id}.json`, offlineTrial);
+      }
+      if (mutation.endsWith("-configuration")) {
+        const selected = mutation.includes("offline")
+          ? work.evaluation.trials.find((item) => item.caseId === "offline-save")
+          : trial;
+        const arm = mutation.startsWith("baseline-") ? selected.baseline : selected;
+        arm.evidence.outputSchema = '{"changed":true}';
+        const { configurationRecord } = await import(`file://${work.cwd}/evaluation/run.mjs`);
+        arm.configuration = configurationRecord(arm);
+        work.write(`${work.evaluation.path}/trials/${selected.id}.json`, selected);
+        const sealed = bound.seal();
+        assert.notEqual(sealed.status, 0);
+        assert.match(sealed.stderr, /Configuration changed within an arm/);
       }
       if (mutation === "receipt") work.write(`${work.evaluation.path}/artifact-receipt.json`, {});
       if (mutation === "bundle")
