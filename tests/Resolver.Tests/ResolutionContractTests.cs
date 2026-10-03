@@ -862,17 +862,53 @@ public sealed class ResolutionContractTests
         Assert.Equal(5, candidates.GetArrayLength());
         Assert.Equal("card", candidates[1].GetProperty("parentId").GetString());
         Assert.Equal("button-save", candidates[1].GetProperty("id").GetString());
-        Assert.Equal("right", candidates[0].GetProperty("neighbors").GetProperty("right")[0].GetString());
-        var below = candidates[0].GetProperty("neighbors").GetProperty("below");
-        Assert.Equal(2, below.GetArrayLength());
-        Assert.Equal("below", below[0].GetString());
-        Assert.Equal("tied-below", below[1].GetString());
+        Assert.False(candidates[0].TryGetProperty("neighbors", out _));
         Assert.False(candidates[1].TryGetProperty("neighbors", out _));
         Assert.Equal(1, handler.ProviderRequestCount);
         var layout = input.RootElement.GetProperty("layout");
         Assert.Equal(4, layout.GetArrayLength());
         Assert.Equal("Save", layout[0].GetProperty("description").GetString());
-        Assert.Equal("below", layout[0].GetProperty("neighbors").GetProperty("below")[0].GetProperty("id").GetString());
+        Assert.Equal("right", layout[0].GetProperty("neighbors").GetProperty("right")[0].GetProperty("id").GetString());
+        var below = layout[0].GetProperty("neighbors").GetProperty("below");
+        Assert.Equal(2, below.GetArrayLength());
+        Assert.Equal("below", below[0].GetProperty("id").GetString());
+        Assert.Equal("tied-below", below[1].GetProperty("id").GetString());
+    }
+
+    [Fact]
+    public async Task ModelInputRetainsOrdinaryCaptureShapeWithoutRepeatedItems()
+    {
+        var capture = JsonNode.Parse(new DeterministicServicesHandler().CaptureBody)!;
+        var button = capture["candidates"]![0]!.DeepClone();
+        var heading = button.DeepClone();
+        heading["id"] = "heading";
+        heading["tag"] = "h2";
+        heading["role"] = "";
+        heading["label"] = "";
+        heading["text"] = "Profile";
+        button["parentId"] = "heading";
+        capture["candidates"] = new JsonArray(heading, button);
+        capture["coverage"]!["scannedCount"] = 2;
+        capture["coverage"]!["eligibleCount"] = 2;
+        capture["coverage"]!["capturedCount"] = 2;
+        var handler = new DeterministicServicesHandler { CaptureBody = capture.ToJsonString() };
+        await using var application = CreateApplication(handler);
+        using var client = application.CreateClient();
+        using var response = await client.PostAsJsonAsync(
+            "/pages/page-1/resolve",
+            new { instruction = "Click Save", documentId = "document-1" }
+        );
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var input = JsonDocument.Parse(
+            handler.ModelRequest.GetProperty("messages")[1].GetProperty("content").GetString()!
+        );
+        Assert.False(input.RootElement.TryGetProperty("layout", out _));
+        var candidates = input.RootElement.GetProperty("candidates");
+        Assert.Equal(2, candidates.GetArrayLength());
+        Assert.Equal("button-save", candidates[1].GetProperty("id").GetString());
+        Assert.False(candidates[1].TryGetProperty("parentId", out _));
+        Assert.False(candidates[1].TryGetProperty("neighbors", out _));
+        Assert.Equal(1, handler.ProviderRequestCount);
     }
 
     [Theory]

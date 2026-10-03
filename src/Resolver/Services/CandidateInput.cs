@@ -45,7 +45,7 @@ internal static class CandidateInput
                 candidates = capture.Candidates.Select(candidate => new
                 {
                     candidate.Id,
-                    candidate.ParentId,
+                    parentId = items.Length == 0 ? null : candidate.ParentId,
                     candidate.Tag,
                     role = string.IsNullOrEmpty(candidate.Role) ? null : candidate.Role,
                     text = string.IsNullOrEmpty(candidate.Text) || candidate.Text == candidate.Label
@@ -62,7 +62,6 @@ internal static class CandidateInput
                         @readonly = candidate.State.Readonly != true ? null : candidate.State.Readonly,
                     },
                     geometry = candidate.Geometry,
-                    neighbors = Neighbors(candidate, peers[(candidate.Frame?.Id, candidate.ParentId)]),
                     appearance = candidate.Appearance is { } appearance
                         ? new
                         {
@@ -91,6 +90,7 @@ internal static class CandidateInput
 
     private static Dictionary<string, string[]>? Neighbors(CandidateElement origin, CandidateElement[] peers)
     {
+        // Peer scans stay bounded by the capture quota; index intervals if preparation becomes a measured bottleneck.
         var nearest = new Dictionary<string, (double Gap, List<string> Ids)>(StringComparer.Ordinal);
         var a = origin.Geometry;
         foreach (var peer in peers)
