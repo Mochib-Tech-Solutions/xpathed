@@ -10,6 +10,10 @@ xpathed is a Resolver API that turns English instructions into verified XPath ex
 
 **The model selects elements; browser code builds and verifies their XPaths.** Independent evaluation checks whether those elements were the intended targets.
 
+<img src="docs/assets/saucedemo-demo.gif" alt="Sauce Demo: finding Login, highlighting the button, and zooming into its XPath and verification" width="720" />
+
+On [Sauce Demo](https://www.saucedemo.com/), “Click the Login button” finds and highlights Login, then returns its verified XPath. The form stays untouched.
+
 ## Try an instruction
 
 > Hover over OK under Employee.
