@@ -95,7 +95,7 @@ The diagram includes the bundled test client.
 | Resolver — ASP.NET Core       | Core resolution API, model selection and orchestration                        |
 | Browser — Playwright/Chromium | Browser API implementation: pages, capture, XPath verification and highlights |
 | Web — React/TypeScript        | Manual test client: chat, tabs and noVNC viewer                               |
-| ClientApi — ASP.NET Core      | Test-client requests                                 |
+| ClientApi — ASP.NET Core      | Test-client requests                                                          |
 
 Resolver runs independently of Web and ClientApi. It addresses Browser through `BrowserUrl`, exchanging serializable records defined in `src/Common`. A replacement browser service must preserve the capture, identity, verification and lifecycle contracts; only the bundled implementation has been verified. The test client's viewer and Resolver address the same managed page.
 
@@ -107,14 +107,14 @@ The repository follows these boundaries: `src/Resolver` contains the core system
 
 The request crosses six boundaries. Each step uses the previous step's evidence and has a specific completion condition.
 
-| Step and owner | Requires | Produces |
-| --- | --- | --- |
-| 1. Accept — Resolver | Instruction, active page and current document ID | Validated request |
-| 2. Capture — Browser | Live page and supported frame documents | Complete scoped candidates, capture ID and retained nodes |
-| 3. Select — model through OpenRouter | Instruction, sanitized candidates, prompt and output schema | Shared action, candidate IDs and found/absent/unsupported outcomes |
-| 4. Validate — Resolver | Model output and the captured candidate set | Schema-checked selection with valid IDs and no duplicates |
-| 5. Verify — Browser | Capture ID, selections and retained live nodes | Unique same-node XPath, frame context, current-view checks and readiness |
-| 6. Return — Resolver | Verified Browser observations and provider usage | API result with target outcomes, limitations, timings and cost |
+| Step and owner                       | Requires                                                    | Produces                                                                 |
+| ------------------------------------ | ----------------------------------------------------------- | ------------------------------------------------------------------------ |
+| 1. Accept — Resolver                 | Instruction, active page and current document ID            | Validated request                                                        |
+| 2. Capture — Browser                 | Live page and supported frame documents                     | Complete scoped candidates, capture ID and retained nodes                |
+| 3. Select — model through OpenRouter | Instruction, sanitized candidates, prompt and output schema | Shared action, candidate IDs and found/absent/unsupported outcomes       |
+| 4. Validate — Resolver               | Model output and the captured candidate set                 | Schema-checked selection with valid IDs and no duplicates                |
+| 5. Verify — Browser                  | Capture ID, selections and retained live nodes              | Unique same-node XPath, frame context, current-view checks and readiness |
+| 6. Return — Resolver                 | Verified Browser observations and provider usage            | API result with target outcomes, limitations, timings and cost           |
 
 Model selection covers steps 3–4. XPath construction and verification covers step 5. Resolver E2E covers the complete request. The model has no browser tools and returns element IDs; Browser constructs the XPath. The [walkthrough](docs/how-it-works.md#step-boundaries) explains the limits and failure conditions at each handoff.
 
@@ -144,13 +144,13 @@ This is a local application. Hosted use needs authentication, network isolation 
 
 The **evaluation set** has three categories, scored separately:
 
-| Category | What it checks | Command |
-| --- | --- | --- |
-| Model selection | Real model selects the expected element from reviewed saved candidates, currently PhraseNode | `pnpm evaluate:model:live` |
-| XPath construction and verification | Controlled selections go directly to Browser; independent DOM labels check XPath identity, state and locator mutations | `pnpm evaluate:xpath` |
-| Resolver E2E | Instruction → real browser capture → real model → verified XPath and final response | `pnpm evaluate:resolver:live` |
+| Category                            | What it checks                                                                                                         | Command                       |
+| ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ----------------------------- |
+| Model selection                     | Real model selects the expected element from reviewed saved candidates, currently PhraseNode                           | `pnpm evaluate:model:live`    |
+| XPath construction and verification | Controlled selections go directly to Browser; independent DOM labels check XPath identity, state and locator mutations | `pnpm evaluate:xpath`         |
+| Resolver E2E                        | Instruction → real browser capture → real model → verified XPath and final response                                    | `pnpm evaluate:resolver:live` |
 
-`pnpm evaluate` runs all three and writes separate results plus a combined summary. **It makes paid model calls** for model selection and Resolver E2E; XPath evaluation needs no provider key. Live commands use `OPENROUTER_EVAL_API_KEY`. Fetch the reviewed inputs with `pnpm datasets:collection fetch` if they are not already available.
+`pnpm evaluate` runs all three and writes separate results plus a combined summary. **It makes paid model calls** for model selection and Resolver E2E; XPath evaluation needs no provider key. Live commands use `OPENROUTER_EVAL_API_KEY`. Fetch the reviewed inputs with `pnpm datasets:collection fetch` if they are not already available. Imported accuracy cases also require a pinned semantic review of the expected target against the supplied input; ambiguous or unanswerable labels remain documented exclusions. See the [dataset review contract](docs/evaluation.md#private-dataset-collection).
 
 “Offline” describes the saved inputs used for model selection, which still calls a live model. XPath evaluation supplies known selections to isolate the stage after inference. E2E checks whether both stages work together. The chat UI is outside this boundary. A **regression** is a lost pass between compared runs. Reusing cases does not establish unseen-site accuracy.
 
@@ -160,13 +160,13 @@ Shared XPath/Resolver case names and browser/pipeline test titles describe their
 
 These are actual cases from the shared evaluation set. Expected selectors belong to the independent grader; the model never receives them.
 
-| Instruction | Expected result | What it checks |
-| --- | --- | --- |
-| “Click Save changes.” | The labelled Save button, with a unique same-node XPath | Target selection and XPath identity |
-| “Click all Approve buttons in Approvals.” | Both buttons, including the disabled one; its readiness is blocked | Exact target-set completeness and readiness |
-| “Click Help.” with Help off-screen | `not_found` in the current view | Scoped absence in Resolver E2E |
-| “Fill Notes.” with readonly Notes | Found target, `fill` action, blocked readiness with reason `readonly` | Action interpretation and passive state |
-| “Click Save changes in Profile.” then insert a wrapper | The saved XPath still identifies the intended button | Locator reuse in deterministic XPath evaluation |
+| Instruction                                            | Expected result                                                       | What it checks                                  |
+| ------------------------------------------------------ | --------------------------------------------------------------------- | ----------------------------------------------- |
+| “Click Save changes.”                                  | The labelled Save button, with a unique same-node XPath               | Target selection and XPath identity             |
+| “Click all Approve buttons in Approvals.”              | Both buttons, including the disabled one; its readiness is blocked    | Exact target-set completeness and readiness     |
+| “Click Help.” with Help off-screen                     | `not_found` in the current view                                       | Scoped absence in Resolver E2E                  |
+| “Fill Notes.” with readonly Notes                      | Found target, `fill` action, blocked readiness with reason `readonly` | Action interpretation and passive state         |
+| “Click Save changes in Profile.” then insert a wrapper | The saved XPath still identifies the intended button                  | Locator reuse in deterministic XPath evaluation |
 
 See [case IDs, fixtures and metric definitions](docs/evaluation.md#example-cases-and-metrics), and [actual outcomes across the three systems](docs/research/engineering-comparison.md#case-examples).
 
@@ -174,11 +174,11 @@ See [case IDs, fixtures and metric definitions](docs/evaluation.md#example-cases
 
 All three systems receive the same instruction and reset page state, but prepare their own model input:
 
-| System | What it uses | What it returns |
-| --- | --- | --- |
-| Basic resolver | Archived current-view capture, sanitized candidates, selection prompt and Browser verification | Shared action, targets, verified XPath and passive readiness |
-| Improved resolver | The same architecture, clearer control/context and absence rules, plus stricter current-view revalidation; selected implementation in `main` | The same resolution contract, with the changes evaluated together |
-| Stagehand | Stock `observe`, its own page snapshot, prompt and selector generation; cache and self-healing disabled | Suggested actions and selectors, normalized and checked by the independent grader |
+| System            | What it uses                                                                                                                                 | What it returns                                                                   |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| Basic resolver    | Archived current-view capture, sanitized candidates, selection prompt and Browser verification                                               | Shared action, targets, verified XPath and passive readiness                      |
+| Improved resolver | The same architecture, clearer control/context and absence rules, plus stricter current-view revalidation; selected implementation in `main` | The same resolution contract, with the changes evaluated together                 |
+| Stagehand         | Stock `observe`, its own page snapshot, prompt and selector generation; cache and self-healing disabled                                      | Suggested actions and selectors, normalized and checked by the independent grader |
 
 The [resolver comparison](docs/research/engineering-comparison.md) uses **183 shared browser cases**, the same DeepSeek V4.1 Flash/Wafer route, and one original attempt per system. Three isolated workers run concurrently. Earlier resolver code stays in saved images; the application keeps one implementation.
 

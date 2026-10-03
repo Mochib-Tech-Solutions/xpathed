@@ -4,5 +4,9 @@
   "asset": "reviewed-72d140c1.json.gz",
   "path": ".artifacts/datasets/reviewed.json.gz",
   "sha256": "72d140c1c5d4ef9032277ce9422f6f4039c6c864f166b3a6572078576db82d86",
-  "cases": 1084
+  "cases": 1084,
+  "labelReview": {
+    "path": "evaluation/datasets/label-review.json",
+    "sha256": "c0748b12e9458c89f7f615564afc473e920d6f28e184675977fbf09303940002"
+  }
 }
