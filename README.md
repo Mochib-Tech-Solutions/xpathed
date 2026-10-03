@@ -1,13 +1,13 @@
 ![xpathed — a golden thread finds one illuminated doorway in a branching, painted library](docs/assets/banner.svg)
 
-# A compass for the web.
+# Natural-language to XPath resolver
 
 [![CI](https://github.com/Mochib-Tech-Solutions/xpathed/actions/workflows/check.yml/badge.svg?branch=main&event=push)](https://github.com/Mochib-Tech-Solutions/xpathed/actions/workflows/check.yml)
 ![.NET 10](https://img.shields.io/badge/.NET-10-512BD4?logo=dotnet&logoColor=white&labelColor=161b22)
 ![React 19 and TypeScript 6](https://img.shields.io/badge/React_19-TypeScript_6-3178C6?logo=react&logoColor=61DAFB&labelColor=161b22)
 ![PostgreSQL 18](https://img.shields.io/badge/PostgreSQL-18-4169E1?logo=postgresql&logoColor=white&labelColor=161b22)
 
-xpathed turns English instructions into verified XPath expressions for the page in front of you. Chat, a live browser and highlighted targets share one workspace.
+xpathed is a Resolver API that turns English instructions into verified XPath expressions for the current browser view. The Resolver is the core system. It uses a browser service through HTTP APIs; the included chat workspace is a client for manual testing and demonstrations.
 
 **The model selects elements; browser code builds and verifies their XPaths.** Independent evaluation checks whether those elements were the intended targets.
 
@@ -52,25 +52,37 @@ All five services run in Docker. Ctrl+C or `pnpm docker:down` removes developmen
 
 ## Architecture
 
+The Resolver accepts instructions from a client or evaluation runner, coordinates capture and model selection, and returns targets verified by the browser service. Browser implementations connect through the [browser API contract](docs/runtime.md#browser-integration). The bundled implementation uses Playwright/Chromium.
+
 [![Service ownership and request paths](docs/diagrams/system-design.svg)](docs/diagrams/system-design.svg)
 
-| Service                       | Responsibility                                         |
-| ----------------------------- | ------------------------------------------------------ |
-| Web — React/TypeScript        | Chat, tabs, noVNC viewer and entry-point proxy         |
-| ClientApi — ASP.NET Core      | Client requests and diagnostic recording               |
-| Resolver — ASP.NET Core       | Candidate context, model selection and orchestration   |
-| Browser — Playwright/Chromium | Live pages, capture, XPath verification and highlights |
-| PostgreSQL                    | Diagnostic records and retained evidence               |
+The diagram includes the bundled test client and its diagnostic storage.
 
-Viewer and resolver address the same managed page. Browser owns live nodes; Resolver has no database dependency.
+| Service                       | Responsibility                                                                |
+| ----------------------------- | ----------------------------------------------------------------------------- |
+| Resolver — ASP.NET Core       | Core resolution API, model selection and orchestration                        |
+| Browser — Playwright/Chromium | Browser API implementation: pages, capture, XPath verification and highlights |
+| Web — React/TypeScript        | Manual test client: chat, tabs and noVNC viewer                               |
+| ClientApi — ASP.NET Core      | Test-client requests and diagnostic recording                                 |
+| PostgreSQL                    | Test-client diagnostic records and retained evidence                          |
+
+Resolver runs independently of Web, ClientApi and PostgreSQL. It addresses Browser through `BrowserUrl`, exchanging serializable records defined in `src/Common`. A replacement browser service must preserve the capture, identity, verification and lifecycle contracts; only the bundled implementation has been verified. The test client's viewer and Resolver address the same managed page.
+
+The repository follows these boundaries: `src/Resolver` contains the core system, `src/Browser` the browser implementation, `src/Common` the shared contracts, and `src/Web` plus `src/ClientApi` the test client. `evaluation/` evaluates the Resolver directly.
 
 ## How resolution works
+
+[![Resolver internals: model selects candidate IDs; browser code constructs and verifies XPath](docs/diagrams/resolver-internals.svg)](docs/diagrams/resolver-internals.html)
+
+**Part 1 — model selection.** The Resolver gives the model an instruction and sanitized candidates. The model returns the action and selected element IDs. `ActionSelectionStrategy` defines the prompt/schema and validates that output.
+
+**Part 2 — XPath construction and verification.** The Resolver sends the selected IDs to Browser. Browser retrieves the retained DOM nodes, builds XPath expressions from their markup, and checks uniqueness, same-node identity, current-view membership and readiness. The model does not write the XPath.
 
 1. **Capture.** Browser assigns temporary IDs to eligible elements in the current view, with sanitized names, roles, context, state, geometry and supported CSS colors. Editable values, cookies and storage stay out. Exceeded capture budgets fail explicitly.
 2. **Select.** One OpenRouter call receives the instruction and complete scoped candidate list. The model returns strict JSON with one shared interaction and distinct candidate IDs, or missing/unsupported outcomes. It has no browser tools.
 3. **Validate.** Resolver checks the response schema, candidate membership, shared action and enumeration completeness.
 4. **Verify.** Browser constructs XPath from test attributes and semantic anchors before structural fallback. Each XPath must uniquely match the retained node in its document. Frame context stays separate. Document and current-view membership are rechecked, including for absence.
-5. **Return.** Browser observes readiness and highlights targets. Disabled or covered elements can still have valid XPaths. Web displays the result; ClientApi records the attempt.
+5. **Return.** Browser observes readiness and highlights targets; Resolver returns the result to its caller. Disabled or covered elements can still have valid XPaths. The test client displays and records its requests; evaluation runners save their own evidence.
 
 ### Model and configuration
 
@@ -100,7 +112,17 @@ This is a local application. Hosted use needs authentication, network isolation 
 
 ## Evaluation
 
-Independent labels check target identity, complete target sets, action, XPath and readiness. Deterministic tests check the pipeline; live runs measure model behavior. Offline selection and browser results have separate denominators.
+The **evaluation set** has three categories, scored separately:
+
+| Category | What it checks | Command |
+| --- | --- | --- |
+| Model selection | Real model selects the expected element from reviewed saved candidates, currently PhraseNode | `pnpm evaluate:model:live` |
+| XPath construction and verification | Controlled selections go directly to Browser; independent DOM labels check XPath identity, state and locator mutations | `pnpm evaluate:xpath` |
+| Resolver E2E | Instruction → real browser capture → real model → verified XPath and final response | `pnpm evaluate:resolver:live` |
+
+`pnpm evaluate` runs all three and writes separate results plus a combined summary. **It makes paid model calls** for model selection and Resolver E2E; XPath evaluation needs no provider key. Live commands use `OPENROUTER_EVAL_API_KEY`. Fetch the reviewed inputs with `pnpm datasets:collection fetch` if they are not already available.
+
+“Offline” describes the saved inputs used for model selection, which still calls a live model. XPath evaluation supplies known selections to isolate the stage after inference. E2E checks whether both stages work together. The chat UI is outside this boundary. A **regression** is a lost pass between compared runs. Reusing cases does not establish unseen-site accuracy.
 
 ### Basic resolver, Improved resolver and Stagehand
 
@@ -118,16 +140,17 @@ Improved gained **15 passes and lost 7**, a net increase of **4.4 percentage poi
 
 The target-selection score excludes eight unsupported-instruction cases and checks exact nodes/absence without requiring the action name. Stagehand uses stock `observe` with a current-view instruction; it does not provide xpathed's readiness contract. The [report](docs/research/engineering-comparison.md) explains these boundaries and separates the full resolver score, timing cohorts and failures.
 
-All **549 paid calls** are retained, with **$0.07312420** reported and no missing charges. These authored regression cases measure this setup, not unseen-site accuracy. The [historical browser/offline report](docs/research/configuration-comparison.md) preserves the earlier collection and its separate offline results.
+All **549 paid calls** are retained, with **$0.07312420** reported and no missing charges. These authored evaluation cases measure this setup. The [historical browser/offline report](docs/research/configuration-comparison.md) preserves the earlier collection and its separate offline results.
 
 ```sh
 pnpm check                              # local checks
-pnpm evaluate                           # deterministic browser evaluation
+pnpm evaluate                           # all three categories, including paid model calls
+pnpm evaluate:resolver                  # complete pipeline with controlled model responses
+pnpm evaluate:xpath -- --case basic-save-v4 # one XPath case, no model call
 pnpm evaluate:replay RUN_DIRECTORY       # regrade saved evidence
-pnpm evaluate:live                      # paid OpenRouter evaluation
 ```
 
-Live evaluation uses `OPENROUTER_EVAL_API_KEY`. Local checks run independent groups concurrently; browser evaluation uses isolated sessions with up to four workers. Use `pnpm evaluate -- --concurrency 1` for serial execution.
+Category commands accept `--case CASE_ID` and `--output DIRECTORY`. `pnpm evaluate -- --output DIRECTORY` stores each category beneath that directory. Controlled browser evaluation uses up to four isolated sessions; `--concurrency 1` selects serial timing. Live runs are serial. CI uses `evaluate:resolver` and stays provider-free. The other apps' unit and integration commands are unchanged.
 
 Release evaluation compares exact candidate and approved images on the complete reviewed collection. Activation is explicit; nightly monitoring reports drift without changing the running app.
 

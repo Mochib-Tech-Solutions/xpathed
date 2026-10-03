@@ -54,12 +54,18 @@
           "overflowY": false
         }
       ],
-      "captured_themes": ["light", "dark"],
+      "captured_themes": [
+        "light",
+        "dark"
+      ],
       "visual_review": "passed",
       "correction_rounds": 0,
       "embedded_svg_review": {
         "image_width_px": 900,
-        "themes": ["light", "dark"],
+        "themes": [
+          "light",
+          "dark"
+        ],
         "status": "passed",
         "primary_text_px": 12.375,
         "secondary_text_px": 10.125
@@ -116,12 +122,18 @@
           "overflowY": false
         }
       ],
-      "captured_themes": ["light", "dark"],
+      "captured_themes": [
+        "light",
+        "dark"
+      ],
       "visual_review": "passed",
       "correction_rounds": 2,
       "embedded_svg_review": {
         "image_width_px": 900,
-        "themes": ["light", "dark"],
+        "themes": [
+          "light",
+          "dark"
+        ],
         "status": "passed",
         "primary_text_px": 12.375,
         "secondary_text_px": 10.125
@@ -178,16 +190,81 @@
           "overflowY": false
         }
       ],
-      "captured_themes": ["light", "dark"],
+      "captured_themes": [
+        "light",
+        "dark"
+      ],
       "visual_review": "passed",
       "correction_rounds": 2,
       "embedded_svg_review": {
         "image_width_px": 900,
-        "themes": ["light", "dark"],
+        "themes": [
+          "light",
+          "dark"
+        ],
         "status": "passed",
         "primary_text_px": 13.75,
         "secondary_text_px": 11.25
       }
+    },
+    {
+      "name": "resolver-internals",
+      "date": "2026-10-03",
+      "diagram_type": "architecture",
+      "specification": {
+        "sha256": "86f60791b2e8e7cf9fd7c6c6f0b94b774495d372128961c45125ce36381b36f2",
+        "bytes": 3328
+      },
+      "artifact": {
+        "sha256": "65585c551fecf5202dbd8229541456594f0e81238327050b7a14f7d1df24feca",
+        "bytes": 802423
+      },
+      "svg_sha256": "ea8d22495df181eadb90b81e8d74d316c02280b9811022915e7eae0794cef1d8",
+      "validation": {
+        "checksPassed": 9,
+        "checkCount": 9,
+        "compositionProfile": "showcase",
+        "compositionStatus": "pass",
+        "errors": 0,
+        "warnings": 0
+      },
+      "browser_evidence": "pass",
+      "viewports": [
+        {
+          "width": 1440,
+          "height": 900,
+          "theme": "light",
+          "overflowX": false,
+          "overflowY": false
+        },
+        {
+          "width": 1600,
+          "height": 1000,
+          "theme": "light",
+          "overflowX": false,
+          "overflowY": false
+        },
+        {
+          "width": 1920,
+          "height": 1080,
+          "theme": "light",
+          "overflowX": false,
+          "overflowY": false
+        },
+        {
+          "width": 2048,
+          "height": 1320,
+          "theme": "light",
+          "overflowX": false,
+          "overflowY": false
+        }
+      ],
+      "captured_themes": [
+        "light",
+        "dark"
+      ],
+      "visual_review": "passed",
+      "correction_rounds": 2
     }
   ]
 }

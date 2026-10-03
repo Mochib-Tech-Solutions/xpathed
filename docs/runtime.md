@@ -1,5 +1,7 @@
 # Local runtime
 
+Resolver is the core API. It needs a browser service and model access for live resolution. The bundled Web/ClientApi workspace is a manual test client; its PostgreSQL storage is independent of Resolver. Evaluation runners call Resolver directly.
+
 ClientApi automatically persists sanitized backend diagnostics and supports internal operator export/import, with no frontend history or capture-consent controls. See [backend diagnostics](diagnostics.md) for migration, retention, schema and access contracts; [ADR-0013](adr/0013-store-diagnostics-as-automatic-backend-logs.md) records the accepted scope.
 
 ## Services
@@ -57,6 +59,35 @@ All three APIs use controller classes with explicit routes and constructor injec
 The browser service exposes the client lifecycle routes without the `/api` prefix. Its read-only inspection is `GET /pages/{pageId}/inspection`. It also owns the stable session stream `/view/{sessionId}`.
 
 The resolver exposes `POST /pages/{pageId}/inspect`. It calls the browser inspection endpoint and returns the result with `inspectedBy: "resolver"`. The resolver also exposes `POST /pages/{pageId}/resolve`; Browser exposes the capture/selection operations in the [resolution contract](resolution.md). Both services provide their own `GET /health` liveness endpoint and can run without the client or database. Resolution uses the server-configured OpenRouter key. Resolution requests provider pricing for the reported model; successful rates are cached for five minutes per API base URL, model and provider. A cache miss has a two-second timeout, and lookup failures preserve the result and reported charge. See [cost estimates](resolution.md#cost-estimates).
+
+## Browser integration
+
+The browser service is the replaceable component behind Resolver's HTTP boundary. `src/Resolver/Program.cs` configures its named browser HTTP client with `BrowserUrl`; Resolver references `Common`, with no project dependency on `Browser`, Playwright or the test client. `src/Common` defines the serialized request and response records.
+
+The core request path is:
+
+```text
+Caller → Resolver POST /pages/{pageId}/resolve
+           → Browser POST /pages/{pageId}/capture
+           → Model selection
+           → Browser POST /pages/{pageId}/selections
+       ← Resolution result
+```
+
+To integrate another browser implementation:
+
+1. Implement the [capture and validation contract](resolution.md#capture-and-validation), including current-view eligibility, sanitized complete captures, opaque page/document/capture/frame identities, retained candidate-to-node identity, document-wide XPath uniqueness, readiness and highlights. Preserve error, invalidation and cancellation semantics. A URL change alone cannot adapt an arbitrary browser API.
+2. Give the caller page/document IDs issued by that same browser service. The bundled client and evaluation runners also use the session/page lifecycle routes described above; the test client's noVNC viewer additionally needs `/view/{sessionId}`. Resolver itself does not use the viewer.
+3. Point Resolver's `BrowserUrl` to the replacement. Point lifecycle callers at the same service. The bundled Compose configuration pins these URLs to `http://browser:8080`; replacing it requires a deployment configuration or Compose override, including the client's viewer proxy if retained.
+4. Verify the API contract and run the deterministic Resolver E2E cases before measuring live model behavior. Changes to browser capture or verification require fresh evaluation evidence.
+
+Playwright/Chromium is the only implemented and verified browser service. There is no ready-made adapter for an external runner's browser or raw HTML submission. A compatible adapter owns its live browser objects and preserves the contract; it does not require a new Resolver strategy or browser plugin registry.
+
+## Evaluation commands
+
+`pnpm evaluate` runs model selection, XPath construction/verification and Resolver E2E in separate isolated stacks and records one summary per category. It includes paid inference and requires `OPENROUTER_EVAL_API_KEY` plus the reviewed dataset collection. Use `evaluate:model:live`, `evaluate:xpath` and `evaluate:resolver:live` to run categories independently. XPath starts Browser and the fixture only; model selection starts Resolver and the evaluation runner only. Neither requires the test client or database.
+
+`evaluate:resolver` preserves the provider-free pipeline suite used in ordinary CI. The unit and integration commands for other apps are unchanged. See [evaluation](evaluation.md#run-and-replay) for filters, evidence and replay.
 
 ## Lifecycle
 
