@@ -24,7 +24,7 @@ The workflow:
 4. Reports every original outcome, gains, lost passes, latency, costs and exclusions. Browser and offline denominators remain separate.
 5. Verifies complete evidence and preserves the exact candidate image bundle and approval request.
 
-Acceptance requires **no lost baseline pass**, plus valid contracts, safety, complete results and verified artifact identity. Equal results can pass. Latency and cost are informational, including unknown charges and unavailable billing metadata. Actual provider failures remain operational failures. There is no separate pilot or mandatory fresh held-out stage. All cases are shared regression evidence; additions and better checks apply to both arms.
+Acceptance requires **no lost baseline pass**, plus valid contracts, safety, complete results and verified artifact identity. Equal results can pass. Latency and cost are informational, including unknown charges and unavailable billing metadata. Actual provider failures remain operational failures. There is no separate pilot or mandatory fresh held-out stage. Both arms use the same evaluation set; additions and better checks apply to both arms. A regression is a lost baseline pass in this comparison.
 
 The comparison does not redeploy the app. A failed run retains its evidence and leaves the existing approval unchanged. A new source tree, changed cases or changed baseline requires another complete comparison; old passing evidence cannot qualify a changed candidate.
 

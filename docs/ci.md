@@ -10,7 +10,7 @@ Every job checks out `github.sha`: the synthetic merge commit for a pull request
 
 The deterministic browser runner schedules individual cases across up to four workers inside one run. Each case gets a fresh managed session, Chromium process and display. The fixture provider routes by the propagated request trace, including fresh mutation resolutions. Trial files remain independent; manifest writes are serialized. The gate still requires every original case exactly once, with no retries, and independently replays the complete evidence.
 
-CI uses four browser workers. Local evaluation defaults to the available CPU count capped at four; `pnpm evaluate -- --concurrency 1` selects serial execution. Ordinary live and release comparison runners remain serial. The engineering comparison uses three isolated workers, one per system. Parallel-run latency includes resource contention and should not be compared as isolated resolver latency.
+CI uses four browser workers. Local evaluation defaults to the available CPU count capped at four; `pnpm evaluate:resolver -- --concurrency 1` selects serial execution. Ordinary live and release comparison runners remain serial. The engineering comparison uses three isolated workers, one per system. Parallel-run latency includes resource contention and should not be compared as isolated resolver latency.
 
 ## Local commit checks
 
@@ -46,7 +46,7 @@ feat(api)!: change the response contract
 
 Git supplies the proposed message to `commit-msg`, which checks the header using `scripts/commit-policy.mjs`. The same validator powers the separate **Conventional Commits / Conventional commits** workflow. It checks the PR title and every commit introduced by the PR, reruns on title edits, and checks commits pushed to `main`. Existing base history is excluded. Fixup/squash placeholders and Git's default merge/revert subjects must be reworded to the convention before publishing; a valid tip does not excuse an invalid earlier commit. Historical PR title edits do not rewrite merged commits.
 
-Local Git hooks can be bypassed or disabled. CI provides a second check, but merge enforcement requires both `check` and `Conventional commits` as required statuses under an eligible branch-protection/ruleset policy. The naming workflow supports PRs and pushes; add `merge_group` handling before requiring it on a merge queue. The current private-repository plan still rejects ruleset access (verified 2026-10-01); see [account controls](#account-controls-remain-separate) and issue #41. GitHub's default squash and merge subjects use the PR title; verify the final merge message before merging. No history rewrite or account-plan change is part of hook installation.
+Local Git hooks can be bypassed or disabled. CI provides a second check, but merge enforcement requires both `Check` and `Conventional commits` as required statuses under an eligible branch-protection/ruleset policy. The naming workflow supports PRs and pushes; add `merge_group` handling before requiring it on a merge queue. The current private-repository plan still rejects ruleset access (verified 2026-10-01); see [account controls](#account-controls-remain-separate) and issue #41. GitHub's default squash and merge subjects use the PR title; verify the final merge message before merging. No history rewrite or account-plan change is part of hook installation.
 
 ### Upstream guidance
 
@@ -56,9 +56,9 @@ Stack checks reuse [dotnet format verification](https://learn.microsoft.com/en-u
 
 ## Aggregate gate
 
-After its checks succeed, each selected job writes a receipt containing the actual checkout SHA, workflow run and attempt, job identity and workflow/package/SDK fingerprints. Each .NET matrix member has its own receipt. The final `check` job requires exactly the selected receipts and successful job results. Missing, unexpected, stale, skipped, cancelled or failed selected jobs fail the gate; unselected jobs must be skipped.
+After its checks succeed, each selected job writes a receipt containing the actual checkout SHA, workflow run and attempt, job identity and workflow/package/SDK fingerprints. Each .NET matrix member has its own receipt. The final `Check` job requires exactly the selected receipts and successful job results. Missing, unexpected, stale, skipped, cancelled or failed selected jobs fail the gate; unselected jobs must be skipped.
 
-The browser job runs `pnpm evaluate --mode deterministic --concurrency 4` with a fresh output directory and isolated Compose project. It builds only Browser, Resolver and the controlled evaluation fixture. It has no OpenRouter key, reads no local `.env`, and uses the fixture model endpoint with response reuse disabled. The shared case catalog includes current-view resolution, deterministic provider failures and saved-locator mutation coverage in one run. Persistence remains a separate PostgreSQL-only job.
+The browser job runs `pnpm evaluate:resolver --mode deterministic --concurrency 4` with a fresh output directory and isolated Compose project. It builds only Browser, Resolver and the controlled evaluation fixture. It has no OpenRouter key, reads no local `.env`, and uses the fixture model endpoint with response reuse disabled. The shared case catalog includes current-view resolution, deterministic provider failures and saved-locator mutation coverage in one run. Persistence remains a separate PostgreSQL-only job.
 
 Both the browser receipt and aggregate replay the saved browser evidence through the existing grader. They require the complete original `evaluation/cases/index.json` suite, one first attempt per case, matching source/configuration identities and a saved summary equal to replay. Partial, retried, live, missing or failing results cannot pass. These are deterministic engineering checks; they do not measure model quality or qualify a release.
 
@@ -74,7 +74,7 @@ Only these explicit paths are uploaded. Local datasets, environment files, user 
 
 Inspect the failing job and `gate.json` before rerunning. **Rerun the entire workflow**, not only failed jobs: every selected receipt must belong to the same attempt. GitHub's **Re-run all jobs** or `gh run rerun RUN_ID` creates a fresh attempt without mixing earlier results. A new commit gets its own PR check; after merge, verify the separate push run against the merged SHA.
 
-Local gate tests run through `pnpm test:tooling`; they exercise receipt/verification boundaries, including negative status, identity, coverage and artifact cases. Use `pnpm evaluate` for the real-browser suite. Ordinary CI remains provider-free.
+Local gate tests run through `pnpm test:tooling`; they exercise receipt/verification boundaries, including negative status, identity, coverage and artifact cases. Use `pnpm evaluate:resolver` for the real-browser suite. Ordinary CI remains provider-free.
 
 ## Release PR checks
 
@@ -90,6 +90,6 @@ These workflow definitions require operational validation after publication. The
 
 A green workflow does not establish required checks, protected merges or an independent review. On 2026-10-01, GitHub reported this private organization's plan as Free, `main` as unprotected, and protection/ruleset endpoints as plan-gated. Organization-owned private repositories require an eligible organization plan for these controls; a personal Pro upgrade does not address that requirement. No plan purchase or visibility change is part of this implementation.
 
-Copilot billing configuration also does not prove review execution. No actual Copilot PR review was verified during the audit. [Issue #41](https://github.com/Mochib-Tech-Solutions/xpathed/issues/41) tracks the remaining protection and review evidence, split from completed implementation issue #10 at the maintainer's request. Once account access permits it, configure the required `check` result and review policy, exercise a deliberately failing PR, verify that merge is blocked, and record an actual Copilot review before marking those criteria complete. Do not infer enforcement from workflow YAML or enable paid review without authorization.
+Copilot billing configuration also does not prove review execution. No actual Copilot PR review was verified during the audit. [Issue #41](https://github.com/Mochib-Tech-Solutions/xpathed/issues/41) tracks the remaining protection and review evidence, split from completed implementation issue #10 at the maintainer's request. Once account access permits it, configure the required `Check` result and review policy, exercise a deliberately failing PR, verify that merge is blocked, and record an actual Copilot review before marking those criteria complete. Do not infer enforcement from workflow YAML or enable paid review without authorization.
 
 References: [protected-branch availability](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/about-protected-branches), [rulesets](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/creating-rulesets-for-a-repository), [Copilot review](https://docs.github.com/en/copilot/concepts/agents/code-review), and [workflow event revisions](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows).

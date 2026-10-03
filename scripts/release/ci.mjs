@@ -40,7 +40,7 @@ export async function requireCI(repository, sha, waitMs = 0, api = gh) {
   do {
     const checks = api(`repos/${repository}/commits/${sha}/check-runs?per_page=100`).check_runs;
     const check = checks
-      .filter((check) => check.name === "check" && check.app?.slug === "github-actions")
+      .filter((check) => check.name === "Check" && check.app?.slug === "github-actions")
       .sort((a, b) => b.id - a.id)[0];
     if (check?.conclusion === "success") return;
     if (check?.status === "completed" || Date.now() >= deadline)

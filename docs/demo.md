@@ -1,6 +1,6 @@
 # Demo guide
 
-Present one inspectable result, then explain its implementation, evaluation and integration boundary.
+Present the Resolver API through its manual test client, then explain its implementation, evaluation and browser integration boundary.
 
 ## Prepare
 
@@ -30,13 +30,13 @@ Use the diagrams in [How it works](how-it-works.md):
 
 Explain the five local Docker services, model settings and single-table schema. Distinguish candidate selection, locator correctness and observed readiness.
 
-A test platform can call the resolve API for an xpathed-managed page. An external browser needs an adapter or ownership change; its runner would own execution and postconditions.
+A test platform can call Resolver directly for a page owned by the configured browser service. The browser implementation is replaceable through the [HTTP contract](runtime.md#browser-integration); an external browser needs a compatible adapter, and its runner owns execution and postconditions. The chat workspace is one test client of the core API.
 
 ## 3. Explain quality · 10 minutes
 
 Walk through a saved case: instruction, independent expected target, captured evidence, response and grade. The recorded `release3-listbox-1` failure found the correct option but changed `click` to `select`; explain why it fails despite a valid XPath.
 
-Show how attempt/trace IDs connect configuration, error stage and available evidence. Keep browser and offline scores separate, with dates and denominators.
+Show how attempt/trace IDs connect configuration, error stage and available evidence. Describe the three evaluation categories: model selection from reviewed PhraseNode inputs, XPath construction and verification from controlled selections, and Resolver E2E with a real model and browser. Keep scores separate, with dates and denominators; use regression to describe a lost pass in a comparison.
 
 Describe the current release gate: exact candidate/baseline images, the complete reviewed collection, no lost baseline pass, explicit activation and nightly monitoring.
 

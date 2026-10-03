@@ -2,6 +2,8 @@
 
 xpathed resolves one English action across targets in the current view. Its design keeps language interpretation measurable, locator verification deterministic and failures available for investigation.
 
+Resolver is the core API. Browser supplies capture and verification through a replaceable HTTP service contract; Playwright/Chromium is the verified implementation. The chat workspace is a manual test client. [Browser integration](runtime.md#browser-integration) describes the replacement contract and current limits.
+
 ## From Basic to Improved
 
 The progression below explains what changed and why. **Basic** is the archived earlier current-view setup used in the comparison; it already selected candidate IDs and verified XPath in the browser.
@@ -45,7 +47,7 @@ Semantic anchors and explicit test attributes are preferred over ordinary IDs an
 
 Controlled browser cases define expected nodes independently of model input. They grade capture coverage, exact target sets, action, XPath identity, readiness, privacy and passive state. Deterministic provider responses check pipeline behavior; live runs measure model selections.
 
-Reviewed imported data adds language and page variety. Offline target selection cannot establish live readiness or viewport correctness, so its denominator stays separate. Repeatedly used cases are regression evidence, not unseen-site generalization.
+The evaluation set separately measures model selection, XPath construction and verification, and Resolver E2E. The XPath category supplies controlled selections directly to Browser and checks the resulting locators against independent DOM labels. Reviewed imported data adds language and page variety. Offline target selection cannot establish live readiness or viewport correctness, so its denominator stays separate. Repeatedly used cases measure this set; they do not establish unseen-site generalization. Comparisons report regressions as lost passes.
 
 ### Compare Basic, Improved and Stagehand
 
@@ -78,6 +80,7 @@ Update the selected implementation in place. Retired contracts and experiment se
 | PostgreSQL integration tests | Real schema, migrations, persistence, isolation and retention                                 | Database behavior needs the actual database                                  |
 | Resolution browser tests     | Real Chromium capture, XPath identity, frames, stale pages, readiness and passive state       | A mock DOM cannot establish browser behavior                                 |
 | Deterministic evaluation     | Shared cases through capture, scripted model output and independent grading                   | Detects pipeline regressions without model variation or cost                 |
+| Live Resolver E2E evaluation | Complete resolution API requests with real model selection and browser verification           | Measures action, targets, XPath and readiness on the browser evaluation set  |
 | Live engineering comparison  | Basic, Improved and Stagehand accuracy, category gains/losses, latency and cost               | Measures actual model decisions under matched conditions                     |
 | Offline dataset evaluation   | Selection against imported labelled candidates                                                | Adds data variety but cannot prove browser readiness or viewport correctness |
 | Replay                       | Regrading saved evidence without another inference call                                       | Checks grading and reporting while preserving original attempts              |

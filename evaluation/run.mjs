@@ -331,6 +331,10 @@ async function observe(spec, trial, session, fixture, browser, timeoutMs) {
 }
 
 async function resolveTrial(spec, trial, session, page, options, services, channelId = trial.id) {
+  if (options.track === "xpath") {
+    const { resolveXPathTrial } = await import("./xpath.mjs");
+    return resolveXPathTrial(spec, trial, session, page, options, services, channelId);
+  }
   const started = performance.now();
   try {
     const envelope = await request(
@@ -526,6 +530,9 @@ export async function fingerprints(
     "docker/compose.qualification.yaml",
     "docker/compose.sh",
     "scripts/evaluate.sh",
+    "scripts/evaluate-model.mjs",
+    "scripts/evaluate-all.mjs",
+    "scripts/release/offline.mjs",
     "tests/resolution/ready.mjs",
   ];
   async function collect(path) {
@@ -699,8 +706,11 @@ export async function runTrials(plan, executeTrial) {
   return trials;
 }
 
-export async function main(args = process.argv.slice(2)) {
+export async function main(args = process.argv.slice(2), track = "resolver") {
   const options = parseOptions(args);
+  options.track = track;
+  if (track === "xpath" && options.mode !== "deterministic")
+    throw new Error("XPath evaluation uses controlled selections and no model calls");
   if (!args.includes("--concurrency") && options.mode === "deterministic")
     options.concurrency = Math.min(4, availableParallelism());
   if (options.prune) {
@@ -721,6 +731,11 @@ export async function main(args = process.argv.slice(2)) {
       "External reconstructed suites use deterministic browser validation; use the budgeted dataset runner for inference",
     );
   let cases = validateCases(suite);
+  let exclusions = [];
+  if (track === "xpath") {
+    const { selectXPathCases } = await import("./xpath.mjs");
+    ({ cases, exclusions } = selectXPathCases(cases));
+  }
   if (options.caseId) cases = cases.filter((c) => c.id === options.caseId);
   if (options.mode === "live")
     cases = cases.filter((c) => !c.provider?.fault && !c.deterministicOnly);
@@ -732,6 +747,8 @@ export async function main(args = process.argv.slice(2)) {
     id: randomUUID(),
     createdAt: new Date().toISOString(),
     mode: options.mode,
+    track,
+    exclusions,
     configurations: {},
     cases: cases.map((item) =>
       item.fixture?.kind === "derived-static-dom" && item.fixture.sha256
@@ -764,10 +781,11 @@ export async function main(args = process.argv.slice(2)) {
     await execute(spec, trial, options, services);
     const grade = gradeTrial(spec, trial);
     await saveJson(join(options.output, "trials", `${trial.id}.json`), trial);
-    await saveJson(
-      join(options.output, "imports", `${trial.id}.json`),
-      toArtifact(manifest, trial, grade),
-    );
+    if (track !== "xpath")
+      await saveJson(
+        join(options.output, "imports", `${trial.id}.json`),
+        toArtifact(manifest, trial, grade),
+      );
     // Only manifest writes share a path; trial and import files have unique identities.
     configurations = configurations.then(() =>
       retainConfigurations(options.output, manifest, trial),
@@ -783,14 +801,16 @@ export async function main(args = process.argv.slice(2)) {
   const first = summary.firstAttempt;
   const readable =
     [
-      `Mode: ${options.mode}; qualification: ${summary.qualification}`,
+      `Evaluation: ${track === "xpath" ? "XPath construction and verification" : "Resolver E2E"}; mode: ${options.mode}; qualification: ${summary.qualification}`,
       `Trials: ${summary.completedTrials}/${summary.plannedTrials}; checks passed: ${first.passed}; failed: ${first.failed}`,
       `Intended targets: ${first.metrics.targetsCorrect}/${first.metrics.targetsExpected}; wrong targets: ${first.metrics.wrongTargets}`,
       `Saved XPath mutations: ${first.savedLocator.passed}/${first.savedLocator.trials}; fresh resolutions: ${first.freshResolution?.passed ?? 0}/${first.freshResolution?.trials ?? 0}`,
       `Resolution latency p50/p95: ${first.latencyMs.p50 ?? "unavailable"}/${first.latencyMs.p95 ?? "unavailable"} ms`,
       `Reported cost: ${first.cost.reportedUsd.total ?? "unavailable"} USD; estimated: ${first.cost.estimatedUsd.total ?? "unavailable"} USD (fresh mutation calls reported separately)`,
       ...summary.failures.map((f) => `${f.caseId}: ${f.category} — ${f.detail}`),
-      "Deterministic provider scores do not measure model quality. See summary.json for coverage and unavailable metrics.",
+      track === "xpath"
+        ? "Controlled selections isolate XPath verification; no model call was made. See summary.json for coverage."
+        : "Deterministic provider scores do not measure model quality. See summary.json for coverage and unavailable metrics.",
     ].join("\n") + "\n";
   await writeFile(join(options.output, "summary.txt"), readable, { flag: "wx" });
   console.log(readable);

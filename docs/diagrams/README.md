@@ -4,6 +4,7 @@ The SVGs are embedded in the project documentation. Each diagram also has an HTM
 
 | Diagram                | Image                         | Interactive viewer              | Source                          |
 | ---------------------- | ----------------------------- | ------------------------------- | ------------------------------- |
+| Resolver internals | [SVG](resolver-internals.svg) | [HTML](resolver-internals.html) | [JSON](resolver-internals.architecture.json) |
 | Service ownership      | [SVG](system-design.svg)      | [HTML](system-design.html)      | [JSON](system-design.json)      |
 | One resolution request | [SVG](resolution-flow.svg)    | [HTML](resolution-flow.html)    | [JSON](resolution-flow.json)    |
 | Evaluation and release | [SVG](evaluation-release.svg) | [HTML](evaluation-release.html) | [JSON](evaluation-release.json) |

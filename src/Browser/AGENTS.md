@@ -1,5 +1,7 @@
 # Browser guidance
 
+This service is the bundled Playwright/Chromium implementation of the Resolver's browser API. Keep implementation details behind the [browser integration contract](../../docs/runtime.md#browser-integration), with serializable Common records and opaque identities at the boundary.
+
 For capture, XPath or readiness changes, read [resolution](../../docs/resolution.md) and use `$xpathed-resolution-checks`. For frame traversal, also read [ADR-0012](../../docs/adr/0012-keep-frame-context-separate-from-xpath.md).
 
 `Sessions/BrowserSessions.cs` serializes operations through the session gate and handles cancellation of live commands. Keep new page operations on that path; a cancelled in-flight browser command cannot safely leave its page available for a later operation. `Viewing/` owns display relay behavior.

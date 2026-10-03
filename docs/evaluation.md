@@ -2,9 +2,11 @@
 
 Evaluation answers whether the resolver selected the intended targets, interpreted the action correctly, and returned verified XPath and state information. Independent labels define the expected answer; a unique XPath alone cannot establish intended-target correctness. Resolution inspects and highlights targets without executing the requested interaction.
 
+The **evaluation set** has three categories: **model selection**, **XPath construction and verification**, and **Resolver E2E**. Model selection uses reviewed saved inputs and live inference. XPath evaluation supplies controlled selections directly to Browser. Resolver E2E evaluates the complete request with a real browser and model. The chat workspace is a test client outside this boundary. A regression is a lost pass between compared runs. Repeated use of these cases does not establish unseen-data generalization. [ADR-0025](adr/0025-evaluate-selection-xpath-and-resolver-separately.md) records these boundaries.
+
 [ADR-0023](adr/0023-simplify-release-evaluation.md) defines the accepted simplification. This runbook describes the new source layout and workflow contract; it does not establish that hosted workflows, private dataset publication, or live qualification have been exercised. The existing approved release keeps its original evidence until replaced.
 
-## One collection, grouped by behavior
+## One evaluation set, grouped by behavior
 
 ```text
 evaluation/
@@ -14,6 +16,8 @@ evaluation/
   research/       # Engineering comparison and archived research continuation
   accounting/     # Shared charge records
   run.mjs         # Browser trials and replay
+  model.mjs       # Live selection from reviewed saved inputs
+  xpath.mjs       # Browser XPath verification from controlled selections
   compare.mjs     # Candidate/baseline and monitoring orchestration
   grader.mjs      # Independent grading
   policy.json     # One current release acceptance policy
@@ -40,7 +44,7 @@ A historical configuration may be an explicitly selected research comparator. Re
 
 ### Browser cases
 
-A live case exercises the complete Resolver request: Browser captures candidates, the real model selects targets, Browser constructs and verifies XPath expressions and observes readiness, and the independent oracle grades the final response. There is no separate paid XPath-algorithm phase.
+A live browser case is a Resolver E2E evaluation: Browser captures candidates, the real model selects targets, Browser constructs and verifies XPath expressions and observes readiness, and the independent oracle grades the final API response. There is no separate paid XPath-algorithm phase.
 
 Grading distinguishes capture coverage, intended-target identity, unique same-node XPath matching, action interpretation, exact plural target sets, scoped absence, readiness and completeness. Missing, extra, duplicate and incorrect targets remain distinct. Privacy, oracle leakage and unintended page changes are hard failures. Deterministic mutation checks separately assess old-locator reuse and fresh resolution after a page change.
 
@@ -48,24 +52,36 @@ Grading distinguishes capture coverage, intended-target identity, unique same-no
 
 PhraseNode and adapted Mind2Web retain original source IDs, splits, family relationships, checksums, labels, transformation history and review evidence. Import support does not imply that every imported record is approved for live submission. Mind2Web contributes only after an eligible adaptation is independently reviewed; the presently prepared release collection contains reviewed PhraseNode inputs.
 
-Offline cases use the Resolver's offline selection path. They can establish target-selection correctness, but historical data cannot establish current viewport membership, live XPath identity, pointer interception, readiness or plural completeness. One report includes both tracks with separate denominators and limitations. Original dataset splits describe provenance; repeated release runs are regression evidence, not unseen-data generalization.
+Offline cases use the Resolver's offline selection path and shared prompt/schema. Live runs make real model calls against these saved inputs and grade the selected target against its independent label. Historical data cannot establish current viewport membership, live XPath identity, pointer interception, readiness or plural completeness. One report includes both tracks with separate denominators and limitations. Original dataset splits describe provenance; they do not make repeatedly used evaluation cases an untouched holdout.
+
+### XPath construction and verification
+
+`evaluate:xpath` reuses the browser case definitions and independent DOM labels. It captures a real page, materializes the fixture's controlled selected IDs, and calls Browser's `/pages/{pageId}/selections` endpoint directly. It starts Browser and the fixture only. No Resolver or model call occurs. The raw browser response is retained alongside a grader adapter; the adapter is not evidence that the Resolver ran.
+
+The category checks document-wide XPath uniqueness, intended-node identity, frame identity, state/readiness and passive behavior. Saved-locator mutations also check old XPath reuse and fresh construction after a page change. Cases without a found target and provider/Resolver-error cases are excluded with explicit reasons in the manifest. They remain covered by Resolver evaluation and existing engineering checks. Original case IDs and source split metadata stay intact.
 
 ## Run and replay
 
 From the repository root:
 
 ```sh
-pnpm evaluate
-pnpm evaluate -- --case CASE_ID --output .artifacts/evaluation/my-check
-pnpm evaluate:live -- --case CASE_ID --output .artifacts/evaluation/my-live-check
+pnpm evaluate -- --output .artifacts/evaluation/my-complete-run
+pnpm evaluate:model:live -- --case PHRASENODE_CASE_ID --output .artifacts/evaluation/my-model-check
+pnpm evaluate:xpath -- --case basic-save-v4 --output .artifacts/evaluation/my-xpath-check
+pnpm evaluate:resolver:live -- --case basic-save-v4 --output .artifacts/evaluation/my-e2e-check
+pnpm evaluate:resolver -- --case basic-save-v4 --output .artifacts/evaluation/my-controlled-check
 pnpm evaluate:replay RUN_DIRECTORY
 ```
 
-Deterministic mode is the default. Individual cases run concurrently in fresh browser sessions, with up to four workers based on available CPUs. Use `--concurrency 1` for serial timing or a value from 1 to 4 to limit resource use. Ordinary live checks and release comparisons remain serial. Research continuation has its own bounded parallel runner below. The manifest records concurrency; parallel-run timings include contention.
+`pnpm evaluate` runs all three categories serially, including paid model calls. It preflights the reviewed collection and dedicated key, keeps each category's artifacts under `model/`, `xpath/` and `resolver/`, and writes a root summary with separate denominators and costs. Ordinary failed cases remain visible while later categories run; interruption or an integrity failure stops continuation. Missing category evidence cannot pass. This command does not approve a release. Use `pnpm evaluate -- --help` for its scope.
+
+Individual category commands accept `--case` and `--output`. `evaluate:model:live` uses the digest-verified reviewed collection, one original attempt per case, the Resolver's existing offline worker, and the provider accounting/identity checks. It needs only Resolver and the evaluation runner. Missing reviewed inputs fail before Docker starts; obtain them with `pnpm datasets:collection fetch`. Provider failures retain their evidence; provider identity/cache or worker-integrity failures stop further attempts.
+
+`evaluate:resolver` is the provider-free complete-pipeline check used in CI; `evaluate:resolver:live` uses the real model. Controlled browser cases run concurrently in fresh sessions, with up to four workers based on available CPUs. Use `--concurrency 1` for serial timing. Live categories remain serial. The manifest records concurrency; parallel timings include contention. The old `evaluate:live` name is replaced by `evaluate:resolver:live`, and the old deterministic `evaluate` command is now `evaluate:resolver`.
 
 A controlled provider response makes fixtures, contracts and grader checks repeatable; those results are not model-quality scores. Live mode calls the configured route. Use `OPENROUTER_EVAL_API_KEY` in the environment or ignored evaluation environment file. Keep the application's key separate; deterministic CI receives no provider credentials.
 
-The wrapper runs Browser, Resolver and the controlled fixture in an isolated Compose project, then stops its containers. It does not require Web, ClientApi or PostgreSQL. `XPATHED_EVALUATION_PROJECT` selects a distinct `xpathed-evaluation-...` project for concurrent work. Output directories must be new and writable through Docker's mount; a VM-backed engine requires a shared host path. Preserve every original attempt in its own run directory, including interrupted and failed attempts.
+The wrapper starts only the services needed by its category in an isolated Compose project, then stops its containers. It does not require Web, ClientApi or PostgreSQL. `XPATHED_EVALUATION_PROJECT` selects a distinct `xpathed-evaluation-...` project for concurrent work. Output directories must be new and writable through Docker's mount; a VM-backed engine requires a shared host path. Preserve every original attempt in its own run directory, including interrupted and failed attempts.
 
 Run the complete paired release comparison through `pnpm release:evaluate`; see [release workflow](releases.md). This launcher verifies the saved images and starts the offline Resolver worker. The underlying `pnpm evaluate:qualify` runner cannot start a complete collection by itself; filtered browser-only deterministic checks remain available. `pnpm evaluate:qualify:replay RUN_DIRECTORY` regrades saved comparison evidence without services or paid calls. A filtered check cannot replace the complete release comparison.
 
@@ -82,7 +98,7 @@ The single current policy is `evaluation/policy.json`:
 
 There is one complete comparison, with no required pilot or fresh held-out phase. The collection grows as regressions and useful new cases are reviewed. Retain independent labels and all outcomes; do not retry away failures or claim generalization from repeatedly inspected cases.
 
-Resolver HTTP timing includes capture, inference and live verification. Fixture setup and independent grading are outside the timer; these results do not measure the complete browser-to-chat experience. One-attempt results are observations of this run, not statistical guarantees.
+Resolver E2E timing is the Resolver HTTP duration, including capture, inference and live verification. Fixture setup and independent grading are outside the timer. Test-client rendering is outside this system boundary. One-attempt results are observations of this run, not statistical guarantees.
 
 ## Private dataset collection
 

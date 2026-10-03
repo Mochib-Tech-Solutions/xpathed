@@ -3,6 +3,8 @@ set -eu
 cd "$(dirname "$0")/.."
 
 mode=deterministic
+model=false
+xpath=false
 qualification=false
 comparison=false
 resume=false
@@ -22,6 +24,8 @@ while [ "$#" -gt 0 ]; do
     --) shift; continue ;;
     --resume) resume=true; shift; continue ;;
     --comparison) comparison=true; shift; continue ;;
+    --model) model=true; shift; continue ;;
+    --xpath) xpath=true; shift; continue ;;
     --basic-bundle|--basic-sha256)
       if [ "$#" -lt 2 ]; then echo "Missing value for $1" >&2; exit 2; fi
       case "$1" in --basic-bundle) basic_bundle=$2 ;; --basic-sha256) basic_digest=$2 ;; esac
@@ -45,6 +49,17 @@ while [ "$#" -gt 0 ]; do
     *) echo "Unknown evaluation option: $1" >&2; exit 2 ;;
   esac
 done
+if [ "$xpath" = true ]; then
+  if [ "$mode" != deterministic ] || [ "$model" = true ] || [ "$qualification" = true ] || [ "$comparison" = true ]; then
+    echo "XPath evaluation uses controlled selections without model, qualification or comparison modes" >&2; exit 2
+  fi
+fi
+if [ "$model" = true ]; then
+  if [ "$mode" != live ] || [ "$qualification" = true ] || [ "$comparison" = true ] || [ -n "$suite" ] || [ "$repetitions" != 1 ] || [ -n "$concurrency" ]; then
+    echo "Model selection requires live mode, one attempt and the reviewed collection; no comparison, qualification or concurrency options" >&2; exit 2
+  fi
+  node --input-type=module -e 'import { selectModelCases } from "./evaluation/model.mjs"; selectModelCases(process.argv[1] || undefined);' "$case_id"
+fi
 if [ "$comparison" = true ]; then
   if [ "$qualification" = true ] || [ -n "$suite" ] || [ -n "$concurrency" ] || [ "$repetitions" != 1 ]; then echo "Comparison requires one attempt, no qualification or custom suite/concurrency" >&2; exit 2; fi
   if [ -z "$basic_bundle" ] || [ -z "$basic_digest" ]; then echo "Comparison requires --basic-bundle DIRECTORY --basic-sha256 DIGEST" >&2; exit 2; fi
@@ -92,6 +107,8 @@ else
 fi
 
 evaluation_default_project=xpathed-evaluation
+if [ "$model" = true ]; then evaluation_default_project=xpathed-evaluation-model; fi
+if [ "$xpath" = true ]; then evaluation_default_project=xpathed-evaluation-xpath; fi
 export COMPOSE_PROJECT_NAME=${XPATHED_EVALUATION_PROJECT:-$evaluation_default_project}
 case "$COMPOSE_PROJECT_NAME" in ''|*[!a-z0-9_-]*) echo "Invalid evaluation project name" >&2; exit 2 ;; esac
 case "$COMPOSE_PROJECT_NAME" in
@@ -171,6 +188,8 @@ compose() {
     docker/compose.sh --env-file "$evaluation_env" -f docker/compose.evaluation.yaml -f docker/compose.comparison.yaml "$@"
   elif [ "$qualification" = true ]; then
     docker/compose.sh --env-file "$evaluation_env" -f docker/compose.evaluation.yaml -f docker/compose.qualification.yaml "$@"
+  elif [ "$model" = true ]; then
+    docker/compose.sh --env-file "$evaluation_env" -f docker/compose.evaluation.yaml -f docker/compose.qualification.yaml "$@"
   elif [ "$mode" = live ]; then
     docker/compose.sh --env-file "$evaluation_env" -f docker/compose.evaluation.yaml -f docker/compose.evaluation-live.yaml "$@"
   else
@@ -196,7 +215,7 @@ if [ "$resume" = true ]; then
 else
   mkdir "$XPATHED_EVALUATION_OUTPUT"
 fi
-if [ "$qualification" = true ]; then
+if [ "$qualification" = true ] || [ "$model" = true ]; then
   mkdir -p .artifacts/datasets
 fi
 compose down
@@ -241,11 +260,19 @@ else
     compose up --no-build --pull never --wait browser resolver browser-basic resolver-basic stagehand evaluation-fixture
   elif [ "$comparison" = true ]; then
     compose up --build --wait browser resolver browser-basic resolver-basic stagehand evaluation-fixture
+  elif [ "$model" = true ]; then
+    compose up --build --no-deps --wait resolver evaluation-fixture
+  elif [ "$xpath" = true ]; then
+    compose up --build --no-deps --wait browser evaluation-fixture
   else
     compose up --build --wait browser resolver evaluation-fixture
   fi
 fi
-if [ -n "${XPATHED_RELEASE_STATE:-}" ]; then
+if [ "$model" = true ]; then
+  compose exec -T evaluation-fixture node /checks/ready.mjs http://resolver:8080/health http://evaluation-fixture:8090/health
+elif [ "$xpath" = true ]; then
+  compose exec -T evaluation-fixture node /checks/ready.mjs http://browser:8080/health http://evaluation-fixture:8090/health
+elif [ -n "${XPATHED_RELEASE_STATE:-}" ]; then
   compose exec -T evaluation-fixture node /checks/ready.mjs http://browser:8080/health "http://$XPATHED_RELEASE_SERVICE:8080/health" http://evaluation-fixture:8090/health
 else
   compose exec -T evaluation-fixture node /checks/ready.mjs http://browser:8080/health http://resolver:8080/health http://evaluation-fixture:8090/health
@@ -278,7 +305,11 @@ if [ "$comparison" = true ]; then
   exit $?
 fi
 echo "Evaluation artifacts: $XPATHED_EVALUATION_OUTPUT"
-if [ "$qualification" = true ]; then
+if [ "$model" = true ]; then
+  node scripts/evaluate-model.mjs "$evaluation_env" "$@"
+elif [ "$xpath" = true ]; then
+  compose exec -T evaluation-fixture node /evaluation/xpath.mjs "$@"
+elif [ "$qualification" = true ]; then
   browser_binary_hash=$(compose exec -T browser sh -c 'sha256sum /ms-playwright/chromium-*/chrome-linux*/chrome' | awk '{print $1}')
   if [ -n "${XPATHED_RELEASE_STATE:-}" ]; then
     compose exec -T -e "XPATHED_BROWSER_BINARY_SHA256=$browser_binary_hash" -e "XPATHED_RELEASE_ARTIFACT_JSON=$XPATHED_RELEASE_ARTIFACT_JSON" -e "XPATHED_RELEASE_COMPARISON_JSON=${XPATHED_RELEASE_COMPARISON_JSON:-}" evaluation-fixture node /evaluation/compare.mjs "$@"
