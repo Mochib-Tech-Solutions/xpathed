@@ -80,7 +80,7 @@ Update the selected implementation in place. Retired contracts and experiment se
 | Resolution browser tests     | Real Chromium capture, XPath identity, frames, stale pages, readiness and passive state       | A mock DOM cannot establish browser behavior                                 |
 | Deterministic evaluation     | Shared cases through capture, scripted model output and independent grading                   | Detects pipeline regressions without model variation or cost                 |
 | Live Resolver E2E evaluation | Complete resolution API requests with real model selection and browser verification           | Measures action, targets, XPath and readiness on the browser evaluation set  |
-| Live engineering comparison  | Basic, Improved and Stagehand accuracy, category gains/losses, latency and cost               | Measures actual model decisions under matched conditions                     |
+| Live resolver comparison  | Basic, Improved and Stagehand accuracy, category gains/losses, latency and cost               | Measures actual model decisions under matched conditions                     |
 | Offline dataset evaluation   | Selection against imported labelled candidates                                                | Adds data variety but cannot prove browser readiness or viewport correctness |
 | Replay                       | Regrading saved evidence without another inference call                                       | Checks grading and reporting while preserving original attempts              |
 | Release evaluation           | Candidate versus approved images under the complete current policy                            | Protects existing passes before a release is approved                        |

@@ -10,7 +10,7 @@ Every job checks out `github.sha`: the synthetic merge commit for a pull request
 
 The deterministic browser runner schedules individual cases across up to four workers inside one run. Each case gets a fresh managed session, Chromium process and display. The fixture provider routes by the propagated request trace, including fresh mutation resolutions. Trial files remain independent; manifest writes are serialized. The gate still requires every original case exactly once, with no retries, and independently replays the complete evidence.
 
-CI uses four browser workers. Local evaluation defaults to the available CPU count capped at four; `pnpm evaluate:resolver -- --concurrency 1` selects serial execution. Ordinary live and release comparison runners remain serial. The engineering comparison uses three isolated workers, one per system. Parallel-run latency includes resource contention and should not be compared as isolated resolver latency.
+CI uses four browser workers. Local evaluation defaults to the available CPU count capped at four; `pnpm evaluate:resolver -- --concurrency 1` selects serial execution. Ordinary live and release comparison runners remain serial. The resolver comparison uses three isolated workers, one per system. Parallel-run latency includes resource contention and should not be compared as isolated resolver latency.
 
 ## Local commit checks
 

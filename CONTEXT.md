@@ -132,6 +132,9 @@ One declared execution of an evaluation case. Repetitions and later diagnostic r
 **Target oracle**:
 An independently established mapping from an expected action to its intended element. It is separate from the resolver's selected candidate and generated XPath.
 
+**Resolver comparison**:
+An assessment of resolver systems on the same independently labelled cases, with shared grading boundaries and separately recorded outcomes for each system.
+
 **Comparison pair**:
 Two resolution attempts on the same evaluation case with equivalent inputs and independently reset page state where applicable. A release comparison pairs the candidate with the approved baseline and retains both outcomes, including failures.
 

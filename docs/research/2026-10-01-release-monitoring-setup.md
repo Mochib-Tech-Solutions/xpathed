@@ -57,10 +57,10 @@ Each row contains one live attempt per development case. These five-case pilots 
 
 | Profile and configuration                  | Environment                  | Correct | Correct within 2 s | p50 / p95, ms | Reported USD |
 | ------------------------------------------ | ---------------------------- | ------: | -----------------: | ------------: | -----------: |
-| DeepSeek/Wafer, prompt 8                   | Hosted exact-image candidate |     3/5 |                3/5 |   1093 / 1295 |  0.000398256 |
-| DeepSeek/Wafer, experimental prompt 9      | Local development            |     3/5 |                3/5 |    945 / 1192 |  0.000431408 |
-| Gemini/Google AI Studio, existing prompt 8 | Local development            |     5/5 |                3/5 |   1838 / 2927 |  0.006375750 |
-| Qwen/Alibaba, existing prompt 8            | Local development            |     3/5 |                1/5 |   2743 / 4146 |  0.000698488 |
+| DeepSeek/Wafer, baseline prompt                   | Hosted exact-image candidate |     3/5 |                3/5 |   1093 / 1295 |  0.000398256 |
+| DeepSeek/Wafer, experimental prompt      | Local development            |     3/5 |                3/5 |    945 / 1192 |  0.000431408 |
+| Gemini/Google AI Studio, baseline prompt | Local development            |     5/5 |                3/5 |   1838 / 2927 |  0.006375750 |
+| Qwen/Alibaba, baseline prompt            | Local development            |     3/5 |                1/5 |   2743 / 4146 |  0.000698488 |
 
 The [hosted DeepSeek pilot](https://github.com/Mochib-Tech-Solutions/xpathed/actions/runs/36932485483) returned found targets for a sequential command and invalid per-target actions for a mixed command. The stricter experimental prompt placed whole-command rejection before enumeration, but retained both failures; it was reverted without merging. Its private diff and original request/response evidence remain saved. Gemini classified all five commands correctly, but absence and mixed-command responses exceeded two seconds. Qwen repeated the two semantic failures and exceeded the latency gate. Total reported cost across these twenty calls was **$0.007903902**.
 
@@ -81,9 +81,9 @@ A candidate must first pass the unchanged development gate, then full exact-imag
 
 ## First approved release — 2026-10-02
 
-The maintainer accepted temporary policy 7: overall correctness must match or exceed the baseline, every individual gain/lost pass remains visible, and latency is descriptive. Safety, provider accounting, complete evidence and exact artifact identity remain mandatory. Preserving each individual baseline pass is intended for a later policy version. Historical qualification outcomes retain their original policies.
+The maintainer accepted a temporary aggregate-correctness policy: overall correctness must match or exceed the baseline, every individual gain/lost pass remains visible, and latency is descriptive. Safety, provider accounting, complete evidence and exact artifact identity remain mandatory. Preserving each individual baseline pass is intended for a later policy version. Historical qualification outcomes retain their original policies.
 
-[Qualification run 37007941576](https://github.com/Mochib-Tech-Solutions/xpathed/actions/runs/37007941576) passed on source `86d8937d97e312be83fca5c626111dacd58225c4`, following successful exact-revision [main CI](https://github.com/Mochib-Tech-Solutions/xpathed/actions/runs/37006721334). The candidate uses DeepSeek V4.1 Flash through Wafer, reasoning disabled, maximum output 4,096 tokens, contract 4, prompt 10, capture 5 and XPath strategy 4. Both candidate and pinned bootstrap images were verified before comparison; every original attempt is retained.
+[Qualification run 37007941576](https://github.com/Mochib-Tech-Solutions/xpathed/actions/runs/37007941576) passed on source `86d8937d97e312be83fca5c626111dacd58225c4`, following successful exact-revision [main CI](https://github.com/Mochib-Tech-Solutions/xpathed/actions/runs/37006721334). The candidate uses DeepSeek V4.1 Flash through Wafer, reasoning disabled, maximum output 4,096 tokens and the current-view pipeline recorded in that source revision. Both candidate and pinned bootstrap images were verified before comparison; every original attempt is retained.
 
 | Phase        | Arm                | Correct | Median, ms | p95, ms |
 | ------------ | ------------------ | ------: | ---------: | ------: |

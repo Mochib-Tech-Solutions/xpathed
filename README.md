@@ -72,19 +72,22 @@ The repository follows these boundaries: `src/Resolver` contains the core system
 
 [![Resolver internals: model selects candidate IDs; browser code constructs and verifies XPath](docs/diagrams/resolver-internals.svg)](docs/diagrams/resolver-internals.html)
 
-**Part 1 — model selection.** The Resolver gives the model an instruction and sanitized candidates. The model returns the action and selected element IDs. `ActionSelectionStrategy` defines the prompt/schema and validates that output.
+The request crosses six boundaries. Each step uses the previous step's evidence and has a specific completion condition.
 
-**Part 2 — XPath construction and verification.** The Resolver sends the selected IDs to Browser. Browser retrieves the retained DOM nodes, builds XPath expressions from their markup, and checks uniqueness, same-node identity, current-view membership and readiness. The model does not write the XPath.
+| Step and owner | Requires | Produces |
+| --- | --- | --- |
+| 1. Accept — Resolver | Instruction, active page and current document ID | Validated request |
+| 2. Capture — Browser | Live page and supported frame documents | Complete scoped candidates, capture ID and retained nodes |
+| 3. Select — model through OpenRouter | Instruction, sanitized candidates, prompt and output schema | Shared action, candidate IDs and found/absent/unsupported outcomes |
+| 4. Validate — Resolver | Model output and the captured candidate set | Schema-checked selection with valid IDs and no duplicates |
+| 5. Verify — Browser | Capture ID, selections and retained live nodes | Unique same-node XPath, frame context, current-view checks and readiness |
+| 6. Return — Resolver | Verified Browser observations and provider usage | API result with target outcomes, limitations, timings and cost |
 
-1. **Capture.** Browser assigns temporary IDs to eligible elements in the current view, with sanitized names, roles, context, state, geometry and supported CSS colors. Editable values, cookies and storage stay out. Exceeded capture budgets fail explicitly.
-2. **Select.** One OpenRouter call receives the instruction and complete scoped candidate list. The model returns strict JSON with one shared interaction and distinct candidate IDs, or missing/unsupported outcomes. It has no browser tools.
-3. **Validate.** Resolver checks the response schema, candidate membership, shared action and enumeration completeness.
-4. **Verify.** Browser constructs XPath from test attributes and semantic anchors before structural fallback. Each XPath must uniquely match the retained node in its document. Frame context stays separate. Document and current-view membership are rechecked, including for absence.
-5. **Return.** Browser observes readiness and highlights targets; Resolver returns the result to its caller. Disabled or covered elements can still have valid XPaths. The test client displays and records its requests; evaluation runners save their own evidence.
+Model selection covers steps 3–4. XPath construction and verification covers step 5. Resolver E2E covers the complete request. The model has no browser tools and returns element IDs; Browser constructs the XPath. The [walkthrough](docs/how-it-works.md#step-boundaries) explains the limits and failure conditions at each handoff.
 
 ### Model and configuration
 
-The development default is **`deepseek/deepseek-v4.1-flash` through OpenRouter's `wafer` provider**, configured in `.env.example` and `docker/compose.yaml`. Runtime uses contract **4**, prompt **10**, capture **5** and XPath strategy **4**.
+The development default is **`deepseek/deepseek-v4.1-flash` through OpenRouter's `wafer` provider**, configured in `.env.example` and `docker/compose.yaml`.
 
 `main` keeps one selected implementation and one prompt/schema, updated in place through Git. Retired API versions and experiment runners are removed; historical experiments use their recorded revisions. See [ADR-0024](docs/adr/0024-keep-one-resolution-implementation.md).
 
@@ -120,9 +123,31 @@ The **evaluation set** has three categories, scored separately:
 
 Shared XPath/Resolver case names and browser/pipeline test titles describe their group and behavior, for example `targeting-save-button-by-name` and `scope-offscreen-target-is-absent`. See the [evaluation guide](docs/evaluation.md#one-evaluation-set-grouped-by-behavior) for naming and provenance.
 
+### Example evaluation cases
+
+These are actual cases from the shared evaluation set. Expected selectors belong to the independent grader; the model never receives them.
+
+| Instruction | Expected result | What it checks |
+| --- | --- | --- |
+| “Click Save changes.” | The labelled Save button, with a unique same-node XPath | Target selection and XPath identity |
+| “Click all Approve buttons in Approvals.” | Both buttons, including the disabled one; its readiness is blocked | Exact target-set completeness and readiness |
+| “Click Help.” with Help off-screen | `not_found` in the current view | Scoped absence in Resolver E2E |
+| “Fill Notes.” with readonly Notes | Found target, `fill` action, blocked readiness with reason `readonly` | Action interpretation and passive state |
+| “Click Save changes in Profile.” then insert a wrapper | The saved XPath still identifies the intended button | Locator reuse in deterministic XPath evaluation |
+
+See [case IDs, fixtures and metric definitions](docs/evaluation.md#example-cases-and-metrics), and [actual outcomes across the three systems](docs/research/engineering-comparison.md#case-examples).
+
 ### Basic resolver, Improved resolver and Stagehand
 
-The [engineering comparison](docs/research/engineering-comparison.md) uses **183 shared browser cases**, the same DeepSeek V4.1 Flash/Wafer route, and one original attempt per system. Three isolated workers run concurrently. Earlier resolver code stays in saved images; the application keeps one implementation.
+All three systems receive the same instruction and reset page state, but prepare their own model input:
+
+| System | What it uses | What it returns |
+| --- | --- | --- |
+| Basic resolver | Archived current-view capture, sanitized candidates, selection prompt and Browser verification | Shared action, targets, verified XPath and passive readiness |
+| Improved resolver | The same architecture, clearer control/context and absence rules, plus stricter current-view revalidation; selected implementation in `main` | The same resolution contract, with the changes evaluated together |
+| Stagehand | Stock `observe`, its own page snapshot, prompt and selector generation; cache and self-healing disabled | Suggested actions and selectors, normalized and checked by the independent grader |
+
+The [resolver comparison](docs/research/engineering-comparison.md) uses **183 shared browser cases**, the same DeepSeek V4.1 Flash/Wafer route, and one original attempt per system. Three isolated workers run concurrently. Earlier resolver code stays in saved images; the application keeps one implementation.
 
 | System            | Correct action and targets | Target selection only |
 | ----------------- | -------------------------: | --------------------: |

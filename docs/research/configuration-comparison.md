@@ -13,7 +13,7 @@ Both arms use `deepseek/deepseek-v4.1-flash` through OpenRouter's Wafer route, w
 | Live verification | Captured targets and viewport checks | Rechecks current-view candidate membership and rejects newly off-screen selected targets                           |
 | Offline selection | Earlier offline selection            | The same offline selection implementation                                                                          |
 
-The browser comparison measures these changes together. The unchanged offline path checks behavior under the same selection implementation; model calls can still produce different outcomes. See the [selection prompt](../../src/Resolver/Services/ActionSelectionStrategy.cs) and [verification contract](../resolution.md#current-view-boundary-version-4).
+The browser comparison measures these changes together. The unchanged offline path checks behavior under the same selection implementation; model calls can still produce different outcomes. See the [selection prompt](../../src/Resolver/Services/ActionSelectionStrategy.cs) and [verification contract](../resolution.md#current-view-boundary).
 
 ## How the comparison works
 
@@ -60,7 +60,7 @@ The run forwarded **2,448 provider calls**, with **$1.31232595 in known charges 
 
 ## Evidence provenance
 
-The Basic browser uses prompt version 8; the Improved browser uses version 10. Both archived offline arms use version 7. These are recorded identifiers, not runtime choices. The new engineering comparison uses the current checkout and includes Stagehand; this historical report retains its original two arms and collection.
+The Basic browser uses the initial current-view prompt; the Improved browser adds the control/context and scoped-absence rules described above. Both archived offline arms share the earlier offline prompt. Their manifests and recorded source revisions preserve the exact prompts. The new resolver comparison uses the current checkout and includes Stagehand; this historical report retains its original two arms and collection.
 
 The fresh run began on 2026-10-02 with run ID `a2fe5484-bc80-472a-a5c9-c1c1cb7bf8e8`. Its manifest freezes the case inputs, image identities and policy before inference.
 

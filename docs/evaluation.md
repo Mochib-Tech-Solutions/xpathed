@@ -13,7 +13,7 @@ evaluation/
   cases/          # Shared browser cases grouped by behavior, with one loader
   fixtures/       # Controlled pages and independent target oracles
   datasets/       # Source adapters and the reviewed private collection manifest
-  research/       # Engineering comparison and archived research continuation
+  research/       # Resolver comparison and archived research continuation
   accounting/     # Shared charge records
   run.mjs         # Browser trials and replay
   model.mjs       # Live selection from reviewed saved inputs
@@ -59,6 +59,35 @@ Offline cases use the Resolver's offline selection path and shared prompt/schema
 `evaluate:xpath` reuses the browser case definitions and independent DOM labels. It captures a real page, materializes the fixture's controlled selected IDs, and calls Browser's `/pages/{pageId}/selections` endpoint directly. It starts Browser and the fixture only. No Resolver or model call occurs. The raw browser response is retained alongside a grader adapter; the adapter is not evidence that the Resolver ran.
 
 The category checks document-wide XPath uniqueness, intended-node identity, frame identity, state/readiness and passive behavior. Saved-locator mutations also check old XPath reuse and fresh construction after a page change. Cases without a found target and provider/Resolver-error cases are excluded with explicit reasons in the manifest. They remain covered by Resolver evaluation and existing engineering checks. Original case IDs and source split metadata stay intact.
+
+## Example cases and metrics
+
+These examples come from the shared case files. The fixture establishes the page state; its independent expected selector is used only by the grader. Live Resolver E2E must discover the target from the instruction. XPath evaluation supplies the selection and tests Browser directly.
+
+| Case and source | Instruction and setup | Required result | Metric exercised |
+| --- | --- | --- | --- |
+| `targeting-save-button-by-name` — [targeting](../evaluation/cases/targeting.json), `form` fixture | “Click Save changes.” | `click` on `#save-profile`, one matching XPath and ready passive checks | Target identity, action correctness, XPath uniqueness |
+| `cardinality-all-approval-buttons-include-disabled-target` — [cardinality](../evaluation/cases/cardinality.json), `batch` fixture | “Click all Approve buttons in Approvals.” | Exactly `#approve-invoice` and `#approve-expense`; the latter remains found with blocked/disabled readiness | Whole-set completeness and per-target readiness |
+| `scope-offscreen-target-is-absent` — [scope](../evaluation/cases/scope.json), `offscreen` fixture | “Click Help.”; Help is below the viewport | `not_found`, with no invented target or scrolling | Current-view absence; Resolver E2E only |
+| `state-readonly-notes-fill-is-blocked` — [state](../evaluation/cases/state.json), `states` fixture | “Fill Notes.” | `fill` on `#notes`, found and readonly, with blocked readiness and failed writable check | Action/state separation |
+| `locators-wrapper-insertion-preserves-current-view-target` — [locators](../evaluation/cases/locators.json), `form` fixture | “Click Save changes in Profile.”; insert a wrapper after resolution | Saved XPath still matches `#save-profile`; fresh construction also identifies it | Locator reuse and reconstruction; deterministic evaluation |
+
+A real model-selection example is `phrasenode-db978249f30c2c27d84a36a8` in the [reviewed PhraseNode collection](../evaluation/datasets/collection.json): “click on site news”, with independently labelled target `n19`. The model receives the original instruction and saved candidates; the expected ID is retained separately for grading. A pass requires the selected set to contain exactly that labelled target. Selecting the label plus an extra candidate fails. This checks selection only; there is no live page on which to establish XPath or readiness. The complete candidate payload stays in the private reviewed archive. This excerpt describes the expected result, not a new measured run.
+
+### Reading the measurements
+
+| Measurement | Calculation / boundary | What a pass establishes |
+| --- | --- | --- |
+| Model selection accuracy | Correct exact target sets / all planned eligible saved-input cases | Agreement with the imported independent target label |
+| XPath category pass rate | Cases passing all applicable Browser/oracle checks / selected XPath cases | Locator identity, frame/state checks and applicable mutations with controlled selections |
+| Resolver E2E pass rate | Cases passing all required final-response checks / all selected E2E cases | Correct action, target set or absence, XPath, readiness and response contract together |
+| Common comparison score | Correct action and full target set, with applicable safety checks / all shared comparison cases | Comparable action/target behavior across Basic, Improved and Stagehand |
+| Target-selection comparison score | Correct exact node sets or absence / shared cases with supported target expectations | Selection independently of action naming; operational and safety failures still fail |
+| Gains and regressions | Paired fail→pass and pass→fail on the same case | Which behaviors changed; a net gain can still contain regressions |
+| Latency | Median and p95 from the recorded request interval, separated by execution cohort | Observed timing under those conditions; failed attempts remain recorded |
+| Cost | Sum of reported charges, alongside estimates and counts of unreported charges | Known spend; an unavailable charge is never zero |
+
+All planned failures remain in their category denominator. Category-specific exclusions are recorded before execution. The three-system comparison's common score is narrower than full Resolver E2E: Stagehand does not produce the xpathed readiness/coverage contract. See [case outcomes](research/engineering-comparison.md#case-examples) for examples of a shared pass, a gain and regressions.
 
 ## Run and replay
 
@@ -130,24 +159,25 @@ Authentication, transport failures, provider rejection and missing resolution re
 
 ## Research comparisons
 
-`main` contains the selected resolver, release evaluation and the engineering comparison below. Retired model, dataset and context experiment runners are available at their recorded Git revisions. New alternatives belong on branches; accepted changes replace the selected implementation and prompt. See [ADR-0024](adr/0024-keep-one-resolution-implementation.md).
+`main` contains the selected resolver, release evaluation and the resolver comparison below. Retired model, dataset and context experiment runners are available at their recorded Git revisions. New alternatives belong on branches; accepted changes replace the selected implementation and prompt. See [ADR-0024](adr/0024-keep-one-resolution-implementation.md).
 
-### Engineering comparison
+### Resolver comparison
 
-Use **Basic resolver**, **Improved resolver** and **Stagehand** in reports and charts. Prompt versions belong in provenance. Basic is a verified archived bundle; Improved is built from the current checkout, with its source fingerprint and exact image IDs recorded. The application keeps one implementation.
+Use **Basic resolver**, **Improved resolver** and **Stagehand** in reports and charts. Internal revision identifiers belong in saved evidence. Basic is a verified archived bundle; Improved is built from the current checkout, with its source fingerprint and exact image IDs recorded. The application keeps one implementation.
 
 ```sh
 pnpm evaluate:compare -- \
   --basic-bundle BASIC_BUNDLE_DIRECTORY --basic-sha256 MANIFEST_SHA256 \
-  --case targeting-save-button-by-name --output .artifacts/engineering-check
+  --case targeting-save-button-by-name --output .artifacts/resolver-comparison-check
 
 # Explicit paid comparison of every eligible shared browser case.
 pnpm evaluate:compare -- --mode live \
   --basic-bundle BASIC_BUNDLE_DIRECTORY --basic-sha256 MANIFEST_SHA256 \
-  --output .artifacts/engineering-live
+  --output .artifacts/resolver-comparison-live
 
-pnpm evaluate:compare:replay .artifacts/engineering-live
-uv run docs/assets/evaluation/engineering-plot.py .artifacts/engineering-live
+pnpm evaluate:compare:replay .artifacts/resolver-comparison-live
+# Refresh the recorded report after setting its run identity and narrative.
+uv run docs/assets/evaluation/engineering-plot.py .artifacts/resolver-comparison-live
 ```
 
 The launcher verifies and restores the archived bundle, builds the current resolver and pinned Stagehand adapter, and starts an isolated evaluation stack. `--resume` with the original output directory continues only unattempted arms using the original image IDs; it rejects changed cases, evaluation code, plan, timeout settings or runtime images and unrecorded provider attempts. Replay verifies both graders and recomputes the shared and full resolver scores from original observations. Provider identity or response-cache violations retain the affected attempt and stop further calls. A fresh run gives its images unique local retention tags recorded in `image-tags.json`; keep those tags available for continuation. Set `XPATHED_EVALUATION_PROJECT=xpathed-evaluation-UNIQUE_NAME` for concurrent checkouts. A live run uses `OPENROUTER_EVAL_API_KEY`; scripted singleton and plural compatibility checks must pass before any paid calls.
