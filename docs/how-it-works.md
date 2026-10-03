@@ -14,7 +14,7 @@ Each managed session owns a Chromium process, browser context and display. Opera
 
 [![Model target selection followed by browser XPath construction and verification](diagrams/resolver-internals.svg)](diagrams/resolver-internals.html)
 
-The model receives candidates and chooses IDs. Browser code turns selected IDs into XPath expressions and verifies those expressions against retained nodes. Resolver coordinates both stages, validates their contracts and returns the combined result. Model-selection evaluation checks the first stage, XPath evaluation isolates the second, and Resolver E2E exercises both together.
+The model receives candidates and chooses IDs. Browser code turns selected IDs into XPath expressions and verifies those expressions against retained nodes. Resolver coordinates both stages, validates their contracts and returns the combined result. Saved-page selection checks the first stage, XPath construction and verification isolates the second, and Live-browser Resolver exercises both together in real Chromium. Live-browser Resolver can use deterministic provider fixtures or live provider inference.
 
 ## Step boundaries
 
@@ -29,7 +29,7 @@ The numbered steps in the diagram map to these service and data boundaries. A fa
 | 5. Verify / Browser | Capture identity, selected IDs/actions and retained nodes | Revalidates document and current-view membership, constructs XPath, checks document-wide uniqueness and same-node identity, observes readiness and highlights targets. One two-second budget covers the batch. An absent result also revalidates the capture. |
 | 6. Return / Resolver | Valid Browser response and request-owned provider evidence | Returns shared action, per-target outcomes, frame context, XPath, readiness, timings and available charges. Estimated and reported costs stay separate; missing accounting remains unavailable or pending. |
 
-The capture and verification budgets bound Browser work. They are separate from the configured provider timeout; there is no two-second deadline for the entire request. Model-selection evaluation supplies saved inputs at step 3; XPath evaluation supplies controlled selections at step 5; live Resolver E2E exercises all six steps.
+The capture and verification budgets bound Browser work. They are separate from the configured provider timeout; there is no two-second deadline for the entire request. Saved-page selection supplies saved inputs at step 3; XPath construction and verification supplies controlled selections at step 5; Live-browser Resolver exercises all six steps.
 
 ## Follow one command
 

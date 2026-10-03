@@ -42,21 +42,21 @@ async function browserEvidence(sha) {
   const suite = loadCases("evaluation/cases/index.json");
   ensure(
     manifest.mode === "deterministic" && manifest.code?.revision === sha,
-    "Browser mode or source SHA mismatch",
+    "Live-browser Resolver mode or source SHA mismatch",
   );
   ensure(
     manifest.policy?.qualification === "incomplete",
-    "Browser checks cannot claim model qualification",
+    "Controlled provider-free Live-browser Resolver checks cannot claim model qualification",
   );
   ensure(
     manifest.sourceManifestHash === hash(JSON.stringify(suite)) &&
       isDeepStrictEqual(manifest.cases, suite.cases),
-    "Browser evidence does not cover the original full suite",
+    "Live-browser Resolver evidence does not cover the original full suite",
   );
   for (const file of ["package.json", "global.json", "evaluation/cases/index.json"])
     ensure(
       manifest.code.files?.[file] === hash(await readFile(file)),
-      `Browser configuration fingerprint mismatch: ${file}`,
+      `Live-browser Resolver configuration fingerprint mismatch: ${file}`,
     );
   const ids = suite.cases.map((item) => item.id).sort();
   const plan = manifest.plan;
@@ -68,11 +68,11 @@ async function browserEvidence(sha) {
       plan.retries === 0 &&
       isDeepStrictEqual([...plan.caseOrder].sort(), ids) &&
       plan.trials?.length === ids.length,
-    "Browser plan must run every case once without retries",
+    "Live-browser Resolver plan must run every case once without retries",
   );
   ensure(
     isDeepStrictEqual(plan.trials.map((trial) => trial.caseId).sort(), ids),
-    "Browser plan is missing or duplicating cases",
+    "Live-browser Resolver plan is missing or duplicating cases",
   );
   const trialIds = new Set();
   for (const planned of plan.trials) {
@@ -81,19 +81,22 @@ async function browserEvidence(sha) {
         !trialIds.has(planned.id) &&
         planned.repetition === 1 &&
         planned.attempt === 1,
-      "Invalid browser first-attempt identity",
+      "Invalid Live-browser Resolver first-attempt identity",
     );
     trialIds.add(planned.id);
     const trial = await json(`${path}/trials/${planned.id}.json`);
     for (const key of ["id", "caseId", "repetition", "attempt"])
-      ensure(trial[key] === planned[key], `Browser trial identity mismatch: ${planned.id}`);
+      ensure(
+        trial[key] === planned[key],
+        `Live-browser Resolver trial identity mismatch: ${planned.id}`,
+      );
   }
   ensure(
     isDeepStrictEqual(
       (await readdir(`${path}/trials`)).sort(),
       [...trialIds].map((id) => `${id}.json`).sort(),
     ),
-    "Missing or extra browser trials",
+    "Missing or extra Live-browser Resolver trials",
   );
   const configurations = Object.entries(manifest.configurations ?? {});
   ensure(
@@ -104,12 +107,12 @@ async function browserEvidence(sha) {
           value.effective?.endpoint === "http://evaluation-fixture:8090/api/v1/" &&
           value.effective.responseCache === false,
       ),
-    "Browser configuration must use the deterministic fixture without response reuse",
+    "Live-browser Resolver configuration must use the controlled provider-free fixture without response reuse",
   );
   const summary = await replay(path);
   ensure(
     isDeepStrictEqual(await json(`${path}/summary.json`), summary),
-    "Saved browser summary differs from replay",
+    "Saved Live-browser Resolver summary differs from replay",
   );
   ensure(
     summary.passed === true &&
@@ -118,7 +121,7 @@ async function browserEvidence(sha) {
       summary.diagnosticReruns.trials === 0 &&
       summary.qualification === "incomplete" &&
       summary.modelQualityMeasured === false,
-    "Browser deterministic checks failed or are incomplete",
+    "Controlled provider-free Live-browser Resolver checks failed or are incomplete",
   );
   return {
     trials: ids.length,

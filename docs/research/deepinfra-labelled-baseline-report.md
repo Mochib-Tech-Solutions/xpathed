@@ -10,16 +10,16 @@ After the interrupted Wafer run, the maintainer approved a separate provider bas
 
 All 860 reviewed input hashes, frozen/forwarded request hashes, original labels and unique generation identities were verified. Every wave was replayed; a second direct singleton comparison independently confirmed 547 correct. The [safe execution receipt](deepinfra-labelled-baseline-execution.json) contains aggregate results and evidence hashes. Raw source payloads, instructions and provider responses remain private under `.artifacts/datasets/expanded-deepinfra-dev-860/`.
 
-| Result                                           |                                       Measurement |
+| Result                                           | Measurement                                       |
 | ------------------------------------------------ | ------------------------------------------------: |
-| Attempted / planned                              |                                         860 / 860 |
-| Strict whole-response target correctness         |                                547 / 860 (63.60%) |
-| Failed attempts                                  |                                               313 |
-| Transport, provider-identity or billing failures |                                                 0 |
+| Attempted / planned                              | 860 / 860                                         |
+| Strict whole-response target correctness         | 547 / 860 (63.60%)                                |
+| Failed attempts                                  | 313                                               |
+| Transport, provider-identity or billing failures | 0                                                 |
 | Output-contract errors                           | 49: 33 malformed responses, 16 incomplete results |
-| Reported provider cost                           |                                      $1.618648388 |
-| Input / output tokens                            |                               11,955,326 / 45,951 |
-| Offline elapsed median / p95                     |                                  5,254 / 6,750 ms |
+| Reported provider cost                           | $1.618648388                                      |
+| Input / output tokens                            | 11,955,326 / 45,951                               |
+| Saved-page elapsed median / p95                  | 5,254 / 6,750 ms                                  |
 
 The mutually exclusive outcomes were 693 found (547 correct, 146 wrong), 87 not found, 31 unsupported and 49 errors. A valid source target exists in every approved case, so absence and unsupported outcomes still fail source target selection. Merely including the gold node among extra guesses does not pass: gold appeared somewhere in 562 responses, while only 547 met strict correctness. All failures remain in the denominator.
 
@@ -36,17 +36,17 @@ The 203 unnamed cases expose a substantial representation/selection gap; this as
 
 ## Timing and comparison boundaries
 
-Offline elapsed includes preparation and process startup. Both the .NET diagnostic named `provider` and proxy elapsed include inline remote GitHub budget accounting. Reservation and reconciliation medians were 1,608 and 1,603 ms. Do not subtract aggregate medians to claim inference speed, browser latency or the two-second application deadline. The separate [current-view baseline](viewport-baseline-report.md) remains the measured source for viewport context reduction and HTTP response time.
+Saved-page elapsed includes preparation and process startup. Both the .NET diagnostic named `provider` and proxy elapsed include inline remote GitHub budget accounting. Reservation and reconciliation medians were 1,608 and 1,603 ms. Do not subtract aggregate medians to claim inference speed, browser latency or the two-second application deadline. The separate [current-view baseline](viewport-baseline-report.md) remains the measured source for viewport context reduction and HTTP response time.
 
 The original 53 Wafer attempts were preserved and independently regraded. On those same 53 cases:
 
-| Measure                   |                        Wafer | DeepInfra FP8 |
+| Measure                   | Wafer                        | DeepInfra FP8 |
 | ------------------------- | ---------------------------: | ------------: |
-| Strict correctness        |                      36 / 53 |       39 / 53 |
-| Offline median            |                     6,834 ms |      4,938 ms |
-| Offline p95               |                    29,491 ms |      6,538 ms |
-| Known reported cost       |                  $0.04142443 |  $0.113151808 |
-| Unknown cost reservations | $0.01538460 across two calls |            $0 |
+| Strict correctness        | 36 / 53                      | 39 / 53       |
+| Saved-page median         | 6,834 ms                     | 4,938 ms      |
+| Saved-page p95            | 29,491 ms                    | 6,538 ms      |
+| Known reported cost       | $0.04142443                  | $0.113151808  |
+| Unknown cost reservations | $0.01538460 across two calls | $0            |
 
 DeepInfra's observed median was 27.74% lower on this shared cohort and it was faster on 36/53 cases. Both routes were correct on 34 cases; Wafer alone on two, DeepInfra alone on five, neither on 12. Among the 34 both-correct cases, medians were 6,834 versus 5,078 ms and costs were $0.03006276 versus $0.079476376. DeepInfra was more expensive on these known-charge comparisons.
 
@@ -67,15 +67,15 @@ Sources: official OpenRouter endpoint snapshots for [DeepSeek](https://openroute
 
 ### Luna compatibility and paired pilot
 
-Azure's advertised `max_completion_tokens` initially failed this harness's literal `max_tokens` requirement. That was a harness limitation, not evidence of model incompatibility. [PR #55](https://github.com/Mochib-Tech-Solutions/xpathed/pull/55) added an exact offline-only Azure profile using its supported cap, reasoning `none` and explicit prompt-cache controls. Conflicting output caps are rejected before payment.
+Azure's advertised `max_completion_tokens` initially failed this harness's literal `max_tokens` requirement. That was a harness limitation, not evidence of model incompatibility. [PR #55](https://github.com/Mochib-Tech-Solutions/xpathed/pull/55) added an exact saved-page-only Azure profile using its supported cap, reasoning `none` and explicit prompt-cache controls. Conflicting output caps are rejected before payment.
 
-At source revision `6a7d63f5f10f6c8f37280bdef93ad3ea532493ad`, the same seven reviewed cases ran once per route with unchanged instructions, context, prompt and labels. A decision policy recorded before inference required Azure to have seven valid standard-route billing records, accuracy at least equal to OpenAI and a lower offline median. OpenAI ran first, then Azure; time, order and cache effects remain confounded.
+At source revision `6a7d63f5f10f6c8f37280bdef93ad3ea532493ad`, the same seven reviewed cases ran once per route with unchanged instructions, context, prompt and labels. A decision policy recorded before inference required Azure to have seven valid standard-route billing records, accuracy at least equal to OpenAI and a lower saved-page median. OpenAI ran first, then Azure; time, order and cache effects remain confounded.
 
-| Pilot result       |     OpenAI |      Azure |
+| Pilot result       | OpenAI     | Azure      |
 | ------------------ | ---------: | ---------: |
-| Strict correctness |      6 / 7 |      6 / 7 |
-| Offline median     |   5,464 ms |   5,778 ms |
-| Offline p95        |   7,285 ms |   6,688 ms |
+| Strict correctness | 6 / 7      | 6 / 7      |
+| Saved-page median  | 5,464 ms   | 5,778 ms   |
+| Saved-page p95     | 7,285 ms   | 6,688 ms   |
 | Reported cost      | $0.0242059 | $0.0242104 |
 
 Both failed the same case. Azure's lower observed tail and higher advertised daily uptime do not override the precommitted median rule: **retain OpenAI provisionally for the next evaluation**. Azure remains an explicit evaluation alternative. Seven sequential cases cannot establish long-term stability, a reliable p95 or general model superiority. The pilot cost $0.0484163; no further paid comparison was needed to apply the frozen rule. The [audited pilot receipt](luna-provider-pilot-execution.json) preserves per-case results, timing, charges, the policy hash and final campaign reconciliation. All calls used standard service tier, zero reported cache/reasoning tokens and base rates of $0.10/$0.50 per million input/output tokens. Conservative forecasts used higher maximum advertised tier/cache-write rates, not actual premium serving.

@@ -8,9 +8,9 @@ import { readEvaluationKey } from "../evaluation/provider.mjs";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 export const categories = [
-  { name: "model", label: "Model selection", args: ["--model", "--mode", "live"] },
+  { name: "model", label: "Saved-page selection", args: ["--model", "--mode", "live"] },
   { name: "xpath", label: "XPath construction and verification", args: ["--xpath"] },
-  { name: "resolver", label: "Resolver E2E", args: ["--mode", "live"] },
+  { name: "resolver", label: "Live-browser Resolver", args: ["--mode", "live"] },
 ];
 
 async function execute(args) {
@@ -39,7 +39,9 @@ export async function runEvaluationSet(output, run = execute) {
   await mkdir(output, { recursive: false, mode: 0o700 });
   const results = [];
   for (const category of categories) {
-    console.log(`\n${category.label}`);
+    console.log(
+      `\n${category.label}; inference mode: ${category.name === "xpath" ? "controlled provider-free" : "live provider inference"}`,
+    );
     const directory = join(output, category.name);
     const code = await run([...category.args, "--output", directory]);
     const summary = await readFile(join(directory, "summary.json"), "utf8")
@@ -76,7 +78,7 @@ export async function runEvaluationSet(output, run = execute) {
   console.log(`\nEvaluation results: ${join(output, "summary.json")}`);
   for (const item of results)
     console.log(
-      `${item.passed ? "PASS" : "FAIL"} ${item.category}: ${item.checksPassed ?? "unavailable"}/${item.planned ?? "unavailable"}`,
+      `${item.passed ? "PASS" : "FAIL"} ${categories.find((category) => category.name === item.category).label}: ${item.checksPassed ?? "unavailable"}/${item.planned ?? "unavailable"}`,
     );
   return results.length === categories.length && results.every((item) => item.passed) ? 0 : 1;
 }
@@ -85,10 +87,11 @@ export async function main(args = process.argv.slice(2)) {
   args = args.filter((arg) => arg !== "--");
   if (args.length === 1 && args[0] === "--help") {
     console.log(`pnpm evaluate [--output DIRECTORY]
-Runs model selection (live), XPath verification (controlled selections), and Resolver E2E (live).
+Runs Saved-page selection and Live-browser Resolver with live provider inference.
+Runs XPath construction and verification with controlled provider-free selections.
 Requires Docker, the reviewed dataset collection and OPENROUTER_EVAL_API_KEY. Makes paid model calls.
 Separate commands: evaluate:model:live, evaluate:xpath, evaluate:resolver:live.
-Provider-free Resolver checks: evaluate:resolver. Replay: evaluate:replay RUN_DIRECTORY.`);
+Live-browser Resolver with controlled provider-free responses: evaluate:resolver. Replay: evaluate:replay RUN_DIRECTORY.`);
     return 0;
   }
   if (
@@ -101,7 +104,7 @@ Provider-free Resolver checks: evaluate:resolver. Replay: evaluate:replay RUN_DI
   process.chdir(root);
   selectModelCases();
   if (!(await readEvaluationKey()))
-    throw new Error("Set OPENROUTER_EVAL_API_KEY for live evaluation");
+    throw new Error("Set OPENROUTER_EVAL_API_KEY for live provider inference");
   const output = resolve(args[1] ?? join(".artifacts/evaluation", randomUUID()));
   await mkdir(resolve(output, ".."), { recursive: true });
   return runEvaluationSet(output);

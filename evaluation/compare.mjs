@@ -302,7 +302,7 @@ export async function main(args = process.argv.slice(2)) {
   const { cases, exclusions } = selectQualificationCases(allCases, options);
   if (!artifact && cases.some((spec) => spec.track === "offline-selection"))
     throw new Error(
-      "Use release:evaluate with a verified image bundle to start the offline Resolver worker",
+      "Use release:evaluate with a verified image bundle to start the Saved-page selection worker",
     );
   if (
     options.mode === "live" &&
@@ -344,7 +344,7 @@ export async function main(args = process.argv.slice(2)) {
     measurement: {
       latencyProtocol: "resolver-http",
       latency:
-        "Browser: complete Resolver HTTP response, independent setup and grading excluded. Offline: Resolver CLI inference process, preparation excluded.",
+        "Live-browser Resolver: complete Resolver HTTP response, independent setup and grading excluded. Saved-page selection: Resolver CLI inference process, preparation excluded.",
       serving: "standard",
       responseReuse: false,
       healing: false,

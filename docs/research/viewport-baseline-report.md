@@ -78,7 +78,7 @@ In the corrected run, all-case reported cost per correct command was **$0.000154
 
 ## Source evidence and next boundary
 
-The separate [original-label model comparison](labelled-model-comparison-report.md) measured 191 original PhraseNode development cases from 40 page families, once per model. DeepSeek obtained **133/191 exact source-target responses** and **120/191 correct provider responses within two seconds**. Those historical offline scores do not label action correctness, current viewport membership, readiness, plural completeness or live XPath verification.
+The separate [original-label model comparison](labelled-model-comparison-report.md) measured 191 original PhraseNode development cases from 40 page families, once per model. DeepSeek obtained **133/191 exact source-target responses** and **120/191 correct provider responses within two seconds**. Those historical saved-page scores do not label action correctness, current viewport membership, readiness, plural completeness or live XPath verification.
 
 The later [prompt comparison](labelled-prompt-comparison-report.md) exposed 30 original test cases from ten families: baseline **24/30 exact, 22/30 within two seconds**, versus variant **23/30, 21/30**. It retained the baseline. The earlier model report's “test split untouched” statement describes that earlier stage only. Current browser cases are explicitly reviewed regression data; the qualification inventory has no fresh held-out cases. No remaining family is declared fresh based only on absence from inference logs; preparation and review exposure also count.
 

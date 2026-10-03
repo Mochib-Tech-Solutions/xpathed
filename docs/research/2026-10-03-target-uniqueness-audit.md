@@ -34,8 +34,8 @@ The reviewed preparation and experiment source is `a8e0d560f4a170b248dcd5aadeb50
 
 ## Retained experiments and continuation
 
-The first run retains 949 of 2,562 planned attempts; the second retains 1,971 of 2,544. All original outcomes, exclusions, missing attempts and charges remain part of their original runs. Neither incomplete offline cohort is the final corrected accuracy comparison.
+The first run retains 949 of 2,562 planned attempts; the second retains 1,971 of 2,544. All original outcomes, exclusions, missing attempts and charges remain part of their original runs. Neither incomplete saved-page cohort is the final corrected accuracy comparison.
 
-The second run completed its separate 183-case browser cohort across all three arms (549 attempts). Its replay and independent evidence audit passed. This admission-only correction permits retaining that cohort while running a separately frozen offline comparison on the 573 admitted cases. Source identities and denominators must be reported separately; the new offline cohort cannot silently replace the earlier attempts. No further paid inference should start before this correction is merged into main.
+The second run completed its separate 183-case browser cohort across all three arms (549 attempts). Its replay and independent evidence audit passed. This admission-only correction permits retaining that cohort while running a separately frozen saved-page comparison on the 573 admitted cases. Source identities and denominators must be reported separately; the new saved-page cohort cannot silently replace the earlier attempts. No further paid inference should start before this correction is merged into main.
 
-The imported cases evaluate offline target selection. They do not certify browser eligibility, action readiness, live DOM state or workflow execution. These decisions are supported review judgments, not a guarantee that the dataset is error-free. Future changes to the retained evidence require a new review before scoring.
+The imported cases evaluate saved-page selection. They do not certify browser eligibility, action readiness, live DOM state or workflow execution. These decisions are supported review judgments, not a guarantee that the dataset is error-free. Future changes to the retained evidence require a new review before scoring.

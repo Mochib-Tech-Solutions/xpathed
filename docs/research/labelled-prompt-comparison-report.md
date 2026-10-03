@@ -16,14 +16,14 @@ Confirmation used 30 original test cases, three each in ten families disjoint fr
 
 ## Paired results
 
-Exact means the complete original labelled singleton target set with valid output. Returning an expected node among unwanted extra targets does not pass. Percentiles below include failures, not just successful responses. Provider timing excludes offline process startup and browser/UI work.
+Exact means the complete original labelled singleton target set with valid output. Returning an expected node among unwanted extra targets does not pass. Percentiles below include failures, not just successful responses. Provider timing excludes saved-page process startup and browser/UI work.
 
-| Sample / configuration | Exact responses | Correct provider <1 s | Correct provider ≤2 s | Provider p50 / p95, ms | Offline p50 / p95, ms |
-| ---------------------- | --------------: | --------------------: | --------------------: | ---------------------: | --------------------: |
-| Development baseline   |           28/40 |                 13/40 |                 25/40 |            1054 / 2273 |           1353 / 2578 |
-| Development variant    |           29/40 |                 17/40 |                 28/40 |             949 / 1784 |           1246 / 2075 |
-| Confirmation baseline  |           24/30 |                 16/30 |                 22/30 |             735 / 2510 |           1033 / 2813 |
-| Confirmation variant   |           23/30 |                 15/30 |                 21/30 |             698 / 6648 |            990 / 6955 |
+| Sample / configuration | Exact responses | Correct provider <1 s | Correct provider ≤2 s | Provider p50 / p95, ms | Saved-page p50 / p95, ms |
+| ---------------------- | --------------: | --------------------: | --------------------: | ---------------------: | -----------------------: |
+| Development baseline   | 28/40           | 13/40                 | 25/40                 | 1054 / 2273            | 1353 / 2578              |
+| Development variant    | 29/40           | 17/40                 | 28/40                 | 949 / 1784             | 1246 / 2075              |
+| Confirmation baseline  | 24/30           | 16/30                 | 22/30                 | 735 / 2510             | 1033 / 2813              |
+| Confirmation variant   | 23/30           | 15/30                 | 21/30                 | 698 / 6648             | 990 / 6955               |
 
 Development produced four newly correct and three newly incorrect cases. Both gate counts improved, permitting confirmation.
 
@@ -63,4 +63,4 @@ Replay the other blocks by substituting `variant-a`, `variant-b` and `baseline-b
 
 These are small, reviewed convenience samples, with one call per configuration and correlated cases within page families. ABBA reduces a simple order imbalance but does not control provider load, caching or inference randomness. The development baseline was collected earlier. The observed differences support the frozen keep-baseline decision, not a population-level or causal claim.
 
-PhraseNode supplies target labels, not independent action, readiness or plural-completeness labels. Offline/provider timings cannot establish the live application's sub-second response goal or two-second maximum. Public-dataset training exposure and residual source-label ambiguity are unknown. Confirmation families are now exposed and must not serve as unseen evidence in later tuning. Neither configuration is promoted or described as production-qualified.
+PhraseNode supplies target labels, not independent action, readiness or plural-completeness labels. Saved-page/provider timings cannot establish the live application's sub-second response goal or two-second maximum. Public-dataset training exposure and residual source-label ambiguity are unknown. Confirmation families are now exposed and must not serve as unseen evidence in later tuning. Neither configuration is promoted or described as production-qualified.

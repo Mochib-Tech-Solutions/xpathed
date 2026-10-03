@@ -182,7 +182,7 @@
   "cards": [
     {
       "dot": "violet",
-      "title": "Model selection",
+      "title": "Saved-page selection",
       "items": [
         "Needs: saved candidates + independent target label",
         "Steps 3\u20134: selected IDs match independent labels"
@@ -198,9 +198,9 @@
     },
     {
       "dot": "cyan",
-      "title": "Resolver E2E",
+      "title": "Live-browser Resolver",
       "items": [
-        "Needs: live page + instruction + provider response",
+        "Needs: real Chromium + instruction + fixture or live provider response",
         "Checks: the complete API result across all six steps"
       ]
     }

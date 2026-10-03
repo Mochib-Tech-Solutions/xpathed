@@ -45,7 +45,7 @@ spec.labelReview = {
   reviewedAt: spec.review.reviewedAt,
 };
 
-test("model selection requires reviewed unchanged inputs and rejects an empty filter", () => {
+test("Saved-page selection requires reviewed unchanged inputs and rejects an empty filter", () => {
   assert.equal(selectModelCases(undefined, [spec]).length, 1);
   assert.throws(() => selectModelCases("missing", [spec]), /No matching/);
   const excluded = { ...spec, labelReview: { ...spec.labelReview, disposition: "ambiguous" } };
@@ -74,7 +74,7 @@ test("model selection requires reviewed unchanged inputs and rejects an empty fi
 });
 
 for (const invalidIdentity of [false, true])
-  test(`model run retains failures, accounting and replay; invalid identity=${invalidIdentity}`, async (t) => {
+  test(`Saved-page selection run retains failures, accounting and replay; invalid identity=${invalidIdentity}`, async (t) => {
     const output = await mkdtemp(join(tmpdir(), "model-evaluation-"));
     t.after(() => rm(output, { recursive: true, force: true }));
     t.mock.method(console, "log", () => {});
@@ -148,6 +148,10 @@ for (const invalidIdentity of [false, true])
       assert.equal(code, 1);
       const summary = JSON.parse(await readFile(join(output, "summary.json")));
       assert.equal(summary.plannedTrials, 2);
+      assert.match(
+        await readFile(join(output, "summary.txt"), "utf8"),
+        /Saved-page selection; inference mode: live provider inference/,
+      );
       assert.equal(summary.completedTrials, invalidIdentity ? 1 : 2);
       assert.equal(processed, invalidIdentity ? 1 : 2);
       assert.equal(summary.firstAttempt.cost.reportedUsd.total, null);

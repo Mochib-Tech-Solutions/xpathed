@@ -1,4 +1,4 @@
-# Offline instruction contract audit — 3 October 2026
+# Saved-page instruction contract audit — 3 October 2026
 
 ## Result
 
@@ -8,7 +8,7 @@ The original archive, instructions, expected labels and splits remain unchanged.
 
 ## Defect and complete review
 
-The offline runner uses `ActionSelectionStrategy.Prompt` and its response parser. It therefore enforces the same one-interaction and current-state contract as Resolver. Grading target identity alone does not make the inference task independent of that contract: a correct whole-request refusal cannot satisfy an imported `found` expectation.
+The saved-page runner uses `ActionSelectionStrategy.Prompt` and its response parser. It therefore enforces the same one-interaction and current-state contract as Resolver. Grading target identity alone does not make the inference task independent of that contract: a correct whole-request refusal cannot satisfy an imported `found` expectation.
 
 Every one of the 573 previously admitted instructions was reviewed against that boundary, with its actual prepared target evidence. Four expectations were excluded:
 
@@ -29,6 +29,6 @@ The [public summary](../assets/evaluation/contract-admission-audit.json) binds t
 
 The reviewed source is `105d6c57840bdcd3666f2e44066e6945883d588c`. Combined private evidence SHA-256: `33f5062838e9a2f22caac6b24953ad5e051da2442b3814ec53066912f3f3f5a9`.
 
-The affected offline study stopped scheduling and drained at **1,563 of 1,719 attempts**. Built-in replay verified all retained results, with no pending provider calls and no unknown charges; reported cost was **$1.110387776**. Original outcomes remain diagnostic evidence under their original labels. The earlier stopped runs and completed 183-case browser cohort remain separate and unchanged. Further paid comparison waits for this correction to merge into main and uses a new frozen offline cohort.
+The affected saved-page study stopped scheduling and drained at **1,563 of 1,719 attempts**. Built-in replay verified all retained results, with no pending provider calls and no unknown charges; reported cost was **$1.110387776**. Original outcomes remain diagnostic evidence under their original labels. The earlier stopped runs and completed 183-case browser cohort remain separate and unchanged. Further paid comparison waits for this correction to merge into main and uses a new frozen saved-page cohort.
 
 Admission now checks source reconciliation, target semantics, actual prepared evidence, competing targets and compatibility of the expected outcome with the shared instruction contract. Review judgments still do not establish perfect labels or unseen-data generalization.

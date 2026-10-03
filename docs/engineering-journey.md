@@ -8,14 +8,14 @@ Resolver is the core API. Browser supplies capture and verification through a re
 
 The progression below explains what changed and why. **Basic** is the archived earlier current-view setup used in the comparison; it already selected candidate IDs and verified XPath in the browser.
 
-| Step | Change | Reason |
-| --- | --- | --- |
-| Basic | Capture the current view, ask the model to select targets, then verify their XPath and state | Establish a working baseline with measurable target correctness |
-| Clarify selection | Distinguish requested controls from section containers and repeated descendant text | Reduce selections of surrounding context instead of the intended control |
-| Clarify absence | Give missing candidates and empty captures explicit outcomes; completeness covers every requested target | Avoid confusing a missing target with an incomplete answer |
-| Revalidate the view | Check current-view membership again after inference | Reject results based on targets that moved out of scope while the model was responding |
-| Consolidate the implementation | Share one prompt and schema between browser and offline selection; remove retired runtime paths | Keep future changes in one place, with earlier implementations recoverable through Git and image archives |
-| Compare the result | Run Basic, Improved and Stagehand against the same independently labelled browser cases | Measure the combined effect, expose regressions and separate action interpretation from target selection |
+| Step                           | Change                                                                                                        | Reason                                                                                                    |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Basic                          | Capture the current view, ask the model to select targets, then verify their XPath and state                  | Establish a working baseline with measurable target correctness                                           |
+| Clarify selection              | Distinguish requested controls from section containers and repeated descendant text                           | Reduce selections of surrounding context instead of the intended control                                  |
+| Clarify absence                | Give missing candidates and empty captures explicit outcomes; completeness covers every requested target      | Avoid confusing a missing target with an incomplete answer                                                |
+| Revalidate the view            | Check current-view membership again after inference                                                           | Reject results based on targets that moved out of scope while the model was responding                    |
+| Consolidate the implementation | Share one prompt and schema between browser resolution and Saved-page selection; remove retired runtime paths | Keep future changes in one place, with earlier implementations recoverable through Git and image archives |
+| Compare the result             | Run Basic, Improved and Stagehand against the same independently labelled browser cases                       | Measure the combined effect, expose regressions and separate action interpretation from target selection  |
 
 We measured Basic and Improved as complete systems. There is no isolated accuracy measurement for each intermediate step. The [comparison report](research/engineering-comparison.md) contains the category graph, paired gains and losses, costs and original evidence identities.
 
@@ -25,7 +25,7 @@ The model selects candidate IDs from browser observations. Browser code builds X
 
 The remaining uncertainty is explicit: the model may select the wrong element. Independent expected targets measure that error. A disabled intended target can be correctly selected while remaining unavailable for the requested action.
 
-The runtime uses one selection call. DeepSeek V4.1 Flash through OpenRouter's Wafer provider is an inexpensive default for live testing, with reasoning and provider fallback disabled and strict structured output. Its target accuracy, latency and cost must be measured on the project's cases. No model is trained here.
+The runtime uses one selection call. DeepSeek V4.1 Flash through OpenRouter's Wafer provider is an inexpensive default for tests with live provider inference, with reasoning and provider fallback disabled and strict structured output. Its target accuracy, latency and cost must be measured on the project's cases. No model is trained here.
 
 Model, provider, prompt and schema settings form a configuration identity. Evaluate changes together on the same cases before approving them.
 
@@ -45,9 +45,9 @@ Semantic anchors and explicit test attributes are preferred over ordinary IDs an
 
 ## Measure each failure at the right boundary
 
-Controlled browser cases define expected nodes independently of model input. They grade capture coverage, exact target sets, action, XPath identity, readiness, privacy and passive state. Deterministic provider responses check pipeline behavior; live runs measure model selections.
+Controlled browser cases define expected nodes independently of model input. They grade capture coverage, exact target sets, action, XPath identity, readiness, privacy and passive state. Deterministic provider responses check pipeline behavior; runs with live provider inference measure model selections. Both use real Chromium when evaluating Live-browser Resolver.
 
-The evaluation set separately measures model selection, XPath construction and verification, and Resolver E2E. The XPath category supplies controlled selections directly to Browser and checks the resulting locators against independent DOM labels. Reviewed imported data adds language and page variety. Offline target selection cannot establish live readiness or viewport correctness, so its denominator stays separate. Repeatedly used cases measure this set; they do not establish unseen-site generalization. Comparisons report regressions as lost passes.
+The evaluation set separately measures Saved-page selection, XPath construction and verification, and Live-browser Resolver. The XPath category supplies controlled selections directly to Browser and checks the resulting locators against independent DOM labels. Reviewed imported data adds language and page variety. Saved-page selection cannot establish browser readiness or viewport correctness, so its denominator stays separate. Repeatedly used cases measure this set; they do not establish unseen-site generalization. Comparisons report regressions as lost passes.
 
 ### Compare Basic, Improved and Stagehand
 
@@ -67,23 +67,23 @@ Three isolated workers run concurrently, one per system. Original evidence, char
 
 ## Keep one implementation
 
-The controller accepts and validates HTTP requests. `ResolutionService` coordinates capture, selection and verification; `CandidateInput` prepares model evidence; `ActionSelectionStrategy` owns the single prompt, schema and selection validation; `BrowserEvidence` validates browser responses. `OpenRouterGateway` owns provider transport and accounting. Browser and offline selection share the prompt and schema. Operational credentials, model/provider, endpoint and timeout remain deployment settings.
+The controller accepts and validates HTTP requests. `ResolutionService` coordinates capture, selection and verification; `CandidateInput` prepares model evidence; `ActionSelectionStrategy` owns the single prompt, schema and selection validation; `BrowserEvidence` validates browser responses. `OpenRouterGateway` owns provider transport and accounting. Browser resolution and Saved-page selection share the prompt and schema. Operational credentials, model/provider, endpoint and timeout remain deployment settings.
 
 Update the selected implementation in place. Retired contracts and experiment selectors are removed. Git history and saved release images preserve the earlier behavior.
 
 ## Why each test exists
 
-| Test                         | What it establishes                                                                           | Why it is separate                                                           |
-| ---------------------------- | --------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| .NET unit and API tests      | Parsing, validation, cancellation, accounting and HTTP contracts with controlled dependencies | Fast feedback on code rules without browsers or paid providers               |
-| Web component tests          | Tabs, chat state, result rendering and client interactions                                    | Checks UI behavior in a simulated DOM                                        |
-| Resolution browser tests     | Real Chromium capture, XPath identity, frames, stale pages, readiness and passive state       | A mock DOM cannot establish browser behavior                                 |
-| Deterministic evaluation     | Shared cases through capture, scripted model output and independent grading                   | Detects pipeline regressions without model variation or cost                 |
-| Live Resolver E2E evaluation | Complete resolution API requests with real model selection and browser verification           | Measures action, targets, XPath and readiness on the browser evaluation set  |
-| Live resolver comparison  | Basic, Improved and Stagehand accuracy, category gains/losses, latency and cost               | Measures actual model decisions under matched conditions                     |
-| Offline dataset evaluation   | Selection against imported labelled candidates                                                | Adds data variety but cannot prove browser readiness or viewport correctness |
-| Replay                       | Regrading saved evidence without another inference call                                       | Checks grading and reporting while preserving original attempts              |
-| Release evaluation           | Candidate versus published images under the complete current policy                            | Protects existing passes before merging a release                        |
+| Test                                                       | What it establishes                                                                           | Why it is separate                                                           |
+| ---------------------------------------------------------- | --------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| .NET unit and API tests                                    | Parsing, validation, cancellation, accounting and HTTP contracts with controlled dependencies | Fast feedback on code rules without browsers or paid providers               |
+| Web component tests                                        | Tabs, chat state, result rendering and client interactions                                    | Checks UI behavior in a simulated DOM                                        |
+| Resolution browser tests                                   | Real Chromium capture, XPath identity, frames, stale pages, readiness and passive state       | A mock DOM cannot establish browser behavior                                 |
+| Live-browser Resolver with deterministic provider fixtures | Shared cases through capture, scripted model output and independent grading                   | Detects pipeline regressions without model variation or cost                 |
+| Live-browser Resolver with live provider inference         | Complete resolution API requests with real model selection and browser verification           | Measures action, targets, XPath and readiness on the browser evaluation set  |
+| Resolver comparison with live provider inference           | Basic, Improved and Stagehand accuracy, category gains/losses, latency and cost               | Measures actual model decisions under matched conditions                     |
+| Saved-page selection                                       | Selection against imported labelled candidates                                                | Adds data variety but cannot prove browser readiness or viewport correctness |
+| Replay                                                     | Regrading saved evidence without another inference call                                       | Checks grading and reporting while preserving original attempts              |
+| Release evaluation                                         | Candidate versus published images under the complete current policy                           | Protects existing passes before merging a release                            |
 
 Tooling tests check the runners, graders, accounting and release scripts themselves. Formatting, analyzers, builds and Docker configuration checks catch source or packaging problems; they do not measure model accuracy.
 

@@ -206,7 +206,7 @@ function browserEvidence(work) {
   return { manifest, trial, summary, saveManifest };
 }
 
-test("browser receipts and the aggregate replay the complete deterministic suite and retain its identities", (t) => {
+test("Live-browser Resolver receipts and the aggregate replay the complete controlled provider-free suite and retain its identities", (t) => {
   const work = workspace(t);
   const { run, needs, cwd } = work;
   const evidence = browserEvidence(work);
@@ -270,7 +270,7 @@ test("record and verify reject another checkout SHA and malformed run context wi
   }
 });
 
-test("browser evidence rejects partial, altered, live, retried and failing runs", (t) => {
+test("Live-browser Resolver evidence rejects partial, altered, live-inference, retried and failing runs", (t) => {
   const work = workspace(t);
   const { cwd, write, run } = work;
   const evidence = browserEvidence(work);

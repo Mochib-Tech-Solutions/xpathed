@@ -6,7 +6,7 @@
 
 ## Result
 
-The initial label review missed a later boundary: the offline Resolver sanitizes each string after loading the reviewed imported input. That can erase a valid instruction or target name. The collection now admits **665 of 1,084 imported cases**, with **419 explicit exclusions**: 276 lack necessary evidence, 138 are ambiguous and five have contradictory expectations. The admitted cases span 177 historical page families (636 dev, 26 test, three train).
+The initial label review missed a later boundary: the saved-page Resolver sanitizes each string after loading the reviewed imported input. That can erase a valid instruction or target name. The collection now admits **665 of 1,084 imported cases**, with **419 explicit exclusions**: 276 lack necessary evidence, 138 are ambiguous and five have contradictory expectations. The admitted cases span 177 historical page families (636 dev, 26 test, three train).
 
 All 671 previously admitted inputs were passed through the exact recorded Resolver image using `--evaluate-offline /dev/stdin --prepare-only`, with eight workers and networking disabled. No provider credentials or model calls were used. The output was compared recursively with the reviewed imported input:
 

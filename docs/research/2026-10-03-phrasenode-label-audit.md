@@ -6,7 +6,7 @@
 
 ## Result
 
-The pinned collection reproduces its original source annotations correctly, but those annotations are not all valid singleton expectations for the retained offline input. All **1,084 cases across 192 page families** received a source-and-input semantic disposition. **671 cases across 177 families** have supported target expectations; **413 cases** remain excluded from accuracy evaluation under the current input representation.
+The pinned collection reproduces its original source annotations correctly, but those annotations are not all valid singleton expectations for the retained saved-page input. All **1,084 cases across 192 page families** received a source-and-input semantic disposition. **671 cases across 177 families** have supported target expectations; **413 cases** remain excluded from accuracy evaluation under the current input representation.
 
 | Disposition              |     Cases | Meaning                                                                                                     |
 | ------------------------ | --------: | ----------------------------------------------------------------------------------------------------------- |
@@ -55,7 +55,7 @@ The collection was sorted by family and case ID and partitioned into disjoint ra
 
 Lexical candidate matching was used to find alternatives, not to generate validation decisions. A supplementary equal-name scan checked validated cases for competing controls. A source-valid target was not automatically validated when its identifying evidence disappeared during import. Conversely, duplicate names, missing geometry or unnamed targets did not automatically cause exclusion: retained named groups, control types and record order sometimes made the requested target unambiguous.
 
-The scope is **offline target selection**. This review does not certify current-view membership, live DOM state, action readiness, successful execution or later-page behavior. Native selection-control identity can be valid while an option choice or readiness question remains outside this grade. Model errors from previous runs were not treated as proof of a bad label.
+The scope is **saved-page selection**. This review does not certify current-view membership, live DOM state, action readiness, successful execution or later-page behavior. Native selection-control identity can be valid while an option choice or readiness question remains outside this grade. Model errors from previous runs were not treated as proof of a bad label.
 
 ## Main defects and limits
 

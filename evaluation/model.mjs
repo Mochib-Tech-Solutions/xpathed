@@ -32,16 +32,16 @@ export function selectModelCases(caseId, collection = readCollection()) {
         hash(item.input) !== item.review.inputHash,
     )
   )
-    throw new Error("Model evaluation requires reviewed offline selection inputs");
+    throw new Error("Saved-page selection requires reviewed saved-page inputs");
   const eligible = cases.filter((item) => validateLabelReview(item).disposition === "validated");
   const selected = caseId ? eligible.filter((item) => item.id === caseId) : eligible;
-  if (!selected.length) throw new Error("No matching model-selection cases");
+  if (!selected.length) throw new Error("No matching Saved-page selection cases");
   return selected;
 }
 
 export async function runModelEvaluation(options, cases, proxy) {
   if (selectModelCases(undefined, cases).length !== cases.length)
-    throw new Error("Model evaluation cannot execute quarantined labels");
+    throw new Error("Saved-page selection cannot execute quarantined labels");
   const output = options.output;
   const plan = buildPlan(cases, options);
   plan.trials = plan.trials.map((trial) => ({ ...trial, id: randomUUID().replaceAll("-", "") }));
@@ -105,7 +105,7 @@ export async function runModelEvaluation(options, cases, proxy) {
   const first = summary.firstAttempt;
   const text =
     [
-      "Model target-selection evaluation (live inference, saved page inputs)",
+      "Saved-page selection; inference mode: live provider inference",
       `Trials: ${summary.completedTrials}/${summary.plannedTrials}; passed: ${first.passed}; failed: ${first.failed}`,
       `Reported cost: ${first.cost.reportedUsd.total ?? "unavailable"} USD; unknown charges: ${first.cost.reportedUsd.unavailable}`,
       "Live XPath and readiness are outside this track. This run does not approve a release.",
@@ -126,7 +126,7 @@ export async function main(args = process.argv.slice(2)) {
     options.prune
   )
     throw new Error(
-      "Model evaluation requires live mode and one attempt per case; use evaluate:replay for saved results",
+      "Saved-page selection requires --mode live (live provider inference) and one attempt per case; use evaluate:replay for saved results",
     );
   const collection = readCollection();
   options.sourceCases = collection.length;

@@ -93,7 +93,7 @@ test("unsupported results must match the independently labelled reason code", ()
   }
 });
 
-test("offline identity grading rejects wrong targets and fabricated browser evidence", () => {
+test("Saved-page selection identity grading rejects wrong targets and fabricated browser evidence", () => {
   const spec = {
     ...caseSpec,
     track: "offline-selection",
@@ -570,7 +570,7 @@ test("malformed results and capture leaks fail even when resolution also errors"
   assert.equal(gradeTrial(errorCase, leaked).metrics.privacyLeak, true);
 });
 
-test("offline forecast preserves unmeasured usage and labels cross-split extrapolation", () => {
+test("Saved-page selection forecast preserves unmeasured usage and labels cross-split extrapolation", () => {
   const spec = {
     id: "sample",
     dataset: "phrasenode",

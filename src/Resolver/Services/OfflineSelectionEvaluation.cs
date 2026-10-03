@@ -150,7 +150,11 @@ public static class OfflineSelectionEvaluation
         var length = await file.ReadAtLeastAsync(buffer, buffer.Length, throwOnEndOfStream: false);
         if (length > InputBudgetBytes)
         {
-            throw new ApiException(422, "model_input_budget_exceeded", "Offline input exceeds the model input budget.");
+            throw new ApiException(
+                422,
+                "model_input_budget_exceeded",
+                "Saved-page input exceeds the model input budget."
+            );
         }
         using var document = JsonDocument.Parse(buffer.AsMemory(0, length));
         var root = document.RootElement;
@@ -209,7 +213,11 @@ public static class OfflineSelectionEvaluation
         var input = JsonSerializer.Serialize(new { instruction, candidates }, JsonOptions);
         if (Encoding.UTF8.GetByteCount(input) > InputBudgetBytes)
         {
-            throw new ApiException(422, "model_input_budget_exceeded", "Offline input exceeds the model input budget.");
+            throw new ApiException(
+                422,
+                "model_input_budget_exceeded",
+                "Saved-page input exceeds the model input budget."
+            );
         }
 
         return input;
