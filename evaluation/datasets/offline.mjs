@@ -5,7 +5,6 @@ import { setTimeout as delay } from "node:timers/promises";
 export function normalize(result, attemptId) {
   if (result.outcome === "error")
     return {
-      contractVersion: "offline-1",
       outcome: "error",
       action: null,
       actions: [],
@@ -18,7 +17,6 @@ export function normalize(result, attemptId) {
     throw new Error("Offline selection has no target items");
   const outcomes = new Set(result.actions.map((item) => item.outcome));
   return {
-    contractVersion: "offline-1",
     outcome: outcomes.size === 1 ? result.actions[0].outcome : "partial",
     action: result.action,
     attemptId,
@@ -80,7 +78,6 @@ export async function executeOffline(spec, trial, output, timeoutMs, baseline, w
         Model: prepared.effective.request.model,
         Provider: prepared.effective.request.provider.only[0],
         Strategy: prepared.effective.strategy,
-        PromptVersion: prepared.promptVersion,
         effective: prepared.effective,
       }),
     };
@@ -111,7 +108,6 @@ export function makeCase(item) {
     track: "offline-selection",
     category: "external-target",
     instruction: item.instruction,
-    setupRevision: item.transformationVersion ?? "external-targets-v1",
     review: item.provenance.adaptation ?? {
       status: "source-annotation",
       actionLabel: "unavailable",

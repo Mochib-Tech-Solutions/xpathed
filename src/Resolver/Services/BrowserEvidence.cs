@@ -195,10 +195,9 @@ internal static partial class BrowserEvidence
             checks.Keyboard,
         ];
         string[] values = [.. readiness, checks.Stability, checks.EventOutcome];
-        return target.State.Version == "2"
-            && target.State.AccessibilityExposed == true
+        return target.State.AccessibilityExposed == true
             && target.State.Readonly is not null
-            && assessment is { Version: "2", Reasons: not null, Checks: not null }
+            && assessment is { Reasons: not null, Checks: not null }
             && assessment.Action == action
             && assessment.Status is "ready" or "blocked" or "unknown" or "unsupported"
             && assessment.Reasons.All(reason => !string.IsNullOrWhiteSpace(reason))

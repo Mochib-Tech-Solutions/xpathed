@@ -18,7 +18,6 @@ export type SessionState = {
 };
 
 export type ResolutionResult = {
-  contractVersion: "4";
   outcome: "found" | "not_found" | "unsupported" | "error" | "partial";
   sessionId: string | null;
   pageId: string;
@@ -61,14 +60,12 @@ export type ResolutionResult = {
       enabled: boolean;
       editable: boolean;
       checked: boolean | null;
-      version?: "1" | "2";
       accessibilityExposed?: boolean | null;
       readonly?: boolean | null;
       selected?: boolean | null;
       selectedOptionCount?: number | null;
     };
     interactability?: {
-      version: "1" | "2";
       action: string;
       status: "ready" | "blocked" | "unknown" | "unsupported";
       reasons: string[];

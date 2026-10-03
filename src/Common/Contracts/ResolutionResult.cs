@@ -1,7 +1,6 @@
 namespace Xpathed.Common.Contracts;
 
 public sealed record ResolutionResult(
-    string ContractVersion,
     string Outcome,
     string? SessionId,
     string PageId,

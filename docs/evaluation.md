@@ -4,7 +4,7 @@ Evaluation answers whether the resolver selected the intended targets, interpret
 
 The **evaluation set** has three categories: **model selection**, **XPath construction and verification**, and **Resolver E2E**. Model selection uses reviewed saved inputs and live inference. XPath evaluation supplies controlled selections directly to Browser. Resolver E2E evaluates the complete request with a real browser and model. The chat workspace is a test client outside this boundary. A regression is a lost pass between compared runs. Repeated use of these cases does not establish unseen-data generalization. [ADR-0025](adr/0025-evaluate-selection-xpath-and-resolver-separately.md) records these boundaries.
 
-[ADR-0023](adr/0023-simplify-release-evaluation.md) defines the accepted simplification. This runbook describes the new source layout and workflow contract; it does not establish that hosted workflows, private dataset publication, or live qualification have been exercised. The existing approved release keeps its original evidence until replaced.
+[ADR-0026](adr/0026-use-the-release-branch-as-the-baseline.md) makes the release commit the comparison baseline. CI evaluates the proposed change before merge; merging establishes the next release.
 
 ## One evaluation set, grouped by behavior
 
@@ -21,14 +21,14 @@ evaluation/
   compare.mjs     # Candidate/baseline and monitoring orchestration
   grader.mjs      # Independent grading
   policy.json     # One current release acceptance policy
-  profiles.json   # Selected model/provider configuration
+  configuration.mjs # Evaluation settings supplied by the environment
   provider.mjs    # Shared provider integration
-scripts/release/  # Images, evidence, approval, activation and rollback
+scripts/release/  # Images, evidence, release publication and monitoring
 ```
 
 Cases are organized by the behavior they check. Shared XPath/Resolver case IDs and browser/pipeline test titles use `<group>-<behavior>`, such as `targeting-save-button-by-name`, `scope-offscreen-target-is-absent` and `state-readonly-notes-fill-is-blocked`. Names describe the condition and expected result; historical case IDs remain in `sourceIds` for provenance. Saved runs retain their original case identities. The shared loader also serves deterministic CI. Injected-provider failures and saved-locator mutation cases remain engineering checks; selection records why they are excluded from live release inference. Unit, integration and UI tests keep their existing locations and ordinary CI ownership.
 
-Each release comparison freezes the complete eligible browser collection and every reviewed eligible imported case. Both candidate and approved baseline receive the same case inputs and current grading rules, with one original attempt per arm. Browser state resets independently. New cases and improved checks are welcome: apply the same updated expectations to both arms. Changing the collection or grader after a run requires another comparison.
+Each release comparison freezes the complete eligible browser collection and every reviewed eligible imported case. Both candidate and release baseline receive the same case inputs and current grading rules, with one original attempt per arm. Browser state resets independently. New cases and improved checks are welcome: apply the same updated expectations to both arms. Changing the collection or grader after a run requires another comparison.
 
 ### Compare configurations on equal cases
 
@@ -38,9 +38,9 @@ Freeze one case collection and grader for both arms. Give each arm the same case
 
 Use the group files listed in `evaluation/cases/index.json` for browser categories: targeting, cardinality, appearance, context, scope, state, robustness and frames. Provider-failure and saved-locator cases remain deterministic checks. Historical `family` values identify related fixtures; they are not the current behavior categories. Offline source labels do not establish these browser capabilities.
 
-Show paired gains and losses, plus passing cases over the full denominator, for every group and arm. Keep browser and offline results separate. Provider routes, cache conditions and execution settings belong beside the scores. An unchanged approved configuration rerun measures repeatability, not a new implementation improvement.
+Show paired gains and losses, plus passing cases over the full denominator, for every group and arm. Keep browser and offline results separate. Provider routes, cache conditions and execution settings belong beside the scores. An unchanged release configuration rerun measures repeatability, not a new implementation improvement.
 
-A historical configuration may be an explicitly selected research comparator. Release approval still compares with the latest approved release under the current policy. The release launcher accepts one candidate and one baseline; comparing several model profiles requires a separate research run with the same frozen inputs.
+A historical configuration may be an explicitly selected research comparator. Release CI compares with the existing release commit under the current policy. The release launcher accepts one candidate and one baseline; comparing several model profiles requires a separate research run with the same frozen inputs.
 
 ### Browser cases
 
@@ -114,13 +114,13 @@ The wrapper starts only the services needed by its category in an isolated Compo
 
 Run the complete paired release comparison through `pnpm release:evaluate`; see [release workflow](releases.md). This launcher verifies the saved images and starts the offline Resolver worker. The underlying `pnpm evaluate:qualify` runner cannot start a complete collection by itself; filtered browser-only deterministic checks remain available. `pnpm evaluate:qualify:replay RUN_DIRECTORY` regrades saved comparison evidence without services or paid calls. A filtered check cannot replace the complete release comparison.
 
-Replay reads the saved manifest, observations and original trials with their matching grader. It makes no provider calls and does not recreate the historical browser. Use the recorded source revision for older artifacts rather than applying today's policy to old approval claims.
+Replay reads the saved manifest, observations and original trials with their matching grader. It makes no provider calls and does not recreate the historical browser. Use the recorded source revision for older artifacts rather than applying today's policy to old release claims.
 
 ## Release acceptance
 
 The single current policy is `evaluation/policy.json`:
 
-- Every case the approved baseline passes must also pass for the candidate. Gains elsewhere cannot offset a lost pass.
+- Every case the release baseline passes must also pass for the candidate. Gains elsewhere cannot offset a lost pass.
 - Safety violations, operational failures, invalid contracts, missing required results and artifact mismatches fail the comparison.
 - Existing semantic failures remain visible. Equality can pass when there are no lost passes and the required invariants hold.
 - Median/p95 latency and reported/estimated/unknown costs are descriptive. Slow results and missing billing metadata are not release blockers.
@@ -163,7 +163,7 @@ Authentication, transport failures, provider rejection and missing resolution re
 
 ### Resolver comparison
 
-Use **Basic resolver**, **Improved resolver** and **Stagehand** in reports and charts. Internal revision identifiers belong in saved evidence. Basic is a verified archived bundle; Improved is built from the current checkout, with its source fingerprint and exact image IDs recorded. The application keeps one implementation.
+Use **Basic resolver**, **Improved resolver** and **Stagehand** in reports and charts. Git commits and image identities belong in saved evidence. For a new comparison, Basic must be a verified bundle implementing the same current API contract; Improved is built from the current checkout, with its source fingerprint and exact image IDs recorded. To reproduce the published historical Basic comparison, check out the recorded runner revision from its evidence first: the current runner does not adapt retired numbered contracts or bundle formats. The application keeps one implementation.
 
 ```sh
 pnpm evaluate:compare -- \
@@ -186,7 +186,7 @@ All arms use the same case inputs and independent node labels. Browser binary, v
 
 The common score measures action and target-set correctness, passive behavior and privacy. Correct absence can pass without an action when Stagehand returns no suggestions; partially absent requests compare the found set. Full resolver-contract scores separately include readiness, capture coverage and outcome details. Adapter selector errors are failures, including on unsupported-instruction cases. Unsupported capabilities and provider errors stay in the denominator.
 
-One worker runs each arm, so three isolated streams run concurrently. Each stream processes its frozen case order serially. Stagehand waits for the matching Basic browser observation before checking parity. There are no retries. Provider caching and host contention can affect latency; serial and parallel timing cohorts are reported separately. Retain every original request, response, charge and unknown charge locally. The export contains aggregate metrics, per-case outcomes and evidence hashes; it excludes page/provider payloads. Category charts use the shared behavior groups. Live browser results remain separate from imported offline selection and release approval.
+One worker runs each arm, so three isolated streams run concurrently. Each stream processes its frozen case order serially. Stagehand waits for the matching Basic browser observation before checking parity. There are no retries. Provider caching and host contention can affect latency; serial and parallel timing cohorts are reported separately. Retain every original request, response, charge and unknown charge locally. The export contains aggregate metrics, per-case outcomes and evidence hashes; it excludes page/provider payloads. Category charts use the shared behavior groups. Live browser results remain separate from imported offline selection and release publication.
 
 ### Continue a research comparison in parallel
 
@@ -201,12 +201,12 @@ node evaluation/research/parallel-comparison.mjs \
 
 The runner copies the frozen plan and evidence, retains completed successes and failures, and executes only missing arms. An unfinished attempted arm blocks continuation; it is never silently retried. Identity, response-reuse or evidence-integrity failures stop new work while active attempts drain.
 
-Keep the phase manifest, per-arm claims, worker charge ledgers and before/after image receipts. Report serial and parallel latency cohorts separately because contention and cache conditions differ. This path produces research evidence; ordinary release comparison and approval remain unchanged.
+Keep the phase manifest, per-arm claims, worker charge ledgers and before/after image receipts. Report serial and parallel latency cohorts separately because contention and cache conditions differ. This path produces research evidence; ordinary release comparison and publication remain unchanged.
 
 Dated reports in `docs/research/` preserve their original scores, policies, limits and commands. See the [external dataset pilot](research/external-dataset-pilot-report.md), [labelled baseline](research/deepinfra-labelled-baseline-report.md), [Stagehand evidence](research/stagehand-v4-compatibility.md), [current-view comparison](research/viewport-baseline-report.md) and [context experiment](research/jev-context-comparison-report.md). Replay historical experiments from their recorded revision.
 
 ## Evidence and monitoring
 
-A run saves its manifest, frozen cases and configuration, every original trial, summaries, and available provider evidence. Keep these artifacts private because sanitized page text can still be sensitive. Preserve source/image identity and approval history separately from expiring page/provider evidence. Run pruning does not erase the charge history or extend original retention deadlines.
+A run saves its manifest, frozen cases and configuration, every original trial, summaries, and available provider evidence. Keep these artifacts private because sanitized page text can still be sensitive. Preserve source/image identity and Git release history separately from expiring page/provider evidence. Run pruning does not erase the charge history or extend original retention deadlines.
 
-After a new approval, nightly monitoring runs the entire approved live collection once against the exact approved images and compares with saved approval measurements. It uses one arm, preserves lost passes and operational failures, and never activates a release or changes the model. New cases enter monitoring only with the next approval. The existing `v1.0.0` approval continues through its archived runner and original sentinel receipt until a new-format approval replaces it. See [monitoring](releases.md#nightly-monitoring).
+Nightly monitoring repeats the complete collection published with the current release commit, using its saved images and measurements. It records drift and operational failures without deploying or selecting a configuration. See [monitoring](releases.md#nightly-monitoring).

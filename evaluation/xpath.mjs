@@ -72,7 +72,6 @@ export async function resolveXPathTrial(spec, trial, session, page, options, ser
     // Grader adapter only: retain the raw Browser response above; no Resolver call was made.
     const outcomes = [...new Set(selections.map((item) => item.outcome))];
     trial.result = {
-      contractVersion: "4",
       outcome: outcomes.length === 1 ? outcomes[0] : "partial",
       action: selections[0].action,
       attemptId: trial.id,

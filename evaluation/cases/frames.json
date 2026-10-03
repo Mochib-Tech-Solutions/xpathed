@@ -32,9 +32,7 @@
         }
       ]
     },
-    "contractVersion": "4",
     "split": "regression",
-    "setupRevision": "viewport-baseline-1",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-fixture-source-review",
@@ -66,7 +64,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "qualification-1",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-contract-review",
@@ -123,7 +120,6 @@
       ]
     },
     "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
-    "contractVersion": "4",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
     "group": "frames",
@@ -141,7 +137,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "qualification-1",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-contract-review",
@@ -179,7 +174,6 @@
       ]
     },
     "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
-    "contractVersion": "4",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
     "group": "frames",

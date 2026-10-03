@@ -90,13 +90,7 @@ export function validateCases(manifest) {
       throw new Error("A family cannot cross split boundaries");
     families.set(item.family, item.split);
     if (!Array.isArray(item.expected?.actions)) throw new Error("Expected actions are required");
-    if (
-      !item.instruction ||
-      (!offline && !item.fixture) ||
-      !item.setupRevision ||
-      !item.review ||
-      !item.category
-    )
+    if (!item.instruction || (!offline && !item.fixture) || !item.review || !item.category)
       throw new Error("Case provenance is incomplete");
     if (!offline && (item.viewport?.width !== 1280 || item.viewport?.height !== 800))
       throw new Error("Only the managed 1280x800 viewport is currently supported");
@@ -165,8 +159,7 @@ export function toArtifact(manifest, trial, grade) {
       : null,
     provenance: {
       source: "evaluation",
-      schemaVersion: "1",
-      codeVersion: manifest.code.revision,
+      commit: manifest.code.revision,
       configurationId: trial.result?.configurationId ?? "unavailable",
       caseId: trial.caseId,
       runId: manifest.id,
@@ -187,22 +180,16 @@ export function configurationRecord(trial) {
     model: configuration.Model ?? trial.result?.diagnostics?.model ?? null,
     provider: configuration.Provider ?? trial.result?.diagnostics?.provider ?? null,
     strategy: configuration.Strategy ?? trial.result?.diagnostics?.strategy ?? null,
-    promptVersion: configuration.PromptVersion ?? trial.result?.diagnostics?.promptVersion ?? null,
     promptHash: evidence?.systemPrompt ? hash(evidence.systemPrompt) : null,
     schemaHash: evidence?.outputSchema ? hash(evidence.outputSchema) : null,
     effective: effective
       ? {
           ...pick(effective, [
             "strategy",
-            "promptVersion",
-            "captureVersion",
             "scope",
             "serverDeadlineMs",
             "estimateCost",
             "pricingCacheSeconds",
-            "stateVersion",
-            "interactabilityVersion",
-            "xpathVersion",
             "endpoint",
             "timeoutSeconds",
             "modelInputBudgetBytes",
@@ -342,7 +329,6 @@ async function resolveTrial(spec, trial, session, page, options, services, chann
       {
         instruction: spec.instruction,
         documentId: page.documentId,
-        contractVersion: spec.contractVersion ?? "4",
       },
       options.timeoutMs,
       {

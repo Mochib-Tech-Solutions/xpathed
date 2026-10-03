@@ -7,7 +7,7 @@ import { gunzipSync } from "node:zlib";
 
 const { JSDOM } = createRequire(new URL("../../src/Web/package.json", import.meta.url))("jsdom");
 
-export const transformationVersion = "external-targets-v1";
+const transformation = "external-targets";
 const text = (value) =>
   typeof value === "string" ? value.replace(/\s+/gu, " ").trim().slice(0, 1000) : "";
 const digest = (value) => createHash("sha256").update(value).digest("hex");
@@ -25,7 +25,7 @@ function record(source, provenance, family, id) {
     reasons: [],
     track: "offline-target-selection",
     historicalState: "unavailable",
-    transformationVersion,
+    transformation,
     provenance: { ...provenance, originalId: id },
     source,
     candidates: [],
@@ -609,7 +609,7 @@ export async function importDataset(
   const inventory = { ...buildInventory(cases), inputs: writtenInputs.size };
   const savedManifest = {
     ...manifest,
-    transformationVersion,
+    transformation,
     manifestSha256: digest(JSON.stringify(manifest)),
     casesSha256: digest(JSON.stringify(cases, null, 2) + "\n"),
     inventorySha256: digest(JSON.stringify(inventory, null, 2) + "\n"),

@@ -51,7 +51,15 @@ test("xpath-browser-verification-rejects-unique-match-for-wrong-node", async (t)
               candidateId: "selected",
               frame: { id: "main" },
               xpaths: ["//button"],
-              state: { version: "2", ...spec.expected.actions[0].state },
+              state: {
+                rendered: true,
+                inViewport: true,
+                enabled: true,
+                editable: false,
+                accessibilityExposed: true,
+                readonly: false,
+                ...spec.expected.actions[0].state,
+              },
               interactability: {
                 version: "2",
                 action: "click",

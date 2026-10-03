@@ -1,3 +1,4 @@
+import { retiredReleaseCommit, assertSameSourceTree } from "./baseline.mjs";
 import { startOfflineWorker } from "./offline.mjs";
 import { execFileSync, spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
@@ -142,7 +143,8 @@ async function main() {
         "--sha256",
         "--baseline-bundle",
         "--baseline-sha256",
-        "--baseline-approval",
+        "--baseline-commit",
+        "--initial-baseline",
       ].includes(args[i])
     ) {
       ensure(!options[args[i]], "Duplicate release evaluation option");
@@ -170,49 +172,52 @@ async function main() {
   const bundle = await verify(options["--bundle"], options["--sha256"]);
   const { manifest } = bundle;
   checkSource(manifest.sourceSha);
-  ensure(
-    manifest.profileId === qualification.profileIds[0],
-    "Qualification profile differs from bundle",
-  );
+  const profile = profiles[0];
+  const resolverEnvironment = {
+    OpenRouter__Model: profile.model,
+    OpenRouter__Provider: profile.provider,
+  };
   ensure(
     Boolean(options["--baseline-bundle"]) === Boolean(options["--baseline-sha256"]),
     "Baseline bundle and digest are required together",
   );
-  let comparison, baselineBundle, baselineConfig;
+  ensure(
+    !options["--initial-baseline"] ||
+      (options["--initial-baseline"] === retiredReleaseCommit &&
+        !options["--baseline-bundle"] &&
+        !qualification.monitoring),
+    "Invalid initial baseline transition",
+  );
+  let comparison, baselineBundle;
   if (options["--baseline-bundle"]) {
     baselineBundle = await verify(options["--baseline-bundle"], options["--baseline-sha256"]);
-    baselineConfig = await json(join(baselineBundle.directory, "configuration.json"));
     const baselineManifest = baselineBundle.manifest;
     ensure(
       isDeepStrictEqual(baselineManifest.platform, manifest.platform),
       "Baseline platform differs",
     );
     comparison = {
-      approval: options["--baseline-approval"] ?? null,
+      commit: options["--baseline-commit"] ?? baselineManifest.sourceSha,
       artifact: {
         version: 1,
         bundleManifestSha256: options["--baseline-sha256"],
         sourceSha: baselineManifest.sourceSha,
-        profileId: baselineManifest.profileId,
+        profileId: profile.id,
         images: baselineManifest.images,
         platform: baselineManifest.platform,
       },
-      profile: baselineConfig.profile,
+      profile,
     };
-    validateReleaseArtifact(comparison.artifact, baselineManifest.sourceSha, [
-      baselineManifest.profileId,
-    ]);
+    validateReleaseArtifact(comparison.artifact, baselineManifest.sourceSha, [profile.id]);
+    assertSameSourceTree(comparison.commit, baselineManifest.sourceSha);
   }
-  const config = await json(join(bundle.directory, "configuration.json"));
-  const profile = profiles.find((p) => p.id === manifest.profileId);
-  ensure(isDeepStrictEqual(config.profile, profile), "Current profile differs from bundle profile");
   const service = new URL(profile.resolver).hostname;
   ensure(/^resolver(?:-[a-z0-9-]+)?$/.test(service), "Unsupported resolver service");
   const artifact = {
     version: 1,
     bundleManifestSha256: options["--sha256"],
     sourceSha: manifest.sourceSha,
-    profileId: manifest.profileId,
+    profileId: profile.id,
     images: manifest.images,
     platform: manifest.platform,
   };
@@ -245,11 +250,11 @@ async function main() {
       overlay,
       "services:\n" +
         imageService("browser", manifest.images[0]) +
-        imageService(service, manifest.images[1], config.resolverEnvironment) +
+        imageService(service, manifest.images[1], resolverEnvironment) +
         (comparison
           ? imageService("browser-baseline", comparison.artifact.images[0]) +
             imageService("resolver-baseline", comparison.artifact.images[1], {
-              ...baselineConfig.resolverEnvironment,
+              ...resolverEnvironment,
               BrowserUrl: "http://browser-baseline:8080",
               OpenRouter__BaseUrl: "http://evaluation-fixture:8091/api/v1/",
               OpenRouter__ApiKey: "qualification-proxy-only",
@@ -266,6 +271,7 @@ async function main() {
       XPATHED_RELEASE_STATE: statePath,
       XPATHED_RELEASE_OVERLAY: overlay,
       XPATHED_RELEASE_SERVICE: service,
+      XPATHED_INITIAL_BASELINE: options["--initial-baseline"] ?? "",
       XPATHED_RELEASE_COMPARISON_JSON: comparison ? JSON.stringify(comparison) : "",
     };
     for (const key of Object.keys(env)) if (key.startsWith("GIT_")) delete env[key];

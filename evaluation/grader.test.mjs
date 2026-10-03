@@ -18,7 +18,7 @@ const trial = () => ({
   repetition: 1,
   elapsedMs: 20,
   result: {
-    contractVersion: "2",
+    action: "click",
     outcome: "found",
     actions: [
       {
@@ -29,7 +29,14 @@ const trial = () => ({
         outcome: "found",
         target: {
           xpaths: ["//button"],
-          state: { version: "2" },
+          state: {
+            rendered: true,
+            inViewport: true,
+            enabled: true,
+            editable: false,
+            accessibilityExposed: true,
+            readonly: false,
+          },
           interactability: { version: "2", action: "click" },
         },
       },
@@ -52,10 +59,9 @@ test("a unique XPath passes only when the independent oracle identifies the inte
   assert.equal(gradeTrial(caseSpec, missing).passed, false);
 });
 
-test("version 3 requires one shared action and independently correct target items", () => {
-  const spec = { ...caseSpec, contractVersion: "3" };
+test("the response requires one shared action and independently correct target items", () => {
+  const spec = { ...caseSpec };
   const actual = trial();
-  actual.result.contractVersion = "3";
   actual.result.action = "click";
   assert.equal(gradeTrial(spec, actual).passed, true);
   actual.result.action = "hover";
@@ -72,7 +78,6 @@ test("offline identity grading rejects wrong targets and fabricated browser evid
     },
   };
   const actual = trial();
-  actual.result.contractVersion = "offline-1";
   actual.result.action = "click";
   actual.result.actions[0].target = { candidateId: "c2" };
   actual.observation = {};
@@ -95,7 +100,16 @@ test("decomposition, ordered outcomes, partial state and request summary are ind
   expected.expected.summary = { total: 1, found: 1, blocked: 1 };
   const correct = trial();
   Object.assign(correct.result.actions[0].target, {
-    state: { version: "2", enabled: false, rendered: true },
+    state: {
+      rendered: true,
+      inViewport: true,
+      enabled: true,
+      editable: false,
+      accessibilityExposed: true,
+      readonly: false,
+      enabled: false,
+      rendered: true,
+    },
     interactability: {
       version: "2",
       action: "click",
@@ -146,6 +160,8 @@ test("provider errors, leaked evidence and incomplete coverage remain distinct f
   const providerFailure = trial();
   Object.assign(providerFailure.result, {
     outcome: "error",
+    action: null,
+    summary: null,
     actions: [],
     diagnostics: { code: "provider_timeout" },
   });
@@ -188,8 +204,9 @@ test("late provider accounting reports charged timeout usage without changing th
   const actual = trial();
   actual.elapsedMs = 2004;
   actual.result = {
-    contractVersion: "4",
     outcome: "error",
+    action: null,
+    summary: null,
     actions: [],
     diagnostics: { code: "resolution_timeout", providerAccounting: "pending", modelCalls: 1 },
   };
@@ -458,7 +475,7 @@ test("an operational action failure in a partial result does not masquerade as a
   assert.equal(recognized.metrics.expectedOperationalError, true);
 });
 
-test("malformed versioned results and capture leaks fail even when resolution also errors", () => {
+test("malformed results and capture leaks fail even when resolution also errors", () => {
   const errorCase = {
     ...caseSpec,
     expected: { outcome: "error", code: "provider_timeout", actions: [] },
@@ -466,7 +483,6 @@ test("malformed versioned results and capture leaks fail even when resolution al
   const errorResult = {
     ...trial(),
     result: {
-      contractVersion: "2",
       outcome: "error",
       actions: [],
       summary: null,
@@ -498,7 +514,7 @@ test("malformed versioned results and capture leaks fail even when resolution al
   }
   for (const mutate of [
     (value) => {
-      value.result.actions[0].target.state.version = "1";
+      delete value.result.actions[0].target.state.rendered;
     },
     (value) => {
       delete value.result.actions[0].target.interactability;
@@ -560,7 +576,6 @@ test("offline forecast preserves unmeasured usage and labels cross-split extrapo
     {
       caseId: spec.id,
       result: {
-        contractVersion: "offline-1",
         outcome: "found",
         action: "inspect",
         actions: [
@@ -596,7 +611,6 @@ test("one interaction cannot duplicate a candidate to inflate target completenes
     { track: "offline-selection", expected },
     {
       result: {
-        contractVersion: "offline-1",
         outcome: "found",
         action: "click",
         actions: [1, 2].map((step) => ({
@@ -635,7 +649,6 @@ test("plural reports distinguish missing, extra, duplicate and wrong targets", (
     [["n9", "n2"], 1, 1, 0, 1, 0],
   ]) {
     const result = {
-      contractVersion: "offline-1",
       outcome: "found",
       action: "click",
       actions: ids.map((candidateId, i) => ({

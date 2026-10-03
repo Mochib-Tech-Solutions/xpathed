@@ -238,7 +238,6 @@ export default function useWorkspace() {
         result = await request<ResolutionResult>(`/pages/${page.pageId}/resolve`, "POST", {
           instruction: text,
           documentId: page.documentId,
-          contractVersion: "4",
         });
         if (!isCurrent()) return;
         await readSession(session.sessionId, isCurrent);

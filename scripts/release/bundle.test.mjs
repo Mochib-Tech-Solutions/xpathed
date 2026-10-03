@@ -18,7 +18,7 @@ import { join } from "node:path";
 import test from "node:test";
 
 const hash = (bytes) => createHash("sha256").update(bytes).digest("hex");
-function workspace(t, profileFile = "profiles.json") {
+function workspace(t) {
   const directory = realpathSync(mkdtempSync(join(tmpdir(), "xpathed-bundle-")));
   t.after(() => rmSync(directory, { recursive: true, force: true }));
   const cwd = join(directory, "source");
@@ -26,7 +26,7 @@ function workspace(t, profileFile = "profiles.json") {
   mkdirSync(join(cwd, "scripts"));
   mkdirSync(join(cwd, "evaluation"));
   cpSync("scripts/release/bundle.mjs", join(cwd, "scripts/release/bundle.mjs"));
-  cpSync("evaluation/profiles.json", join(cwd, "evaluation", profileFile));
+  cpSync("evaluation/configuration.mjs", join(cwd, "evaluation/configuration.mjs"));
   writeFileSync(join(cwd, ".gitignore"), ".artifacts/\n.env\n");
   const git = (...args) => {
     const result = spawnSync("git", args, { cwd, encoding: "utf8" });
@@ -94,8 +94,7 @@ else if (args[0] === 'build') {
       encoding: "utf8",
     });
   const output = join(directory, "bundle");
-  const create = () =>
-    run("create", "--profile", "deepseek", "--source-sha", sha, "--output", output);
+  const create = () => run("create", "--source-sha", sha, "--output", output);
   return { cwd, directory, env, log, sha, run, output, create, git };
 }
 
@@ -105,11 +104,9 @@ test("create preserves exact immutable images and verify/restore work after the 
   assert.equal(created.status, 0, created.stderr);
   const manifestBytes = readFileSync(join(work.output, "manifest.json"));
   const manifest = JSON.parse(manifestBytes);
-  assert.equal(manifest.status, "packaged-unqualified");
-  assert.equal(manifest.defaultActivated, false);
   assert.equal(manifest.sourceSha, work.sha);
   assert.equal(statSync(work.output).mode & 0o777, 0o700);
-  for (const file of ["manifest.json", "source.tar", "images.tar", "configuration.json"])
+  for (const file of ["manifest.json", "source.tar", "images.tar"])
     assert.equal(statSync(join(work.output, file)).mode & 0o777, 0o600);
   writeFileSync(join(work.cwd, "changed-source.txt"), "The packaged source stays available");
   work.git("add", "changed-source.txt");
@@ -137,39 +134,22 @@ test("create preserves exact immutable images and verify/restore work after the 
     ),
   );
   const saved = calls.find((args) => args[1] === "save");
-  assert.deepEqual(saved.slice(-2), ["sha256:" + "a".repeat(64), "sha256:" + "b".repeat(64)]);
+  assert.deepEqual(saved.slice(-2), [
+    `xpathed/browser:${work.sha}`,
+    `xpathed/resolver:${work.sha}`,
+  ]);
   assert.ok(
     !readFileSync(join(work.output, "source.tar")).includes(
       Buffer.from("fixture-secret-not-for-archive"),
     ),
   );
-  assert.ok(
-    !readFileSync(join(work.output, "configuration.json"), "utf8").includes(
-      "fixture-secret-not-for-archive",
-    ),
-  );
+  assert.equal(existsSync(join(work.output, "configuration.json")), false);
 });
 
-test("verify reads the legacy profile catalog from the pinned archive", (t) => {
-  const work = workspace(t, "qualification-profiles.json");
-  const created = work.create();
-  assert.equal(created.status, 0, created.stderr);
-  const digest = hash(readFileSync(join(work.output, "manifest.json")));
-  writeFileSync(join(work.cwd, "evaluation/profiles.json"), "invalid current catalog");
-  const before = readFileSync(work.log, "utf8");
-  const verified = work.run("verify", work.output, "--sha256", digest);
-  assert.equal(verified.status, 0, verified.stderr);
-  assert.equal(readFileSync(work.log, "utf8"), before);
-});
-
-test("a malformed current catalog cannot fall back to a valid legacy catalog", (t) => {
+test("a baseline bundle builds the explicitly requested Git commit", (t) => {
   const work = workspace(t);
-  cpSync(
-    join(work.cwd, "evaluation/profiles.json"),
-    join(work.cwd, "evaluation/qualification-profiles.json"),
-  );
-  writeFileSync(join(work.cwd, "evaluation/profiles.json"), "invalid current catalog");
-  work.git("add", "evaluation");
+  writeFileSync(join(work.cwd, "later.txt"), "later commit");
+  work.git("add", "later.txt");
   work.git(
     "-c",
     "user.name=Bundle test",
@@ -178,20 +158,11 @@ test("a malformed current catalog cannot fall back to a valid legacy catalog", (
     "commit",
     "--quiet",
     "-m",
-    "Malformed current catalog fixture",
+    "Later source",
   );
-  const result = work.run(
-    "create",
-    "--profile",
-    "deepseek",
-    "--source-sha",
-    work.git("rev-parse", "HEAD"),
-    "--output",
-    work.output,
-  );
-  assert.equal(result.status, 1);
-  assert.match(result.stderr, /JSON/);
-  assert.equal(existsSync(work.log), false);
+  const result = work.create();
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(JSON.parse(readFileSync(join(work.output, "manifest.json"))).sourceSha, work.sha);
 });
 
 test("a caller-pinned digest and exact regular-file inventory gate every restore", (t) => {
@@ -203,7 +174,7 @@ test("a caller-pinned digest and exact regular-file inventory gate every restore
   let result = work.run("restore", work.output, "--sha256", "0".repeat(64));
   assert.equal(result.status, 1);
   assert.match(result.stderr, /SHA-256 mismatch/);
-  for (const file of ["source.tar", "images.tar", "configuration.json"]) {
+  for (const file of ["source.tar", "images.tar"]) {
     const path = join(work.output, file);
     const bytes = readFileSync(path);
     writeFileSync(path, "changed");
@@ -243,17 +214,9 @@ test("failed builds or saves remove only their new bundle and existing output is
 
 test("create rejects dirty or wrong source and unknown profiles without Docker writes", (t) => {
   const work = workspace(t);
-  let result = work.run(
-    "create",
-    "--profile",
-    "deepseek",
-    "--source-sha",
-    "0".repeat(40),
-    "--output",
-    work.output,
-  );
+  let result = work.run("create", "--source-sha", "0".repeat(40), "--output", work.output);
   assert.equal(result.status, 1);
-  assert.match(result.stderr, /Source SHA/);
+  assert.match(result.stderr, /git rev-parse failed/);
   result = work.run(
     "create",
     "--profile",
@@ -264,7 +227,7 @@ test("create rejects dirty or wrong source and unknown profiles without Docker w
     work.output,
   );
   assert.equal(result.status, 1);
-  assert.match(result.stderr, /profile/);
+  assert.match(result.stderr, /Use create/);
   writeFileSync(join(work.cwd, "dirty.txt"), "Untracked work");
   result = work.create();
   assert.equal(result.status, 1);
@@ -303,15 +266,7 @@ test("tracked environment secrets are rejected before archiving or Docker access
     "Invalid tracked environment fixture",
   );
   const sha = work.git("rev-parse", "HEAD");
-  const result = work.run(
-    "create",
-    "--profile",
-    "deepseek",
-    "--source-sha",
-    sha,
-    "--output",
-    work.output,
-  );
+  const result = work.run("create", "--source-sha", sha, "--output", work.output);
   assert.equal(result.status, 1);
   assert.match(result.stderr, /tracked environment/i);
   assert.equal(existsSync(work.log), false);
@@ -342,7 +297,7 @@ test("verify rejects malformed pinned manifests before any Docker operation", (t
   const before = readFileSync(work.log, "utf8");
   for (const change of [
     (m) => {
-      m.version = 2;
+      m.sourceSha = "invalid";
     },
     (m) => {
       m.files["../outside"] = m.files["images.tar"];
@@ -362,9 +317,7 @@ test("verify rejects malformed pinned manifests before any Docker operation", (t
     (m) => {
       m.images[0].architecture = "arm64";
     },
-    (m) => {
-      m.defaultActivated = true;
-    },
+
     (m) => {
       m.extra = "not supported";
     },

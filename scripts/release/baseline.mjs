@@ -1,27 +1,23 @@
-import { join } from "node:path";
-import { selectQualificationCases } from "../../evaluation/compare.mjs";
-import { fetchApprovedRelease } from "./fetch.mjs";
+import { execFileSync } from "node:child_process";
+import { downloadRelease } from "./download.mjs";
 
-export async function prepareBaseline(snapshot, destination) {
-  if (!snapshot.state.current)
-    throw new Error("No approved baseline; restore the existing approval before comparison");
-  const staged = await fetchApprovedRelease(snapshot, destination);
-  return {
-    bundle: join(staged.source, staged.candidate.bundle),
-    digest: staged.candidate.bundleSha256,
-    approval: snapshot.state.current.candidateSha256,
-    cases: selectQualificationCases(staged.cases).cases,
-  };
+import { retiredReleaseCommit } from "../../evaluation/release-transition.mjs";
+export { retiredReleaseCommit };
+export function assertLatestBaseline(comparison, commit) {
+  if (!/^[a-f\d]{40}$/.test(commit ?? "") || comparison?.commit !== commit)
+    throw new Error("Release branch changed; rerun against its current commit");
 }
-export function assertLatestBaseline(comparison, current) {
-  if (
-    !current ||
-    comparison?.approval !== current.candidateSha256 ||
-    comparison.artifact?.sourceSha !== current.sourceSha ||
-    comparison.artifact.profileId !== current.profile ||
-    comparison.artifact.bundleManifestSha256 !== current.bundleSha256
-  )
-    throw new Error(
-      "Comparison baseline differs from the current approved release; rerun evaluation",
-    );
+export function assertSameSourceTree(commit, testedCommit) {
+  if (![commit, testedCommit].every((sha) => /^[a-f\d]{40}$/.test(sha ?? "")))
+    throw new Error("Exact release and tested commits are required");
+  const tree = (sha) =>
+    execFileSync("git", ["rev-parse", `${sha}^{tree}`], { encoding: "utf8" }).trim();
+  if (tree(commit) !== tree(testedCommit))
+    throw new Error("Published image source differs from the release tree");
+}
+export async function prepareBaseline(repository, commit, destination) {
+  if (commit === retiredReleaseCommit) return null;
+  const downloaded = await downloadRelease(repository, commit, destination);
+  assertSameSourceTree(commit, downloaded.manifest.sourceSha);
+  return { bundle: downloaded.directory, digest: downloaded.receipt.bundleSha256, commit };
 }

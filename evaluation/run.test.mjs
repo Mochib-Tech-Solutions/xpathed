@@ -24,7 +24,6 @@ const example = {
   category: "semantics",
   fixture: "editor",
   instruction: "Click Save",
-  setupRevision: "1",
   viewport: { width: 1280, height: 800 },
   review: { status: "pending" },
   expected: {
@@ -36,7 +35,6 @@ test("evidence-effective-configuration-excludes-page-content-and-credentials", (
   const record = configurationRecord({
     result: {
       configurationId: "config",
-      diagnostics: { model: "model", provider: "route", strategy: "strategy", promptVersion: "6" },
     },
     evidence: {
       systemPrompt: "system",
@@ -47,7 +45,6 @@ test("evidence-effective-configuration-excludes-page-content-and-credentials", (
         effective: {
           endpoint: "https://example.test/api/",
           timeoutSeconds: "30",
-          captureVersion: "4",
           stateVersion: "2",
           interactabilityVersion: "2",
           xpathVersion: "3",
@@ -92,7 +89,6 @@ async function runWithServices(
   caseId,
   {
     captureFailure = false,
-    contractVersion = "4",
     captureScope = "current_view",
     freshFailure = false,
     freshIdentityMismatch = false,
@@ -126,7 +122,7 @@ async function runWithServices(
     if (path === "/browser/pages/page/navigate")
       return send({ pageId: "page", documentId: "document" });
     if (path === "/browser/pages/page/capture") {
-      if (contractVersion === "4") assert.equal(body.scope, "current_view");
+      assert.equal(body.scope, "current_view");
       return captureFailure
         ? send({ code: "capture_budget_exceeded" }, 502)
         : send({
@@ -169,12 +165,12 @@ async function runWithServices(
       attempts.push(attemptId);
       if (freshFailure && attempts.length === 2) return send({ code: "service_unavailable" }, 503);
       const result = {
-        contractVersion,
         pageId: "page",
         documentId: "document",
         attemptId: freshIdentityMismatch && attempts.length === 2 ? "wrong-attempt" : attemptId,
         traceId: "trace",
         configurationId: "config",
+        action: captureFailure ? null : "click",
         outcome: captureFailure ? "error" : "found",
         actions: captureFailure
           ? []
@@ -233,7 +229,6 @@ async function runWithServices(
 
 test("evidence-authored-dom-fixtures-retain-complete-identity", async (t) => {
   const { output } = await runWithServices(t, "appearance-button-above-named-control", {
-    contractVersion: "4",
     captureScope: "viewport",
   });
   const manifest = JSON.parse(await readFile(join(output, "manifest.json"), "utf8"));

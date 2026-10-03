@@ -1,15 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { nextCandidateTag, releaseNotes, phaseNotes } from "./notes.mjs";
+import { releaseTag, releaseNotes, phaseNotes } from "./notes.mjs";
 import { mkdtemp, mkdir, writeFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
-test("release candidates follow the package version and never overwrite a stable release", () => {
-  assert.equal(nextCandidateTag("1.0.0", ["candidate-123-1"]), "v1.0.0-rc.1");
-  assert.equal(nextCandidateTag("1.0.0", ["v1.0.0-rc.2", "v1.0.0-rc.9"]), "v1.0.0-rc.10");
-  assert.throws(() => nextCandidateTag("1.0.0", ["v1.0.0"]), /Bump/);
-  assert.throws(() => nextCandidateTag("01.0.0", []), /MAJOR/);
+test("release identity is the merged Git commit", () => {
+  assert.equal(releaseTag("a".repeat(40)), `release-${"a".repeat(40)}`);
+  assert.throws(() => releaseTag("1.0.0"), /commit/);
 });
 
 test("interrupted trial reporting retains provider records without a completed trial", async (t) => {
@@ -63,7 +61,7 @@ test("release notes show both arms, incomplete qualification and unknown charges
   };
   const notes = releaseNotes(input);
   for (const text of [
-    "not approved",
+    "did not pass",
     "deepseek/deepseek-v4.1-flash",
     "wafer",
     "3/5 (60.0%)",

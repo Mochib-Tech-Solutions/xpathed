@@ -10,7 +10,6 @@ comparison=false
 resume=false
 basic_bundle=
 basic_digest=
-profile=deepseek
 repetitions=1
 seed=1
 timeout=45000
@@ -31,7 +30,7 @@ while [ "$#" -gt 0 ]; do
       case "$1" in --basic-bundle) basic_bundle=$2 ;; --basic-sha256) basic_digest=$2 ;; esac
       shift 2 ;;
     --qualification) qualification=true; shift; continue ;;
-    --mode|--repetitions|--seed|--timeout-ms|--case|--output|--suite|--profile|--monitoring|--concurrency)
+    --mode|--repetitions|--seed|--timeout-ms|--case|--output|--suite|--monitoring|--concurrency)
       if [ "$#" -lt 2 ]; then echo "Missing value for $1" >&2; exit 2; fi
       case "$1" in
         --concurrency) concurrency=$2 ;;
@@ -42,7 +41,6 @@ while [ "$#" -gt 0 ]; do
         --case) case_id=$2 ;;
         --output) output=$2 ;;
         --suite) suite=$2 ;;
-        --profile) profile=$2 ;;
         --monitoring) monitoring=$2 ;;
       esac
       shift 2 ;;
@@ -70,7 +68,6 @@ if [ -n "$monitoring" ] && [ "$qualification" != true ]; then echo "Monitoring r
 if [ -n "${XPATHED_RELEASE_STATE:-}" ]; then
   if [ "$qualification" != true ] || [ -z "${XPATHED_RELEASE_OVERLAY:-}" ] || [ -z "${XPATHED_RELEASE_SERVICE:-}" ]; then echo "Artifact qualification requires its verified launcher" >&2; exit 2; fi
 fi
-if [ "$qualification" != true ] && [ "$profile" != deepseek ]; then echo "Model profile requires qualification mode" >&2; exit 2; fi
 if [ "$qualification" = true ]; then
   case "$suite" in ''|evaluation/cases/index.json) ;; *) echo "Release qualification uses the complete reviewed collection" >&2; exit 2 ;; esac
   suite=${suite:-evaluation/cases/index.json}
@@ -95,7 +92,6 @@ if [ -n "$case_id" ]; then set -- "$@" --case "$case_id"; fi
 if [ -n "$concurrency" ]; then set -- "$@" --concurrency "$concurrency"; fi
 # Reuse the runner's validation before starting services or creating artifacts.
 if [ "$qualification" = true ]; then
-  set -- "$@" --profile "$profile"
   if [ -n "$monitoring" ]; then set -- "$@" --monitoring "$monitoring"; fi
   node --input-type=module -e 'import { parseQualificationOptions } from "./evaluation/compare.mjs"; parseQualificationOptions(process.argv.slice(1));' -- "$@"
 
@@ -310,7 +306,7 @@ elif [ "$xpath" = true ]; then
 elif [ "$qualification" = true ]; then
   browser_binary_hash=$(compose exec -T browser sh -c 'sha256sum /ms-playwright/chromium-*/chrome-linux*/chrome' | awk '{print $1}')
   if [ -n "${XPATHED_RELEASE_STATE:-}" ]; then
-    compose exec -T -e "XPATHED_BROWSER_BINARY_SHA256=$browser_binary_hash" -e "XPATHED_RELEASE_ARTIFACT_JSON=$XPATHED_RELEASE_ARTIFACT_JSON" -e "XPATHED_RELEASE_COMPARISON_JSON=${XPATHED_RELEASE_COMPARISON_JSON:-}" evaluation-fixture node /evaluation/compare.mjs "$@"
+    compose exec -T -e "XPATHED_BROWSER_BINARY_SHA256=$browser_binary_hash" -e "XPATHED_RELEASE_ARTIFACT_JSON=$XPATHED_RELEASE_ARTIFACT_JSON" -e "XPATHED_INITIAL_BASELINE=${XPATHED_INITIAL_BASELINE:-}" -e "XPATHED_RELEASE_COMPARISON_JSON=${XPATHED_RELEASE_COMPARISON_JSON:-}" evaluation-fixture node /evaluation/compare.mjs "$@"
   else
     compose exec -T -e "XPATHED_BROWSER_BINARY_SHA256=$browser_binary_hash" evaluation-fixture node /evaluation/compare.mjs "$@"
   fi
