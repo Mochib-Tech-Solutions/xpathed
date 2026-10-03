@@ -1,6 +1,6 @@
 # CI checks and evidence
 
-The `CI` workflow runs on pull requests, pushes to `main`, merge groups and manual dispatch. Changed paths select independent .NET, persistence, Web, tooling, Docker-configuration and deterministic-browser jobs. Shared inputs select their consumers; documentation-only changes still run selection and the aggregate. Manual dispatch selects every job.
+The `CI` workflow runs on pull requests, pushes to `main`, merge groups and manual dispatch. Changed paths select independent .NET, Web, tooling, Docker-configuration and deterministic-browser jobs. Shared inputs select their consumers; documentation-only changes still run selection and the aggregate. Manual dispatch selects every job.
 
 Every job checks out `github.sha`: the synthetic merge commit for a pull request, the actual pushed revision on `main`, or the merge-group revision. Superseded PR runs can be cancelled; separate `main` revisions do not cancel each other. A failed post-merge check requires investigation and a corrective PR or an explicitly authorized revert; this workflow does not roll back releases.
 
@@ -32,7 +32,7 @@ Installation uses Git's native `core.hooksPath` and worktree configuration. It e
 
 Full-project checks preserve TypeScript configuration and catch dependencies beyond the staged files. Nothing is autoformatted or staged. When executable inputs are selected, unstaged tracked or untracked source/configuration causes rejection before any checks run. Stage the intended changes or set unrelated edits aside yourself; the hook never stashes work. Unstaged documentation and ignored outputs do not block code checks. The hook also rejects index/source changes detected after checking. Keep ignored generated files and dependencies current; this is local feedback, not a hermetic build.
 
-PostgreSQL persistence and deterministic browser integration remain in their isolated CI jobs. Local hooks never start the application stack or call a paid provider. Docker validation can resolve image metadata. The hook fails if a selected tool or check is unavailable; it does not silently skip checks.
+Deterministic browser integration remains in its isolated CI job. Local hooks never start the application stack or call a paid provider. Docker validation can resolve image metadata. The hook fails if a selected tool or check is unavailable; it does not silently skip checks.
 
 ## Commit and PR titles
 
@@ -58,7 +58,7 @@ Stack checks reuse [dotnet format verification](https://learn.microsoft.com/en-u
 
 After its checks succeed, each selected job writes a receipt containing the actual checkout SHA, workflow run and attempt, job identity and workflow/package/SDK fingerprints. Each .NET matrix member has its own receipt. The final `Check` job requires exactly the selected receipts and successful job results. Missing, unexpected, stale, skipped, cancelled or failed selected jobs fail the gate; unselected jobs must be skipped.
 
-The browser job runs `pnpm evaluate:resolver --mode deterministic --concurrency 4` with a fresh output directory and isolated Compose project. It builds only Browser, Resolver and the controlled evaluation fixture. It has no OpenRouter key, reads no local `.env`, and uses the fixture model endpoint with response reuse disabled. The shared case catalog includes current-view resolution, deterministic provider failures and saved-locator mutation coverage in one run. Persistence remains a separate PostgreSQL-only job.
+The browser job runs `pnpm evaluate:resolver --mode deterministic --concurrency 4` with a fresh output directory and isolated Compose project. It builds only Browser, Resolver and the controlled evaluation fixture. It has no OpenRouter key, reads no local `.env`, and uses the fixture model endpoint with response reuse disabled. The shared case catalog includes current-view resolution, deterministic provider failures and saved-locator mutation coverage in one run.
 
 Both the browser receipt and aggregate replay the saved browser evidence through the existing grader. They require the complete original `evaluation/cases/index.json` suite, one first attempt per case, matching source/configuration identities and a saved summary equal to replay. Partial, retried, live, missing or failing results cannot pass. These are deterministic engineering checks; they do not measure model quality or qualify a release.
 

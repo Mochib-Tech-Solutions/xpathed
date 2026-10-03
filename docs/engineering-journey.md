@@ -77,7 +77,6 @@ Update the selected implementation in place. Retired contracts and experiment se
 | ---------------------------- | --------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
 | .NET unit and API tests      | Parsing, validation, cancellation, accounting and HTTP contracts with controlled dependencies | Fast feedback on code rules without browsers or paid providers               |
 | Web component tests          | Tabs, chat state, result rendering and client interactions                                    | Checks UI behavior in a simulated DOM                                        |
-| PostgreSQL integration tests | Real schema, migrations, persistence, isolation and retention                                 | Database behavior needs the actual database                                  |
 | Resolution browser tests     | Real Chromium capture, XPath identity, frames, stale pages, readiness and passive state       | A mock DOM cannot establish browser behavior                                 |
 | Deterministic evaluation     | Shared cases through capture, scripted model output and independent grading                   | Detects pipeline regressions without model variation or cost                 |
 | Live Resolver E2E evaluation | Complete resolution API requests with real model selection and browser verification           | Measures action, targets, XPath and readiness on the browser evaluation set  |
@@ -90,7 +89,7 @@ Tooling tests check the runners, graders, accounting and release scripts themsel
 
 ## Preserve evidence and protect known behavior
 
-ClientApi stores attempts, outcomes, configuration, timings and sanitized evidence in PostgreSQL. Storage problems do not replace semantic results. Investigation starts from the attempt and trace IDs, then separates capture, provider, contract, stale-page and target-selection failures. An operational log alone cannot establish the user's intended target.
+Resolution responses carry attempt and trace IDs, configuration, timings and reason codes. Evaluation runners save their own evidence for investigation and replay. Operational logs separate capture, provider, contract, stale-page and target-selection failures; they cannot establish the user’s intended target.
 
 Ordinary CI remains provider-free. Release evaluation compares exact candidate and approved images on the same complete collection, with one original attempt per case and no automatic retries. Approval requires no lost baseline pass and valid contract, safety and artifact checks. Latency and cost remain descriptive; missing charges remain unknown.
 

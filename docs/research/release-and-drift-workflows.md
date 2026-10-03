@@ -1,5 +1,7 @@
 # Release qualification and nightly drift workflows
 
+Storage references below describe the earlier design. Application persistence was removed on 2026-10-03; see [ADR-0013](../adr/0013-keep-workspace-state-in-memory.md) and the [current runtime](../runtime.md).
+
 Research checked 2026-09-29. This is a proposed design; workflows, repository protection, notification settings, and email delivery have not been configured or verified by this research.
 
 ## User decisions

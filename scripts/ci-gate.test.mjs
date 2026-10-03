@@ -41,7 +41,6 @@ function workspace(t) {
   };
   const outputs = {
     dotnet: "[]",
-    persistence: "false",
     solution: "false",
     web: "false",
     tooling: "false",

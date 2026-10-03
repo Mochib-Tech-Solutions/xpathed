@@ -50,58 +50,6 @@
         "resolved": "17.14.1",
         "contentHash": "pmTrhfFIoplzFVbhVwUquT+77CbGH+h4/3mBpdmIlYtBi9nAB+kKI6dN3A/nV4DFi3wLLx/BlHIPK+MkbQ6Tpg=="
       },
-      "Microsoft.EntityFrameworkCore": {
-        "type": "Transitive",
-        "resolved": "10.0.12",
-        "contentHash": "e7OrVN8U5yr4kuwdTHWBHGVQIVsGfMkAr0Ej1/BnrS989Q0XBVANpIzNZ2bc1GvMZ0/XwMt5InTnmKskxGy99Q==",
-        "dependencies": {
-          "Microsoft.EntityFrameworkCore.Abstractions": "10.0.12",
-          "Microsoft.EntityFrameworkCore.Analyzers": "10.0.12",
-          "Microsoft.Extensions.Caching.Memory": "10.0.12",
-          "Microsoft.Extensions.Logging": "10.0.12"
-        }
-      },
-      "Microsoft.EntityFrameworkCore.Abstractions": {
-        "type": "Transitive",
-        "resolved": "10.0.12",
-        "contentHash": "kDrux7T6C3V/YYYe2LXr7x6AEsVyq5Y2YoTE9er1SwbDtap3z1g8RgxNh5eKQVyB4T+DKvBBJ4Ezd/VZzJQJZg=="
-      },
-      "Microsoft.EntityFrameworkCore.Analyzers": {
-        "type": "Transitive",
-        "resolved": "10.0.12",
-        "contentHash": "Kd4o2oO1A6dfKxjz5LS16QyLtpCFTUiFWwmBABETAXRsSImBdRdWeKjSgbbRhAMiV3a3/nWr95ZtzClT4uaADQ=="
-      },
-      "Microsoft.EntityFrameworkCore.Relational": {
-        "type": "Transitive",
-        "resolved": "10.0.12",
-        "contentHash": "OiHmr8XzX96dbgMsYGe8qoqg4KxibdZG2r0QUVJBGktFInOp8IrABe8jvcbo5hrqeWfbwpK7fCEBiEPbY/ik4A==",
-        "dependencies": {
-          "Microsoft.EntityFrameworkCore": "10.0.12",
-          "Microsoft.Extensions.Caching.Memory": "10.0.12",
-          "Microsoft.Extensions.Configuration.Abstractions": "10.0.12",
-          "Microsoft.Extensions.Logging": "10.0.12"
-        }
-      },
-      "Microsoft.Extensions.Caching.Abstractions": {
-        "type": "Transitive",
-        "resolved": "10.0.12",
-        "contentHash": "sI3A6MUAyZwccLnwq0cXuRmC3WBtXieimBWafXSfhRJ4jnM2uGVXrqImDDVyW27u4vVaTOGlJxNJd8d1FGvCNQ==",
-        "dependencies": {
-          "Microsoft.Extensions.Primitives": "10.0.12"
-        }
-      },
-      "Microsoft.Extensions.Caching.Memory": {
-        "type": "Transitive",
-        "resolved": "10.0.12",
-        "contentHash": "fhC3DHcBcFF4bXvHIxFtXJYNut7q7ZItqNFcgWfrIgmpVImlcEKNHhE7ztpNSPJYMHYYStS5QGND2I5mC26yeA==",
-        "dependencies": {
-          "Microsoft.Extensions.Caching.Abstractions": "10.0.12",
-          "Microsoft.Extensions.DependencyInjection.Abstractions": "10.0.12",
-          "Microsoft.Extensions.Logging.Abstractions": "10.0.12",
-          "Microsoft.Extensions.Options": "10.0.12",
-          "Microsoft.Extensions.Primitives": "10.0.12"
-        }
-      },
       "Microsoft.Extensions.Configuration": {
         "type": "Transitive",
         "resolved": "10.0.12",
@@ -405,24 +353,6 @@
         "resolved": "13.0.3",
         "contentHash": "HrC5BXdl00IP9zeV+0Z848QWPAoCr9P3bDEZguI+gkLcBKAOxix/tLEAAHC+UvDNPv4a2d18lOReHMOagPa+zQ=="
       },
-      "Npgsql": {
-        "type": "Transitive",
-        "resolved": "10.0.3",
-        "contentHash": "7nb5YzXuvWWJxB0J8DiyL3we+X4FOctZrt0fIBnucOIaIevFEEwGQVZKtiu9olXdlNAK1eNgqSral6r/jlhI4w==",
-        "dependencies": {
-          "Microsoft.Extensions.Logging.Abstractions": "10.0.0"
-        }
-      },
-      "Npgsql.EntityFrameworkCore.PostgreSQL": {
-        "type": "Transitive",
-        "resolved": "10.0.3",
-        "contentHash": "IPGrrZnRkuW7OlHDhUESZz4G5DLkW7Nej/O3Cx+0iTsgyU5XJxBgpsvTHLloo3WWuAKKbDHXBvWPVkX1deRh1Q==",
-        "dependencies": {
-          "Microsoft.EntityFrameworkCore": "[10.0.4, 11.0.0)",
-          "Microsoft.EntityFrameworkCore.Relational": "[10.0.4, 11.0.0)",
-          "Npgsql": "10.0.3"
-        }
-      },
       "System.Diagnostics.EventLog": {
         "type": "Transitive",
         "resolved": "10.0.12",
@@ -471,9 +401,7 @@
       "clientapi": {
         "type": "Project",
         "dependencies": {
-          "Common": "[1.0.0, )",
-          "Microsoft.EntityFrameworkCore.Relational": "[10.0.12, )",
-          "Npgsql.EntityFrameworkCore.PostgreSQL": "[10.0.3, )"
+          "Common": "[1.0.0, )"
         }
       },
       "common": {

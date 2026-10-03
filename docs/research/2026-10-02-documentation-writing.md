@@ -1,5 +1,7 @@
 # Writing and illustrating xpathed
 
+Storage references below describe the earlier design. Application persistence was removed on 2026-10-03; see [ADR-0013](../adr/0013-keep-workspace-state-in-memory.md) and the [current runtime](../runtime.md).
+
 Research date: 2026-10-02. Editorial guidance for the current project documentation; product behavior remains defined by the implementation and accepted contracts.
 
 ## Write for a new technical reader

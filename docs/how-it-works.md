@@ -6,7 +6,7 @@
 
 [![Service ownership and request paths](diagrams/system-design.svg)](diagrams/system-design.svg)
 
-Resolver is the core system: it accepts instructions through its API and coordinates capture, model selection and verification. Browser supplies live page operations through HTTP; the bundled implementation owns Playwright and Chromium. `Common` defines the records exchanged at this boundary. Web and ClientApi form the manual test client, with PostgreSQL retaining that client's diagnostic records.
+Resolver is the core system: it accepts instructions through its API and coordinates capture, model selection and verification. Browser supplies live page operations through HTTP; the bundled implementation owns Playwright and Chromium. `Common` defines the records exchanged at this boundary. Web and ClientApi form the manual test client. Chat history lives in the workspace session.
 
 Each managed session owns a Chromium process, browser context and display. Operations are serialized within the session. Viewer and resolver share the active page ID; navigation changes its document ID, and a capture identifies one temporary element inventory. Tab switches invalidate captures.
 
@@ -24,7 +24,7 @@ The diagram follows a request from the bundled test client. Resolver's API is al
 
 ### 1. Capture the current view
 
-A caller sends the instruction, active `pageId`, `documentId` and contract version to Resolver. Resolver requests a Browser capture. In the manual test client, Web forwards through ClientApi, which opens a diagnostic attempt; evaluation runners call Resolver directly.
+A caller sends the instruction, active `pageId`, `documentId` and contract version to Resolver. Resolver requests a Browser capture. In the manual test client, Web forwards through ClientApi; evaluation runners call Resolver directly.
 
 Browser retains live nodes locally and assigns temporary candidate IDs. The model-visible descriptions contain sanitized names, roles, section/row context, state, geometry, supported CSS colors and frame context. In our example, the Employee heading distinguishes its OK button from other OK buttons.
 
@@ -64,12 +64,6 @@ Browser highlights found targets and Resolver returns the shared action, target 
 
 Estimated and provider-reported cost remain separate; missing accounting is unknown. Cancelled requests may still incur charges. Two seconds is a latency measurement, not a total-response cutoff.
 
-## Storage and failure investigation
-
-ClientApi records each attempt's result and sanitized evidence in PostgreSQL so failures can be investigated after a tab closes. Retries get new IDs; storage failure is logged without replacing the resolution outcome. Resolver has no database dependency.
-
-Follow the attempt/trace ID, configuration, stage and reason code to distinguish capture, provider, response-validation and browser-verification failures. Judging a wrong selection also requires an independently known intended target. The [diagnostics guide](diagnostics.md) gives the commands and a worked example.
-
 ## Extending and integrating
 
 | Change                      | Implementation boundary                                        |
@@ -79,7 +73,6 @@ Follow the attempt/trace ID, configuration, stage and reason code to distinguish
 | Prompt or interpretation    | `ActionSelectionStrategy`                                      |
 | Model-visible context       | `CandidateInput`                                               |
 | Capture, XPath or readiness | `BrowserPageCapture`, `BrowserCaptureScript`                   |
-| Diagnostic persistence      | `ResolutionRecorder`, `DiagnosticStore`, `AppDbContext`        |
 
 The selected Resolver has one prompt/schema and implementation, updated in place. Browser replacement uses the service contract, independently of model selection. Changes require corresponding target, contract, privacy and browser checks.
 

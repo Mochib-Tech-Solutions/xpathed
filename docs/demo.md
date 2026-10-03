@@ -26,7 +26,7 @@ Use the diagrams in [How it works](how-it-works.md):
 2. Browser captures sanitized candidates and retains their live nodes.
 3. One model call selects IDs; Resolver validates the contract.
 4. Browser builds XPath, verifies identity and rechecks the current view.
-5. ClientApi stores the diagnostic attempt in PostgreSQL.
+5. The workspace keeps the result in the active tab’s chat history until it is cleared or the tab closes.
 
 Explain the five local Docker services, model settings and single-table schema. Distinguish candidate selection, locator correctness and observed readiness.
 

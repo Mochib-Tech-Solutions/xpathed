@@ -6,13 +6,6 @@ import { setTimeout as delay } from "node:timers/promises";
 const client = "http://client-api:8080";
 const fixture = "http://resolution-fixture:8090";
 
-test("Diagnostic records are unavailable through Web and from other service containers", async () => {
-  const publicResponse = await fetch("http://web:8080/internal/diagnostics");
-  assert.equal(publicResponse.status, 404);
-  const serviceResponse = await fetch(`${client}/internal/diagnostics`);
-  assert.equal(serviceResponse.status, 403);
-});
-
 test("Client results preserve nested frame chains and expanded actions through the complete pipeline", async () => {
   await json(`${fixture}/scenario`, "POST", {
     name: "batch",

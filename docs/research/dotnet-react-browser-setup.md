@@ -1,5 +1,7 @@
 # .NET, React, and managed browser setup
 
+Storage references below describe the earlier design. Application persistence was removed on 2026-10-03; see [ADR-0013](../adr/0013-keep-workspace-state-in-memory.md) and the [current runtime](../runtime.md).
+
 Official sources checked on 2026-09-29. PostgreSQL and separate client API, resolver, and browser runtimes are now accepted in specification issue #1 and ADR-0005. The combined-host proposal below is historical and superseded; package/API observations still require verification during implementation.
 
 ## Supported release baseline

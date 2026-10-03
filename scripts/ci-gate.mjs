@@ -7,7 +7,7 @@ import { projects } from "./ci-changes.mjs";
 import { replay } from "../evaluation/run.mjs";
 
 const directory = ".artifacts/ci";
-const flags = ["persistence", "solution", "web", "tooling", "docker", "browser"];
+const flags = ["solution", "web", "tooling", "docker", "browser"];
 const keys = ["changes", "dotnet", ...flags];
 const jobs = ["changes", ...projects.map((project) => `dotnet-${project}`), ...flags];
 const hash = (value) => createHash("sha256").update(value).digest("hex");

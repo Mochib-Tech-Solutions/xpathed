@@ -13,7 +13,6 @@ const none = {
   tooling: false,
   docker: false,
   solution: false,
-  persistence: false,
   browser: false,
 };
 const all = {
@@ -22,10 +21,9 @@ const all = {
   tooling: true,
   docker: true,
   solution: true,
-  persistence: true,
   browser: true,
 };
-const sharedDotnet = { ...none, dotnet: projects, persistence: true, browser: true };
+const sharedDotnet = { ...none, dotnet: projects, browser: true };
 
 test("Browser source changes require deterministic browser evaluation", () => {
   assert.equal(classifyChanges(["src/Browser/Sessions/BrowserSessions.cs"]).browser, true);
@@ -75,15 +73,8 @@ for (const [path, expected] of [
   [".npmrc", { ...none, web: true, tooling: true, browser: true }],
   ["src/Browser/Sessions/BrowserSessions.cs", { ...none, dotnet: ["Browser"], browser: true }],
   ["src/Resolver/Resolver.csproj", { ...none, dotnet: ["Resolver"], browser: true }],
-  ["tests/ClientApi.Tests/SessionTests.cs", { ...none, dotnet: ["ClientApi"], persistence: true }],
-  [
-    "tests/ClientApi.IntegrationTests/PersistenceTests.cs",
-    { ...none, dotnet: ["ClientApi"], persistence: true },
-  ],
-  [
-    "src/ClientApi/Persistence/ClientDbContext.cs",
-    { ...none, dotnet: ["ClientApi"], persistence: true },
-  ],
+  ["tests/ClientApi.Tests/SessionTests.cs", { ...none, dotnet: ["ClientApi"] }],
+  ["src/ClientApi/Controllers/PagesController.cs", { ...none, dotnet: ["ClientApi"] }],
   ["src/Common/Contracts/Session.cs", sharedDotnet],
   ["tests/Common.Tests/ContractTests.cs", sharedDotnet],
   ["Directory.Build.props", sharedDotnet],
@@ -182,26 +173,25 @@ test("test discovery selects only the owning service test projects", (t) => {
   for (const name of [
     "Browser.Tests",
     "Browser.IntegrationTests",
-    "ClientApi.IntegrationTests",
+    "ClientApi.Tests",
     "Resolver.Tests",
   ]) {
     mkdirSync(join(cwd, "tests", name), { recursive: true });
     writeFileSync(join(cwd, "tests", name, `${name}.csproj`), "<Project />");
   }
   assert.deepEqual(testProjects("Browser", cwd), ["tests/Browser.Tests/Browser.Tests.csproj"]);
-  assert.equal(testProjects("all", cwd).length, 2);
-  assert.deepEqual(testProjects("ClientApi", cwd), []);
-  assert.deepEqual(testProjects("Common", cwd), []);
-  assert.deepEqual(testProjects("persistence", cwd), [
-    "tests/ClientApi.IntegrationTests/ClientApi.IntegrationTests.csproj",
+  assert.equal(testProjects("all", cwd).length, 3);
+  assert.deepEqual(testProjects("ClientApi", cwd), [
+    "tests/ClientApi.Tests/ClientApi.Tests.csproj",
   ]);
+  assert.deepEqual(testProjects("Common", cwd), []);
   assert.throws(() => testProjects("../outside", cwd), /Unknown project/);
 });
 
 test("required service test projects cannot disappear from discovery", (t) => {
   const cwd = mkdtempSync(join(tmpdir(), "xpathed-ci-missing-tests-"));
   t.after(() => rmSync(cwd, { recursive: true, force: true }));
-  for (const name of ["Browser", "Resolver"]) {
+  for (const name of ["Browser", "ClientApi", "Resolver"]) {
     assert.throws(() => testProjects(name, cwd), /required.*test project.*missing/i);
     mkdirSync(join(cwd, "tests", `${name}.Tests`), { recursive: true });
     assert.throws(() => testProjects(name, cwd), /required.*test project.*missing/i);

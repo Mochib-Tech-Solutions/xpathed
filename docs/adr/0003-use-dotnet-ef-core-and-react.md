@@ -1,3 +1,0 @@
-# Use .NET, EF Core, and React
-
-Use a .NET backend with Entity Framework Core and PostgreSQL, and a React frontend. PostgreSQL runs in Docker for local development. This follows the candidate's chosen implementation stack and replaces the earlier TypeScript-only proposal. Model connections and resolution strategies remain replaceable, with OpenRouter as the only initial gateway and no Zen adapter in scope. Select supported stable releases and compatible provider versions when establishing the build. The initial demo runs locally; hosted delivery follows later. Persistence details remain open in specification issue #1; separate service ownership is recorded in ADR-0005.

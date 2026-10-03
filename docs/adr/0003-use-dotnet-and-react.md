@@ -1,0 +1,3 @@
+# Use .NET and React
+
+Use a .NET backend and a React frontend. The services run in Docker for local development. This follows the candidate's chosen implementation stack and replaces the earlier TypeScript-only proposal. Model connections and resolution strategies remain replaceable, with OpenRouter as the only initial gateway and no Zen adapter in scope. Select supported stable releases and compatible provider versions when establishing the build. The initial demo runs locally; hosted delivery follows later. Application storage was removed under [ADR-0013](0013-keep-workspace-state-in-memory.md); separate service ownership is recorded in ADR-0005.

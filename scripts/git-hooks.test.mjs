@@ -44,7 +44,7 @@ test("local command selection reuses CI ownership and excludes integration/paid 
   for (const [paths, expected] of [
     [["src/Resolver/Resolver.csproj"], ["Resolver"]],
     [["src/Common/Contracts.cs"], ["Common", "Browser", "ClientApi", "Resolver"]],
-    [["tests/ClientApi.IntegrationTests/RecordTests.cs"], ["ClientApi"]],
+    [["tests/ClientApi.Tests/ControllerContractTests.cs"], ["ClientApi"]],
   ]) {
     const commands = checkCommands(paths);
     assert.deepEqual(
@@ -59,7 +59,7 @@ test("local command selection reuses CI ownership and excludes integration/paid 
   const all = checkCommands(["package.json"]);
   assert.ok(all.some((cmd) => cmd[1] === "build:dotnet"));
   assert.ok(all.some((cmd) => cmd[1] === "docker:check"));
-  assert.ok(!JSON.stringify(all).match(/evaluate|test:persistence|test:resolution|--live/));
+  assert.ok(!JSON.stringify(all).match(/evaluate|test:resolution|--live/));
 });
 
 test("Conventional Commits covers optional scopes, breaking changes and rejects malformed headers", () => {

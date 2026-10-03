@@ -3,7 +3,6 @@ set -eu
 cd "$(dirname "$0")/.."
 
 # Configuration validation must not depend on local credentials or create .env.
-export POSTGRES_PASSWORD=configuration-check-only
 export XPATHED_PORT=8080
 export OPENROUTER_API_KEY=configuration-check-only
 export OPENROUTER_EVAL_API_KEY=configuration-check-only

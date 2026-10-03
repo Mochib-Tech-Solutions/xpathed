@@ -122,8 +122,6 @@ if ! mkdir "$evaluation_lock" 2>/dev/null; then
 fi
 trap 'rmdir "$evaluation_lock"' EXIT
 
-# The base Compose file parses unused database settings; no database service starts.
-export POSTGRES_PASSWORD=evaluation-unused
 evaluation_env=${XPATHED_ENV_FILE:-/dev/null}
 if [ "$mode" = live ] && [ -z "${XPATHED_ENV_FILE:-}" ] && [ -f .env ]; then evaluation_env=.env; fi
 if [ "$mode" = live ]; then
