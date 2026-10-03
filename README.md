@@ -215,3 +215,5 @@ The fresh `v1.0.0` establishes its baseline after ordinary CI and complete live 
 - [Demo guide](docs/demo.md): present the working system.
 - [Runtime](docs/runtime.md) and [resolution contract](docs/resolution.md): API and configuration reference.
 - [Evaluation](docs/evaluation.md) and [releases](docs/releases.md): run, compare and deploy.
+
+Imported-case review also binds the prepared model input after privacy sanitization. The host verifies this hash before provider inference; see the [prepared-input audit](docs/research/2026-10-03-prepared-input-audit.md).

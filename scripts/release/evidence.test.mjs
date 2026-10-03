@@ -96,6 +96,7 @@ async function workspace(t, { qualificationPolicy = "current", bootstrapBaseline
     caseId: offline.id,
     inputHash: hash(input),
     labelHash: hash(offline.expected),
+    preparedInputHash: hash(offline.input),
     disposition: "validated",
     reason: "Unique named source target verified.",
     reviewer: "fixture-source-review",

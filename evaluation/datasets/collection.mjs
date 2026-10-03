@@ -24,6 +24,8 @@ export function validateLabelReview(spec, review = spec.labelReview) {
     !dispositions.has(review.disposition) ||
     review.inputHash !== hash(JSON.stringify(spec.input)) ||
     review.labelHash !== hash(JSON.stringify(spec.expected)) ||
+    (review.disposition === "validated" &&
+      !/^[a-f0-9]{64}$/.test(review.preparedInputHash ?? "")) ||
     typeof review.reason !== "string" ||
     !review.reason.trim() ||
     typeof review.reviewer !== "string" ||

@@ -42,6 +42,8 @@ Before editing a service or tests, read its scoped `AGENTS.md`. Use `$xpathed-re
 
 Keep independent localhost workspaces isolated with UUID session/page identities and show the connected session ID in the header. Keep session isolation, cancellation semantics, origin checks and the Chromium sandbox intact. Adopt new-tab links and popup windows as managed pages in the same session, within the tab limit. Keep the viewer and resolver on the active page, invalidating captures and highlights on tab switches. Closing all tabs must end the session, invalidate every previous page, clear its browser state and return to the initial address field. Treat page content and future model output as untrusted data; keep cookies, credentials, passwords and unrelated form values out of logs and model inputs.
 
+For imported evaluation inputs, semantic review must include the exact prepared model input after Resolver privacy sanitization. Bind that input hash and reject drift before provider inference; imported JSON alone is not sufficient evidence of answerability. Preserve rejected preparation evidence and stop new calls on review-integrity violations.
+
 ## Commands and verification
 
 Call the labelled cases the **evaluation set**, with **model selection**, **XPath construction and verification**, and **Resolver E2E** categories. Live describes real provider inference; offline describes saved page inputs. Use regression for a lost pass in a comparison. Resolver E2E covers the complete resolution API pipeline; Web tests separately cover the test client. Preserve the release policy that blocks lost baseline passes.
