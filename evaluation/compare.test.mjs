@@ -205,6 +205,21 @@ test("release selection reuses every reviewed current case without a phase or sp
     ["new", "regression", "offline"],
   );
   assert.equal(selected.exclusions.length, 2);
+  const sourceExclusions = [
+    { caseId: "removed-source", reason: "label incorrect: Contradicts the instruction." },
+  ];
+  const filtered = selectQualificationCases(
+    cases,
+    { ...options, caseId: "offline" },
+    sourceExclusions,
+  );
+  assert.equal(filtered.sourceCases, 6);
+  assert.equal(filtered.cases.length, 1);
+  assert.equal(filtered.exclusions.length, 5);
+  assert.deepEqual(filtered.exclusions[0], sourceExclusions[0]);
+  assert.deepEqual(sourceExclusions, [
+    { caseId: "removed-source", reason: "label incorrect: Contradicts the instruction." },
+  ]);
   const plan = buildMatrixPlan(selected.cases, [{ id: "candidate" }], options);
   assert.equal(plan.trials.length, 3);
   assert.equal(plan.retries, 0);

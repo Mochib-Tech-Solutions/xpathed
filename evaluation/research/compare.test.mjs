@@ -87,6 +87,52 @@ test("provider identity and cache violations are rejected even on the final atte
   );
 });
 
+test("ended response-body timeouts remain failed attempts without stopping later cases", () => {
+  const record = {
+    id: "body-timeout",
+    forwarded: true,
+    status: 200,
+    error: "The operation was aborted due to timeout",
+    reportedUsd: null,
+  };
+  const trial = {
+    error: { message: "Upstream response failed" },
+    provider: [record],
+    evidence: { provider: [{ ...record, request: { model: "expected-model" }, response: null }] },
+  };
+  assert.doesNotThrow(() => assertProviderIntegrity(trial));
+  assert.doesNotThrow(() =>
+    assertProviderIntegrity({ ...trial, error: undefined, result: { outcome: "error" } }),
+  );
+  assert.throws(
+    () => assertProviderIntegrity({ ...trial, error: undefined, result: { outcome: "found" } }),
+    /comparison stopped/,
+  );
+  for (const changed of [
+    { identityValid: false },
+    { responseCacheHit: true },
+    { response: "malformed response" },
+    { response: null, error: "Cannot read properties of null (reading 'usage')" },
+    { observedIdentity: { model: "unexpected-model" } },
+  ]) {
+    const evidence = { ...trial.evidence.provider[0], ...changed };
+    const { request, response, ...metadata } = evidence;
+    assert.throws(
+      () =>
+        assertProviderIntegrity({
+          ...trial,
+          provider: [metadata],
+          evidence: { provider: [evidence] },
+        }),
+      /comparison stopped/,
+    );
+  }
+  assert.throws(
+    () => assertProviderIntegrity({ ...trial, evidence: undefined }),
+    /comparison stopped/,
+  );
+});
+
 test("continuation freezes fixture, oracle, provider and grader code; replay checks both graders", () => {
   const files = Object.fromEntries(
     [

@@ -3,6 +3,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { readFile, writeFile, mkdir, readdir } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { once } from "node:events";
+import { isDeepStrictEqual } from "node:util";
 import { createServer } from "node:http";
 import {
   parseOptions,
@@ -245,10 +246,23 @@ export function trialId(planned, arm) {
 
 export function assertProviderIntegrity(trial) {
   for (const record of trial.provider ?? []) {
+    const evidence = trial.evidence?.provider?.find((item) => item.id === record.id);
+    const { request, response, ...metadata } = evidence ?? {};
+    const failedBodyTimeout =
+      (trial.error || trial.result?.outcome === "error") &&
+      record.error === "The operation was aborted due to timeout" &&
+      record.identityValid === undefined &&
+      record.observedIdentity === undefined &&
+      evidence &&
+      response == null &&
+      isDeepStrictEqual(metadata, record);
     if (
       record.forwarded &&
       (record.responseCacheHit === true ||
-        (record.status >= 200 && record.status < 300 && record.identityValid !== true))
+        (record.status >= 200 &&
+          record.status < 300 &&
+          record.identityValid !== true &&
+          !failedBodyTimeout))
     )
       throw new Error("Provider identity mismatch or response cache hit; comparison stopped");
   }

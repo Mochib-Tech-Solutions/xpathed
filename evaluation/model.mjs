@@ -19,7 +19,7 @@ const hash = (value) => createHash("sha256").update(JSON.stringify(value)).diges
 const save = (path, value) =>
   writeFile(path, JSON.stringify(value, null, 2) + "\n", { flag: "wx", mode: 0o600 });
 
-export function selectModelCases(caseId, collection = readCollection()) {
+export function selectModelCases(caseId, collection = readCollection().cases) {
   const cases = validateCases({ version: "1", cases: collection });
   if (
     cases.some(
@@ -129,9 +129,12 @@ export async function main(args = process.argv.slice(2)) {
       "Saved-page selection requires --mode live (live provider inference) and one attempt per case; use evaluate:replay for saved results",
     );
   const collection = readCollection();
-  options.sourceCases = collection.length;
-  options.labelExclusions = labelExclusions(collection, options.caseId);
-  const cases = selectModelCases(options.caseId, collection);
+  options.sourceCases = collection.sourceCases;
+  options.labelExclusions = [
+    ...collection.exclusions,
+    ...labelExclusions(collection.cases, options.caseId),
+  ];
+  const cases = selectModelCases(options.caseId, collection.cases);
   await mkdir(join(options.output, "provider"), { recursive: true, mode: 0o700 });
   const proxy = await createBudgetProxy({
     profiles,

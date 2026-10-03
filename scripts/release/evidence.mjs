@@ -65,7 +65,8 @@ export async function evidence(options) {
   const current = await fingerprints(process.cwd());
   const suitePath = "evaluation/cases/index.json";
   const suite = loadCases(suitePath);
-  suite.cases.push(...readCollection());
+  const collection = readCollection();
+  suite.cases.push(...collection.cases);
   const { manifest: bundle } = await verifyBundle(options.bundle, options.bundleSha256);
   const artifact = validateReleaseArtifact(
     {
@@ -201,10 +202,11 @@ export async function evidence(options) {
     "Policy differs from current policy",
   );
   ensure(m.sourceManifestHash === hash(suite), "Case collection differs from reviewed collection");
-  const selection = selectQualificationCases(suite.cases);
+  const selection = selectQualificationCases(suite.cases, {}, collection.exclusions);
   ensure(
     isDeepStrictEqual(m.cases, selection.cases) &&
-      isDeepStrictEqual(m.exclusions, selection.exclusions),
+      isDeepStrictEqual(m.exclusions, selection.exclusions) &&
+      m.sourceCases === selection.sourceCases,
     "Incomplete release case collection",
   );
   ensure(
