@@ -6,9 +6,9 @@ export async function githubBudget(repository, token, fetchImpl = fetch) {
   const path = "experiment-budget.json";
   const authority = `github:${repository}:${branch}:${path}`;
   const url = `https://api.github.com/repos/${repository}/contents/${path}`;
-  async function request(method, body) {
+  async function request(method, body, target = method === "GET" ? `${url}?ref=${branch}` : url) {
     try {
-      const response = await fetchImpl(method === "GET" ? `${url}?ref=${branch}` : url, {
+      const response = await fetchImpl(target, {
         method,
         headers: {
           Authorization: `Bearer ${token}`,
@@ -26,16 +26,21 @@ export async function githubBudget(repository, token, fetchImpl = fetch) {
     }
   }
   const file = await request("GET");
-  if (
-    file.type !== "file" ||
-    file.encoding !== "base64" ||
-    !/^[a-f\d]{40}$/.test(file.sha ?? "") ||
-    typeof file.content !== "string"
-  )
+  if (file.type !== "file" || !/^[a-f\d]{40}$/.test(file.sha ?? ""))
+    throw new Error("Invalid GitHub budget file");
+  const blob =
+    file.encoding === "none"
+      ? await request(
+          "GET",
+          undefined,
+          `https://api.github.com/repos/${repository}/git/blobs/${file.sha}`,
+        )
+      : file;
+  if (blob.sha !== file.sha || blob.encoding !== "base64" || typeof blob.content !== "string")
     throw new Error("Invalid GitHub budget file");
   let ledger;
   try {
-    ledger = JSON.parse(Buffer.from(file.content, "base64").toString("utf8"));
+    ledger = JSON.parse(Buffer.from(blob.content, "base64").toString("utf8"));
   } catch {
     throw new Error("Invalid GitHub budget ledger");
   }

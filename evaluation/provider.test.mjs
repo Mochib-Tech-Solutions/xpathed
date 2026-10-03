@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import test from "node:test";
 import { createBudgetProxy } from "./provider.mjs";
+import { githubBudget as readGithubBudget } from "./accounting/github.mjs";
 
 const model = "deepseek/deepseek-v4.1-flash";
 const pricing = {
@@ -360,6 +361,46 @@ test("live evaluation selects its dedicated key and never falls back to the app 
       assert.equal(calls[0].options.headers.Authorization, `Bearer ${expected}`);
     });
   }
+});
+
+test("large GitHub accounting files load the exact blob and retain conditional writes", async () => {
+  const sha = "a".repeat(40);
+  const initial = {
+    remoteAuthority: "github:example/private:evaluation-budget:experiment-budget.json",
+    entries: [{ id: "previous", reportedUsd: null }],
+  };
+  const requests = [];
+  const remote = await readGithubBudget("example/private", "test-token", async (url, options) => {
+    requests.push({ url, options });
+    if (requests.length === 1)
+      return Response.json({ type: "file", encoding: "none", content: "", sha });
+    if (requests.length === 2) {
+      assert.equal(url, `https://api.github.com/repos/example/private/git/blobs/${sha}`);
+      return Response.json({
+        sha,
+        encoding: "base64",
+        content: Buffer.from(JSON.stringify(initial)).toString("base64"),
+      });
+    }
+    const body = JSON.parse(options.body);
+    assert.equal(body.sha, sha);
+    assert.equal(body.branch, "evaluation-budget");
+    assert.deepEqual(JSON.parse(Buffer.from(body.content, "base64").toString()), initial);
+    return Response.json({ content: { sha: "b".repeat(40) } });
+  });
+  assert.deepEqual(remote.ledger, initial);
+  await remote.persist(remote.ledger);
+  assert.equal(requests.length, 3);
+  await assert.rejects(
+    readGithubBudget("example/private", "test-token", async (url) =>
+      Response.json(
+        url.includes("/contents/")
+          ? { type: "file", encoding: "none", sha }
+          : { encoding: "base64", sha: "b".repeat(40), content: "e30=" },
+      ),
+    ),
+    /Invalid GitHub budget file/,
+  );
 });
 
 function githubBudget(initial) {
