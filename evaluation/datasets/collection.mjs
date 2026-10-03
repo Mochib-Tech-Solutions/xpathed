@@ -15,22 +15,34 @@ const dispositions = new Set([
   "unresolved",
 ]);
 
+function validReview(review) {
+  return (
+    review &&
+    typeof review.caseId === "string" &&
+    review.caseId.trim() &&
+    dispositions.has(review.disposition) &&
+    [
+      review.inputHash,
+      review.labelHash,
+      ...(review.disposition === "validated" ? [review.preparedInputHash] : []),
+    ].every((value) => typeof value === "string" && /^[a-f0-9]{64}$/.test(value)) &&
+    typeof review.reason === "string" &&
+    review.reason.trim() &&
+    typeof review.reviewer === "string" &&
+    review.reviewer.trim() &&
+    typeof review.reviewedAt === "string" &&
+    Number.isFinite(Date.parse(review.reviewedAt))
+  );
+}
+
 export function validateLabelReview(spec, review = spec.labelReview) {
   const candidates = spec.input?.candidates;
   const actions = spec.expected?.actions;
   if (
-    !review ||
+    !validReview(review) ||
     review.caseId !== spec.id ||
-    !dispositions.has(review.disposition) ||
     review.inputHash !== hash(JSON.stringify(spec.input)) ||
     review.labelHash !== hash(JSON.stringify(spec.expected)) ||
-    (review.disposition === "validated" &&
-      !/^[a-f0-9]{64}$/.test(review.preparedInputHash ?? "")) ||
-    typeof review.reason !== "string" ||
-    !review.reason.trim() ||
-    typeof review.reviewer !== "string" ||
-    !review.reviewer.trim() ||
-    !Number.isFinite(Date.parse(review.reviewedAt)) ||
     spec.instruction !== spec.input?.instruction ||
     !Array.isArray(candidates) ||
     candidates.some((item) => !item || typeof item.id !== "string" || !item.id.trim()) ||
@@ -62,6 +74,15 @@ export function readCollection(
   root = process.env.XPATHED_WORKSPACE || process.cwd(),
 ) {
   const config = json(configPath);
+  if (
+    !/^[a-f0-9]{64}$/.test(config.source?.sha256 ?? "") ||
+    !Number.isInteger(config.source?.cases) ||
+    config.source.cases < config.cases ||
+    ["repository", "tag", "asset"].some(
+      (key) => typeof config.source?.[key] !== "string" || !config.source[key].trim(),
+    )
+  )
+    throw new Error("Reviewed dataset requires its original source archive identity");
   const bytes = readFileSync(resolve(root, config.path));
   if (hash(bytes) !== config.sha256) throw new Error("Reviewed dataset package digest mismatch");
   const collection = JSON.parse(gunzipSync(bytes, { maxOutputLength: 64 * 1024 * 1024 }));
@@ -89,19 +110,31 @@ export function readCollection(
   const audit = JSON.parse(reviewBytes);
   if (
     audit.version !== 1 ||
-    audit.archiveSha256 !== config.sha256 ||
+    audit.archiveSha256 !== config.source.sha256 ||
     !Array.isArray(audit.cases) ||
-    audit.cases.length !== collection.cases.length ||
+    audit.cases.length !== config.source.cases ||
+    audit.cases.some((review) => !validReview(review)) ||
     new Set(audit.cases.map((item) => item.caseId)).size !== audit.cases.length
   )
     throw new Error("Dataset label review inventory mismatch");
   const reviews = new Map(audit.cases.map((item) => [item.caseId, item]));
-  if (collection.cases.some((spec) => !reviews.has(spec.id)))
+  if (
+    audit.cases.filter((review) => review.disposition === "validated").length !==
+      collection.cases.length ||
+    collection.cases.some((spec) => reviews.get(spec.id)?.disposition !== "validated")
+  )
     throw new Error("Dataset label review inventory mismatch");
-  return collection.cases.map((spec) => ({
+  const cases = collection.cases.map((spec) => ({
     ...spec,
     labelReview: validateLabelReview(spec, reviews.get(spec.id)),
   }));
+  const exclusions = audit.cases
+    .filter((review) => review.disposition !== "validated")
+    .map((review) => ({
+      caseId: review.caseId,
+      reason: `label ${review.disposition}: ${review.reason}`,
+    }));
+  return { cases, exclusions, sourceCases: config.source.cases };
 }
 
 if (import.meta.main) {

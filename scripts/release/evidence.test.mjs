@@ -107,10 +107,26 @@ async function workspace(t, { qualificationPolicy = "current", bootstrapBaseline
   secondOffline.labelReview.caseId = secondOffline.id;
   const offlineCases = [offline, secondOffline];
   const dataset = gzipSync(JSON.stringify({ version: 1, cases: offlineCases }));
+  const source = {
+    sha256: hash("immutable original archive"),
+    cases: offlineCases.length + 1,
+    repository: "owner/repo",
+    tag: "data",
+    asset: "original.json.gz",
+  };
+  const excludedReview = {
+    ...offline.labelReview,
+    caseId: "excluded-source",
+    disposition: "ambiguous",
+    reason: "Two controls match.",
+  };
+  const sourceExclusions = [
+    { caseId: excludedReview.caseId, reason: "label ambiguous: Two controls match." },
+  ];
   const audit = {
     version: 1,
-    archiveSha256: hash(dataset),
-    cases: offlineCases.map((spec) => spec.labelReview),
+    archiveSha256: source.sha256,
+    cases: [...offlineCases.map((spec) => spec.labelReview), excludedReview],
   };
   write("evaluation/datasets/labels.json", audit);
   writeFileSync(join(cwd, ".artifacts/datasets/reviewed.json.gz"), dataset);
@@ -118,6 +134,7 @@ async function workspace(t, { qualificationPolicy = "current", bootstrapBaseline
     path: ".artifacts/datasets/reviewed.json.gz",
     sha256: hash(dataset),
     cases: offlineCases.length,
+    source,
     labelReview: {
       path: "evaluation/datasets/labels.json",
       sha256: hash(readFileSync(join(cwd, "evaluation/datasets/labels.json"))),
@@ -149,10 +166,14 @@ async function workspace(t, { qualificationPolicy = "current", bootstrapBaseline
   const profile = profiles.find((item) => item.id === "deepseek");
   const code = await fingerprints(cwd);
   const build = (phase, pilot) => {
-    const selected = selectQualificationCases(cases, {
-      mode: "live",
-      splits: phase === "pilot" ? ["development"] : defaultPolicy.requiredSplits,
-    });
+    const selected = selectQualificationCases(
+      cases,
+      {
+        mode: "live",
+        splits: phase === "pilot" ? ["development"] : defaultPolicy.requiredSplits,
+      },
+      sourceExclusions,
+    );
     const path = `.artifacts/${phase}`;
     mkdirSync(join(cwd, path, "trials"), { recursive: true });
     const manifest = {
@@ -465,6 +486,8 @@ test("sealing rejects missing results, changed policy, lost passes, artifacts an
     "expired",
     "duplicate",
     "symlink",
+    "missing-exclusion",
+    "source-count",
   ])
     await t.test(mutation, async (t) => {
       const work = await workspace(t),
@@ -508,16 +531,23 @@ test("sealing rejects missing results, changed policy, lost passes, artifacts an
       if (mutation === "bundle")
         writeFileSync(join(work.cwd, bound.bundle, "images.tar"), "altered");
       if (mutation === "source") writeFileSync(join(work.cwd, "evaluation/grader.mjs"), "altered");
-      if (["policy", "expired", "duplicate"].includes(mutation)) {
+      if (
+        ["policy", "expired", "duplicate", "missing-exclusion", "source-count"].includes(mutation)
+      ) {
         const m = work.evaluation.manifest;
         if (mutation === "policy") m.policy.correctnessAcceptance = "allow-losses";
         if (mutation === "expired") m.createdAt = "2020-01-01T00:00:00Z";
         if (mutation === "duplicate") m.plan.trials.push(m.plan.trials[0]);
+        if (mutation === "missing-exclusion") m.exclusions = [];
+        if (mutation === "source-count") m.sourceCases--;
         delete m.contentHash;
         m.contentHash = hash(m);
         work.write(`${work.evaluation.path}/manifest.json`, m);
       }
-      assert.notEqual(bound.seal().status, 0);
+      const sealed = bound.seal();
+      assert.notEqual(sealed.status, 0);
+      if (["missing-exclusion", "source-count"].includes(mutation))
+        assert.match(sealed.stderr, /Incomplete release case collection/);
     });
 });
 

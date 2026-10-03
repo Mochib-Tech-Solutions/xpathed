@@ -152,7 +152,7 @@ The **evaluation set** has three categories, scored separately:
 | XPath construction and verification | Controlled selections go directly to Browser; independent DOM labels check XPath identity, state and locator mutations | `pnpm evaluate:xpath`         |
 | Live-browser Resolver               | Instruction → real browser capture → real model → verified XPath and final response                                    | `pnpm evaluate:resolver:live` |
 
-`pnpm evaluate` runs all three and writes separate results plus a combined summary. **It makes paid model calls** for Saved-page selection and Live-browser Resolver; XPath evaluation needs no provider key. Commands using live provider inference use `OPENROUTER_EVAL_API_KEY`. Fetch the reviewed inputs with `pnpm datasets:collection fetch` if they are not already available. Imported accuracy cases also require a pinned semantic review of the expected target against the supplied input; ambiguous or unanswerable labels remain documented exclusions. See the [dataset review contract](docs/evaluation.md#private-dataset-collection).
+`pnpm evaluate` runs all three and writes separate results plus a combined summary. **It makes paid model calls** for Saved-page selection and Live-browser Resolver; XPath evaluation needs no provider key. Commands using live provider inference use `OPENROUTER_EVAL_API_KEY`. Fetch the reviewed inputs with `pnpm datasets:collection fetch` if they are not already available. The active archive contains only the 569 admitted saved-page cases; the original 1,084-case source archive and the audit explaining 515 exclusions remain available for traceability. Imported accuracy cases also require a pinned semantic review of the expected target against the supplied input; ambiguous or unanswerable labels remain documented exclusions. See the [dataset review contract](docs/evaluation.md#private-dataset-collection).
 
 Saved-page selection calls a real model using saved page inputs. Live-browser Resolver uses a real Chromium page; its provider mode can be controlled (provider-free) or live (paid inference). XPath evaluation supplies known selections to isolate the stage after inference. Live-browser Resolver checks whether both stages work together. The chat UI is outside this boundary. A **regression** is a lost pass between compared runs. Reusing cases does not establish unseen-site accuracy.
 
@@ -170,33 +170,25 @@ These are actual cases from the shared evaluation set. Expected selectors belong
 | “Fill Notes.” with readonly Notes                      | Found target, `fill` action, blocked readiness with reason `readonly` | Action interpretation and passive state         |
 | “Click Save changes in Profile.” then insert a wrapper | The saved XPath still identifies the intended button                  | Locator reuse in deterministic XPath evaluation |
 
-See [case IDs, fixtures and metric definitions](docs/evaluation.md#example-cases-and-metrics), and [actual outcomes across the three systems](docs/research/engineering-comparison.md#case-examples).
+See [case IDs, fixtures and metric definitions](docs/evaluation.md#example-cases-and-metrics), and [actual outcomes across the three systems](docs/research/clean-evaluation-comparison.md#case-examples).
 
-### Basic resolver, Improved resolver and Stagehand
+### Current comparison: Basic resolver, Improved resolver and Stagehand
 
-All three systems receive the same instruction and reset page state, but prepare their own model input:
+Fresh measurements on the **final audited dataset**, with one original provider attempt per case and system. Basic and Improved use the same 569 reviewed saved-page inputs. All three systems use the same 183 controlled browser cases. Stagehand requires a live page, so it has no saved-page score.
 
-| System            | What it uses                                                                                                                                 | What it returns                                                                   |
-| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| Basic resolver    | Archived current-view capture, sanitized candidates, selection prompt and Browser verification                                               | Shared action, targets, verified XPath and passive readiness                      |
-| Improved resolver | The same architecture, clearer control/context and absence rules, plus stricter current-view revalidation; selected implementation in `main` | The same resolution contract, with the changes evaluated together                 |
-| Stagehand         | Stock `observe`, its own page snapshot, prompt and selector generation; cache and self-healing disabled                                      | Suggested actions and selectors, normalized and checked by the independent grader |
+| System            | Saved-page target selection | Browser action + targets |
+| ----------------- | --------------------------: | -----------------------: |
+| Basic resolver    |             501/569 (88.0%) |          161/183 (88.0%) |
+| Improved resolver |             498/569 (87.5%) |          172/183 (94.0%) |
+| Stagehand         |              Not applicable |          114/183 (62.3%) |
 
-The [resolver comparison](docs/research/engineering-comparison.md) uses **183 shared browser cases**, the same DeepSeek V4.1 Flash/Wafer route, and one original attempt per system. Three isolated workers run concurrently. Earlier resolver code stays in saved images; the application keeps one implementation.
+[![Fresh comparison on the audited evaluation set](docs/assets/evaluation/clean-comparison.svg)](docs/research/clean-evaluation-comparison.md)
 
-| System            | Correct action and targets | Target selection only |
-| ----------------- | -------------------------: | --------------------: |
-| Basic resolver    |            161/183 (88.0%) |       160/175 (91.4%) |
-| Improved resolver |        **169/183 (92.3%)** |   **169/175 (96.6%)** |
-| Stagehand         |            103/183 (56.3%) |       136/175 (77.7%) |
+Basic → Improved gained **13 browser passes and lost 2**. Saved-page selection gained **36 passes and lost 39**. These are separate measurements; failures remain in each denominator. The [report](docs/research/clean-evaluation-comparison.md) includes full resolver-contract scores, target-only scores, behavior categories, every gain and regression, timing cohorts and source/image identities.
 
-[![Accuracy by behavior category](docs/assets/evaluation/engineering-category-results.svg)](docs/assets/evaluation/engineering-category-results.svg)
+Controlled XPath verification passed **172/172 cases**, including **22/22 saved-locator mutations** and **22/22 fresh resolutions after mutation**, without model calls.
 
-Improved gained **15 passes and lost 7**, a net increase of **4.4 percentage points**. Scope and targeting improved most; state cases lost one net pass. The regressions remain visible and fail release checks under the no-regression rule.
-
-The target-selection score excludes eight unsupported-instruction cases and checks exact nodes/absence without requiring the action name. Stagehand uses stock `observe` with a current-view instruction; it does not provide xpathed's readiness contract. The [report](docs/research/engineering-comparison.md) explains these boundaries and separates the full resolver score, timing cohorts and failures.
-
-All **549 paid calls** are retained, with **$0.07312420** reported and no missing charges. These authored evaluation cases measure this setup. The [historical browser and saved-page report](docs/research/configuration-comparison.md) preserves the earlier collection and its separate saved-page results.
+The paid comparison retains **1,687 original provider calls**, with **$0.79015806 known reported cost** and **2 unreported charges**. All current tables and the figure derive from the [same verified aggregate](docs/assets/evaluation/clean-comparison.json). Earlier reports retain their original datasets and are clearly marked historical. These authored/reviewed cases do not establish unseen-site accuracy or release approval.
 
 ```sh
 pnpm check                              # local checks

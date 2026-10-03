@@ -122,7 +122,17 @@ for (const invalidIdentity of [false, true])
     })();
     try {
       const code = await runModelEvaluation(
-        { output, repetitions: 1, concurrency: 1, seed: 1, timeoutMs: 1000 },
+        {
+          output,
+          repetitions: 1,
+          concurrency: 1,
+          seed: 1,
+          timeoutMs: 1000,
+          sourceCases: 3,
+          labelExclusions: [
+            { caseId: "excluded-source", reason: "label ambiguous: Two controls match." },
+          ],
+        },
         [
           spec,
           {
@@ -147,6 +157,13 @@ for (const invalidIdentity of [false, true])
       );
       assert.equal(code, 1);
       const summary = JSON.parse(await readFile(join(output, "summary.json")));
+      const manifest = JSON.parse(await readFile(join(output, "manifest.json")));
+      assert.equal(manifest.sourceCases, 3);
+      assert.equal(manifest.cases.length, 2);
+      assert.deepEqual(manifest.exclusions, [
+        { caseId: "excluded-source", reason: "label ambiguous: Two controls match." },
+      ]);
+      assert.ok(manifest.plan.trials.every((trial) => trial.caseId !== "excluded-source"));
       assert.equal(summary.plannedTrials, 2);
       assert.match(
         await readFile(join(output, "summary.txt"), "utf8"),

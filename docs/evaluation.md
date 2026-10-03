@@ -87,7 +87,7 @@ A Saved-page selection example is `phrasenode-db978249f30c2c27d84a36a8` in the [
 | Latency                           | Median and p95 from the recorded request interval, separated by execution cohort                | Observed timing under those conditions; failed attempts remain recorded                  |
 | Cost                              | Sum of reported charges, alongside estimates and counts of unreported charges                   | Known spend; an unavailable charge is never zero                                         |
 
-All planned failures remain in their category denominator. Category-specific exclusions are recorded before execution. The three-system comparison's common score is narrower than full Live-browser Resolver: Stagehand does not produce the xpathed readiness/coverage contract. See [case outcomes](research/engineering-comparison.md#case-examples) for examples of a shared pass, a gain and regressions.
+All planned failures remain in their category denominator. Category-specific exclusions are recorded before execution. The three-system comparison's common score is narrower than full Live-browser Resolver: Stagehand does not produce the xpathed readiness/coverage contract. The [current audited-set comparison](research/clean-evaluation-comparison.md) reports all category scores, failures, costs and source identities from the final dataset. Earlier reports retain their historical case definitions separately.
 
 ## Run and replay
 
@@ -133,7 +133,7 @@ Live-browser Resolver timing is the Resolver HTTP duration, including capture, p
 
 ## Private dataset collection
 
-`evaluation/datasets/collection.json` pins the private archive's repository, release asset, local path, digest and inventory. The payload lives under ignored `.artifacts/datasets/`; raw or derived page inputs are not committed to source.
+`evaluation/datasets/collection.json` pins the active private archive, its digest and inventory. This derived archive contains only admitted cases, with unchanged instructions, candidates, expected labels and original splits. The original source archive and complete exclusion audit remain separate provenance. Payloads live under ignored `.artifacts/datasets/`; raw or derived page inputs are not committed to source.
 
 Build a reviewed collection from imported inputs and explicit review files:
 
@@ -149,7 +149,11 @@ Obtain and verify the pinned private asset with:
 pnpm datasets:collection fetch
 ```
 
-The private `evaluation-data/reviewed-72d140c1.json.gz` asset is published. Its original payloads and expected labels remain immutable. The collection manifest also pins `label-review.json`, which accounts for every archived case and binds each decision to its imported-input and expected-label hashes. A validated case also binds the exact prepared model input after Resolver sanitization. Before inference, the host runs `--prepare-only` and checks this prepared-input hash for both candidate and baseline; missing or changed bindings stop further inference while preserving prepared evidence. Only `validated` cases enter accuracy inference. Incorrect, ambiguous, evidence-insufficient and unresolved cases remain visible as explicit pre-run exclusions; they are never counted as model failures or silently relabelled. A missing, incomplete or changed audit blocks loading. The [prepared-input audit](research/2026-10-03-prepared-input-audit.md) records the additional checks at the actual model boundary; reviewing only the imported JSON is insufficient. The [label audit](research/2026-10-03-phrasenode-label-audit.md) records the source reconciliation, semantic decisions and limits. A fresh download was checked against the pinned digest; the workflow performs the same verification before reading the collection. A missing or changed required dataset fails completeness checks; it must not silently reduce the release denominator.
+The collection manifest identifies the active asset and pins `label-review.json`, which accounts for the full original source inventory, including cases excluded from the active archive. Every decision binds the imported-input and expected-label hashes. Admitted cases also bind the exact prepared model input after Resolver sanitization. Repacking copies admitted records unchanged; it does not relabel cases, rerun inference or revise previous results.
+
+Before inference, the host runs `--prepare-only` and checks the prepared-input hash for both candidate and baseline. Missing or changed bindings stop further inference while preserving prepared evidence. Only `validated` cases enter accuracy inference. Incorrect, ambiguous, evidence-insufficient and unresolved source records remain explicit exclusions; they are never counted as model failures or silently discarded from the source inventory. Missing required inputs or an incomplete or changed audit block loading.
+
+The [instruction-contract audit](research/2026-10-03-contract-admission-audit.md) records the final admission decisions. The active archive contains 569 admitted records; the separate pinned audit preserves all 1,084 source decisions and 515 exclusions. A fresh download of the admitted-only archive was verified against its digest and exact validated ID set. The earlier [prepared-input audit](research/2026-10-03-prepared-input-audit.md) and [label audit](research/2026-10-03-phrasenode-label-audit.md) retain their source reconciliation, semantic review and limits.
 
 Use `pnpm datasets:fetch` and `pnpm datasets:import` with the checked-in source manifests to prepare collection inputs. Reviewed Saved-page selection cases run through the release evaluator. Keep imported, excluded, unsupported, ambiguous and unreconstructible records visible with reasons. Dataset terms and submission review remain required even when cost is unrestricted.
 
@@ -165,6 +169,8 @@ Authentication, transport failures, provider rejection and missing resolution re
 
 ### Resolver comparison
 
+The [current report](research/clean-evaluation-comparison.md) and [figure data](assets/evaluation/clean-comparison.json) use the final audited dataset. The figure exporter verifies current category membership and paired input/label identities before producing scores.
+
 Use **Basic resolver**, **Improved resolver** and **Stagehand** in reports and charts. Git commits and image identities belong in saved evidence. For a new comparison, Basic must be a verified bundle implementing the same current API contract; Improved is built from the current checkout, with its source fingerprint and exact image IDs recorded. To reproduce the published historical Basic comparison, check out the recorded runner revision from its evidence first: the current runner does not adapt retired numbered contracts or bundle formats. The application keeps one implementation.
 
 ```sh
@@ -178,8 +184,9 @@ pnpm evaluate:compare -- --mode live \
   --output .artifacts/resolver-comparison-live
 
 pnpm evaluate:compare:replay .artifacts/resolver-comparison-live
-# Refresh the recorded report after setting its run identity and narrative.
-uv run docs/assets/evaluation/engineering-plot.py .artifacts/resolver-comparison-live
+# Export the final browser, paired saved-page and controlled XPath measurements.
+uv run docs/assets/evaluation/clean-comparison-plot.py \
+  BROWSER_RUN BASIC_SAVED_RUN IMPROVED_SAVED_RUN XPATH_RUN
 ```
 
 The launcher verifies and restores the archived bundle, builds the current resolver and pinned Stagehand adapter, and starts an isolated evaluation stack. `--resume` with the original output directory continues only unattempted arms using the original image IDs; it rejects changed cases, evaluation code, plan, timeout settings or runtime images and unrecorded provider attempts. Replay verifies both graders and recomputes the shared and full resolver scores from original observations. Provider identity or response-cache violations retain the affected attempt and stop further calls. A fresh run gives its images unique local retention tags recorded in `image-tags.json`; keep those tags available for continuation. Set `XPATHED_EVALUATION_PROJECT=xpathed-evaluation-UNIQUE_NAME` for concurrent checkouts. A live run uses `OPENROUTER_EVAL_API_KEY`; scripted singleton and plural compatibility checks must pass before any paid calls.

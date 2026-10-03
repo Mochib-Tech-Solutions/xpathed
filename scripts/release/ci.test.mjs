@@ -8,6 +8,13 @@ import { qualificationCoverage, requireCI, trustedReleasePR, caseChanges } from 
 test("release coverage reuses reviewed cases and comparison requires the current baseline", () => {
   const suite = loadCases();
   assert.equal(qualificationCoverage(suite).ready, true);
+  const exclusions = [
+    { caseId: "excluded-source", reason: "label ambiguous: Two controls match." },
+  ];
+  const coverage = qualificationCoverage(suite, exclusions);
+  assert.equal(coverage.sourceCases, suite.cases.length + 1);
+  assert.deepEqual(coverage.exclusions[0], exclusions[0]);
+  assert.equal(coverage.sourceCases, coverage.cases + coverage.exclusions.length);
   suite.cases[0].review.status = "pending";
   assert.equal(qualificationCoverage(suite).ready, false);
   const commit = "b".repeat(40);

@@ -15,8 +15,12 @@ const node = (script, args) =>
   execFileSync(process.execPath, [script, ...args], { stdio: "inherit" });
 const hash = (bytes) => createHash("sha256").update(bytes).digest("hex");
 
-export function qualificationCoverage(suite) {
-  const { cases } = selectQualificationCases(validateCases(suite));
+export function qualificationCoverage(suite, sourceExclusions = []) {
+  const { cases, exclusions, sourceCases } = selectQualificationCases(
+    validateCases(suite),
+    {},
+    sourceExclusions,
+  );
   const blockers = cases.some(
     (spec) =>
       spec.review?.status !== "reviewed" ||
@@ -25,7 +29,7 @@ export function qualificationCoverage(suite) {
   )
     ? ["Every live case requires independently reviewed labels"]
     : [];
-  return { ready: !blockers.length, cases: cases.length, blockers };
+  return { ready: !blockers.length, cases: cases.length, exclusions, sourceCases, blockers };
 }
 export function trustedReleasePR(event, repository) {
   const pr = event.pull_request;
@@ -142,8 +146,9 @@ async function main() {
   const root = ".artifacts/release-ci";
   await mkdir(root, { recursive: true, mode: 0o700 });
   const suite = loadCases();
-  suite.cases.push(...readCollection());
-  const coverage = qualificationCoverage(suite);
+  const collection = readCollection();
+  suite.cases.push(...collection.cases);
+  const coverage = qualificationCoverage(suite, collection.exclusions);
   if (!coverage.ready) throw new Error(coverage.blockers.join("; "));
   const baselineCommit = gh(`repos/${env.GITHUB_REPOSITORY}/git/ref/heads/release`).object.sha;
   if (baselineCommit !== event.pull_request.base.sha)

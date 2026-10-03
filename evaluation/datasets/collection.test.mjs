@@ -41,11 +41,24 @@ test("reviewed collection binds package bytes, inventory, and each submitted inp
     reviewedAt: "2026-10-03T00:00:00Z",
   };
   const collection = { version: 1, cases: [spec] };
-  const write = (value, overrides = {}, reviews = [labelReview]) => {
+  const excludedReview = {
+    ...labelReview,
+    caseId: "excluded-source-case",
+    disposition: "ambiguous",
+    reason: "Two controls match.",
+  };
+  const source = {
+    sha256: hash("immutable source archive"),
+    cases: 2,
+    repository: "owner/repo",
+    tag: "data",
+    asset: "original.json.gz",
+  };
+  const write = (value, overrides = {}, reviews = [labelReview, excludedReview]) => {
     const bytes = gzipSync(JSON.stringify(value));
     writeFileSync(packagePath, bytes);
     const auditBytes = Buffer.from(
-      JSON.stringify({ version: 1, archiveSha256: hash(bytes), cases: reviews }),
+      JSON.stringify({ version: 1, archiveSha256: source.sha256, cases: reviews }),
     );
     writeFileSync(join(directory, "labels.json"), auditBytes);
     writeFileSync(
@@ -54,13 +67,45 @@ test("reviewed collection binds package bytes, inventory, and each submitted inp
         path: "reviewed.json.gz",
         sha256: hash(bytes),
         cases: value.cases.length,
+        source,
         labelReview: { path: "labels.json", sha256: hash(auditBytes) },
         ...overrides,
       }),
     );
   };
   write(collection);
-  assert.deepEqual(readCollection(configPath, directory), [{ ...spec, labelReview }]);
+  assert.deepEqual(readCollection(configPath, directory), {
+    cases: [{ ...spec, labelReview }],
+    exclusions: [{ caseId: excludedReview.caseId, reason: "label ambiguous: Two controls match." }],
+    sourceCases: 2,
+  });
+  for (const reviews of [
+    [labelReview],
+    [labelReview, labelReview],
+    [labelReview, { ...excludedReview, disposition: "validated" }],
+    [labelReview, { ...excludedReview, reason: "" }],
+    [labelReview, { ...excludedReview, inputHash: "invalid" }],
+    [labelReview, { ...excludedReview, inputHash: [excludedReview.inputHash] }],
+    [labelReview, { ...excludedReview, labelHash: "invalid" }],
+    [labelReview, { ...excludedReview, reviewedAt: null }],
+    [labelReview, { ...excludedReview, reviewedAt: 2026 }],
+    [labelReview, { ...excludedReview, disposition: "guessed" }],
+    [labelReview, { ...excludedReview, reviewer: "" }],
+    [labelReview, { ...excludedReview, caseId: "" }],
+    [labelReview, null],
+  ]) {
+    write(collection, {}, reviews);
+    assert.throws(() => readCollection(configPath, directory), /label review inventory/);
+  }
+  write({ version: 1, cases: [spec, { ...spec, id: excludedReview.caseId }] });
+  assert.throws(() => readCollection(configPath, directory), /label review inventory/);
+  write(collection, { source: undefined });
+  assert.throws(() => readCollection(configPath, directory), /source archive/);
+  write(collection, { source: { ...source, sha256: "0".repeat(64) } });
+  assert.throws(() => readCollection(configPath, directory), /label review inventory/);
+  write(collection, { source: { ...source, cases: 3 } });
+  assert.throws(() => readCollection(configPath, directory), /label review inventory/);
+  write(collection);
 
   writeFileSync(packagePath, gzipSync(JSON.stringify({ ...collection, version: 2 })));
   assert.throws(() => readCollection(configPath, directory), /package digest mismatch/);

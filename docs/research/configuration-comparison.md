@@ -1,5 +1,9 @@
 # Basic and Improved resolver: historical comparison
 
+For measurements on the final audited dataset, use the [current comparison](clean-evaluation-comparison.md). This report preserves its original historical evidence.
+
+**Historical comparison — 2 October 2026.** The saved-page scores below use the original collection before later semantic, prepared-input, uniqueness and instruction-contract audits excluded invalid expectations. They are not the clean-dataset baseline. Original scores and evidence remain unchanged; see the [active dataset contract](../evaluation.md#private-dataset-collection).
+
 On the same complete collection, browser passes rose from **111 to 120 out of 140**, with ten gained passes and one lost pass. Saved-page selection was **716 versus 710 out of 1,084** under the same prompt and configuration. Every planned case received one attempt per arm.
 
 ## What changed
@@ -34,8 +38,8 @@ Provider response reuse is disabled; prompt caching is allowed. Fixed current-fi
 
 | Track                             | Cases per arm | Basic passes | Improved passes | Gained passes | Lost passes |
 | --------------------------------- | ------------: | -----------: | --------------: | ------------: | ----------: |
-| Live-browser Resolver             | 140           | 111 (79.3%)  | 120 (85.7%)     | 10            | 1           |
-| Saved-page selection (PhraseNode) | 1,084         | 716 (66.1%)  | 710 (65.5%)     | 78            | 84          |
+| Live-browser Resolver             |           140 |  111 (79.3%) |     120 (85.7%) |            10 |           1 |
+| Saved-page selection (PhraseNode) |         1,084 |  716 (66.1%) |     710 (65.5%) |            78 |          84 |
 
 [![Browser pass rates and paired gains and losses by behavior](../assets/evaluation/category-results.svg)](../assets/evaluation/category-results.svg)
 
@@ -51,10 +55,10 @@ Latency below is median / p95 in seconds, within matched execution cohorts. Brow
 
 | Track / phase                        | Cases per arm | Basic resolver | Improved resolver |
 | ------------------------------------ | ------------: | -------------: | ----------------: |
-| Live-browser Resolver / serial       | 69            | 0.886 / 1.250  | 0.624 / 0.871     |
-| Live-browser Resolver / continuation | 71            | 1.040 / 1.718  | 0.621 / 1.098     |
-| Saved-page selection / serial        | 373           | 0.910 / 4.346  | 1.082 / 11.530    |
-| Saved-page selection / continuation  | 711           | 1.065 / 6.190  | 1.230 / 5.836     |
+| Live-browser Resolver / serial       |            69 |  0.886 / 1.250 |     0.624 / 0.871 |
+| Live-browser Resolver / continuation |            71 |  1.040 / 1.718 |     0.621 / 1.098 |
+| Saved-page selection / serial        |           373 |  0.910 / 4.346 |    1.082 / 11.530 |
+| Saved-page selection / continuation  |           711 |  1.065 / 6.190 |     1.230 / 5.836 |
 
 The run forwarded **2,448 provider calls**, with **$1.31232595 in known charges and four unavailable charges**. Browser calls cost $0.01245089 earlier and $0.01302741 current. Saved-page calls cost $0.58211627 earlier and at least $0.70473138 current; the four unknown charges belong to the current saved-page arm. Estimates remain separate in the [aggregate evidence](../assets/evaluation/configuration-comparison.json).
 
