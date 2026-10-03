@@ -4,9 +4,9 @@ Issue: [#7](https://github.com/Mochib-Tech-Solutions/xpathed/issues/7). These ar
 
 ## Source accounting
 
-| Source                                         |      Original records |                    Offline eligible | Remaining records                                                           | Original splits                        |
+| Source                                         | Original records      | Saved-page eligible                 | Remaining records                                                           | Original splits                        |
 | ---------------------------------------------- | --------------------: | ----------------------------------: | --------------------------------------------------------------------------- | -------------------------------------- |
-| PhraseNode command corpus with processed pages |                51,663 |                              36,404 | 14,965 source-equivalence review required; 294 accessibility-hidden targets | Train 36,078 / dev 5,334 / test 10,251 |
+| PhraseNode command corpus with processed pages | 51,663                | 36,404                              | 14,965 source-equivalence review required; 294 accessibility-hidden targets | Train 36,078 / dev 5,334 / test 10,251 |
 | Pinned Mind2Web `train_10` pilot shard         | 49 actions in 9 tasks | 1 independently reviewed adaptation | 48 require independent instruction adaptation                               | Train only; not the full corpus        |
 
 PhraseNode eligible counts are train 25,426, dev 3,719 and test 7,259. Inputs deduplicate to 1,810 page representations. Historical browser replay eligibility is zero for these imports: historical layout, state and readiness cannot be established from these assets.
@@ -21,7 +21,7 @@ The fixture removes scripts, network assets and form values; styles and some doc
 
 Private evidence: `.artifacts/evaluation/phrasenode-derived-pilot` and `.artifacts/evaluation/v3-plural-reviewed`.
 
-## Offline pilots
+## Saved-page pilots
 
 The diagnostic lexical baseline selected 4/30 PhraseNode targets and 0/1 adapted Mind2Web target. Both runs exited nonzero and retain every attempted case. They validate failure accounting and report plumbing, not model quality. These are the final sanitized imports; earlier development runs are not the reported baseline.
 

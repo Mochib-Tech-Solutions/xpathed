@@ -912,7 +912,7 @@ test("Azure requires its advertised cap and rejects route, tier, reasoning and c
   assert.equal(proxy.budget.spentUsd, 0);
 });
 
-test("the explicit offline DeepInfra profile pins only its declared standard endpoint", async (t) => {
+test("the explicit Saved-page selection DeepInfra profile pins only its declared standard endpoint", async (t) => {
   const profile = {
     id: "deepseek-deepinfra",
     model,

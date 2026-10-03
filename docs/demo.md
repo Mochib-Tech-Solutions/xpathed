@@ -36,7 +36,7 @@ A test platform can call Resolver directly for a page owned by the configured br
 
 Walk through a saved case: instruction, independent expected target, captured evidence, response and grade. The recorded listbox-option failure found the correct option but changed `click` to `select`; explain why it fails despite a valid XPath. The current case is `state-listbox-option-for-click`; its `sourceIds` link it to the saved evidence.
 
-Show how attempt/trace IDs connect configuration, error stage and available evidence. Describe the three evaluation categories: model selection from reviewed PhraseNode inputs, XPath construction and verification from controlled selections, and Resolver E2E with a real model and browser. Keep scores separate, with dates and denominators; use regression to describe a lost pass in a comparison.
+Show how attempt/trace IDs connect configuration, error stage and available evidence. Describe the three evaluation categories: Saved-page selection from reviewed PhraseNode inputs, XPath construction and verification from controlled selections, and Live-browser Resolver through the complete API pipeline in real Chromium. State separately whether a run uses deterministic provider fixtures or live provider inference. Keep scores separate, with dates and denominators; use regression to describe a lost pass in a comparison.
 
 Describe the current release gate: exact candidate/baseline images, the complete reviewed collection, no lost baseline pass, deployment and nightly monitoring.
 

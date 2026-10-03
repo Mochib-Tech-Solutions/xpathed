@@ -8,7 +8,7 @@ import { runEvaluationSet, main } from "./evaluate-all.mjs";
 test("evaluate runs all three categories, retains a failed category and never hides missing evidence", async (t) => {
   const root = await mkdtemp(join(tmpdir(), "evaluate-all-"));
   t.after(() => rm(root, { recursive: true, force: true }));
-  t.mock.method(console, "log", () => {});
+  const log = t.mock.method(console, "log", () => {});
   const calls = [];
   const output = join(root, "run");
   const code = await runEvaluationSet(output, async (args) => {
@@ -40,6 +40,18 @@ test("evaluate runs all three categories, retains a failed category and never hi
   );
   assert.deepEqual(summary.pending, []);
   assert.equal(summary.categories[2].planned, null);
+  assert.deepEqual(
+    summary.categories.map((item) => item.category),
+    ["model", "xpath", "resolver"],
+  );
+  const displayed = log.mock.calls.map((call) => call.arguments[0]).join("\n");
+  assert.match(displayed, /Saved-page selection; inference mode: live provider inference/);
+  assert.match(
+    displayed,
+    /XPath construction and verification; inference mode: controlled provider-free/,
+  );
+  assert.match(displayed, /Live-browser Resolver; inference mode: live provider inference/);
+  assert.match(displayed, /FAIL Saved-page selection: 1\/2/);
 });
 
 test("evaluate stops further categories after an evidence-integrity failure", async (t) => {

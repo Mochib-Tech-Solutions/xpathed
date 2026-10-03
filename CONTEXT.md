@@ -105,17 +105,19 @@ The performance of the requested interaction on a resolved target element.
 ## Evaluation
 
 **Evaluation set**:
-The collection of independently labelled cases used to assess model selection, XPath construction and verification, and the complete Resolver request. Each category has its own score.
+The collection of independently labelled cases used for Saved-page selection, XPath construction and verification, and Live-browser Resolver evaluation. Each category has its own score.
 _Avoid_: Regression evaluation set
 
-**Resolver E2E evaluation**:
-Assessment of the complete resolution request, from browser capture through target selection, XPath verification and readiness to the final result.
+**Live-browser Resolver**:
+Assessment of the complete resolution request on a real browser page, from capture through target selection, XPath verification and readiness to the final result. The selection provider can return controlled responses or use live model inference.
+_Avoid_: Resolver E2E, browser tests
 
-**XPath construction and verification evaluation**:
+**XPath construction and verification**:
 Assessment of the stage after selection: known selected elements must produce XPath expressions that uniquely identify the intended nodes in a real browser, with accurate state observations.
 
-**Model-selection evaluation**:
-Assessment of target selection from saved page inputs and independent labels. Offline describes the page inputs; inference can use a live model. Imported cases enter accuracy measurement only after a semantic label review confirms that the instruction and prepared model evidence distinguish the expected target, with hashes checked after privacy sanitization and before inference; source provenance and permission to submit the input are separate checks.
+**Saved-page selection**:
+Assessment of target selection from saved page inputs and independently reviewed labels using real model inference. A pass establishes target selection from that evidence; current browser state, XPath and readiness remain outside this category.
+_Avoid_: Offline tests, model-selection evaluation
 
 **Regression**:
 A case that passes in a reference run and fails in the compared run. It describes a comparison outcome, rather than a kind of evaluation set.

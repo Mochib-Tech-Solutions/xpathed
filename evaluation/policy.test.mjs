@@ -155,7 +155,7 @@ test("missing trials, duplicate attempts, changed policy, and leaked oracle labe
   }
 });
 
-test("offline target passes count and a lost offline baseline pass blocks release", () => {
+test("Saved-page selection passes count and a lost baseline pass blocks release", () => {
   const { manifest, trials } = releaseEvidence();
   const spec = manifest.cases.at(-1),
     trial = trials.at(-1);

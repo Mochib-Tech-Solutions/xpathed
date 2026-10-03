@@ -34,9 +34,9 @@ All 1,000 candidate records were reviewed before inference. The review approved 
 
 The final sample has 398 link, 287 input, 143 button and 32 select cases; 203 targets are unnamed in the serialized representation. Candidate-count bands contain 39 / 178 / 304 / 339 cases for ≤100 / 101–250 / 251–500 / >500 candidates. Overlapping lexical counts are 43 spatial, 49 ordinal, four color-word, 18 plural-word and 145 input-verb cases. No replacements were selected after observing model results; the reserve queue remains unused. Review exclusions and duplicate-source mappings remain separate from model failures.
 
-This expansion uses the existing offline runner, selected standard DeepSeek V4.1 Flash/Wafer profile and baseline prompt, with one attempt per accepted case. It does not rerun the four-model comparison or introduce another prompt. Whole-response target correctness is stricter than merely containing the gold node among extra guesses. Original source labels do not establish action, readiness, XPath, current-viewport or full plural-set correctness.
+This expansion uses the existing saved-page runner, selected standard DeepSeek V4.1 Flash/Wafer profile and baseline prompt, with one attempt per accepted case. It does not rerun the four-model comparison or introduce another prompt. Whole-response target correctness is stricter than merely containing the gold node among extra guesses. Original source labels do not establish action, readiness, XPath, current-viewport or full plural-set correctness.
 
-The current-view baseline remains the separate [measured browser experiment](viewport-baseline-report.md). The fixed offline representation omits archived coordinates, and original labels do not establish viewport eligibility or readiness. The records cannot become a viewport benchmark by assuming every candidate is visible. This exposed development sample is not a fresh holdout or release qualification. Its deliberately different composition also prevents treating a raw score change from the old sample as a model improvement.
+The current-view baseline remains the separate [measured browser experiment](viewport-baseline-report.md). The fixed saved-page representation omits archived coordinates, and original labels do not establish viewport eligibility or readiness. The records cannot become a viewport benchmark by assuming every candidate is visible. This exposed development sample is not a fresh holdout or release qualification. Its deliberately different composition also prevents treating a raw score change from the old sample as a model improvement.
 
 ## Budget
 
@@ -52,19 +52,19 @@ The first launch stopped before inference because the pinned Wafer route changed
 
 The seven-case pilot included the largest prepared input and each target type and candidate-count band. It completed 7/7 correct. The next wave stopped after 38/100 attempts on a timeout without usage or generation identity. After manual accounting review retained its full original reservation, a new frozen queue excluded all 45 actual attempts, including that timeout, and resumed only never-attempted cases. That wave stopped after 8/100 attempts on another missing-charge timeout. Original interrupted manifests and results were preserved. The final unresolved charge blocks further paid calls; **807 cases remain unattempted**, not silently excluded or scored as successful.
 
-| Retained measurement                        |                      Result |
+| Retained measurement                        | Result                      |
 | ------------------------------------------- | --------------------------: |
-| Attempts / frozen plan                      |                    53 / 860 |
-| Families attempted / reviewed               |                    46 / 180 |
-| Exact whole-response target correctness     |            36 / 53 (67.92%) |
-| Failed actual attempts                      |                          17 |
+| Attempts / frozen plan                      | 53 / 860                    |
+| Families attempted / reviewed               | 46 / 180                    |
+| Exact whole-response target correctness     | 36 / 53 (67.92%)            |
+| Failed actual attempts                      | 17                          |
 | Known provider charges                      | $0.04142443 across 51 calls |
-| Unknown charges, full reservations retained |  $0.01538460 across 2 calls |
-| Offline elapsed p50 / p95                   |           6,834 / 29,491 ms |
+| Unknown charges, full reservations retained | $0.01538460 across 2 calls  |
+| Saved-page elapsed p50 / p95                | 6,834 / 29,491 ms           |
 
 Failures comprise seven wrong-target responses, four incorrect outcome responses, three malformed model responses, one incomplete decomposition and two provider timeouts. All 53 attempts and all 807 unattempted cases remain visible in the frozen-plan report. There are 51 verified unique generation identities; the timeouts have no invented identities or charges. The interrupted prefix is not representative of all 860 reviewed cases and does not establish a new model ranking, an accuracy improvement or release qualification.
 
-Offline elapsed includes preparation and child-process startup. Both the .NET diagnostic named `provider` and proxy elapsed also include inline GitHub budget accounting; they are not pure inference or browser/UI response measurements. Reservation and reconciliation medians are approximately 1,465 and 1,502 ms respectively, retained separately without subtracting them to claim application latency. The previous current-view HTTP measurement remains the appropriate source for viewport-context efficiency and response-time comparisons.
+Saved-page elapsed includes preparation and child-process startup. Both the .NET diagnostic named `provider` and proxy elapsed also include inline GitHub budget accounting; they are not pure inference or browser/UI response measurements. Reservation and reconciliation medians are approximately 1,465 and 1,502 ms respectively, retained separately without subtracting them to claim application latency. The previous current-view HTTP measurement remains the appropriate source for viewport-context efficiency and response-time comparisons.
 
 The expanded run consumes **$0.05680903** including both full unknown-charge reservations. Across the entire campaign, **$2.0919348558 is consumed and $7.9080651442 remains**. The dedicated evaluation key reports **$0.04880995 total usage**, exactly its previous $0.00738552 plus the 51 known new charges. Account-level usage does not establish an individual timeout's charge: both `reportedUsd` values remain null. The first new timeout's reservation was explicitly reviewed; the second remains unresolved. No ceiling or provider setting was changed to continue through that stop.
 

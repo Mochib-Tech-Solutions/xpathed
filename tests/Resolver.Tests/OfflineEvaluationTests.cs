@@ -63,7 +63,7 @@ public sealed class OfflineEvaluationTests
     [InlineData("truncated", "provider_truncated_response")]
     [InlineData("rate_limited", "provider_rate_limited")]
     [InlineData("missing_usage", null)]
-    public async Task OfflineInferenceReusesSelectionValidationAndReportsOneSharedChargeWithoutBrowserClaims(
+    public async Task SavedPageInferenceReusesSelectionValidationAndReportsOneSharedChargeWithoutBrowserClaims(
         string scenario,
         string? expectedCode
     )
@@ -233,7 +233,7 @@ public sealed class OfflineEvaluationTests
     }
 
     [Fact]
-    public async Task LiveOfflineCommandRequiresCredentialsWithoutStartingAService()
+    public async Task SavedPageCommandWithLiveInferenceRequiresCredentialsWithoutStartingAService()
     {
         var (exitCode, output) = await RunAsync("""{"instruction":"Click Save","candidates":[]}""", prepareOnly: false);
         Assert.Equal(1, exitCode);
@@ -289,7 +289,7 @@ public sealed class OfflineEvaluationTests
             catch (OperationCanceledException)
             {
                 process.Kill(entireProcessTree: true);
-                throw new InvalidOperationException("Offline command did not exit: " + await errors);
+                throw new InvalidOperationException("Saved-page command did not exit: " + await errors);
             }
             return (process.ExitCode, await output);
         }

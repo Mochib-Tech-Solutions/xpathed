@@ -304,7 +304,7 @@ export function gradeTrial(caseSpec, trial) {
           if (!object(target) || Object.keys(target).some((key) => key !== "candidateId"))
             fail(
               "contract",
-              "Offline selection cannot claim browser XPath, geometry or readiness evidence.",
+              "Saved-page selection cannot claim browser XPath, geometry or readiness evidence.",
             );
           if (
             typeof target?.candidateId !== "string" ||
@@ -357,13 +357,14 @@ export function gradeTrial(caseSpec, trial) {
         fail("contract", `Action ${index + 1} returned a target for a non-found outcome.`);
       }
       if (label?.state) {
-        if (offline) fail("contract", "Historical state is unavailable in offline selection.");
+        if (offline) fail("contract", "Historical state is unavailable in Saved-page selection.");
         if (!matchesPartial(action.target?.state, label.state))
           fail("target_state", `Action ${index + 1} state differs from its label.`);
         else metrics.stateCorrect++;
       }
       if (label?.interactability) {
-        if (offline) fail("contract", "Historical readiness is unavailable in offline selection.");
+        if (offline)
+          fail("contract", "Historical readiness is unavailable in Saved-page selection.");
         if (!matchesPartial(action.target?.interactability, label.interactability))
           fail("interactability", `Action ${index + 1} readiness differs from its label.`);
         else metrics.readinessCorrect++;

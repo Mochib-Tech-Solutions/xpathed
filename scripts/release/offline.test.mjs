@@ -23,7 +23,7 @@ test("polling failures remain observed until shutdown reports them", async () =>
   }
 });
 
-test("offline worker sends only model input to pinned images and retains execution errors", async () => {
+test("Saved-page selection worker sends only model input to pinned images and retains execution errors", async () => {
   const root = await mkdtemp(join(tmpdir(), "xpathed-offline-worker-"));
   const bin = join(root, "bin"),
     output = join(root, "output"),
@@ -101,7 +101,7 @@ else console.log(JSON.stringify({outcome:"found"}));
       }
       await delay(25);
     }
-    assert.fail("Offline worker did not write a response");
+    assert.fail("Saved-page selection worker did not write a response");
   }
   try {
     const result = await request("select target");
@@ -122,14 +122,17 @@ else console.log(JSON.stringify({outcome:"found"}));
     });
     assert.match((await request("malformed")).error, /JSON/);
     const before = await readFile(log, "utf8");
-    assert.match((await request("select target", false, 16)).error, /Invalid offline request/);
+    assert.match(
+      (await request("select target", false, 16)).error,
+      /Invalid Saved-page selection request/,
+    );
     assert.equal(await readFile(log, "utf8"), before);
     for (const baseline of [false, true]) {
       for (const expectedPreparedInputHash of [undefined, null, "invalid"]) {
         assert.match(
           (await request("select target", baseline, undefined, { expectedPreparedInputHash }))
             .error,
-          /Invalid offline request/,
+          /Invalid Saved-page selection request/,
         );
         assert.equal(await readFile(log, "utf8"), before);
       }
@@ -180,7 +183,7 @@ else console.log(JSON.stringify({outcome:"found"}));
   }
 });
 
-test("parallel offline requests isolate routing, bound execution, drain and never replay IDs", async () => {
+test("parallel Saved-page selection requests isolate routing, bound execution, drain and never replay IDs", async () => {
   const root = await mkdtemp(join(tmpdir(), "xpathed-offline-parallel-"));
   const directory = join(root, "offline"),
     bin = join(root, "bin"),
@@ -244,7 +247,7 @@ else {
       if (await condition()) return;
       await delay(25);
     }
-    assert.fail("Timed out waiting for offline workers");
+    assert.fail("Timed out waiting for Saved-page selection workers");
   }
   try {
     await Promise.all([0, 1, 2].map(send));
