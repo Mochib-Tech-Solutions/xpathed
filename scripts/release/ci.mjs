@@ -2,12 +2,12 @@ import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { setTimeout as delay } from "node:timers/promises";
-import { profiles, selectQualificationCases } from "../../evaluation/compare.mjs";
+import { profiles, selectQualificationCases, readRun } from "../../evaluation/compare.mjs";
 import { validateCases } from "../../evaluation/run.mjs";
 import { loadCases } from "../../evaluation/cases/load.mjs";
 import { readCollection } from "../../evaluation/datasets/collection.mjs";
-import { prepareBaseline } from "./baseline.mjs";
-import { readState } from "./state.mjs";
+import { measuredEntry } from "../../evaluation/comparison.mjs";
+import { prepareBaseline, retiredReleaseCommit } from "./baseline.mjs";
 const gh = (path) => JSON.parse(execFileSync("gh", ["api", path], { encoding: "utf8" }));
 const node = (script, args) =>
   execFileSync(process.execPath, [script, ...args], { stdio: "inherit" });
@@ -52,11 +52,9 @@ export async function requireCI(repository, sha, waitMs = 0, api = gh) {
 }
 export function caseChanges(previous, current) {
   const fields = [
-    "contractVersion",
     "track",
     "instruction",
     "fixture",
-    "setupRevision",
     "viewport",
     "expected",
     "mutation",
@@ -80,8 +78,10 @@ export function caseChanges(previous, current) {
   };
 }
 async function main() {
-  const env = process.env,
-    [profileId = "deepseek"] = process.argv.slice(2);
+  const env = process.env;
+  const profileId = profiles[0].id;
+  if (process.argv.length !== 2)
+    throw new Error("Release CI uses the supplied environment, without a profile selector");
   if (!env.OPENROUTER_EVAL_API_KEY?.trim()) throw new Error("Missing evaluation key");
   const event = JSON.parse(await readFile(env.GITHUB_EVENT_PATH, "utf8"));
   if (
@@ -104,7 +104,9 @@ async function main() {
   suite.cases.push(...readCollection());
   const coverage = qualificationCoverage(suite);
   if (!coverage.ready) throw new Error(coverage.blockers.join("; "));
-  const releaseState = readState(env.GITHUB_REPOSITORY);
+  const baselineCommit = gh(`repos/${env.GITHUB_REPOSITORY}/git/ref/heads/release`).object.sha;
+  if (baselineCommit !== event.pull_request.base.sha)
+    throw new Error("Release branch moved; update the PR before evaluation");
   const preflight = {
     sourceSha: env.GITHUB_SHA,
     sourceTree: git("rev-parse", "HEAD^{tree}"),
@@ -112,14 +114,14 @@ async function main() {
     headSha: event.pull_request.head.sha,
     mode: "live",
     profileId,
+    baselineCommit,
+    initialBaseline: baselineCommit === retiredReleaseCommit,
     coverage,
   };
   await writeFile(`${root}/preflight.json`, JSON.stringify(preflight, null, 2) + "\n");
   const bundle = `${root}/bundle`;
   node("scripts/release/bundle.mjs", [
     "create",
-    "--profile",
-    profileId,
     "--source-sha",
     env.GITHUB_SHA,
     "--output",
@@ -127,15 +129,7 @@ async function main() {
   ]);
   const digest = hash(await readFile(`${bundle}/manifest.json`));
   await writeFile(`${root}/bundle-sha256.txt`, digest + "\n");
-  const baseline = await prepareBaseline(releaseState, `${root}/baseline`);
-  await writeFile(
-    `${root}/case-changes.json`,
-    JSON.stringify(
-      caseChanges(baseline.cases, selectQualificationCases(suite.cases).cases),
-      null,
-      2,
-    ) + "\n",
-  );
+  const baseline = await prepareBaseline(env.GITHUB_REPOSITORY, baselineCommit, `${root}/baseline`);
   node("scripts/release/evaluate.mjs", [
     "--bundle",
     bundle,
@@ -143,16 +137,18 @@ async function main() {
     digest,
     "--mode",
     "live",
-    "--profile",
-    profileId,
     "--output",
     `${root}/evaluation`,
-    "--baseline-bundle",
-    baseline.bundle,
-    "--baseline-sha256",
-    baseline.digest,
-    "--baseline-approval",
-    baseline.approval,
+    ...(baseline
+      ? [
+          "--baseline-bundle",
+          baseline.bundle,
+          "--baseline-sha256",
+          baseline.digest,
+          "--baseline-commit",
+          baseline.commit,
+        ]
+      : ["--initial-baseline", retiredReleaseCommit]),
   ]);
   node("scripts/release/evidence.mjs", [
     "seal",
@@ -168,9 +164,12 @@ async function main() {
     digest,
     "--output",
     `${root}/candidate.json`,
+    ...(baseline ? [] : ["--initial-baseline", retiredReleaseCommit]),
   ]);
   const candidateDigest = hash(await readFile(`${root}/candidate.json`));
   await writeFile(`${root}/candidate-sha256.txt`, candidateDigest + "\n");
+  if (gh(`repos/${env.GITHUB_REPOSITORY}/git/ref/heads/release`).object.sha !== baselineCommit)
+    throw new Error("Release changed during evaluation; rerun against the new baseline");
   node("scripts/release/archive.mjs", [
     "pack",
     `${root}/candidate.json`,
@@ -178,6 +177,30 @@ async function main() {
     candidateDigest,
     `${root}/release-evidence.json.gz`,
   ]);
+  const run = await readRun(`${root}/evaluation`);
+  const monitoring = {
+    sourceSha: preflight.sourceSha,
+    profile: run.manifest.profiles[0],
+    entries: run.manifest.cases.map((spec) =>
+      measuredEntry(
+        spec,
+        run.trials.find((trial) => trial.caseId === spec.id),
+        run.manifest.profiles[0],
+        run.manifest.policy,
+      ),
+    ),
+  };
+  const monitoringBytes = JSON.stringify(monitoring, null, 2) + "\n";
+  await writeFile(`${root}/monitoring-baseline.json`, monitoringBytes);
+  preflight.monitoringSha256 = hash(monitoringBytes);
+  await writeFile(
+    `${root}/receipt.json`,
+    JSON.stringify(
+      { ...preflight, bundleSha256: digest, candidateSha256: candidateDigest },
+      null,
+      2,
+    ) + "\n",
+  );
 }
 if (import.meta.main)
   main().catch((error) => {

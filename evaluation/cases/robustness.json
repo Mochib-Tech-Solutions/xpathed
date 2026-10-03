@@ -11,7 +11,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "viewport-baseline-1",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-fixture-source-review",
@@ -67,7 +66,6 @@
       ]
     },
     "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
-    "contractVersion": "4",
     "critical": true,
     "labelProvenance": {
       "kind": "controlled-authored",
@@ -96,7 +94,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "viewport-baseline-1",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-fixture-source-review",
@@ -127,7 +124,6 @@
       ]
     },
     "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
-    "contractVersion": "4",
     "labelProvenance": {
       "kind": "controlled-authored",
       "sourceCaseId": "large-visible-prefix",
@@ -158,7 +154,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "qualification-1",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-contract-review",
@@ -222,7 +217,6 @@
       "PRIVATE_COOKIE_VALUE",
       "PRIVATE_STORAGE_VALUE"
     ],
-    "contractVersion": "4",
     "critical": true,
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
@@ -241,7 +235,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "qualification-1",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-contract-review",
@@ -265,7 +258,6 @@
       "fault": "malformed"
     },
     "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
-    "contractVersion": "4",
     "deterministicOnly": true,
     "sourceSplit": "development",
     "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
@@ -284,7 +276,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "qualification-1",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-contract-review",
@@ -308,7 +299,6 @@
       "fault": "unknown"
     },
     "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
-    "contractVersion": "4",
     "deterministicOnly": true,
     "sourceSplit": "development",
     "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
@@ -327,7 +317,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "qualification-1",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-contract-review",
@@ -351,7 +340,6 @@
       "fault": "rate_limit"
     },
     "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
-    "contractVersion": "4",
     "deterministicOnly": true,
     "sourceSplit": "development",
     "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
@@ -370,7 +358,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "qualification-1",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-contract-review",
@@ -394,7 +381,6 @@
       "fault": "timeout"
     },
     "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
-    "contractVersion": "4",
     "deterministicOnly": true,
     "sourceSplit": "development",
     "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
@@ -413,7 +399,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "qualification-1",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-contract-review",
@@ -437,7 +422,6 @@
       "fault": "refusal"
     },
     "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
-    "contractVersion": "4",
     "deterministicOnly": true,
     "sourceSplit": "development",
     "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
@@ -456,7 +440,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "qualification-1",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-contract-review",
@@ -480,7 +463,6 @@
       "fault": "empty"
     },
     "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
-    "contractVersion": "4",
     "deterministicOnly": true,
     "sourceSplit": "development",
     "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
@@ -499,7 +481,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "qualification-1",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-contract-review",
@@ -523,7 +504,6 @@
       "fault": "truncated"
     },
     "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
-    "contractVersion": "4",
     "deterministicOnly": true,
     "sourceSplit": "development",
     "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
@@ -542,7 +522,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "qualification-1",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-contract-review",
@@ -604,7 +583,6 @@
       "fault": "missing_usage"
     },
     "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
-    "contractVersion": "4",
     "deterministicOnly": true,
     "sourceSplit": "development",
     "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],

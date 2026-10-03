@@ -828,8 +828,6 @@ test("state-disabled-target-has-distinct-click-and-hover-readiness", async () =>
           candidateId: candidate.id,
           action,
         });
-        assert.equal(target.state.version, "2");
-        assert.equal(target.interactability.version, "2");
         assert.equal(target.interactability.action, action);
         assert.equal(target.interactability.status, status);
         assert.equal(

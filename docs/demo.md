@@ -38,7 +38,7 @@ Walk through a saved case: instruction, independent expected target, captured ev
 
 Show how attempt/trace IDs connect configuration, error stage and available evidence. Describe the three evaluation categories: model selection from reviewed PhraseNode inputs, XPath construction and verification from controlled selections, and Resolver E2E with a real model and browser. Keep scores separate, with dates and denominators; use regression to describe a lost pass in a comparison.
 
-Describe the current release gate: exact candidate/baseline images, the complete reviewed collection, no lost baseline pass, explicit activation and nightly monitoring.
+Describe the current release gate: exact candidate/baseline images, the complete reviewed collection, no lost baseline pass, deployment and nightly monitoring.
 
 ## 4. Discuss tradeoffs · 10 minutes
 

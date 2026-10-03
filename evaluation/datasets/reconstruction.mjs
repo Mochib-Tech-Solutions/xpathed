@@ -7,7 +7,6 @@ import { parseArgs } from "node:util";
 import { derivedTags, derivedAttributes, renderDerivedBody } from "../fixtures/pages.mjs";
 
 const { JSDOM } = createRequire(new URL("../../src/Web/package.json", import.meta.url))("jsdom");
-export const reconstructionVersion = "phrasenode-static-tree-v1";
 
 export function reconstructPhraseNode(annotation, page, provenance) {
   if (!Array.isArray(page?.info) || !page.info.length) throw new Error("Invalid source tree");
@@ -103,7 +102,6 @@ export function reconstructPhraseNode(annotation, page, provenance) {
     if (targets.length !== 1)
       throw new Error("Source target is missing or ambiguous after reconstruction");
     return {
-      version: reconstructionVersion,
       mode: "derived-static-dom",
       historicalState: "unavailable",
       limitations: [
@@ -187,7 +185,6 @@ export async function createBrowserSuite(values) {
         fixture: reconstruction.fixture,
         instruction: item.instruction,
         viewport: { width: 1280, height: 800, tolerance: 1 },
-        setupRevision: reconstructionVersion,
         review: {
           status: "source-mapping-validated",
           method:

@@ -11,7 +11,6 @@ function evidence() {
     id: `case-${index}`,
     family: `family-${index}`,
     split: index === 10 ? "regression" : "held-out",
-    contractVersion: "3",
     expected: {
       outcome: "found",
       actions: (index === 0 ? [1, 2] : [1]).map((step) => ({
@@ -69,7 +68,6 @@ function evidence() {
         },
       ],
       result: {
-        contractVersion: "3",
         action: "click",
         outcome: "found",
         actions: spec.expected.actions.map(({ step }) => ({
@@ -81,8 +79,15 @@ function evidence() {
           target: {
             candidateId: `c${step}`,
             xpaths: [`//button[@id='button-${step}']`],
-            state: { version: "2" },
-            interactability: { version: "2", action: "click" },
+            state: {
+              rendered: true,
+              inViewport: true,
+              enabled: true,
+              editable: false,
+              accessibilityExposed: true,
+              readonly: false,
+            },
+            interactability: { action: "click" },
           },
         })),
         summary: { processingComplete: true },
@@ -101,7 +106,6 @@ function releaseEvidence() {
   const trials = repeated.filter((trial) => trial.repetition === 1);
   manifest.cases.forEach((spec) => {
     spec.split = "regression";
-    spec.contractVersion = "4";
   });
   manifest.plan.trials = manifest.plan.trials.filter((trial) => trial.repetition === 1);
   delete manifest.baselineEvidence;
@@ -111,7 +115,6 @@ function releaseEvidence() {
     frozenAt: "2026-10-02T12:00:00Z",
   };
   for (const trial of trials) {
-    trial.result.contractVersion = "4";
     trial.baseline = structuredClone(trial);
     trial.baseline.profileId = "release-baseline";
     trial.baseline.id = createHash("sha256")
@@ -127,7 +130,6 @@ test("complete paired regression evidence qualifies without a pilot or holdout",
   const { manifest, trials } = releaseEvidence();
   const summary = summarizeQualification(manifest, trials);
   assert.deepEqual(summary.qualifiedCandidates, ["candidate"]);
-  assert.equal(summary.defaultActivated, false);
 });
 
 test("regressions block release, while latency and missing charges do not", () => {
@@ -206,5 +208,44 @@ test("provider evidence errors block release while accounting warnings stay desc
       "infrastructure_failure",
     );
     delete arm.provider[0].error;
+  }
+});
+
+test("fresh baseline retains the complete denominator and rejects missing or invalid provider evidence", () => {
+  const fresh = () => {
+    const run = releaseEvidence();
+    delete run.manifest.comparison;
+    run.manifest.initialBaseline = "retired-release";
+    for (const trial of run.trials) delete trial.baseline;
+    return run;
+  };
+  const run = fresh();
+  run.trials[0].observation.actions[0].matches[0].intended = false;
+  let result = summarizeQualification(run.manifest, run.trials);
+  assert.deepEqual(result.qualifiedCandidates, ["candidate"]);
+  assert.equal(
+    result.profiles.candidate.qualification.comparison.candidate.total,
+    run.manifest.cases.length,
+  );
+  assert.equal(result.profiles.candidate.qualification.comparison.baseline, undefined);
+  delete run.manifest.initialBaseline;
+  assert.deepEqual(summarizeQualification(run.manifest, run.trials).qualifiedCandidates, []);
+  for (const change of [
+    ({ trials }) => trials.pop(),
+    ({ trials }) => trials.push(structuredClone(trials[0])),
+    ({ trials }) => {
+      trials[0].provider[0].identityValid = false;
+    },
+    ({ trials }) => {
+      trials[0].provider[0].observedIdentity.generationId =
+        trials[1].provider[0].observedIdentity.generationId;
+    },
+  ]) {
+    const changed = fresh();
+    change(changed);
+    assert.deepEqual(
+      summarizeQualification(changed.manifest, changed.trials).qualifiedCandidates,
+      [],
+    );
   }
 });

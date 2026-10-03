@@ -20,7 +20,6 @@ const spec = {
   track: "offline-selection",
   dataset: "fixture",
   instruction: input.instruction,
-  setupRevision: "1",
   input,
   expected: {
     outcome: "found",

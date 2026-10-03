@@ -1,0 +1,27 @@
+name: xpathed-release
+services:
+  browser:
+    image: ${XPATHED_BROWSER_IMAGE:?Load the release images first}
+    pull_policy: never
+    init: true
+    shm_size: 1gb
+    security_opt: ["seccomp=./browser-seccomp.json"]
+    ports: ["127.0.0.1:${BROWSER_PORT:-8082}:8080"]
+    environment:
+      ViewerOrigins: ${VIEWER_ORIGINS:-http://localhost:8080,http://127.0.0.1:8080}
+      MaxSessions: ${BROWSER_MAX_SESSIONS:-4}
+      Logging__LogLevel__Default: Warning
+    stop_grace_period: 20s
+  resolver:
+    image: ${XPATHED_RESOLVER_IMAGE:?Load the release images first}
+    pull_policy: never
+    ports: ["127.0.0.1:${RESOLVER_PORT:-8083}:8080"]
+    environment:
+      BrowserUrl: http://browser:8080
+      OpenRouter__ApiKey: ${OPENROUTER_API_KEY:?Supply OPENROUTER_API_KEY in your environment file}
+      OpenRouter__Model: ${OPENROUTER_MODEL:?Supply OPENROUTER_MODEL in your environment file}
+      OpenRouter__Provider: ${OPENROUTER_PROVIDER:?Supply OPENROUTER_PROVIDER in your environment file}
+      OpenRouter__BaseUrl: ${OPENROUTER_BASE_URL:-https://openrouter.ai/api/v1/}
+      OpenRouter__TimeoutSeconds: ${OPENROUTER_TIMEOUT_SECONDS:-30}
+      Logging__LogLevel__Default: Warning
+    depends_on: [browser]

@@ -15,6 +15,7 @@ docker/compose.sh --env-file /dev/null -f docker/compose.evaluation.yaml config 
 docker/compose.sh --env-file /dev/null -f docker/compose.evaluation.yaml -f docker/compose.evaluation-live.yaml config --quiet
 docker/compose.sh --env-file /dev/null -f docker/compose.evaluation.yaml -f docker/compose.qualification.yaml config --quiet
 XPATHED_BASIC_BROWSER=sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa XPATHED_BASIC_RESOLVER=sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb docker/compose.sh --env-file /dev/null -f docker/compose.evaluation.yaml -f docker/compose.comparison.yaml config --quiet
+XPATHED_BROWSER_IMAGE=sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa XPATHED_RESOLVER_IMAGE=sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb OPENROUTER_MODEL=configuration-check OPENROUTER_PROVIDER=configuration-check docker compose --env-file /dev/null -f docker/compose.release.yaml config --quiet
 docker buildx build --check --file docker/stagehand.Dockerfile .
 for dockerfile in docker/*/Dockerfile; do
   for target in runtime development; do

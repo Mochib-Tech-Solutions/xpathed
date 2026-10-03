@@ -30,7 +30,7 @@ Preserve separate client API, resolver and browser service runtimes. The browser
 - Preserve all attempts, including failed model calls. Retries must not turn a first-attempt failure into an unqualified pass. Compare strategies on equivalent page state and viewport; disable execution repair when grading resolution.
 - Version code, prompt, model/provider settings, page processing, datasets, and browser dependencies in evaluation evidence. Enforce agreed thresholds without inventing new ones.
 - Required PR checks and post-merge evaluations must assess the intended commit. Skipped or unavailable required live checks must not silently qualify a release. Unreviewed PR code must not receive provider credentials through a privileged workflow.
-- Adding an experimental model must not activate it for clients. Promotion changes the approved default only after qualification; retain the prior approved release for rollback. Copilot feedback supplements deterministic checks and model evaluation.
+- Experiments must not change deployment settings. Required CI and live evaluation precede merge into `release`; publish those tested images and use that commit as the next baseline. Deployment supplies OpenRouter configuration. Copilot feedback supplements deterministic checks and model evaluation.
 - Scheduled drift failures fail CI and alert the maintainer. They must not disable the active feature, automatically replace the default, or silently roll back. New releases still require successful qualification.
 
 ## Findings

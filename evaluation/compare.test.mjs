@@ -148,19 +148,18 @@ test("release selection reuses every reviewed current case without a phase or sp
   ])
     assert.throws(() => parseQualificationOptions(args));
   const cases = [
-    { id: "old", contractVersion: "3" },
-    { id: "new", contractVersion: "4", split: "held-out" },
-    { id: "regression", contractVersion: "4", split: "regression" },
+    { id: "new", split: "held-out" },
+    { id: "regression", split: "regression" },
     { id: "offline", track: "offline-selection" },
-    { id: "mutation", contractVersion: "4", mutation: {} },
-    { id: "fault", contractVersion: "4", provider: { fault: "timeout" } },
+    { id: "mutation", mutation: {} },
+    { id: "fault", provider: { fault: "timeout" } },
   ];
   const selected = selectQualificationCases(cases, options);
   assert.deepEqual(
     selected.cases.map((c) => c.id),
     ["new", "regression", "offline"],
   );
-  assert.equal(selected.exclusions.length, 3);
+  assert.equal(selected.exclusions.length, 2);
   const plan = buildMatrixPlan(selected.cases, [{ id: "candidate" }], options);
   assert.equal(plan.trials.length, 3);
   assert.equal(plan.retries, 0);
@@ -180,7 +179,6 @@ test("artifact identities must bind both components to the tested source and pro
 test("nightly requires independent live generation IDs without matching the saved reference IDs", () => {
   const cases = ["one", "two"].map((id) => ({
     id,
-    contractVersion: "4",
     expected: {
       outcome: "not_found",
       actions: [{ step: 1, action: "click", outcome: "not_found" }],
@@ -198,7 +196,6 @@ test("nightly requires independent live generation IDs without matching the save
     caseId: spec.id,
     elapsedMs: 100,
     result: {
-      contractVersion: "4",
       action: "click",
       outcome: "not_found",
       actions: [{ step: 1, order: 1, actionId: "a1", action: "click", outcome: "not_found" }],
@@ -230,7 +227,6 @@ test("nightly requires independent live generation IDs without matching the save
     const result = summarizeMonitoring(manifest, changed, baseline);
     assert.equal(result.status, "infrastructure_failure");
     assert.equal(result.entries[1].operational, true);
-    assert.equal(result.defaultActivated, false);
   }
 });
 
@@ -238,5 +234,38 @@ test("direct release comparison rejects parallel execution metadata", () => {
   assert.throws(
     () => parseQualificationOptions(["--concurrency", "2"]),
     /Comparison requires concurrency 1/,
+  );
+});
+
+test("live runner accepts only the explicit initial baseline before loading the complete suite", async (t) => {
+  const { main } = await import("./compare.mjs");
+  const { retiredReleaseCommit } = await import("./release-transition.mjs");
+  const names = [
+    "XPATHED_INITIAL_BASELINE",
+    "XPATHED_RELEASE_COMPARISON_JSON",
+    "XPATHED_RELEASE_ARTIFACT_JSON",
+  ];
+  const old = Object.fromEntries(names.map((name) => [name, process.env[name]]));
+  t.after(() => {
+    for (const name of names) {
+      if (old[name] === undefined) delete process.env[name];
+      else process.env[name] = old[name];
+    }
+  });
+  for (const name of names) delete process.env[name];
+  await assert.rejects(
+    main(["--mode", "live", "--suite", "/missing-release-test-suite"]),
+    /baseline images/,
+  );
+  process.env.XPATHED_INITIAL_BASELINE = "arbitrary";
+  await assert.rejects(main(["--mode", "live"]), /Invalid initial baseline/);
+  process.env.XPATHED_INITIAL_BASELINE = retiredReleaseCommit;
+  await assert.rejects(
+    main(["--mode", "live", "--suite", "/missing-release-test-suite"]),
+    /ENOENT/,
+  );
+  await assert.rejects(
+    main(["--mode", "live", "--monitoring", "true"]),
+    /Invalid initial baseline/,
   );
 });

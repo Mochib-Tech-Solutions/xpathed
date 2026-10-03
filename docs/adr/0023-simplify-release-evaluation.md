@@ -1,4 +1,6 @@
 ---
+
+Release selection is superseded by [ADR-0026](0026-use-the-release-branch-as-the-baseline.md). The following records the earlier decision.
 status: accepted
 ---
 

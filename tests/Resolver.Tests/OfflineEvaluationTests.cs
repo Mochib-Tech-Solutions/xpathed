@@ -12,7 +12,7 @@ namespace Xpathed.Resolver.Tests;
 public sealed class OfflineEvaluationTests
 {
     [Fact]
-    public async Task PrepareOnlyBuildsTheVersionedRequestWithoutCredentialsOrBrowserClaims()
+    public async Task PrepareOnlyBuildsTheRequestWithoutCredentialsOrBrowserClaims()
     {
         var (exitCode, output) = await RunAsync(
             """{"instruction":"Click Save","candidates":[{"id":"c1","tag":"button","label":"Save"}]}""",
@@ -21,7 +21,6 @@ public sealed class OfflineEvaluationTests
         Assert.Equal(0, exitCode);
         using var json = JsonDocument.Parse(output);
         var result = json.RootElement;
-        Assert.Equal("10", result.GetProperty("promptVersion").GetString());
         Assert.Equal(4096, result.GetProperty("outputTokens").GetInt32());
         Assert.Contains("one interaction shared", result.GetProperty("prompt").GetString(), StringComparison.Ordinal);
         using var modelInput = JsonDocument.Parse(result.GetProperty("modelInput").GetString()!);
@@ -157,14 +156,6 @@ public sealed class OfflineEvaluationTests
         Assert.Equal(
             prepared.RootElement.GetProperty("configurationId").GetString(),
             result.GetProperty("configurationId").GetString()
-        );
-        Assert.Equal(
-            prepared.RootElement.GetProperty("promptVersion").GetString(),
-            result.GetProperty("promptVersion").GetString()
-        );
-        Assert.Equal(
-            prepared.RootElement.GetProperty("promptVersion").GetString(),
-            result.GetProperty("diagnostics").GetProperty("promptVersion").GetString()
         );
         Assert.Equal(expectedCode is null ? "found" : "error", result.GetProperty("outcome").GetString());
         if (expectedCode is null)

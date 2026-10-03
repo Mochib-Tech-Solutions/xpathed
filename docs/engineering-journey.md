@@ -63,7 +63,7 @@ Action interpretation matters separately from selecting the right element. Witho
 
 The seven regressions include three malformed model responses, two changed action interpretations, one incorrect unsupported result and one wrong target for an absent request. The aggregate improvement does not satisfy the release gate's no-regression requirement. One attempt per case also leaves model variation unresolved.
 
-Three isolated workers run concurrently, one per system. Original evidence, charges, source identities, image identities and timing cohorts are preserved. The application carries one selected implementation; archived images and Git preserve Basic. Exact prompt versions remain reproducibility details rather than visible comparison labels.
+Three isolated workers run concurrently, one per system. Original evidence, charges, source identities, image identities and timing cohorts are preserved. The application carries one selected implementation; archived images and Git preserve Basic. Git commits and saved prompt bytes preserve reproducibility.
 
 ## Keep one implementation
 
@@ -83,7 +83,7 @@ Update the selected implementation in place. Retired contracts and experiment se
 | Live resolver comparison  | Basic, Improved and Stagehand accuracy, category gains/losses, latency and cost               | Measures actual model decisions under matched conditions                     |
 | Offline dataset evaluation   | Selection against imported labelled candidates                                                | Adds data variety but cannot prove browser readiness or viewport correctness |
 | Replay                       | Regrading saved evidence without another inference call                                       | Checks grading and reporting while preserving original attempts              |
-| Release evaluation           | Candidate versus approved images under the complete current policy                            | Protects existing passes before a release is approved                        |
+| Release evaluation           | Candidate versus published images under the complete current policy                            | Protects existing passes before merging a release                        |
 
 Tooling tests check the runners, graders, accounting and release scripts themselves. Formatting, analyzers, builds and Docker configuration checks catch source or packaging problems; they do not measure model accuracy.
 
@@ -91,9 +91,9 @@ Tooling tests check the runners, graders, accounting and release scripts themsel
 
 Resolution responses carry attempt and trace IDs, configuration, timings and reason codes. Evaluation runners save their own evidence for investigation and replay. Operational logs separate capture, provider, contract, stale-page and target-selection failures; they cannot establish the user’s intended target.
 
-Ordinary CI remains provider-free. Release evaluation compares exact candidate and approved images on the same complete collection, with one original attempt per case and no automatic retries. Approval requires no lost baseline pass and valid contract, safety and artifact checks. Latency and cost remain descriptive; missing charges remain unknown.
+Ordinary CI remains provider-free. Release evaluation compares exact candidate and published images on the same complete collection, with one original attempt per case and no automatic retries. Approval requires no lost baseline pass and valid contract, safety and artifact checks. Latency and cost remain descriptive; missing charges remain unknown.
 
-Activation is explicit. Nightly monitoring repeats approved cases and reports drift without changing the running application. Replay regrades retained evidence; it cannot recreate an arbitrary historical website.
+Activation is explicit. Nightly monitoring repeats release cases and reports drift without changing the running application. Replay regrades retained evidence; it cannot recreate an arbitrary historical website.
 
 ## What to improve next
 

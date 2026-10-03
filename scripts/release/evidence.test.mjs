@@ -23,20 +23,13 @@ const hash = (value) =>
   createHash("sha256")
     .update(typeof value === "string" || Buffer.isBuffer(value) ? value : JSON.stringify(value))
     .digest("hex");
-async function workspace(
-  t,
-  {
-    contractVersion = "4",
-    promptVersion = "10",
-    qualificationPolicy = "current",
-    bootstrapBaseline = false,
-  } = {},
-) {
+async function workspace(t, { qualificationPolicy = "current", bootstrapBaseline = false } = {}) {
   const cwd = realpathSync(mkdtempSync(join(tmpdir(), "xpathed-release-")));
   t.after(() => rmSync(cwd, { recursive: true, force: true }));
   cpSync("evaluation", join(cwd, "evaluation"), { recursive: true });
   mkdirSync(join(cwd, "scripts/release"), { recursive: true });
-  cpSync("scripts/release/evidence.mjs", join(cwd, "scripts/release/evidence.mjs"));
+  for (const name of ["evidence", "baseline", "download"])
+    cpSync(`scripts/release/${name}.mjs`, join(cwd, `scripts/release/${name}.mjs`));
   cpSync("scripts/release/bundle.mjs", join(cwd, "scripts/release/bundle.mjs"));
   cpSync("scripts/release/archive.mjs", join(cwd, "scripts/release/archive.mjs"));
   writeFileSync(join(cwd, ".gitignore"), ".artifacts/\n");
@@ -48,10 +41,8 @@ async function workspace(
     id: `case-${i}`,
     family: `family-${i}`,
     split: "regression",
-    contractVersion,
     instruction: "Click the labelled buttons",
     fixture: "synthetic",
-    setupRevision: "1",
     review: { status: "reviewed", reviewer: "synthetic", reviewedAt: time(-5000) },
     category: "target",
     viewport: { width: 1280, height: 800 },
@@ -88,7 +79,6 @@ async function workspace(
     track: "offline-selection",
     category: "external-target",
     instruction: input.instruction,
-    setupRevision: "1",
     input,
     review: {
       status: "reviewed",
@@ -196,7 +186,6 @@ async function workspace(
         ],
         result: {
           configurationId: "c".repeat(64),
-          contractVersion: spec.track === "offline-selection" ? "offline-1" : contractVersion,
           action: "click",
           outcome: spec.expected.outcome,
           summary: { processingComplete: true },
@@ -214,8 +203,15 @@ async function workspace(
                       ? {}
                       : {
                           xpaths: [`//button[@id='button-${step}']`],
-                          state: { version: "2" },
-                          interactability: { version: "2", action: "click" },
+                          state: {
+                            rendered: true,
+                            inViewport: true,
+                            enabled: true,
+                            editable: false,
+                            accessibilityExposed: true,
+                            readonly: false,
+                          },
+                          interactability: { action: "click" },
                         }),
                   },
                 }
@@ -232,10 +228,9 @@ async function workspace(
           configurationJson: JSON.stringify({
             Model: profile.model,
             Provider: profile.provider,
-            Strategy: "candidate-selection-v1",
-            PromptVersion: promptVersion,
+            Strategy: "candidate-selection",
             effective: {
-              ...(contractVersion === "4" ? { scope: "current_view", captureVersion: "5" } : {}),
+              scope: "current_view",
               responseCache: false,
               request: {
                 model: profile.model,
@@ -265,7 +260,7 @@ async function workspace(
         trial.baseline.elapsedMs = 3500;
         if (bootstrapBaseline) {
           const config = JSON.parse(trial.baseline.evidence.configurationJson);
-          config.PromptVersion = "8";
+          config.OutputTokens = 512;
           trial.baseline.evidence.configurationJson = JSON.stringify(config);
           trial.baseline.configuration = configurationRecord(trial.baseline);
         }
@@ -311,17 +306,6 @@ async function workspace(
       cwd,
     });
     writeFileSync(join(cwd, bundle, "images.tar"), "Synthetic image archive; no Docker execution");
-    write(`${bundle}/configuration.json`, {
-      version: 1,
-      profile,
-      resolverEnvironment: {
-        OpenRouter__Model: profile.model,
-        OpenRouter__Provider: profile.provider,
-      },
-      secretsRequired: ["OpenRouter__ApiKey"],
-      runtimeDefaults: "frozen-in-images",
-      defaultActivated: false,
-    });
     const platform = { os: "linux", architecture: "amd64" };
     const images = ["browser", "resolver"].map((component, index) => ({
       component,
@@ -330,17 +314,13 @@ async function workspace(
       sourceSha: sha,
     }));
     const files = Object.fromEntries(
-      ["source.tar", "images.tar", "configuration.json"].map((name) => {
+      ["source.tar", "images.tar"].map((name) => {
         const bytes = readFileSync(join(cwd, bundle, name));
         return [name, { sha256: hash(bytes), bytes: bytes.length }];
       }),
     );
     write(`${bundle}/manifest.json`, {
-      version: 1,
-      status: "packaged-unqualified",
-      defaultActivated: false,
       sourceSha: sha,
-      profileId: profile.id,
       platform,
       images,
       files,
@@ -372,7 +352,7 @@ async function workspace(
           }
         : artifact;
       const comparison = qualificationPolicy
-        ? { artifact: baselineArtifact, profile, approval: "a".repeat(64) }
+        ? { artifact: baselineArtifact, profile, commit: baselineArtifact.sourceSha }
         : undefined;
       if (comparison) run.manifest.comparison = comparison;
       delete run.manifest.contentHash;
@@ -416,7 +396,7 @@ test("seal, replay and archive bind one complete evaluation to exact tested arti
     bytes = readFileSync(path);
   const candidate = JSON.parse(bytes);
   assert.equal(candidate.version, 3);
-  assert.equal(candidate.defaultActivated, false);
+  assert.equal(candidate.defaultActivated, undefined);
   assert.equal(candidate.pilot, undefined);
   assert.equal(candidate.evaluation, work.evaluation.path);
   assert.equal(work.run("verify", path, "--sha256", hash(bytes)).status, 0);
@@ -492,4 +472,52 @@ test("sealing rejects missing results, changed policy, lost passes, artifacts an
       }
       assert.notEqual(bound.seal().status, 0);
     });
+});
+
+test("fresh baseline seals complete candidate evidence and cannot silently omit the baseline later", async (t) => {
+  const work = await workspace(t, { qualificationPolicy: null });
+  const bound = work.bindArtifact();
+  const { retiredReleaseCommit } = await import("./baseline.mjs");
+  const { summarizeQualification } = await import(`file://${work.cwd}/evaluation/policy.mjs`);
+  const manifest = work.evaluation.manifest;
+  manifest.initialBaseline = retiredReleaseCommit;
+  delete manifest.contentHash;
+  manifest.contentHash = hash(manifest);
+  work.write(`${work.evaluation.path}/manifest.json`, manifest);
+  work.write(
+    `${work.evaluation.path}/summary.json`,
+    summarizeQualification(manifest, work.evaluation.trials),
+  );
+  assert.notEqual(
+    bound.seal().status,
+    0,
+    "Omitting a baseline requires the explicit one-time transition",
+  );
+  const result = work.seal(
+    "--bundle",
+    bound.bundle,
+    "--bundle-sha256",
+    bound.digest,
+    "--initial-baseline",
+    retiredReleaseCommit,
+  );
+  assert.equal(result.status, 0, result.stderr);
+  const file = join(work.cwd, ".artifacts/candidate.json"),
+    bytes = readFileSync(file);
+  assert.equal(JSON.parse(bytes).initialBaseline, retiredReleaseCommit);
+  const verified = work.run("verify", file, "--sha256", hash(bytes));
+  assert.equal(verified.status, 0, verified.stderr);
+  const archived = spawnSync(
+    process.execPath,
+    [
+      "scripts/release/archive.mjs",
+      "pack",
+      file,
+      "--sha256",
+      hash(bytes),
+      ".artifacts/fresh-evidence.json.gz",
+    ],
+    { cwd: work.cwd, encoding: "utf8" },
+  );
+  assert.equal(archived.status, 0, archived.stderr);
 });

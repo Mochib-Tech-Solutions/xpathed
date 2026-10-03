@@ -1,7 +1,5 @@
 {
-  "version": "current",
-  "requiredContractVersion": "4",
-  "latencyProtocol": "resolver-http-v1",
+  "latencyProtocol": "resolver-http",
   "goalMs": 1000,
   "deadlineMs": 2000,
   "hardFailureCategories": [

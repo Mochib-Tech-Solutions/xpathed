@@ -16,7 +16,7 @@ import { join, resolve } from "node:path";
 import { isDeepStrictEqual } from "node:util";
 
 const components = ["browser", "resolver"];
-const inventory = ["configuration.json", "images.tar", "manifest.json", "source.tar"];
+const inventory = ["images.tar", "manifest.json", "source.tar"];
 const ensure = (condition, message) => {
   if (!condition) throw new Error(message);
 };
@@ -28,24 +28,8 @@ const keys = (value, names) =>
   isDeepStrictEqual(Object.keys(value).sort(), [...names].sort());
 
 function validate(manifest) {
-  ensure(
-    keys(manifest, [
-      "version",
-      "status",
-      "defaultActivated",
-      "sourceSha",
-      "profileId",
-      "platform",
-      "images",
-      "files",
-    ]) &&
-      manifest.version === 1 &&
-      manifest.status === "packaged-unqualified" &&
-      manifest.defaultActivated === false &&
-      /^[a-f\d]{40}$/.test(manifest.sourceSha ?? "") &&
-      /^[a-z0-9-]+$/.test(manifest.profileId ?? ""),
-    "Unsupported bundle manifest",
-  );
+  ensure(manifest && /^[a-f\d]{40}$/.test(manifest.sourceSha ?? ""), "Unsupported bundle manifest");
+  ensure(keys(manifest, ["sourceSha", "platform", "images", "files"]), "Unexpected bundle fields");
   ensure(
     keys(manifest.platform, ["os", "architecture"]) &&
       manifest.platform.os === "linux" &&
@@ -68,10 +52,11 @@ function validate(manifest) {
     "Invalid component image identities",
   );
   ensure(
-    keys(
-      manifest.files,
-      inventory.filter((name) => name !== "manifest.json"),
-    ) &&
+    keys(manifest.files, [
+      "images.tar",
+      "source.tar",
+      ...(manifest.files?.["configuration.json"] ? ["configuration.json"] : []),
+    ]) &&
       Object.values(manifest.files).every(
         (file) =>
           keys(file, ["sha256", "bytes"]) &&
@@ -163,69 +148,6 @@ async function fingerprint(path) {
   return { sha256: digest.digest("hex"), bytes };
 }
 
-function configuration(profile) {
-  ensure(
-    keys(profile, [
-      "id",
-      "model",
-      "provider",
-      "reasoning",
-      "maxTokens",
-      "resolver",
-      "variant",
-      ...(Object.hasOwn(profile, "promptCacheOptions") ? ["promptCacheOptions"] : []),
-    ]),
-    "Unsupported profile settings",
-  );
-  ensure(
-    [profile.id, profile.model, profile.provider, profile.resolver].every(
-      (value) => typeof value === "string" && value.length > 0,
-    ) &&
-      profile.maxTokens === 4096 &&
-      profile.variant === "baseline" &&
-      ((keys(profile.reasoning, ["enabled"]) && profile.reasoning.enabled === false) ||
-        (keys(profile.reasoning, ["effort"]) &&
-          typeof profile.reasoning.effort === "string" &&
-          profile.reasoning.effort.length > 0)) &&
-      (!profile.promptCacheOptions ||
-        (keys(profile.promptCacheOptions, ["mode"]) &&
-          profile.promptCacheOptions.mode === "explicit")),
-    "Unsupported profile settings",
-  );
-  const resolverEnvironment = {
-    OpenRouter__Model: profile.model,
-    OpenRouter__Provider: profile.provider,
-  };
-  if (profile.reasoning?.effort)
-    resolverEnvironment.OpenRouter__ReasoningEffort = profile.reasoning.effort;
-  if (profile.promptCacheOptions?.mode)
-    resolverEnvironment.OpenRouter__PromptCacheMode = profile.promptCacheOptions.mode;
-  return {
-    version: 1,
-    profile,
-    resolverEnvironment,
-    secretsRequired: ["OpenRouter__ApiKey"],
-    runtimeDefaults: "frozen-in-images",
-    defaultActivated: false,
-  };
-}
-
-async function archivedConfiguration(source, profileId, sha) {
-  ensure(
-    (await command("git", ["get-tar-commit-id"], source)) === sha,
-    "Archived source revision mismatch",
-  );
-  const files = (await command("tar", ["-tf", source])).split("\n");
-  const path = files.includes("evaluation/profiles.json")
-    ? "evaluation/profiles.json"
-    : "evaluation/qualification-profiles.json";
-  const profiles = JSON.parse(await command("tar", ["-xOf", source, path]));
-  const matches = Array.isArray(profiles) ? profiles.filter((item) => item.id === profileId) : [];
-  ensure(matches.length === 1, "Unknown or duplicate archived profile");
-  const profile = matches[0];
-  return configuration(profile);
-}
-
 async function dockerPlatform(docker) {
   const info = JSON.parse(await docker(["info", "--format", "{{json .}}"]));
   const platform = {
@@ -255,9 +177,11 @@ async function inspect(docker, id, component, sha, platform) {
 }
 
 async function create(options) {
-  const sha = await command("git", ["rev-parse", "HEAD"]);
+  const checkout = await command("git", ["rev-parse", "HEAD"]);
+  const sha = options.sourceSha;
   ensure(
-    /^[a-f\d]{40}$/.test(options.sourceSha ?? "") && sha === options.sourceSha,
+    /^[a-f\d]{40}$/.test(options.sourceSha ?? "") &&
+      (await command("git", ["rev-parse", `${sha}^{commit}`])) === sha,
     "Source SHA differs from actual checkout",
   );
   ensure(
@@ -283,12 +207,6 @@ async function create(options) {
     await command("git", ["archive", "--format=tar", "--output", source, sha]);
     await chmod(source, 0o600);
     const sourceFingerprint = await fingerprint(source);
-    const config = await archivedConfiguration(source, options.profile, sha);
-    const configBytes = JSON.stringify(config, null, 2) + "\n";
-    await writeFile(join(output, "configuration.json"), configBytes, {
-      flag: "wx",
-      mode: 0o600,
-    });
     const docker = await localDocker();
     const platform = await dockerPlatform(docker);
     const images = [];
@@ -300,6 +218,8 @@ async function create(options) {
           "--builder",
           "default",
           "--quiet",
+          "--tag",
+          `xpathed/${component}:${sha}`,
           "--platform",
           `${platform.os}/${platform.architecture}`,
           "--file",
@@ -330,31 +250,23 @@ async function create(options) {
       "save",
       "--output",
       join(output, "images.tar"),
-      ...images.map((image) => image.id),
+      ...images.map((image) => `xpathed/${image.component}:${sha}`),
     ]);
     await chmod(join(output, "images.tar"), 0o600);
     const files = {};
     for (const file of inventory.filter((name) => name !== "manifest.json"))
       files[file] = await fingerprint(join(output, file));
     ensure(
-      isDeepStrictEqual(files["source.tar"], sourceFingerprint) &&
-        isDeepStrictEqual(files["configuration.json"], {
-          sha256: hash(configBytes),
-          bytes: Buffer.byteLength(configBytes),
-        }),
-      "Archived source or configuration changed during packaging",
+      isDeepStrictEqual(files["source.tar"], sourceFingerprint),
+      "Archived source changed during packaging",
     );
     ensure(
-      (await command("git", ["rev-parse", "HEAD"])) === sha &&
+      (await command("git", ["rev-parse", "HEAD"])) === checkout &&
         !(await command("git", ["status", "--porcelain", "--untracked-files=all"])),
       "Source changed during packaging",
     );
     const manifest = {
-      version: 1,
-      status: "packaged-unqualified",
-      defaultActivated: false,
       sourceSha: sha,
-      profileId: options.profile,
       platform,
       images,
       files,
@@ -362,9 +274,7 @@ async function create(options) {
     validate(manifest);
     const bytes = JSON.stringify(manifest, null, 2) + "\n";
     await writeFile(join(output, "manifest.json"), bytes, { flag: "wx", mode: 0o600 });
-    console.log(
-      `Bundle packaged without qualification or activation; retain manifest SHA-256 ${hash(bytes)} independently.`,
-    );
+    console.log(`Bundle packaged; retain manifest SHA-256 ${hash(bytes)} independently.`);
   } catch (error) {
     await rm(output, { recursive: true, force: true });
     throw error;
@@ -378,22 +288,21 @@ export async function verify(directory, digest) {
   const manifest = JSON.parse(bytes);
   validate(manifest);
   ensure(
-    isDeepStrictEqual((await readdir(directory)).sort(), inventory),
+    isDeepStrictEqual(
+      (await readdir(directory)).sort(),
+      [...Object.keys(manifest.files), "manifest.json"].sort(),
+    ),
     "Unexpected or missing bundle files",
   );
-  for (const name of inventory.filter((name) => name !== "manifest.json"))
+  for (const name of Object.keys(manifest.files))
     ensure(
       isDeepStrictEqual(await fingerprint(join(directory, name)), manifest.files[name]),
       `Bundle file integrity mismatch: ${name}`,
     );
-  const config = await archivedConfiguration(
-    join(directory, "source.tar"),
-    manifest.profileId,
-    manifest.sourceSha,
-  );
   ensure(
-    isDeepStrictEqual(config, JSON.parse(await smallFile(join(directory, "configuration.json")))),
-    "Archived configuration mismatch",
+    (await command("git", ["get-tar-commit-id"], join(directory, "source.tar"))) ===
+      manifest.sourceSha,
+    "Archived source commit mismatch",
   );
   return { directory, manifest };
 }
@@ -421,16 +330,14 @@ async function main() {
       const docker = await localDocker();
       await restoreVerified({ directory, manifest }, docker);
     }
-    console.log(
-      `Bundle ${operation === "restore" ? "images restored" : "integrity verified"}; unqualified, runtime default unchanged.`,
-    );
+    console.log(`Bundle ${operation === "restore" ? "images restored" : "integrity verified"}.`);
     return;
   }
   ensure(
-    operation === "create" && args.length === 6,
-    "Use create --profile ID --source-sha SHA --output DIRECTORY",
+    operation === "create" && args.length === 4,
+    "Use create --source-sha SHA --output DIRECTORY",
   );
-  const names = { "--profile": "profile", "--source-sha": "sourceSha", "--output": "output" };
+  const names = { "--source-sha": "sourceSha", "--output": "output" };
   const options = {};
   for (let i = 0; i < args.length; i += 2) {
     ensure(

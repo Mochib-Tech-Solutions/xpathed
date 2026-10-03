@@ -1,5 +1,7 @@
 # Qualify against the latest baseline
 
+Release selection is superseded by [ADR-0026](0026-use-the-release-branch-as-the-baseline.md). The following records the earlier decision.
+
 Current release design is superseded by [ADR-0023](0023-simplify-release-evaluation.md). The rules below describe historical decisions and remain relevant to their original artifacts; they are not additional gates for new release PRs.
 
 Accepted, 2026-10-02. The maintainer replaced the absolute 95% requirements with no regression against the latest baseline. The initial relative policy supersedes the numerical gates in ADR-0016 and ADR-0021; two seconds remains an aspirational speed metric under ADR-0020. Historical evidence keeps its original policy.

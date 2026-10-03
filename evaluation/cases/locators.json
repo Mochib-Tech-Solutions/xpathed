@@ -11,7 +11,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "1",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-fixture-review",
@@ -122,7 +121,6 @@
         }
       }
     },
-    "contractVersion": "4",
     "deterministicOnly": true,
     "sourceSplit": "development",
     "sourceCatalogs": ["cases.json"],
@@ -141,7 +139,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "1",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-fixture-review",
@@ -252,7 +249,6 @@
         }
       }
     },
-    "contractVersion": "4",
     "deterministicOnly": true,
     "sourceSplit": "development",
     "sourceCatalogs": ["cases.json"],
@@ -271,7 +267,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "1",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-fixture-review",
@@ -382,7 +377,6 @@
         }
       }
     },
-    "contractVersion": "4",
     "deterministicOnly": true,
     "sourceSplit": "development",
     "sourceCatalogs": ["cases.json"],
@@ -401,7 +395,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "1",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-fixture-review",
@@ -512,7 +505,6 @@
         }
       }
     },
-    "contractVersion": "4",
     "deterministicOnly": true,
     "sourceSplit": "development",
     "sourceCatalogs": ["cases.json"],
@@ -531,7 +523,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "1",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-fixture-review",
@@ -642,7 +633,6 @@
         }
       }
     },
-    "contractVersion": "4",
     "deterministicOnly": true,
     "sourceSplit": "development",
     "sourceCatalogs": ["cases.json"],
@@ -661,7 +651,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "1",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-fixture-review",
@@ -772,7 +761,6 @@
         }
       }
     },
-    "contractVersion": "4",
     "deterministicOnly": true,
     "sourceSplit": "development",
     "sourceCatalogs": ["cases.json"],
@@ -791,7 +779,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "1",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-fixture-review",
@@ -882,7 +869,6 @@
         }
       }
     },
-    "contractVersion": "4",
     "deterministicOnly": true,
     "sourceSplit": "development",
     "sourceCatalogs": ["cases.json"],
@@ -901,7 +887,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "1",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-fixture-review",
@@ -992,7 +977,6 @@
         }
       }
     },
-    "contractVersion": "4",
     "deterministicOnly": true,
     "sourceSplit": "development",
     "sourceCatalogs": ["cases.json"],
@@ -1011,7 +995,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "1",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-fixture-review",
@@ -1118,7 +1101,6 @@
     "sourceSplit": "development",
     "sourceCatalogs": ["cases.json"],
     "group": "locators",
-    "contractVersion": "4",
     "sourceIds": ["mutation-wrapper"]
   },
   {
@@ -1133,7 +1115,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "1",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-fixture-review",
@@ -1240,7 +1221,6 @@
     "sourceSplit": "development",
     "sourceCatalogs": ["cases.json"],
     "group": "locators",
-    "contractVersion": "4",
     "sourceIds": ["mutation-sibling"]
   },
   {
@@ -1255,7 +1235,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "1",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-fixture-review",
@@ -1362,7 +1341,6 @@
     "sourceSplit": "development",
     "sourceCatalogs": ["cases.json"],
     "group": "locators",
-    "contractVersion": "4",
     "sourceIds": ["mutation-class"]
   },
   {
@@ -1377,7 +1355,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "1",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-fixture-review",
@@ -1484,7 +1461,6 @@
     "sourceSplit": "development",
     "sourceCatalogs": ["cases.json"],
     "group": "locators",
-    "contractVersion": "4",
     "sourceIds": ["mutation-id"]
   },
   {
@@ -1499,7 +1475,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "1",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-fixture-review",
@@ -1606,7 +1581,6 @@
     "sourceSplit": "development",
     "sourceCatalogs": ["cases.json"],
     "group": "locators",
-    "contractVersion": "4",
     "sourceIds": ["mutation-duplicate"]
   },
   {
@@ -1621,7 +1595,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "1",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-fixture-review",
@@ -1728,7 +1701,6 @@
     "sourceSplit": "development",
     "sourceCatalogs": ["cases.json"],
     "group": "locators",
-    "contractVersion": "4",
     "sourceIds": ["mutation-rerender"]
   },
   {
@@ -1754,7 +1726,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "1",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-fixture-source-review",
@@ -1807,7 +1778,6 @@
         ]
       }
     },
-    "contractVersion": "4",
     "deterministicOnly": true,
     "sourceSplit": "development",
     "sourceCatalogs": ["locators.json"],
@@ -1846,7 +1816,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "1",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-fixture-source-review",
@@ -1899,7 +1868,6 @@
         ]
       }
     },
-    "contractVersion": "4",
     "deterministicOnly": true,
     "sourceSplit": "development",
     "sourceCatalogs": ["locators.json"],
@@ -1931,7 +1899,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "1",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-fixture-source-review",
@@ -1984,7 +1951,6 @@
         ]
       }
     },
-    "contractVersion": "4",
     "deterministicOnly": true,
     "sourceSplit": "development",
     "sourceCatalogs": ["locators.json"],
@@ -2015,7 +1981,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "1",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-fixture-source-review",
@@ -2068,7 +2033,6 @@
         ]
       }
     },
-    "contractVersion": "4",
     "deterministicOnly": true,
     "sourceSplit": "development",
     "sourceCatalogs": ["locators.json"],
@@ -2115,7 +2079,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "1",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-fixture-source-review",
@@ -2168,7 +2131,6 @@
         ]
       }
     },
-    "contractVersion": "4",
     "deterministicOnly": true,
     "sourceSplit": "development",
     "sourceCatalogs": ["locators.json"],
@@ -2199,7 +2161,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "1",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-fixture-source-review",
@@ -2252,7 +2213,6 @@
         ]
       }
     },
-    "contractVersion": "4",
     "deterministicOnly": true,
     "sourceSplit": "development",
     "sourceCatalogs": ["locators.json"],
@@ -2283,7 +2243,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "1",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-fixture-source-review",
@@ -2336,7 +2295,6 @@
         ]
       }
     },
-    "contractVersion": "4",
     "deterministicOnly": true,
     "sourceSplit": "development",
     "sourceCatalogs": ["locators.json"],
@@ -2379,7 +2337,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "1",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-fixture-source-review",
@@ -2432,7 +2389,6 @@
         ]
       }
     },
-    "contractVersion": "4",
     "deterministicOnly": true,
     "sourceSplit": "development",
     "sourceCatalogs": ["locators.json"],
@@ -2476,7 +2432,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "1",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-fixture-source-review",
@@ -2529,7 +2484,6 @@
         ]
       }
     },
-    "contractVersion": "4",
     "deterministicOnly": true,
     "sourceSplit": "development",
     "sourceCatalogs": ["locators.json"],
@@ -2571,7 +2525,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "1",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-fixture-source-review",
@@ -2624,7 +2577,6 @@
         ]
       }
     },
-    "contractVersion": "4",
     "deterministicOnly": true,
     "sourceSplit": "development",
     "sourceCatalogs": ["locators.json"],
@@ -2688,7 +2640,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "1",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-fixture-source-review",
@@ -2742,7 +2693,6 @@
         ]
       }
     },
-    "contractVersion": "4",
     "deterministicOnly": true,
     "sourceSplit": "development",
     "sourceCatalogs": ["locators.json"],
@@ -2833,7 +2783,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "1",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-fixture-source-review",
@@ -2887,7 +2836,6 @@
         ]
       }
     },
-    "contractVersion": "4",
     "deterministicOnly": true,
     "sourceSplit": "development",
     "sourceCatalogs": ["locators.json"],
@@ -2933,7 +2881,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "1",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-fixture-source-review",
@@ -2986,7 +2933,6 @@
         ]
       }
     },
-    "contractVersion": "4",
     "deterministicOnly": true,
     "sourceSplit": "development",
     "sourceCatalogs": ["locators.json"],
@@ -3029,7 +2975,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "1",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-fixture-source-review",
@@ -3079,7 +3024,6 @@
         ]
       }
     },
-    "contractVersion": "4",
     "deterministicOnly": true,
     "sourceSplit": "development",
     "sourceCatalogs": ["locators.json"],

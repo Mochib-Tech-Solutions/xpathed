@@ -1,117 +1,117 @@
 # Release workflow
 
-The release flow is **feature PR → main → release PR → live comparison → merge and verified approval → explicit activation**. [ADR-0023](adr/0023-simplify-release-evaluation.md) records the accepted decision. Approval and activation are separate: a passing comparison approves exact images; activation starts them in the local workspace.
+**Passing checks → merge into `release` → publish that commit → use it as the next baseline.** Git is the source of release identity. [ADR-0026](adr/0026-use-the-release-branch-as-the-baseline.md) records the decision.
 
-## Prepare the repository
+## Required checks before merge
 
-Keep a persistent `release` branch for release PRs from `main`. Feature PRs continue targeting `main` and run ordinary CI. Changes to main do not replace the approved baseline.
+Open a trusted same-repository `main` → `release` PR. Ordinary CI must pass for the exact proposed source. Release Qualification then builds the candidate and restores the current release’s published images, records their exact image identities, and runs one complete paired live comparison. Both arms receive the same reviewed browser/offline cases and inference settings; original failures, accuracy, gains, lost passes, timing and reported/unknown costs are retained.
 
-Configure the dedicated `OPENROUTER_EVAL_API_KEY` Actions secret and preserve private release state and existing approved assets. The checked-in private dataset manifest pins the required reviewed collection. The private `evaluation-data/reviewed-72d140c1.json.gz` asset is published and its downloaded bytes were verified against the pinned digest. See [dataset collection setup](evaluation.md#private-dataset-collection).
+Every baseline pass must remain a pass. Missing required results, provider failures, privacy violations and mismatched evidence fail the check. Timing and unavailable accounting remain descriptive. Changing the PR source or release baseline requires a fresh comparison. Configure required checks in GitHub before allowing merges; repository workflows do not themselves provide branch protection.
 
-Release Qualification, Release Promotion and scheduled monitoring currently require a **private repository**. Making the repository public skips those jobs; release-state operations also reject public repositories. Public operation needs a separate design for private evidence and workflow access.
+CI needs `OPENROUTER_EVAL_API_KEY` as a secret. Optional `OPENROUTER_MODEL` and `OPENROUTER_PROVIDER` repository variables configure inference; otherwise the documented development defaults apply. Reviewed datasets are fetched by digest. Keep ordinary CI provider-free and preserve the complete comparison denominator.
 
-Workflow files describe checks, not enforced branch protection. Verify the account's ability to require CI and release checks separately. Even if a PR is manually merged without passing checks, promotion must reject it rather than replacing the approval.
+## Publish the merged commit
 
-## Compare a release PR
+Merging the passing PR establishes the release and baseline immediately. Release Publication verifies the successful run, PR head, baseline parent, final source-tree equality and saved artifact digests. It publishes the tested Browser/Resolver image bytes under a Git release tag (`v1.0.0` for the fresh initial release, then `release-FULL_COMMIT_SHA`), with source, evaluation evidence and monitoring measurements. It does not rebuild the candidate or request another approval.
 
-Open a trusted same-repository PR from `main` into `release`. Opening, updating, reopening or marking it ready triggers **Release Qualification**. Drafts and other source branches do not qualify.
+Assets upload to a draft and their SHA-256 digests are verified before publication. A failed upload leaves the draft resumable; repair and rerun publication for that commit. A published tag cannot be reused for different source. Published assets identify both the tested PR merge commit and final merged commit, which may differ while their trees match. Historical artifacts remain historical evidence and are never selected through an approval registry.
 
-The workflow:
+## Deployment configuration
 
-1. Requires passing ordinary CI for the exact evaluated PR revision.
-2. Freezes the approved baseline, candidate images, current policy and complete reviewed collection.
-3. Runs one candidate and one baseline attempt per case, including browser resolution and reviewed offline dataset selection. Browser state resets independently.
-4. Reports every original outcome, gains, lost passes, latency, costs and exclusions. Browser and offline denominators remain separate.
-5. Verifies complete evidence and preserves the exact candidate image bundle and approval request.
+Supply these through Docker/environment configuration:
 
-Acceptance requires **no lost baseline pass**, plus valid contracts, safety, complete results and verified artifact identity. Equal results can pass. Latency and cost are informational, including unknown charges and unavailable billing metadata. Actual provider failures remain operational failures. There is no separate pilot or mandatory fresh held-out stage. Both arms use the same evaluation set; additions and better checks apply to both arms. A regression is a lost baseline pass in this comparison.
+- `OPENROUTER_API_KEY`: application secret.
+- `OPENROUTER_MODEL` and `OPENROUTER_PROVIDER`: inference route.
+- `OPENROUTER_BASE_URL` and `OPENROUTER_TIMEOUT_SECONDS`: endpoint and request timeout.
 
-The comparison does not redeploy the app. A failed run retains its evidence and leaves the existing approval unchanged. A new source tree, changed cases or changed baseline requires another complete comparison; old passing evidence cannot qualify a changed candidate.
+Release images contain the code and prompt. They do not contain secrets or install saved evaluation settings. Recorded nonsecret evaluation settings explain the measurements; deploying a different route does not inherit those measurements.
 
-## Merge and approve
+## Run the published Browser and Resolver
 
-Merging the release PR requests approval of the saved tested candidate. **Release Promotion** checks that:
+Prerequisites: Docker with Compose, Node 24.16.0, pnpm 12.8.1 and authenticated `gh` access to the repository. The hosted release is built on Linux ARM64; the loader verifies that the Docker daemon has the same architecture. For another architecture, build the source locally.
 
-- The latest matching release comparison succeeded and ordinary CI passed for its exact revision.
-- The PR head and final merged source tree match the recorded candidate.
-- The baseline used in the comparison is still the approved release.
-- The preserved images, configuration, datasets and qualification evidence match their pinned identities.
-
-GitHub's temporary PR merge commit can differ from the final merge commit even when their source trees are equal. Preserve those identities and verify tree equality; do not rebuild images and assume the replacement bytes were tested. Promotion selects the tested images and retains the previous approval. If verification fails after merge, the old approval remains in effect and the failed promotion needs investigation.
-
-The authoritative approval record determines the baseline. A branch, tag, uploaded bundle or green measurement alone is not approval.
-
-## Activate or roll back locally
-
-GitHub approval does not deploy into the maintainer's local Docker daemon. Inspect the selection and activate it explicitly:
+From a clone of this repository:
 
 ```sh
-pnpm release:state status
-pnpm release:activate --expected-current APPROVED_CANDIDATE_DIGEST
+pnpm release:download --output .artifacts/deployment
+cd .artifacts/deployment
+cp release.env.example .env
 ```
 
-Activation verifies approved artifacts and the local Compose project's ownership, preserves the application credentials, and records actual container/image identities. Stop this checkout's development runner first. Browser sessions restart. A failed activation remains a failed deployment, even when approval succeeded.
-
-Rollback explicitly selects the retained compatible previous approval and then activates it:
+Edit `.env` with your key, model and provider. The downloader does not create or overwrite your runtime settings. Then:
 
 ```sh
-pnpm release:rollback --expected-current CURRENT_DIGEST --reason "Regression investigation"
-pnpm release:activate --expected-current PREVIOUS_DIGEST
+docker compose --env-file .env --env-file images.env -f compose.release.yaml up -d --no-build --pull never
+curl --fail http://localhost:8082/health
+curl --fail http://localhost:8083/health
+docker compose --env-file .env --env-file images.env -f compose.release.yaml logs --tail 100
 ```
 
-Restoring images cannot restore a hosted provider's historical weights. Keep current and previous approved artifacts available and verifiable.
+| File | Purpose |
+| --- | --- |
+| `release.json` | Final release commit, tested source, evidence and deployment-file digests |
+| `bundle/manifest.json` | Browser and Resolver component names, image IDs, platform, source and checksums |
+| `browser-resolver-images.tar.gz.part-0000`, etc. | Ordered compressed image archive parts, reassembled and verified by the downloader |
+| `bundle/images.tar` | Both exact tested images, loaded into Docker |
+| `bundle/source.tar` | Exact tested source, excluding ignored environment files |
+| `compose.release.yaml` | Browser and Resolver services; no build definitions |
+| `browser-seccomp.json` | Browser sandbox policy from the tested source |
+| `release.env.example` | Template for the operator's `.env` |
+| `images.env` | Generated exact Browser and Resolver image IDs; contains no provider settings |
+| `monitoring-baseline.json` | Original measurements for nightly comparison |
+| `candidate.json`, `release-evidence.json.gz` | Published evaluation provenance and original evidence, downloaded separately when needed |
 
-## Artifacts and evidence
+Docker image names are `xpathed/browser:TESTED_COMMIT` and `xpathed/resolver:TESTED_COMMIT`; Compose pins the immutable image IDs in `images.env`. Browser uses 1 GiB shared memory, the recorded seccomp policy and its nonroot image user. Resolver addresses `http://browser:8080` inside the network. Host ports bind to loopback; `.env` can change `BROWSER_PORT`, `RESOLVER_PORT`, `VIEWER_ORIGINS` and `BROWSER_MAX_SESSIONS`. Keep each deployment in its own directory and use `-p PROJECT_NAME` plus distinct ports for parallel deployments.
 
-Release helpers live in `scripts/release/`. A bundle contains tracked source, exact Browser/Resolver images, nonsecret configuration and an integrity manifest. Credentials, local environment files and user browsing state are excluded. Resolver qualification does not attest separately built Web or ClientApi images.
+Stop with the same Compose flags and `down`. Publication does not connect to a deployment's Docker daemon. To update, download into a new directory, supply its environment file and deliberately replace the running deployment. Revert through Git and follow the same checks to roll back. `pnpm dev` continues to build the current local checkout and includes the Web/ClientApi test client.
 
-Local packaging and inspection remain available:
+### Use the APIs
+
+Create a session, copy `sessionId` and `pageId` from its response, then navigate that page:
 
 ```sh
-pnpm release:bundle --profile deepseek --source-sha FULL_COMMIT_SHA --output NEW_BUNDLE_DIRECTORY
-pnpm release:bundle:verify BUNDLE_DIRECTORY --sha256 PINNED_MANIFEST_DIGEST
-pnpm release:bundle:restore BUNDLE_DIRECTORY --sha256 PINNED_MANIFEST_DIGEST
+curl --fail -X POST http://localhost:8082/sessions
+curl --fail -X POST http://localhost:8082/pages/PAGE_ID/navigate \
+  -H 'Content-Type: application/json' -d '{"url":"https://example.com"}'
 ```
 
-Create from a clean exact checkout. Verification requires an independently retained manifest digest. Restoration loads images without starting the application. The manifest checks image IDs, platform, source and file inventory; altered or unsafe archives fail. Packaging alone does not qualify a release.
-
-For an explicit local paired run, use the candidate's exact source checkout and both preserved bundles:
+Copy `documentId` from the navigation response and resolve an instruction. This request makes a paid model call:
 
 ```sh
-pnpm release:evaluate --bundle CANDIDATE_BUNDLE --sha256 CANDIDATE_MANIFEST_DIGEST \
-  --baseline-bundle APPROVED_BUNDLE --baseline-sha256 APPROVED_MANIFEST_DIGEST \
-  --baseline-approval APPROVED_CANDIDATE_DIGEST --mode live --profile deepseek \
-  --output NEW_RUN_DIRECTORY
+curl --fail -X POST http://localhost:8083/pages/PAGE_ID/resolve \
+  -H 'Content-Type: application/json' \
+  -d '{"documentId":"DOCUMENT_ID","instruction":"Click the Learn more link."}'
+curl --fail -X DELETE http://localhost:8082/sessions/SESSION_ID
 ```
 
-The evaluator runs saved images without rebuilding and checks their identities. The complete reviewed private dataset must be present and digest-verified. Local live evaluation is explicit and uses the evaluation key.
+Replace the uppercase placeholders with the returned IDs. Each restart invalidates prior sessions. Browser creates the managed session and page; Resolver uses those same identities. The API contract and runnable request examples are in [runtime](runtime.md#browser-integration) and [resolution](resolution.md). Health endpoints confirm service availability; a live resolution additionally requires a valid OpenRouter route and key. Both APIs are loopback-only in this setup.
 
-Seal the resulting complete comparison and verify it:
+## Local image and evidence checks
+
+Package a clean committed source and verify the resulting image bundle:
 
 ```sh
-pnpm release:seal --evaluation RUN_DIRECTORY --profile deepseek --source-sha FULL_COMMIT_SHA \
-  --bundle CANDIDATE_BUNDLE --bundle-sha256 CANDIDATE_MANIFEST_DIGEST --output CANDIDATE_FILE
-pnpm release:verify CANDIDATE_FILE --sha256 PINNED_CANDIDATE_DIGEST
+pnpm release:bundle --source-sha FULL_COMMIT_SHA --output NEW_BUNDLE_DIRECTORY
+pnpm release:bundle:verify BUNDLE_DIRECTORY --sha256 MANIFEST_DIGEST
+pnpm release:bundle:restore BUNDLE_DIRECTORY --sha256 MANIFEST_DIGEST
 ```
 
-The verifier regrades original evidence and checks coverage and identities. A saved passing summary is insufficient. Keep original failed attempts. `release:archive` and `release:archive:restore` preserve private evidence for transfer; archives do not restart evidence retention. Page/provider evidence remains subject to its original expiry, while source/image identities and approval history are retained separately. Preserve known charges and explicit unknown accounting independently of run cleanup.
+Bundles include source, images and integrity metadata. Restoring loads images without starting services or modifying environment settings. For subsequent release comparisons, download the existing release bundle and reuse its exact image bytes. The working checkout must stay clean while packaging the candidate.
 
-## Release versions and notes
+Run a complete comparison with both bundles:
 
-Use the package version and sequential rc tags for candidate assets. Notes identify source, model/provider settings, the case collection, no-regression result, retained failures, latency, reported/unknown costs and changelog. Stable publication must reuse the qualified images. Keep tags and assets referenced by the current or previous approval.
+```sh
+pnpm release:evaluate --bundle CANDIDATE_BUNDLE --sha256 CANDIDATE_DIGEST \
+  --baseline-bundle BASELINE_BUNDLE --baseline-sha256 BASELINE_DIGEST \
+  --baseline-commit RELEASE_COMMIT --mode live --output NEW_RUN_DIRECTORY
+```
 
-Historical reports retain their original rules. Replay them from their recorded source rather than keeping old policy branches in today's evaluator or reinterpreting old results under the current policy.
+Use the candidate's exact source checkout. The launcher verifies and attests both bundles and starts the offline Resolver worker. Replay and evidence sealing validate results; they do not choose a release. Keep original attempts and charges, enforce original evidence expiry, and never infer success from a saved summary alone.
 
 ## Nightly monitoring
 
-**Release Monitoring** runs at 02:17 UTC and supports manual dispatch. It restores the exact approved release and its complete frozen live collection. Each case runs once against the approved configuration; results are compared with the saved approval measurements. It does not run a second baseline arm, rebuild current main, repeat ordinary CI, or add cases introduced since approval.
+Monitoring runs at 02:17 UTC or through manual dispatch. It resolves `release`, finds that commit's published artifacts and measurements, and runs the matching source's complete frozen collection with the saved images. It compares results with the measurements recorded during release CI. Missing assets or changed inference settings fail explicitly; monitoring never substitutes another release or deploys anything.
 
-Lost passes, operational failures and invalid artifacts fail the workflow. Latency and cost remain descriptive. Monitoring records last-started and last-completed runs and preserves evidence. It never changes approval, switches models, activates a release, rolls back, or stops the application.
+`pnpm release:monitor` performs the same check locally. `pnpm release:monitor --notification-test` fails deliberately without inference. Original results and failures are retained as workflow artifacts. A schedule or failed job is not evidence that email was delivered.
 
-The existing `v1.0.0` approval is preserved during migration. Its archived source, policy and original sentinel receipt continue to govern monitoring until a new approval is created by this flow. The new full-collection rule does not rewrite its historical measurements.
-
-Run the same monitor locally with `pnpm release:monitor`. A controlled notification check uses `pnpm release:monitor --notification-test` without inference. GitHub schedules and email are best effort: verify actual delivery separately; a failed job does not prove an email arrived, and a schedule that never starts cannot send a workflow-failure notification.
-
-## Migration status
-
-The accepted design replaces historical pilot/confirmation, held-out exhaustion and aggregate-correctness gates. Existing approved images and historical evidence remain intact. Private dataset publication and the persistent release branch are configured. Before claiming the new release path operational, verify trusted release-PR execution, an actual complete comparison, merge-time approval checks and explicit activation independently. Documentation and local deterministic checks alone establish none of those external outcomes.
+The maintainer requested retiring the old release and recreating `v1.0.0`. The one-time transition is tied to the retired release branch commit `a9a0d7caf0b7abc46902f9c7831aa3c1339298a6`: run the complete live collection once against the candidate, retain all outcomes and charges, and establish fresh measurements. Do not compare with or adapt the old implementation. After that merge, every release requires the paired comparison against published images; missing assets fail explicitly. Remove the old GitHub release/tag only when the replacement checks are ready. Monitoring starts after the new assets are published. Hosted publication and live execution must be verified separately from local deterministic tests.
