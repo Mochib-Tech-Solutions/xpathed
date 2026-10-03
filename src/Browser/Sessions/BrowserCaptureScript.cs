@@ -350,14 +350,50 @@ internal static class BrowserCaptureScript
             return value && !/https?:\/\//u.test(value) && (name !== 'id' || !/(?:[a-f\d]{16}|\d{5}|^:|^\d+$|[a-f\d]{8}-[a-f\d]{4}-[a-f\d]{4}-[a-f\d]{4}-[a-f\d]{12})/iu.test(value));
           }).map(name => `@${name}=${literal(element.getAttribute(name))}`);
           const semanticAttributes = ['aria-label', 'placeholder', 'alt', 'title'];
+          const textPredicates = element => {
+            const semanticText = text(element);
+            if (!semanticText) return [];
+            const predicates = [`normalize-space(.)=${literal(semanticText)}`];
+            const parts = [];
+            const fragments = [];
+            const xpathNormalize = value => value.replace(/[ \t\r\n]+/gu, ' ').replace(/^ | $/gu, '');
+            let count = 0, excluded = false;
+            const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+            for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+              checkBudget();
+              if (node.textContent.length > 64000) return predicates;
+              const value = xpathNormalize(node.textContent);
+              if (value) count++;
+              // Bound expression size as well as the shared validation deadline.
+              if (count > 16) return predicates;
+              const parent = node.parentElement;
+              if (parent.closest(`${valueContainer},${ignored}`) || !accessibilityExposed(parent)) {
+                excluded = true;
+                continue;
+              }
+              parts.push(node.textContent);
+              if (value) fragments.push(`descendant::text()[normalize-space(.)!=''][${count}][normalize-space(.)=${literal(value)}]`);
+            }
+            // XPath joins descendant text without separators and normalizes only XML whitespace.
+            // Accessible-name substitutions must not silently become unrelated DOM text.
+            if (normalize(parts.join(' ')) !== semanticText) return predicates;
+            if (excluded) {
+              // Keep only exposed text literals. The count guard rejects added/replaced label fragments.
+              if (fragments.length) predicates.push(`count(descendant::text()[normalize-space(.)!=''])=${count} and ${fragments.join(' and ')}`);
+            } else {
+              const xpathText = xpathNormalize(parts.join(''));
+              if (xpathText && xpathText !== semanticText) predicates.push(`normalize-space(.)=${literal(xpathText)}`);
+            }
+            return predicates;
+          };
           const contextPredicates = ancestor => {
             const predicates = attributes(ancestor, [...testAttributes, 'aria-label', 'title']);
             const heading = ancestor.querySelector(':scope > legend,:scope > h1,:scope > h2,:scope > h3,:scope > h4,:scope > h5,:scope > h6');
-            if (heading && text(heading)) predicates.push(`${tag(heading)}[normalize-space(.)=${literal(text(heading))}]`);
+            if (heading) predicates.push(...textPredicates(heading).map(predicate => `${tag(heading)}[${predicate}]`));
             if (ancestor.matches('tr,[role=row]')) {
               for (const cell of ancestor.children) {
-                if (cell.matches('td,th,[role=cell],[role=rowheader],[role=gridcell]') && text(cell))
-                  predicates.push(`${tag(cell)}[normalize-space(.)=${literal(text(cell))}]`);
+                if (cell.matches('td,th,[role=cell],[role=rowheader],[role=gridcell]'))
+                  predicates.push(...textPredicates(cell).map(predicate => `${tag(cell)}[${predicate}]`));
               }
             }
             return predicates;
@@ -373,9 +409,8 @@ internal static class BrowserCaptureScript
             };
             const testPredicates = attributes(element, testAttributes);
             const stablePredicates = attributes(element, stableAttributes);
-            const elementText = text(element);
             const semanticPredicates = attributes(element, semanticAttributes);
-            if (elementText) semanticPredicates.push(`normalize-space(.)=${literal(elementText)}`);
+            semanticPredicates.push(...textPredicates(element));
             if (element.matches(buttonInput) && element.getAttribute('value')) semanticPredicates.push(`@value=${literal(element.getAttribute('value'))}`);
             for (const predicate of testPredicates) if (add(`//${tag(element)}[${predicate}]`)) return xpaths;
             for (let ancestor = element.parentElement; ancestor && ancestor !== document.body; ancestor = ancestor.parentElement) {
@@ -388,8 +423,9 @@ internal static class BrowserCaptureScript
               }
             }
             for (const associatedLabel of element.labels ?? []) {
-              const labelText = text(associatedLabel);
-              if (labelText && element.id && associatedLabel.htmlFor === element.id && add(`//${tag(element)}[@id=//label[normalize-space(.)=${literal(labelText)}]/@for]`)) return xpaths;
+              if (element.id && associatedLabel.htmlFor === element.id)
+                for (const predicate of textPredicates(associatedLabel))
+                  if (add(`//${tag(element)}[@id=//label[${predicate}]/@for]`)) return xpaths;
             }
             for (const predicate of semanticPredicates) if (add(`//${tag(element)}[${predicate}]`)) return xpaths;
             for (const predicate of stablePredicates) if (add(`//${tag(element)}[${predicate}]`)) return xpaths;
