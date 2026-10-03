@@ -24,7 +24,7 @@ XPath: //*[@aria-label='Employee']//button[normalize-space(.)='OK']
 Verification: one match, same captured node, still in the current view
 ```
 
-The actual XPath comes from the DOM. Results include readiness, time and cost. You browse manually; the resolver highlights targets without executing the instruction.
+The actual XPath comes from the DOM. Results include readiness, time and cost. A blocked action appears as one red explanation naming the target and why the action is unavailable, without an XPath card or repeated state labels. You browse manually; the resolver highlights targets without executing the instruction.
 
 ## Run locally
 

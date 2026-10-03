@@ -38,7 +38,7 @@ Top-level `action` is the shared interpreted interaction. The existing `actions`
 
 A command that mixes interactions returns one unsupported result with `unsupported_action`; a sequential workflow or any target requiring an earlier page change returns one unsupported result with `current_state_dependency`. No independent-looking portion is executed or returned as a successful partial interpretation of those unsupported commands. Top-level `action` is `unsupported` for mixed/ambiguous commands or the interpreted shared action for a same-action future-state dependency. Malformed model output, mixed-action arrays or duplicate target identities fail the request with empty actions, no summary and no shared action.
 
-Chat displays the shared action once and each target's label, state, readiness and one XPath. It omits repeated per-target action names and interpreted instructions. Usage/cost remains shared once. Semantic completeness is still unverified by the model's declaration; independent evaluation must grade the entire intended target set and shared action.
+Chat displays the shared action once. Blocked targets show one red explanation with the target name and first specific blocking reason, without an XPath card, verification list or repeated state labels. Other targets show their label, state, readiness and one XPath. It omits repeated per-target action names and interpreted instructions. Usage/cost remains shared once. Semantic completeness is still unverified by the model's declaration; independent evaluation must grade the entire intended target set and shared action.
 
 ### Current-view boundary: version 4
 
@@ -191,7 +191,7 @@ Client response labels follow the resolver outcome and reason code:
 
 | Resolver result                            | Client response                                               |
 | ------------------------------------------ | ------------------------------------------------------------- |
-| `found`                                    | Element identity, XPath and reported readiness                |
+| `found`                                    | Element identity, XPath and reported readiness; blocked actions show one red explanation |
 | `not_found`                                | Target not found, in the current view         |
 | `unsupported` / `ambiguous`                | Ambiguous target                                              |
 | `unsupported` / `unsupported_action`       | Unsupported interaction                                       |
@@ -208,4 +208,4 @@ Semantic limitations are not technical-error alerts. Per-target failures retain 
 
 Resolved targets optionally include browser-derived `role` and `accessibleName` alongside the existing `tag` and legacy `label`. These additive fields are shared by all three contracts. The accessible name uses the existing sanitized DOM naming policy, including image alt text; an empty name stays empty rather than falling back to descendant content. Older results may omit these fields and retain their label/tag fallback. The browser computes these descriptions; the model does not invent them.
 
-Chat leads with the role/type and uses the accessible name as supporting text, or explicitly reports an unnamed element. It does not fetch images or infer their visual contents. Multi-target replies separate numbered target cards, retaining one shared action and per-target XPath/verification. The UI omits generic execution disclaimers and redundant action-scope suffixes while retaining specific unknown or blocked readiness. Sent and received timestamps are local workspace metadata; resolver duration remains separately labelled. Accessible names receive the same diagnostic redaction as labels.
+Chat leads with the role/type and uses the accessible name as supporting text, or explicitly reports an unnamed element. It does not fetch images or infer their visual contents. Multi-target replies separate numbered target cards, retaining one shared action and per-target XPath/verification except for blocked actions, which show only their concise explanation. The API still retains their found outcome, verified XPath and complete observations. The UI omits generic execution disclaimers and redundant action-scope suffixes while retaining specific unknown or blocked readiness. Sent and received timestamps are local workspace metadata; resolver duration remains separately labelled. Accessible names receive the same diagnostic redaction as labels.

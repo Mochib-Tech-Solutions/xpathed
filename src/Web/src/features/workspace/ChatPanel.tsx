@@ -290,6 +290,27 @@ export default function ChatPanel({
                   )}
                   {actions.map((action) => {
                     const target = action.target;
+                    if (target?.interactability?.status === "blocked") {
+                      const reason = target.interactability.reasons.find(
+                        (reason) => interactionReasons[reason],
+                      );
+                      return (
+                        <section key={action.actionId} aria-label={`Target ${action.order}`}>
+                          <p className="text-destructive">
+                            Cannot {action.action?.replaceAll("_", "-") ?? "interact with"}{" "}
+                            <bdi>
+                              {(target.accessibleName ?? target.label)
+                                ? `“${target.accessibleName ?? target.label}”`
+                                : `the unnamed ${elementType(target).toLowerCase()}`}
+                            </bdi>
+                            .{" "}
+                            {reason
+                              ? interactionReasons[reason]
+                              : "The requested action is blocked."}
+                          </p>
+                        </section>
+                      );
+                    }
                     const checks = target?.interactability?.checks;
                     const verified = [
                       checks?.compatibleControl === "pass" &&
@@ -416,15 +437,13 @@ export default function ChatPanel({
                                   <p>
                                     {target.interactability?.status === "ready"
                                       ? "Detailed interaction checks are unavailable."
-                                      : target.interactability?.status === "blocked"
-                                        ? "Interaction blocked."
-                                        : target.interactability?.status === "unsupported"
-                                          ? "Interaction assessment unsupported."
-                                          : target.interactability?.status === "unknown"
-                                            ? checks?.keyboard === "unknown"
-                                              ? "Keyboard readiness unknown."
-                                              : "Interaction readiness unknown."
-                                            : "Interaction readiness unavailable."}
+                                      : target.interactability?.status === "unsupported"
+                                        ? "Interaction assessment unsupported."
+                                        : target.interactability?.status === "unknown"
+                                          ? checks?.keyboard === "unknown"
+                                            ? "Keyboard readiness unknown."
+                                            : "Interaction readiness unknown."
+                                          : "Interaction readiness unavailable."}
                                   </p>
                                 )}
                                 <div className="flex flex-wrap gap-x-3 gap-y-1">
