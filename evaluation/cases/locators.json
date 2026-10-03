@@ -2682,7 +2682,7 @@
         ]
       }
     },
-    "instruction": "Click Save.",
+    "instruction": "Click Save in the Employee group section.",
     "viewport": {
       "width": 1280,
       "height": 800,
@@ -2827,7 +2827,7 @@
         ]
       }
     },
-    "instruction": "Click Approve.",
+    "instruction": "Click Approve in the Café row.",
     "viewport": {
       "width": 1280,
       "height": 800,
