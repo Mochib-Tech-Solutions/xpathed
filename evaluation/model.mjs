@@ -13,7 +13,7 @@ import {
 } from "./run.mjs";
 import { gradeTrial, summarize } from "./grader.mjs";
 import { createBudgetProxy } from "./provider.mjs";
-import profiles from "./profiles.json" with { type: "json" };
+import { profiles } from "./configuration.mjs";
 
 const hash = (value) => createHash("sha256").update(JSON.stringify(value)).digest("hex");
 const save = (path, value) =>

@@ -46,7 +46,6 @@ test("offline bridge sends only reviewed input, retains Resolver evidence and or
             modelInput: JSON.stringify(spec.input),
             prompt: "Select a target",
             schema: {},
-            promptVersion: "7",
             effective: {
               strategy: "single",
               request: { model: "model", provider: { only: ["provider"] } },

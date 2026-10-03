@@ -7,12 +7,6 @@ import { reserveCharge } from "./accounting/ledger.mjs";
 import { githubBudget } from "./accounting/github.mjs";
 
 const model = "deepseek/deepseek-v4.1-flash";
-const approved = {
-  "deepseek/deepseek-v4.1-flash": { provider: "wafer", reasoning: { enabled: false } },
-  "openai/gpt-6-luna": { provider: "openai", reasoning: { effort: "none" } },
-  "google/gemini-3.8-flash": { provider: "google-ai-studio", reasoning: { effort: "low" } },
-  "qwen/qwen3.8-flash": { provider: "alibaba", reasoning: { enabled: false } },
-};
 const equal = (left, right) =>
   object(left) &&
   object(right) &&
@@ -21,40 +15,32 @@ const equal = (left, right) =>
 
 function declaredProfiles(profiles) {
   const strict = profiles != null;
-  profiles ??= [{ id: "default", model, ...approved[model] }];
-  if (!Array.isArray(profiles) || !profiles.length) throw new Error("No approved profiles");
+  profiles ??= [{ id: "default", model, provider: "wafer", reasoning: { enabled: false } }];
+  if (!Array.isArray(profiles) || !profiles.length) throw new Error("No declared profiles");
   const ids = new Set();
   return profiles.map((profile) => {
-    const allowed =
-      profile?.id === "deepseek-deepinfra" && profile.model === model
-        ? { provider: "deepinfra/fp8", reasoning: { enabled: false } }
-        : profile?.id === "luna-azure" && profile.model === "openai/gpt-6-luna"
-          ? { provider: "azure", reasoning: { effort: "none" } }
-          : approved[profile?.model];
     if (
-      !allowed ||
-      (profile.id === "luna-azure" &&
-        (profile.model !== "openai/gpt-6-luna" ||
-          !equal(profile.promptCacheOptions, { mode: "explicit" }))) ||
-      typeof profile.id !== "string" ||
+      typeof profile?.id !== "string" ||
       !profile.id ||
       ids.has(profile.id) ||
-      profile.provider !== allowed.provider ||
-      !equal(profile.reasoning, allowed.reasoning) ||
+      typeof profile.model !== "string" ||
+      !/^[a-zA-Z0-9._-]+\/[a-zA-Z0-9._:/-]+$/.test(profile.model) ||
+      typeof profile.provider !== "string" ||
+      !/^[a-zA-Z0-9._/-]+$/.test(profile.provider) ||
+      !object(profile.reasoning) ||
       (profile.maxTokens != null &&
         (!Number.isInteger(profile.maxTokens) ||
           profile.maxTokens < 1 ||
           profile.maxTokens > 4096)) ||
       (profile.promptCacheOptions != null &&
-        (profile.model !== "openai/gpt-6-luna" ||
-          !equal(profile.promptCacheOptions, { mode: "explicit" })))
+        !equal(profile.promptCacheOptions, { mode: "explicit" }))
     )
-      throw new Error("Unapproved model, route, reasoning or output profile");
+      throw new Error("Invalid model, route, reasoning or output profile");
     ids.add(profile.id);
     return {
       ...profile,
       strict,
-      outputLimitParameter: profile.id === "luna-azure" ? "max_completion_tokens" : "max_tokens",
+      outputLimitParameter: profile.provider === "azure" ? "max_completion_tokens" : "max_tokens",
       endpointPath: `/models/${profile.model}/endpoints`,
     };
   });
@@ -158,7 +144,7 @@ function boundedRequest(body, profile) {
     (body.stream != null && body.stream !== false) ||
     (body.n != null && body.n !== 1)
   )
-    throw new Error("Only one non-streaming completion on the approved model is allowed");
+    throw new Error("Only one non-streaming completion on the declared model is allowed");
   if (
     !Array.isArray(body.messages) ||
     body.messages.length < 1 ||
@@ -189,12 +175,12 @@ function boundedRequest(body, profile) {
     if (!Number.isInteger(limit) || limit < 1 || limit > 4096)
       throw new Error("Output limit must be at most 4096 tokens");
   if ((profile.strict || body.reasoning != null) && !equal(body.reasoning, profile.reasoning))
-    throw new Error("Reasoning must match the approved profile");
+    throw new Error("Reasoning must match the declared profile");
   if (
     (profile.promptCacheOptions != null || body.prompt_cache_options != null) &&
     !equal(body.prompt_cache_options, profile.promptCacheOptions)
   )
-    throw new Error("Prompt caching must match the approved profile");
+    throw new Error("Prompt caching must match the declared profile");
   if (
     body.max_tokens != null &&
     body.max_completion_tokens != null &&
@@ -205,7 +191,7 @@ function boundedRequest(body, profile) {
     profile.maxTokens != null &&
     (body.max_tokens ?? body.max_completion_tokens) !== profile.maxTokens
   )
-    throw new Error("Output limit must match the approved profile");
+    throw new Error("Output limit must match the declared profile");
   if (
     profile.strict &&
     (body.response_format?.type !== "json_schema" ||
@@ -250,7 +236,7 @@ function boundedRequest(body, profile) {
           (!Array.isArray(route) || route.length !== 1 || route[0] !== profile.provider),
       ))
   )
-    throw new Error("Only the approved route without fallbacks is allowed");
+    throw new Error("Only the declared route without fallbacks is allowed");
   if (
     profile.strict &&
     (body.provider?.allow_fallbacks !== false ||

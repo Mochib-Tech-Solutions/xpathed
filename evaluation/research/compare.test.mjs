@@ -17,7 +17,7 @@ import {
 test("comparison uses the shared current cases and explicit plural labels", () => {
   const cases = selectCases();
   assert.equal(new Set(cases.map((c) => c.id)).size, cases.length);
-  assert.ok(cases.every((c) => c.contractVersion === "4" && !c.mutation && !c.provider.fault));
+  assert.ok(cases.every((c) => !c.mutation && !c.provider.fault));
   assert.equal(selectCases("targeting-save-button-by-name")[0].cardinality, "singleton");
   assert.equal(selectCases("scope-all-approval-buttons-in-current-view")[0].cardinality, "all");
   assert.throws(() => selectCases("missing"));
@@ -93,7 +93,7 @@ test("continuation freezes fixture, oracle, provider and grader code; replay che
       "evaluation/fixtures/pages.mjs",
       "evaluation/fixtures/oracle.js",
       "evaluation/provider.mjs",
-      "evaluation/profiles.json",
+      "evaluation/configuration.mjs",
       "evaluation/run.mjs",
       "evaluation/grader.mjs",
       "evaluation/research/grade.mjs",

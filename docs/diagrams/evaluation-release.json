@@ -2,7 +2,7 @@
   "schema_version": 1,
   "diagram_type": "architecture",
   "meta": {
-    "title": "From source checks to an approved release",
+    "title": "From source checks to a published release",
     "locale": "en",
     "quality_profile": "showcase",
     "legend": {
@@ -18,7 +18,7 @@
           "label": "Gate"
         },
         "cloud": {
-          "label": "Local activation"
+          "label": "Deployment"
         }
       }
     },
@@ -59,8 +59,8 @@
     {
       "id": "compare",
       "type": "backend",
-      "label": "Live comparison",
-      "sublabel": "Candidate + approved",
+      "label": "Live evaluation",
+      "sublabel": "Candidate + release",
       "pos": [
         540,
         30
@@ -85,10 +85,10 @@
       ]
     },
     {
-      "id": "approve",
+      "id": "publish",
       "type": "security",
-      "label": "Merge + verify",
-      "sublabel": "Approve tested images",
+      "label": "Merge + publish",
+      "sublabel": "Tested images",
       "pos": [
         285,
         160
@@ -99,10 +99,10 @@
       ]
     },
     {
-      "id": "activate",
+      "id": "deploy",
       "type": "cloud",
-      "label": "Explicit activation",
-      "sublabel": "Local workspace",
+      "label": "Docker deployment",
+      "sublabel": "External configuration",
       "pos": [
         30,
         160
@@ -116,7 +116,7 @@
       "id": "monitor",
       "type": "backend",
       "label": "Nightly monitoring",
-      "sublabel": "Approved cases + images",
+      "sublabel": "Release cases + images",
       "pos": [
         285,
         290
@@ -143,27 +143,27 @@
     {
       "from": "compare",
       "to": "gate",
-      "label": "Grade both arms",
+      "label": "Grade all cases",
       "id": "compare-gate",
       "labelDy": 45
     },
     {
       "from": "gate",
-      "to": "approve",
+      "to": "publish",
       "label": "Pass + merge",
-      "id": "gate-approve"
+      "id": "gate-publish"
     },
     {
-      "from": "approve",
-      "to": "activate",
-      "label": "Maintainer",
-      "id": "approve-activate"
+      "from": "publish",
+      "to": "deploy",
+      "label": "Verified images",
+      "id": "publish-deploy"
     },
     {
-      "from": "approve",
+      "from": "publish",
       "to": "monitor",
       "label": "Schedule nightly",
-      "id": "approve-monitor",
+      "id": "publish-monitor",
       "labelDy": 45
     }
   ]

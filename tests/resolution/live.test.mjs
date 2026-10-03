@@ -31,7 +31,6 @@ test("provider-live-inference-resolves-plural-frame-targets-and-scoped-absence",
       const result = await json(`${resolver}/pages/${session.pageId}/resolve`, "POST", {
         instruction,
         documentId: page.documentId,
-        contractVersion: "4",
       });
       console.log(
         JSON.stringify({
@@ -87,7 +86,6 @@ test("provider-live-inference-resolves-plural-frame-targets-and-scoped-absence",
       assert.equal(result.sessionId, session.sessionId);
       assert.equal(result.pageId, session.pageId);
       assert.equal(result.documentId, page.documentId);
-      assert.equal(result.contractVersion, "4");
       if (outcome === "found") {
         assert.equal(result.actions.length, 2);
         assert.ok(

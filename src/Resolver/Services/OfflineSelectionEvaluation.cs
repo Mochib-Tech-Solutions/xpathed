@@ -23,13 +23,7 @@ public static class OfflineSelectionEvaluation
         var timer = Stopwatch.StartNew();
         string? configurationId = null;
         var prompt = ActionSelectionStrategy.Prompt;
-        var promptVersion = ActionSelectionStrategy.PromptVersion;
-        var diagnostics = new ResolutionDiagnostics
-        {
-            Stage = "input",
-            Strategy = "candidate-selection-offline-v1",
-            PromptVersion = promptVersion,
-        };
+        var diagnostics = new ResolutionDiagnostics { Stage = "input", Strategy = "candidate-selection-offline" };
         try
         {
             if (args.Length is < 2 or > 3 || args.Length == 3 && args[2] != "--prepare-only")
@@ -72,7 +66,6 @@ public static class OfflineSelectionEvaluation
                             schema = ActionSelectionStrategy.Schema,
                             outputTokens = ActionSelectionStrategy.OutputTokens,
                             configurationId,
-                            promptVersion,
                             effective = gateway.DescribeConfiguration("offline"),
                         },
                         JsonOptions
@@ -88,7 +81,6 @@ public static class OfflineSelectionEvaluation
             {
                 Stage = "selection",
                 Strategy = diagnostics.Strategy,
-                PromptVersion = promptVersion,
                 ModelCalls = 1,
                 ModelInputBytes = diagnostics.ModelInputBytes,
                 ModelInputCount = candidateIds.Length,
@@ -140,7 +132,6 @@ public static class OfflineSelectionEvaluation
                     actions = selections,
                     diagnostics,
                     configurationId,
-                    promptVersion,
                     inputBytes = diagnostics.ModelInputBytes,
                     providerLatencyMs = diagnostics.TimingsMs.TryGetValue("provider", out var elapsed)
                         ? (double?)elapsed

@@ -11,7 +11,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "viewport-baseline-1",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-fixture-source-review",
@@ -94,7 +93,6 @@
       ]
     },
     "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
-    "contractVersion": "4",
     "labelProvenance": {
       "kind": "controlled-authored",
       "sourceCaseId": "single-action-plural-confirmations",
@@ -190,13 +188,11 @@
       ]
     },
     "oracleSentinels": ["QUALIFICATION_ORACLE_PRIVATE_37e2"],
-    "contractVersion": "4",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-release-label-review",
       "reviewedAt": "2026-10-01T20:59:51.033533+00:00"
     },
-    "setupRevision": "qualification-1",
     "labelProvenance": {
       "kind": "controlled-authored",
       "sourceCaseId": "named-found-missing",
@@ -255,13 +251,11 @@
       ]
     },
     "oracleSentinels": ["QUALIFICATION_ORACLE_PRIVATE_37e2"],
-    "contractVersion": "4",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-release-label-review",
       "reviewedAt": "2026-10-01T20:59:51.033533+00:00"
     },
-    "setupRevision": "qualification-1",
     "labelProvenance": {
       "kind": "controlled-authored",
       "sourceCaseId": "mixed-interactions",
@@ -319,13 +313,11 @@
       ]
     },
     "oracleSentinels": ["QUALIFICATION_ORACLE_PRIVATE_37e2"],
-    "contractVersion": "4",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-release-label-review",
       "reviewedAt": "2026-10-01T20:59:51.033533+00:00"
     },
-    "setupRevision": "qualification-1",
     "labelProvenance": {
       "kind": "controlled-authored",
       "sourceCaseId": "sequential-workflow",

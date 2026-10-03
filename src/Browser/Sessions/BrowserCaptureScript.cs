@@ -185,7 +185,7 @@ internal static class BrowserCaptureScript
           const state = element => {
             const rect = visibleRect(element);
             return {
-              version: '2', accessibilityExposed: accessibilityExposed(element), readonly: (element.localName === 'textarea' ||
+              accessibilityExposed: accessibilityExposed(element), readonly: (element.localName === 'textarea' ||
                 element.localName === 'input' && ['text','search','email','url','tel','password','number','date','month','week','time','datetime-local'].includes(element.type)) && element.readOnly ||
                 ['textbox','searchbox','spinbutton','combobox','listbox','checkbox','slider'].includes(role(element)) && element.getAttribute('aria-readonly') === 'true',
               rendered: rendered(element),
@@ -232,7 +232,7 @@ internal static class BrowserCaptureScript
             if (!observed.rendered) reasons.push('not_visually_rendered');
             if (checks.pointerReception === 'fail') reasons.push(getComputedStyle(element).pointerEvents === 'none' ? 'pointer_events_none' : 'obstructed_at_hit_point');
             const readiness = [checks.compatibleControl, checks.enabled, checks.writable, checks.viewport, checks.pointerReception, checks.keyboard];
-            return { version: '2', action, status: readiness.includes('fail') ? 'blocked' : custom ? 'unsupported' : readiness.includes('unknown') ? 'unknown' : 'ready', reasons, checks };
+            return { action, status: readiness.includes('fail') ? 'blocked' : custom ? 'unsupported' : readiness.includes('unknown') ? 'unknown' : 'ready', reasons, checks };
           };
           const eligible = element => {
             if (!accessibilityExposed(element)) return false;

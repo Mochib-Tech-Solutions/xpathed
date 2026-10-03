@@ -41,14 +41,6 @@ export function summarizeQualification(manifest, trials, policy = defaultPolicy)
       if (!Number.isFinite(Date.parse(manifest.qualification?.frozenAt)))
         reasons.push("policy_not_frozen");
       if (
-        manifest.cases.some(
-          (spec) =>
-            spec.track !== "offline-selection" &&
-            spec.contractVersion !== policy.requiredContractVersion,
-        )
-      )
-        reasons.push("unsupported_release_contract");
-      if (
         observed.some(
           (trial) =>
             !planned.some((entry) =>
@@ -82,7 +74,6 @@ export function summarizeQualification(manifest, trials, policy = defaultPolicy)
           ...summary,
           qualification: {
             status: reasons.length ? "not-qualified" : "qualified",
-            policyVersion: policy.version,
             reasons: [...new Set(reasons)],
             hardFailures,
             comparison,
@@ -115,6 +106,5 @@ export function summarizeQualification(manifest, trials, policy = defaultPolicy)
     qualifiedCandidates: Object.entries(reports)
       .filter(([, report]) => report.qualification.status === "qualified")
       .map(([id]) => id),
-    defaultActivated: false,
   };
 }

@@ -211,13 +211,9 @@ export function gradeTrial(caseSpec, trial) {
     fail("contract", "Required resolution result/actions are missing or malformed.");
   } else {
     metrics.actionsActual = trial.result.actions.length;
-    const contractVersion = offline ? "offline-1" : (caseSpec.contractVersion ?? "2");
-    if (trial.result.contractVersion !== contractVersion)
-      fail("contract", `Expected resolution contract version ${contractVersion}.`);
-    if (trial.result.target != null || (contractVersion === "2" && trial.result.action != null))
+    if (trial.result.target != null)
       fail("contract", "Unexpected top-level target or legacy action.");
     if (
-      contractVersion !== "2" &&
       trial.result.outcome !== "error" &&
       (!trial.result.action ||
         trial.result.actions.some((item) => item?.action !== trial.result.action))
@@ -225,7 +221,9 @@ export function gradeTrial(caseSpec, trial) {
       fail("contract", "All target items must share the command's one action.");
     if (
       trial.result.outcome === "error" &&
-      (trial.result.actions.length > 0 || trial.result.summary != null)
+      (trial.result.actions.length > 0 ||
+        trial.result.summary != null ||
+        trial.result.action != null)
     )
       fail("contract", "Request errors must have empty actions and no summary.");
     if (Object.hasOwn(expected, "code") && trial.result.diagnostics?.code !== expected.code)
@@ -251,7 +249,6 @@ export function gradeTrial(caseSpec, trial) {
     const ids = new Set();
     const selectedTargets = new Set();
     if (
-      contractVersion !== "2" &&
       trial.result.outcome !== "error" &&
       (trial.result.actions.length < 1 || trial.result.actions.length > 16)
     )
@@ -288,7 +285,7 @@ export function gradeTrial(caseSpec, trial) {
         metrics.unsupportedCorrect++;
       if (action.outcome === "found") {
         metrics.targetsReturned++;
-        if (contractVersion !== "2" && action.target?.candidateId) {
+        if (action.target?.candidateId) {
           if (selectedTargets.has(action.target.candidateId)) {
             duplicateTarget = true;
             metrics.duplicateTargets++;
@@ -318,14 +315,18 @@ export function gradeTrial(caseSpec, trial) {
           } else if (!duplicateTarget) metrics.targetsCorrect++;
         } else {
           if (
-            action.target?.state?.version !== "2" ||
-            action.target?.interactability?.version !== "2" ||
+            !object(action.target?.state) ||
+            [
+              "rendered",
+              "inViewport",
+              "enabled",
+              "editable",
+              "accessibilityExposed",
+              "readonly",
+            ].some((key) => typeof action.target.state[key] !== "boolean") ||
             action.target?.interactability?.action !== action.action
           )
-            fail(
-              "contract",
-              `Action ${index + 1} must return version 2 state and matching action interactability.`,
-            );
+            fail("contract", `Action ${index + 1} must return matching action interactability.`);
           const paths = action.target?.xpaths;
           const matches = trial.observation?.actions?.[index]?.matches;
           if (

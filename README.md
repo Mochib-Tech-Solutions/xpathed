@@ -27,7 +27,7 @@ The actual XPath comes from the DOM. Results include readiness, time and cost. A
 
 XPath construction prefers explicit test attributes and meaningful semantics. It distinguishes sanitized names from DOM text so Unicode and nested labels can retain semantic locators across wrapper changes, while excluding hidden text and form values from new text predicates. The [selection policy](docs/resolution.md#preferred-xpath) describes the bounds and saved-locator limits.
 
-## Run locally
+## Clone and run locally
 
 Install **Node 24.16.0**, **pnpm 12.8.1**, and **Docker with Compose and Buildx**. Chromium needs the [documented Linux sandbox support](docs/runtime.md#sandbox-and-supported-environment).
 
@@ -37,10 +37,12 @@ cd xpathed
 pnpm run setup
 ```
 
-Setup creates an ignored `.env`. Add your OpenRouter application key:
+Setup creates an ignored `.env` from `.env.example` without replacing an existing file. Supply the application settings:
 
 ```dotenv
 OPENROUTER_API_KEY=your-key-here
+OPENROUTER_MODEL=deepseek/deepseek-v4.1-flash
+OPENROUTER_PROVIDER=wafer
 ```
 
 ```sh
@@ -50,6 +52,30 @@ pnpm dev
 Open **[localhost:8080](http://localhost:8080)**, enter a website address and submit an instruction. Manual browsing works without a key; live resolution uses your OpenRouter account.
 
 All four services run in Docker. Ctrl+C or `pnpm docker:down` removes development containers while preserving configuration. A separate checkout needs its own `COMPOSE_PROJECT_NAME`, `XPATHED_PORT` and `.env`.
+
+## Run the published Docker release
+
+The release contains **Browser** and **Resolver** images. Install Docker with Compose, Node and `gh`, authenticate `gh` for this private repository, then use the cloned repository's download command:
+
+```sh
+pnpm release:download --output .artifacts/deployment
+cd .artifacts/deployment
+cp release.env.example .env
+# Edit .env: supply OPENROUTER_API_KEY, OPENROUTER_MODEL and OPENROUTER_PROVIDER.
+docker compose --env-file .env --env-file images.env -f compose.release.yaml up -d --no-build --pull never
+curl --fail http://localhost:8082/health  # Browser
+curl --fail http://localhost:8083/health  # Resolver
+```
+
+The command resolves the current `release` commit, downloads its published assets, verifies the bundle and loads both images. `images.env` pins their exact Docker IDs. Compose starts those images without rebuilding; `pnpm dev` builds the current local checkout instead. Published images currently target **Linux ARM64**, matching CI; the downloader rejects a different Docker architecture. Local source builds support the Docker host's architecture.
+
+Browser listens on `localhost:8082`; Resolver on `localhost:8083`, and connects to Browser over the Compose network. These are API services; the chat workspace is available through the source setup above. See the [API example](docs/releases.md#use-the-apis) and [release files and configuration](docs/releases.md#run-the-published-browser-and-resolver).
+
+Stop this deployment from its directory:
+
+```sh
+docker compose --env-file .env --env-file images.env -f compose.release.yaml down
+```
 
 ## Architecture
 
@@ -91,9 +117,9 @@ Model selection covers steps 3–4. XPath construction and verification covers s
 
 The development default is **`deepseek/deepseek-v4.1-flash` through OpenRouter's `wafer` provider**, configured in `.env.example` and `docker/compose.yaml`.
 
-`main` keeps one selected implementation and one prompt/schema, updated in place through Git. Retired API versions and experiment runners are removed; historical experiments use their recorded revisions. See [ADR-0024](docs/adr/0024-keep-one-resolution-implementation.md).
+The repository keeps one implementation and one prompt/schema, updated in place. Git tracks their history; code has no manual prompt or behavior revision numbers. See [ADR-0024](docs/adr/0024-keep-one-resolution-implementation.md).
 
-`ActionSelectionStrategy` owns the shared runtime/offline prompt, schema and selection validation. `OpenRouterGateway` pins the provider, disables reasoning and fallback, and limits output to 4,096 tokens. A configuration hash identifies effective settings. No model is trained here; changes to the pretrained model, prompt or context require evaluation. Runtime defaults and approved release configurations are separate.
+`ActionSelectionStrategy` owns the shared runtime/offline prompt, schema and selection validation. `OpenRouterGateway` pins the provider, disables reasoning and fallback, and limits output to 4,096 tokens. A configuration hash identifies effective settings. No model is trained here; changes to the pretrained model, prompt or context require evaluation. Docker/environment variables supply OpenRouter credentials, endpoint, model and provider. Release artifacts do not override deployment configuration.
 
 Illustrative saved click result:
 
@@ -159,7 +185,7 @@ The [resolver comparison](docs/research/engineering-comparison.md) uses **183 sh
 
 [![Accuracy by behavior category](docs/assets/evaluation/engineering-category-results.svg)](docs/assets/evaluation/engineering-category-results.svg)
 
-Improved gained **15 passes and lost 7**, a net increase of **4.4 percentage points**. Scope and targeting improved most; state cases lost one net pass. The regressions remain visible and prevent release approval under the no-regression rule.
+Improved gained **15 passes and lost 7**, a net increase of **4.4 percentage points**. Scope and targeting improved most; state cases lost one net pass. The regressions remain visible and fail release checks under the no-regression rule.
 
 The target-selection score excludes eight unsupported-instruction cases and checks exact nodes/absence without requiring the action name. Stagehand uses stock `observe` with a current-view instruction; it does not provide xpathed's readiness contract. The [report](docs/research/engineering-comparison.md) explains these boundaries and separates the full resolver score, timing cohorts and failures.
 
@@ -175,7 +201,7 @@ pnpm evaluate:replay RUN_DIRECTORY       # regrade saved evidence
 
 Category commands accept `--case CASE_ID` and `--output DIRECTORY`. `pnpm evaluate -- --output DIRECTORY` stores each category beneath that directory. Controlled browser evaluation uses up to four isolated sessions; `--concurrency 1` selects serial timing. Live runs are serial. CI uses `evaluate:resolver` and stays provider-free. The other apps' unit and integration commands are unchanged.
 
-Release evaluation compares exact candidate and approved images on the complete reviewed collection. Activation is explicit; nightly monitoring reports drift without changing the running app.
+The fresh `v1.0.0` establishes its baseline after ordinary CI and complete live checks, retiring the old release. Subsequent release PRs run ordinary CI and the complete live comparison against the exact images published for the current `release` commit. Once checks pass and the PR merges, that commit becomes the release and next baseline. Publication retains the tested images and evidence. Nightly monitoring tests that release without changing the running app. See [release operations](docs/releases.md).
 
 ## Read more
 
@@ -183,4 +209,4 @@ Release evaluation compares exact candidate and approved images on the complete 
 - [Engineering decisions](docs/engineering-journey.md): tradeoffs, quality and next steps.
 - [Demo guide](docs/demo.md): present the working system.
 - [Runtime](docs/runtime.md) and [resolution contract](docs/resolution.md): API and configuration reference.
-- [Evaluation](docs/evaluation.md) and [releases](docs/releases.md): run, compare and activate.
+- [Evaluation](docs/evaluation.md) and [releases](docs/releases.md): run, compare and deploy.

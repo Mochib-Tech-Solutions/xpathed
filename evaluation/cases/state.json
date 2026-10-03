@@ -5,8 +5,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "release-current-view-3",
-    "contractVersion": "4",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-release-label-review",
@@ -74,8 +72,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "release-current-view-3",
-    "contractVersion": "4",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-release-label-review",
@@ -142,8 +138,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "release-current-view-3",
-    "contractVersion": "4",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-release-label-review",
@@ -210,8 +204,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "release-current-view-3",
-    "contractVersion": "4",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-release-label-review",
@@ -278,8 +270,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "release-current-view-3",
-    "contractVersion": "4",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-release-label-review",
@@ -393,8 +383,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "release-current-view-3",
-    "contractVersion": "4",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-release-label-review",
@@ -448,8 +436,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "release-current-view-3",
-    "contractVersion": "4",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-release-label-review",
@@ -516,8 +502,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "release-current-view-3",
-    "contractVersion": "4",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-release-label-review",
@@ -584,8 +568,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "release-current-view-3",
-    "contractVersion": "4",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-release-label-review",
@@ -652,8 +634,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "release-current-view-3",
-    "contractVersion": "4",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-release-label-review",
@@ -720,8 +700,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "release-current-view-3",
-    "contractVersion": "4",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-release-label-review",
@@ -812,8 +790,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "release-current-view-3",
-    "contractVersion": "4",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-release-label-review",
@@ -867,8 +843,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "release-current-view-3",
-    "contractVersion": "4",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-release-label-review",
@@ -935,8 +909,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "release-current-view-3",
-    "contractVersion": "4",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-release-label-review",
@@ -1003,8 +975,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "release-current-view-3",
-    "contractVersion": "4",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-release-label-review",
@@ -1071,8 +1041,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "release-current-view-3",
-    "contractVersion": "4",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-release-label-review",
@@ -1139,8 +1107,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "release-current-view-3",
-    "contractVersion": "4",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-release-label-review",
@@ -1207,8 +1173,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "release-current-view-3",
-    "contractVersion": "4",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-release-label-review",
@@ -1305,8 +1269,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "release-current-view-4",
-    "contractVersion": "4",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-release-label-review",
@@ -1370,8 +1332,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "release-current-view-4",
-    "contractVersion": "4",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-release-label-review",
@@ -1435,8 +1395,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "release-current-view-4",
-    "contractVersion": "4",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-release-label-review",
@@ -1487,8 +1445,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "release-current-view-4",
-    "contractVersion": "4",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-release-label-review",
@@ -1552,8 +1508,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "release-current-view-4",
-    "contractVersion": "4",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-release-label-review",
@@ -1617,8 +1571,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "release-current-view-4",
-    "contractVersion": "4",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-release-label-review",
@@ -1682,8 +1634,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "release-current-view-4",
-    "contractVersion": "4",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-release-label-review",
@@ -1747,8 +1697,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "release-current-view-4",
-    "contractVersion": "4",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-release-label-review",
@@ -1836,8 +1784,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "release-current-view-4",
-    "contractVersion": "4",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-release-label-review",
@@ -1888,7 +1834,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "viewport-baseline-1",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-fixture-source-review",
@@ -1943,7 +1888,6 @@
     },
     "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
     "privacySentinels": ["PRIVATE_NOTES_VALUE", "PRIVATE_OPTION_VALUE"],
-    "contractVersion": "4",
     "labelProvenance": {
       "kind": "controlled-authored",
       "sourceCaseId": "control-states-1",
@@ -1975,7 +1919,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "viewport-baseline-1",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-fixture-source-review",
@@ -2032,7 +1975,6 @@
     },
     "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
     "privacySentinels": ["PRIVATE_NOTES_VALUE", "PRIVATE_OPTION_VALUE"],
-    "contractVersion": "4",
     "labelProvenance": {
       "kind": "controlled-authored",
       "sourceCaseId": "control-states-2",
@@ -2055,7 +1997,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "viewport-baseline-1",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-fixture-source-review",
@@ -2116,7 +2057,6 @@
     },
     "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
     "privacySentinels": ["PRIVATE_NOTES_VALUE", "PRIVATE_OPTION_VALUE"],
-    "contractVersion": "4",
     "labelProvenance": {
       "kind": "controlled-authored",
       "sourceCaseId": "control-states-3",
@@ -2139,7 +2079,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "qualification-1",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-contract-review",
@@ -2195,7 +2134,6 @@
     },
     "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
     "privacySentinels": ["PRIVATE_NOTES_VALUE", "PRIVATE_OPTION_VALUE"],
-    "contractVersion": "4",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
     "group": "state",
@@ -2213,7 +2151,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "qualification-1",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-contract-review",
@@ -2267,7 +2204,6 @@
     },
     "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
     "privacySentinels": ["PRIVATE_NOTES_VALUE", "PRIVATE_OPTION_VALUE"],
-    "contractVersion": "4",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
     "group": "state",
@@ -2285,7 +2221,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "qualification-1",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-contract-review",
@@ -2337,7 +2272,6 @@
     },
     "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
     "privacySentinels": ["PRIVATE_NOTES_VALUE", "PRIVATE_OPTION_VALUE"],
-    "contractVersion": "4",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
     "group": "state",
@@ -2355,7 +2289,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "qualification-1",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-contract-review",
@@ -2406,7 +2339,6 @@
       ]
     },
     "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
-    "contractVersion": "4",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
     "group": "state",
@@ -2424,7 +2356,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "qualification-1",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-contract-review",
@@ -2475,7 +2406,6 @@
       ]
     },
     "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
-    "contractVersion": "4",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
     "group": "state",
@@ -2493,7 +2423,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "qualification-1",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-contract-review",
@@ -2544,7 +2473,6 @@
       ]
     },
     "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
-    "contractVersion": "4",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
     "group": "state",
@@ -2562,7 +2490,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "qualification-1",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-contract-review",
@@ -2613,7 +2540,6 @@
       ]
     },
     "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
-    "contractVersion": "4",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
     "group": "state",
@@ -2631,7 +2557,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "qualification-1",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-contract-review",
@@ -2682,7 +2607,6 @@
       ]
     },
     "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
-    "contractVersion": "4",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
     "group": "state",
@@ -2700,7 +2624,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "qualification-1",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-contract-review",
@@ -2751,7 +2674,6 @@
       ]
     },
     "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
-    "contractVersion": "4",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
     "group": "state",
@@ -2769,7 +2691,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "qualification-1",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-contract-review",
@@ -2820,7 +2741,6 @@
       ]
     },
     "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
-    "contractVersion": "4",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
     "group": "state",
@@ -2838,7 +2758,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "qualification-1",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-contract-review",
@@ -2889,7 +2808,6 @@
       ]
     },
     "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
-    "contractVersion": "4",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
     "group": "state",
@@ -2907,7 +2825,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "qualification-1",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-contract-review",
@@ -2958,7 +2875,6 @@
       ]
     },
     "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
-    "contractVersion": "4",
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
     "group": "state",
@@ -3114,13 +3030,11 @@
       ]
     },
     "oracleSentinels": ["QUALIFICATION_ORACLE_PRIVATE_37e2"],
-    "contractVersion": "4",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-contract-review",
       "reviewedAt": "2026-09-30T20:59:55.247Z"
     },
-    "setupRevision": "qualification-1",
     "previousSplit": "held-out",
     "exposedAt": "2026-09-30",
     "exposureRunId": "312713e2-f4ba-4e35-b28b-6df3e3e78fce",
@@ -3232,13 +3146,11 @@
       ]
     },
     "oracleSentinels": ["QUALIFICATION_ORACLE_PRIVATE_37e2"],
-    "contractVersion": "4",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-contract-review",
       "reviewedAt": "2026-09-30T20:59:55.247Z"
     },
-    "setupRevision": "qualification-1",
     "previousSplit": "held-out",
     "exposedAt": "2026-09-30",
     "exposureRunId": "312713e2-f4ba-4e35-b28b-6df3e3e78fce",
@@ -3351,13 +3263,11 @@
       ]
     },
     "oracleSentinels": ["QUALIFICATION_ORACLE_PRIVATE_37e2"],
-    "contractVersion": "4",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-contract-review",
       "reviewedAt": "2026-09-30T20:59:55.247Z"
     },
-    "setupRevision": "qualification-1",
     "previousSplit": "held-out",
     "exposedAt": "2026-09-30",
     "exposureRunId": "312713e2-f4ba-4e35-b28b-6df3e3e78fce",
@@ -3489,13 +3399,11 @@
       ]
     },
     "oracleSentinels": ["QUALIFICATION_ORACLE_PRIVATE_37e2"],
-    "contractVersion": "4",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-contract-review",
       "reviewedAt": "2026-09-30T20:59:55.247Z"
     },
-    "setupRevision": "qualification-1",
     "previousSplit": "held-out",
     "exposedAt": "2026-09-30",
     "exposureRunId": "312713e2-f4ba-4e35-b28b-6df3e3e78fce",
@@ -3619,13 +3527,11 @@
       ]
     },
     "oracleSentinels": ["QUALIFICATION_ORACLE_PRIVATE_37e2"],
-    "contractVersion": "4",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-contract-review",
       "reviewedAt": "2026-09-30T20:59:55.247Z"
     },
-    "setupRevision": "qualification-1",
     "previousSplit": "held-out",
     "exposedAt": "2026-09-30",
     "exposureRunId": "312713e2-f4ba-4e35-b28b-6df3e3e78fce",
@@ -3761,13 +3667,11 @@
       ]
     },
     "oracleSentinels": ["QUALIFICATION_ORACLE_PRIVATE_37e2"],
-    "contractVersion": "4",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-contract-review",
       "reviewedAt": "2026-09-30T20:59:55.247Z"
     },
-    "setupRevision": "qualification-1",
     "previousSplit": "held-out",
     "exposedAt": "2026-09-30",
     "exposureRunId": "312713e2-f4ba-4e35-b28b-6df3e3e78fce",
@@ -3896,13 +3800,11 @@
       ]
     },
     "oracleSentinels": ["QUALIFICATION_ORACLE_PRIVATE_37e2"],
-    "contractVersion": "4",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-contract-review",
       "reviewedAt": "2026-09-30T20:59:55.247Z"
     },
-    "setupRevision": "qualification-1",
     "previousSplit": "held-out",
     "exposedAt": "2026-09-30",
     "exposureRunId": "312713e2-f4ba-4e35-b28b-6df3e3e78fce",
@@ -4029,13 +3931,11 @@
       ]
     },
     "oracleSentinels": ["QUALIFICATION_ORACLE_PRIVATE_37e2"],
-    "contractVersion": "4",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-contract-review",
       "reviewedAt": "2026-09-30T20:59:55.247Z"
     },
-    "setupRevision": "qualification-1",
     "previousSplit": "held-out",
     "exposedAt": "2026-09-30",
     "exposureRunId": "312713e2-f4ba-4e35-b28b-6df3e3e78fce",
@@ -4151,13 +4051,11 @@
       ]
     },
     "oracleSentinels": ["QUALIFICATION_ORACLE_PRIVATE_37e2"],
-    "contractVersion": "4",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-contract-review",
       "reviewedAt": "2026-09-30T20:59:55.247Z"
     },
-    "setupRevision": "qualification-1",
     "previousSplit": "held-out",
     "exposedAt": "2026-09-30",
     "exposureRunId": "312713e2-f4ba-4e35-b28b-6df3e3e78fce",
@@ -4255,13 +4153,11 @@
       ]
     },
     "oracleSentinels": ["QUALIFICATION_ORACLE_PRIVATE_37e2"],
-    "contractVersion": "4",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-contract-review",
       "reviewedAt": "2026-09-30T20:59:55.247Z"
     },
-    "setupRevision": "qualification-1",
     "previousSplit": "held-out",
     "exposedAt": "2026-09-30",
     "exposureRunId": "312713e2-f4ba-4e35-b28b-6df3e3e78fce",
@@ -4410,13 +4306,11 @@
       ]
     },
     "oracleSentinels": ["QUALIFICATION_ORACLE_PRIVATE_37e2"],
-    "contractVersion": "4",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-contract-review",
       "reviewedAt": "2026-09-30T20:59:55.247Z"
     },
-    "setupRevision": "qualification-1",
     "previousSplit": "held-out",
     "exposedAt": "2026-09-30",
     "exposureRunId": "312713e2-f4ba-4e35-b28b-6df3e3e78fce",
@@ -4438,7 +4332,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "1",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-fixture-review",
@@ -4469,7 +4362,6 @@
     "sourceSplit": "development",
     "sourceCatalogs": ["cases.json"],
     "group": "state",
-    "contractVersion": "4",
     "sourceIds": ["plural-partial"],
     "cardinality": "all"
   },
@@ -4485,7 +4377,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "1",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-fixture-review",
@@ -4517,7 +4408,6 @@
     "sourceSplit": "regression",
     "sourceCatalogs": ["cases.json"],
     "group": "state",
-    "contractVersion": "4",
     "sourceIds": ["control-states"]
   },
   {
@@ -4532,7 +4422,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "1",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-fixture-review",
@@ -4563,7 +4452,6 @@
     "sourceSplit": "regression",
     "sourceCatalogs": ["cases.json"],
     "group": "state",
-    "contractVersion": "4",
     "sourceIds": ["action-families"]
   }
 ]

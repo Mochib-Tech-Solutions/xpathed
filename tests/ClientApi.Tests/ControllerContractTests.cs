@@ -21,8 +21,7 @@ public sealed class ControllerContractTests
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal("client-api", body.GetProperty("service").GetString());
-        Assert.Equal("4", body.GetProperty("resolutionContract").GetString());
-        Assert.Equal(["resolutionContract", "service"], body.EnumerateObject().Select(item => item.Name).Order());
+        Assert.Equal(["service"], body.EnumerateObject().Select(item => item.Name).Order());
         using var removed = await client.GetAsync("/internal/diagnostics");
         Assert.Equal(HttpStatusCode.NotFound, removed.StatusCode);
     }
@@ -33,7 +32,7 @@ public sealed class ControllerContractTests
     [InlineData(HttpStatusCode.BadGateway, "{\"code\":\"provider_unavailable\"}")]
     public async Task ResolutionForwardsTheRequestAndOriginalResponse(HttpStatusCode status, string result)
     {
-        const string body = "{\"instruction\":\"click Save\",\"documentId\":\"doc-1\",\"contractVersion\":\"4\"}";
+        const string body = "{\"instruction\":\"click Save\",\"documentId\":\"doc-1\"}";
         using var upstream = new ResolverHandler(status, result);
         await using var application = Application(upstream);
         using var client = application.CreateClient();

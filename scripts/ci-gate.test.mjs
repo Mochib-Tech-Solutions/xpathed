@@ -135,7 +135,6 @@ function browserEvidence(work) {
     split: "regression",
     instruction: "Do unsupported work",
     fixture: { kind: "basic" },
-    setupRevision: "1",
     review: "synthetic",
     category: "unsupported",
     viewport: { width: 1280, height: 800 },
@@ -150,7 +149,7 @@ function browserEvidence(work) {
   const trial = {
     ...planned,
     result: {
-      contractVersion: "2",
+      action: "unsupported",
       outcome: "unsupported",
       actions: [
         { actionId: "one", order: 1, step: 1, action: "unsupported", outcome: "unsupported" },

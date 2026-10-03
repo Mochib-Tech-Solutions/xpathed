@@ -8,10 +8,12 @@ services:
   resolver:
     environment:
       <<: *qualification-environment
-      OpenRouter__Model: deepseek/deepseek-v4.1-flash
-      OpenRouter__Provider: wafer
+      OpenRouter__Model: ${OPENROUTER_MODEL:-deepseek/deepseek-v4.1-flash}
+      OpenRouter__Provider: ${OPENROUTER_PROVIDER:-wafer}
   evaluation-fixture:
     environment:
+      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-deepseek/deepseek-v4.1-flash}
+      OPENROUTER_PROVIDER: ${OPENROUTER_PROVIDER:-wafer}
       OPENROUTER_EVAL_API_KEY: ${OPENROUTER_EVAL_API_KEY:-}
       XPATHED_BUDGET_PATH: /budget/experiment-budget.json
       XPATHED_BUDGET_GITHUB_REPOSITORY: ${XPATHED_BUDGET_GITHUB_REPOSITORY:-}

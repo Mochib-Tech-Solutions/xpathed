@@ -1,7 +1,5 @@
-# Keep one selected resolution implementation
+# Keep one resolution implementation
 
-Keep one resolution implementation, prompt and output schema in `main`, updated in place and versioned through Git. The current implementation resolves one action across current-view targets; omitted `contractVersion` uses the supported contract, and retired identifiers are rejected. Browser and offline selection share the same prompt and validation. This supersedes the legacy compatibility commitments in ADR-0014 and ADR-0018, and the exception for public legacy contracts in ADR-0023.
+Keep one resolver implementation, prompt and output schema, updated in place. Git records changes; runtime requests, readiness observations and diagnostics carry their actual fields without manually maintained prompt, contract, capture or XPath revision numbers. Historical experiments remain reproducible from their Git commits and saved evidence.
 
-Remove retired model and context-planning runners from `main`. Keep one resolver comparison harness for the archived Basic resolver, the current Improved resolver and Stagehand. Earlier resolver implementations run from verified image bundles; they do not return as runtime options. Reproduce historical experiments from their recorded Git revisions and artifacts; develop new alternatives on branches. Keep configuration hashes and version metadata as evidence of what ran. Deployment credentials, endpoint and timeout remain operational configuration.
-
-Keep approved image archives, frozen evidence and candidate-versus-approved release evaluation. A change in `main` does not replace the approved baseline or activate a release; those still follow the explicit release process. Saved evaluation artifacts retain their original payloads.
+The resolver handles one action across distinct current-view targets. Browser and offline selection share the prompt and validation. Source commits, image digests and content hashes identify evaluated code and artifacts. The release branch determines the release under [ADR-0026](0026-use-the-release-branch-as-the-baseline.md).

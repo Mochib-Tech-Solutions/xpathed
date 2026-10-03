@@ -1,3 +1,4 @@
+import { retiredReleaseCommit, assertSameSourceTree } from "./baseline.mjs";
 import { createHash } from "node:crypto";
 import { readFile, writeFile, lstat, realpath, readdir } from "node:fs/promises";
 import { execFileSync } from "node:child_process";
@@ -71,7 +72,7 @@ export async function evidence(options) {
       version: 1,
       bundleManifestSha256: options.bundleSha256,
       sourceSha: bundle.sourceSha,
-      profileId: bundle.profileId,
+      profileId: options.profile,
       images: bundle.images,
       platform: bundle.platform,
     },
@@ -102,8 +103,11 @@ export async function evidence(options) {
   );
   const snapshot = { "manifest.json": hash(headerBytes) };
   ensure(
-    isDeepStrictEqual(header.qualification?.artifact, artifact) && header.comparison,
-    "Exact candidate and approved baseline artifacts are required",
+    isDeepStrictEqual(header.qualification?.artifact, artifact) &&
+      (header.comparison ||
+        (options.initialBaseline === retiredReleaseCommit &&
+          header.initialBaseline === retiredReleaseCommit)),
+    "Exact candidate and release baseline artifacts are required",
   );
   if (artifact) {
     const beforeBytes = await regular(join(directory, "artifact-before.json"));
@@ -150,10 +154,7 @@ export async function evidence(options) {
     );
     if (header.comparison) {
       const baseline = header.comparison;
-      ensure(
-        /^[a-f\d]{64}$/.test(baseline.approval ?? ""),
-        "Pinned approved baseline identity is missing",
-      );
+      assertSameSourceTree(baseline.commit, baseline.artifact.sourceSha);
       validateReleaseArtifact(baseline.artifact, baseline.artifact.sourceSha, [
         baseline.profile.id,
       ]);
@@ -214,7 +215,7 @@ export async function evidence(options) {
   for (const trial of run.trials) {
     for (const [arm, profile] of [
       [trial, m.profiles[0]],
-      [trial.baseline, m.comparison.profile],
+      ...(m.comparison ? [[trial.baseline, m.comparison.profile]] : []),
     ]) {
       fresh(arm.createdAt);
       ensure(
@@ -242,7 +243,7 @@ export async function evidence(options) {
           isDeepStrictEqual(request.reasoning, profile.reasoning),
         "Observed configuration differs from tested profile",
       );
-      const key = `${arm === trial ? profile.id : "release-baseline"}:${arm.result.contractVersion}`;
+      const key = arm === trial ? profile.id : "release-baseline";
       ensure(
         !configurations[key] || isDeepStrictEqual(configurations[key], record),
         "Configuration changed within an arm",
@@ -273,12 +274,12 @@ export async function evidence(options) {
   return {
     version: 3,
     status: "artifact-bound-evidence-verified",
-    defaultActivated: false,
+    ...(m.initialBaseline ? { initialBaseline: m.initialBaseline } : {}),
     sourceSha: options.sourceSha,
     sourceTree: git("rev-parse", "HEAD^{tree}"),
     suite: suitePath,
     profile: options.profile,
-    comparison: m.comparison,
+    ...(m.comparison ? { comparison: m.comparison } : {}),
     evaluation: portable(options.evaluation),
     bundle: portable(options.bundle),
     bundleSha256: options.bundleSha256,
@@ -313,6 +314,7 @@ async function main() {
       "--bundle": "bundle",
       "--bundle-sha256": "bundleSha256",
       "--output": "output",
+      "--initial-baseline": "initialBaseline",
     },
     options = {};
   for (let i = 0; i < args.length; i += 2) {
@@ -323,7 +325,9 @@ async function main() {
     options[names[args[i]]] = args[i + 1];
   }
   ensure(
-    Object.values(names).every((name) => options[name]),
+    Object.values(names)
+      .filter((name) => name !== "initialBaseline")
+      .every((name) => options[name]),
     "Missing release option",
   );
   const bytes = JSON.stringify(await evidence(options), null, 2) + "\n";

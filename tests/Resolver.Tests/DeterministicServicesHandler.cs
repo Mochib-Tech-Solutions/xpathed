@@ -102,9 +102,9 @@ internal sealed class DeterministicServicesHandler : HttpMessageHandler
             .Parse(
                 """
                 {"candidateId":"button-save","tag":"button","label":"Save","xpaths":["//*[@data-testid='save-profile']"],
-                 "state":{"version":"2","accessibilityExposed":true,"rendered":true,"inViewport":true,"enabled":true,"editable":false,"readonly":false,"checked":null},
+                 "state":{"accessibilityExposed":true,"rendered":true,"inViewport":true,"enabled":true,"editable":false,"readonly":false,"checked":null},
                  "geometry":{"x":20,"y":40,"width":90,"height":30},
-                 "interactability":{"version":"2","action":"click","status":"ready","reasons":[],"checks":{"compatibleControl":"pass","enabled":"pass","writable":"not_applicable","viewport":"pass","pointerReception":"pass","keyboard":"not_applicable","stability":"unknown","eventOutcome":"unknown"}}}
+                 "interactability":{"action":"click","status":"ready","reasons":[],"checks":{"compatibleControl":"pass","enabled":"pass","writable":"not_applicable","viewport":"pass","pointerReception":"pass","keyboard":"not_applicable","stability":"unknown","eventOutcome":"unknown"}}}
                 """
             )!
             .AsObject();

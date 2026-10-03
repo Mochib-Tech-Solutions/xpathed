@@ -65,7 +65,7 @@ esac
 }
 
 test("live evaluation wrappers pass the dedicated file key and reject an app-only file before Docker", async (t) => {
-  for (const args of [[], ["--qualification", "--profile", "deepseek"]]) {
+  for (const args of [[], ["--qualification"]]) {
     await t.test(args[0] ?? "direct", (t) => {
       const selected = runWrapper(t, "xpathed-evaluation-key", "web", ["--mode", "live", ...args], {
         envText: "OPENROUTER_API_KEY=fixture-app\nOPENROUTER_EVAL_API_KEY=fixture-eval\n",
@@ -147,8 +147,6 @@ test("release comparison accepts the unified collection and forwards its contain
     "--qualification",
     "--suite",
     "evaluation/cases/index.json",
-    "--profile",
-    "deepseek",
   ]);
   assert.equal(result.status, 77);
   assert.match(result.calls, /suite=\/workspace\/evaluation\/cases\/index.json/);

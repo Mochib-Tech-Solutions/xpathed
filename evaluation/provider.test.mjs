@@ -795,21 +795,12 @@ test("Azure Luna rejects conflicting output aliases before reserving or forwardi
   assert.equal(proxy.budget.spentUsd, 0);
 });
 
-test("the Azure profile ID cannot authorize a different model or lose explicit cache controls", async (t) => {
-  for (const profile of [
-    {
-      ...azureProfile,
-      model,
-      provider: "wafer",
-      reasoning: { enabled: false },
-      promptCacheOptions: undefined,
-    },
-    { ...azureProfile, promptCacheOptions: undefined },
-  ]) {
-    const metadata = azureMetadata();
-    metadata.data.endpoints[0].tag = profile.provider;
-    await assert.rejects(setup(t, { profiles: [profile], metadata }), /Unapproved/);
-  }
+test("profile names do not select historical model or route settings", async (t) => {
+  const profile = { ...qualificationProfiles[2], id: "current", provider: "deepinfra/fp8" };
+  const metadata = profileMetadata(`/models/${profile.model}/endpoints`);
+  metadata.data.endpoints[0].tag = profile.provider;
+  const { proxy } = await setup(t, { profiles: [profile], metadata });
+  assert.equal(proxy.profiles[0].provider, profile.provider);
 });
 
 test("Azure alias normalization preserves frozen request and allocation guards", async (t) => {
@@ -858,15 +849,6 @@ test("Azure requires its advertised cap and rejects route, tier, reasoning and c
     "structured_outputs",
   ];
   await assert.rejects(setup(t, { profiles: [azureProfile], metadata }), /required parameters/);
-  for (const profile of [
-    { ...azureProfile, id: "luna" },
-    { ...azureProfile, provider: "azure/eu" },
-    { ...azureProfile, provider: "azure/priority" },
-  ])
-    await assert.rejects(
-      setup(t, { profiles: [profile], metadata: azureMetadata() }),
-      /Unapproved/,
-    );
   const { proxy, post, calls } = await setup(t, {
     profiles: [azureProfile],
     metadata: azureMetadata(),
@@ -889,7 +871,7 @@ test("Azure requires its advertised cap and rejects route, tier, reasoning and c
   assert.equal(proxy.budget.spentUsd, 0);
 });
 
-test("the explicit offline DeepInfra profile pins only its approved standard endpoint", async (t) => {
+test("the explicit offline DeepInfra profile pins only its declared standard endpoint", async (t) => {
   const profile = {
     id: "deepseek-deepinfra",
     model,
@@ -935,17 +917,11 @@ test("the explicit offline DeepInfra profile pins only its approved standard end
   assert.equal(calls.length, 1);
   assert.deepEqual(JSON.parse(calls[0].options.body).provider.only, ["deepinfra/fp8"]);
   assert.equal(proxy.records.at(-1).identityValid, true);
-  await assert.rejects(
-    setup(t, { profiles: [{ ...profile, provider: "deepinfra/turbo" }] }),
-    /Unapproved/,
-  );
-  await assert.rejects(
-    setup(t, { profiles: [{ ...profile, id: "arbitrary-route" }] }),
-    /Unapproved/,
-  );
+  const renamed = await setup(t, { profiles: [{ ...profile, id: "arbitrary-route" }], metadata });
+  assert.equal(renamed.proxy.profiles[0].provider, profile.provider);
 });
 
-test("qualification pins each approved profile and reserves the highest tier and cache-write cost", async (t) => {
+test("qualification pins each declared profile and reserves the highest tier and cache-write cost", async (t) => {
   const { proxy, post, calls, ledgerPath } = await setup(t, {
     profiles: qualificationProfiles,
     metadata: profileMetadata,
