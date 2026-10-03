@@ -1,6 +1,8 @@
 # PhraseNode expectation audit — 3 October 2026
 
-**Superseding reviews:** The initial review below admitted 671 cases. The [runtime-boundary audit](2026-10-03-prepared-input-audit.md) reduced admission to 665. The [full target-uniqueness recheck](2026-10-03-target-uniqueness-audit.md) now admits **573 cases** and preserves **511 exclusions**. Counts and examples below describe the initial review; subsequent decisions take precedence.
+**Current admission:** The [instruction-contract audit](2026-10-03-contract-admission-audit.md) admits **569 cases**, with **515 explicit exclusions**.
+
+**Superseding reviews:** The initial review below admitted 671 cases. The [runtime-boundary audit](2026-10-03-prepared-input-audit.md) reduced admission to 665. The [full target-uniqueness recheck](2026-10-03-target-uniqueness-audit.md) previously admitted **573 cases** and preserved **511 exclusions**. Counts and examples below describe the initial review; subsequent decisions take precedence.
 
 ## Result
 
