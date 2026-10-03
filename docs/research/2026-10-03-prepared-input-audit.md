@@ -1,6 +1,8 @@
 # Prepared model input audit — 3 October 2026
 
-**Superseding semantic review:** The [full target-uniqueness recheck](2026-10-03-target-uniqueness-audit.md) now admits **573 cases** with **511 exclusions**. The counts below record the earlier prepared-input audit. Its hash checks remain in force; unchanged bytes alone do not establish unique answerability.
+**Current admission:** The [instruction-contract audit](2026-10-03-contract-admission-audit.md) admits **569 cases**, with **515 explicit exclusions**.
+
+**Superseding semantic review:** The [full target-uniqueness recheck](2026-10-03-target-uniqueness-audit.md) previously admitted **573 cases** with **511 exclusions**. The counts below record the earlier prepared-input audit. Its hash checks remain in force; unchanged bytes alone do not establish unique answerability.
 
 ## Result
 

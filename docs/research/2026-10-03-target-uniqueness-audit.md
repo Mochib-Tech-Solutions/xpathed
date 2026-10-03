@@ -1,5 +1,7 @@
 # Target uniqueness audit — 3 October 2026
 
+**Superseding admission review:** The [instruction-contract audit](2026-10-03-contract-admission-audit.md) now admits **569 cases** with **515 exclusions**. Counts below record the earlier target-uniqueness review; unique target identity alone does not establish a valid expected outcome under the shared Resolver prompt.
+
 ## Result
 
 The collection admits **573 of 1,084 PhraseNode cases**, across **171 historical page families**. The remaining **511 cases are explicitly excluded**: 288 lack necessary evidence, 218 are ambiguous and five have contradictory expectations. Original instructions, source labels, archive bytes and splits remain unchanged. The admitted split counts are 546 dev, 24 test and three train.
