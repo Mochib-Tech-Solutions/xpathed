@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdtemp, writeFile, rm } from "node:fs/promises";
+import { mkdtemp, writeFile, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { hash } from "./download.mjs";
-import { verifyMerge, publishAssets } from "./publish.mjs";
+import { verifyMerge, publishAssets, writeChecksums } from "./publish.mjs";
 
 test("publication accepts the tested tree across differing synthetic and final merge commits", () => {
   const receipt = {
@@ -95,4 +95,16 @@ test("publication resumes a draft and publishes only after every uploaded digest
       );
     }
   }
+});
+
+test("standalone checksums verify the unpacked image archive and every download", async (t) => {
+  const root = await mkdtemp(join(tmpdir(), "release-checksums-"));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  const payload = join(root, "images.env");
+  await writeFile(payload, "XPATHED_BROWSER_IMAGE=sha256:example\n");
+  const output = await writeChecksums(root, [payload], "a".repeat(64));
+  assert.equal(
+    await readFile(output, "utf8"),
+    `${"a".repeat(64)}  images.tar\n${hash(await readFile(payload))}  images.env\n`,
+  );
 });
