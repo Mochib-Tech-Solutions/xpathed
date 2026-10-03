@@ -7,5 +7,5 @@ namespace Xpathed.ClientApi.Controllers;
 public sealed class HealthController : ControllerBase
 {
     [HttpGet]
-    public IActionResult Get() => Ok(new { service = "client-api", resolutionContract = "4" });
+    public IActionResult Get() => Ok(new { service = "client-api" });
 }

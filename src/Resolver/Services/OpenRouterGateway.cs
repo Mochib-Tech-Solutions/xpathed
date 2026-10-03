@@ -71,15 +71,10 @@ public sealed class OpenRouterGateway(
         new
         {
             strategy = ActionSelectionStrategy.Strategy,
-            promptVersion = ActionSelectionStrategy.PromptVersion,
-            captureVersion = scope == "current_view" ? "5" : null,
             scope,
             serverDeadlineMs = (int?)null,
             estimateCost = true,
             pricingCacheSeconds = 300,
-            stateVersion = "2",
-            interactabilityVersion = "2",
-            xpathVersion = "5",
             endpoint = Uri.TryCreate(endpoint, UriKind.Absolute, out var address) ? address.AbsoluteUri : endpoint,
             timeoutSeconds = timeoutSeconds.ToString("R", CultureInfo.InvariantCulture),
             modelInputBudgetBytes = ActionSelectionStrategy.InputBudgetBytes,

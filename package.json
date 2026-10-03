@@ -1,7 +1,6 @@
 {
   "name": "xpathed-workspace",
   "private": true,
-  "version": "1.1.0",
   "type": "module",
   "packageManager": "pnpm@12.8.1",
   "engines": {
@@ -66,10 +65,7 @@
     "check:staged": "node scripts/pre-commit.mjs",
     "release:archive": "node scripts/release/archive.mjs pack",
     "release:archive:restore": "node scripts/release/archive.mjs restore",
-    "release:state": "node scripts/release/state.mjs",
-    "release:promote": "node scripts/release/control.mjs promote",
-    "release:rollback": "node scripts/release/control.mjs rollback",
-    "release:activate": "node scripts/release/control.mjs activate",
+    "release:download": "node scripts/release/download.mjs",
     "release:monitor": "node scripts/release/monitor.mjs",
     "datasets:collection": "node evaluation/datasets/collection.mjs",
     "evaluate:compare": "scripts/evaluate.sh --comparison",

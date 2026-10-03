@@ -87,8 +87,55 @@ export function compareMeasurements(candidate, baseline) {
   };
 }
 
+export function initialMeasurements(entries) {
+  const times = entries.map((entry) => entry.elapsedMs).sort((a, b) => a - b);
+  const valid =
+    entries.length > 0 &&
+    entries.every((entry) => !entry.operational && !entry.hardFailure && finite(entry.elapsedMs)) &&
+    new Set(entries.map((entry) => entry.generationId)).size === entries.length;
+  return {
+    status: valid ? "passed" : "infrastructure_failure",
+    reasons: valid ? [] : ["initial_evidence_invalid"],
+    initialBaseline: true,
+    candidate: {
+      correct: entries.filter((entry) => entry.passed).length,
+      total: entries.length,
+      p50: times[Math.ceil(times.length * 0.5) - 1],
+      p95: times[Math.ceil(times.length * 0.95) - 1],
+    },
+  };
+}
+
 export function compareTrials(manifest, trials, policy) {
   const baselineProfile = manifest.comparison?.profile;
+  if (!baselineProfile && manifest.initialBaseline) {
+    const entries = manifest.cases.map((spec) => {
+      const matching = trials.filter((trial) => trial.caseId === spec.id && trial.attempt === 1);
+      const trial = matching.length === 1 ? matching[0] : null;
+      return measuredEntry(
+        spec,
+        trial,
+        manifest.profile ?? manifest.profiles.find((p) => p.id === trial?.profileId) ?? {},
+        policy,
+      );
+    });
+    const report = initialMeasurements(entries);
+    if (trials.length !== manifest.cases.length) {
+      report.status = "infrastructure_failure";
+      report.reasons.push("initial_inventory_invalid");
+    }
+    report.groups = {};
+    for (const track of ["browser", "offline-selection"]) {
+      const ids = new Set(
+        manifest.cases.filter((spec) => (spec.track ?? "browser") === track).map((spec) => spec.id),
+      );
+      if (ids.size)
+        report.groups[track] = initialMeasurements(
+          entries.filter((entry) => ids.has(entry.caseId)),
+        );
+    }
+    return report;
+  }
   if (!baselineProfile) return { status: "infrastructure_failure", reasons: ["baseline_missing"] };
   const candidate = [],
     baseline = [],

@@ -22,7 +22,6 @@ test("fixtures-reviewed-cases-preserve-family-boundaries-without-oracle-instruct
     assert.ok(Number.isFinite(Date.parse(spec.exposedAt)));
   }
   for (const spec of cases) {
-    assert.equal(spec.contractVersion, "4");
     assert.equal(spec.review.status, "reviewed");
     const html = renderFixture(spec.fixture, "qualification-test");
     assert.ok(html.startsWith("<!doctype html>"));
@@ -258,7 +257,7 @@ test("provider-controlled-failures-preserve-distinct-response-outcomes", async (
 
 test("selection-default-suite-covers-reviewed-current-view-behaviors", async () => {
   const suite = loadCases(new URL("../cases/index.json", import.meta.url));
-  const cases = suite.cases.filter((entry) => entry.contractVersion === "4");
+  const cases = suite.cases.filter((entry) => true);
   for (const fixture of ["viewport-clipped", "viewport-plural", "offscreen", "qualification-color"])
     assert.ok(
       cases.some((entry) => entry.fixture === fixture),

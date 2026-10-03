@@ -5,29 +5,15 @@ import test from "node:test";
 import { readFile } from "node:fs/promises";
 import { qualificationCoverage, requireCI, trustedReleasePR, caseChanges } from "./ci.mjs";
 
-test("release coverage reuses reviewed cases and promotion requires the current baseline", () => {
+test("release coverage reuses reviewed cases and comparison requires the current baseline", () => {
   const suite = loadCases();
   assert.equal(qualificationCoverage(suite).ready, true);
-  suite.cases.find((spec) => spec.contractVersion === "4").review.status = "pending";
+  suite.cases[0].review.status = "pending";
   assert.equal(qualificationCoverage(suite).ready, false);
-  const current = {
-    candidateSha256: "a".repeat(64),
-    sourceSha: "b".repeat(40),
-    profile: "deepseek",
-    bundleSha256: "c".repeat(64),
-  };
-  const comparison = {
-    approval: current.candidateSha256,
-    artifact: {
-      sourceSha: current.sourceSha,
-      profileId: current.profile,
-      bundleManifestSha256: current.bundleSha256,
-    },
-  };
-  assert.doesNotThrow(() => assertLatestBaseline(comparison, current));
-  assert.throws(() =>
-    assertLatestBaseline(comparison, { ...current, candidateSha256: "d".repeat(64) }),
-  );
+  const commit = "b".repeat(40);
+  const comparison = { commit, artifact: { sourceSha: commit } };
+  assert.doesNotThrow(() => assertLatestBaseline(comparison, commit));
+  assert.throws(() => assertLatestBaseline(comparison, "c".repeat(40)));
   assert.throws(() => assertLatestBaseline(comparison, null));
 });
 

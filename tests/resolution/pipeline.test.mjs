@@ -39,7 +39,6 @@ test("frames-client-response-preserves-nested-frame-chains-and-actions", async (
     const result = await json(`${client}/api/pages/${page.pageId}/resolve`, "POST", {
       instruction: "Click both Approval buttons in Payroll.",
       documentId: page.documentId,
-      contractVersion: "4",
     });
     assert.equal(result.outcome, "found", JSON.stringify(result));
     assert.equal(Object.hasOwn(result, "evidence"), false);
@@ -110,10 +109,8 @@ test("cardinality-client-response-preserves-found-blocked-and-missing-targets", 
     const result = await json(`${client}/api/pages/${page.pageId}/resolve`, "POST", {
       instruction: "Click all Approval buttons and Contact.",
       documentId: page.documentId,
-      contractVersion: "4",
     });
     assert.equal(result.outcome, "partial", JSON.stringify(result));
-    assert.equal(result.contractVersion, "4");
     assert.deepEqual(
       result.actions.map((action) => action.actionId),
       ["a1", "a2", "a3"],
@@ -136,7 +133,6 @@ test("cardinality-client-response-preserves-found-blocked-and-missing-targets", 
       assessmentUnsupported: 0,
     });
     assert.equal(result.diagnostics.modelCalls, 1);
-    assert.equal(result.diagnostics.promptVersion, "10");
     assert.ok(
       result.actions.every(
         (action) =>
@@ -207,9 +203,7 @@ test("cardinality-one-click-command-resolves-every-confirmation-in-list", async 
     const result = await json(`${client}/api/pages/${page.pageId}/resolve`, "POST", {
       instruction: "Click all confirmation buttons in the Pending requests list",
       documentId: page.documentId,
-      contractVersion: "4",
     });
-    assert.equal(result.contractVersion, "4");
     assert.equal(result.action, "click");
     assert.equal(result.actions.length, 2);
     assert.ok(result.actions.every((item) => item.action === "click" && item.outcome === "found"));
@@ -253,7 +247,6 @@ test("cardinality-independent-oracle-rejects-omitted-targets-despite-valid-xpath
     const result = await json(`${client}/api/pages/${page.pageId}/resolve`, "POST", {
       instruction: "Click all Approval buttons",
       documentId: page.documentId,
-      contractVersion: "4",
     });
     assert.equal(result.outcome, "found");
     assert.equal(result.summary.semanticCompleteness, "unverified");
@@ -330,51 +323,35 @@ test("targeting-complete-pipeline-resolves-independently-labelled-node", async (
   }
 });
 
-for (const contractVersion of ["4"])
-  test(`scope-client-response-preserves-current-view-absence`, async () => {
-    await json(
-      `${fixture}/scenario`,
-      "POST",
-      contractVersion === "4"
-        ? {
-            name: "batch",
-            actions: [
-              { step: 1, instruction: "Click Contact", action: "click", outcome: "not_found" },
-            ],
-          }
-        : { name: "absent" },
-    );
-    const session = await json(`${client}/api/sessions`, "POST");
-    const run = randomUUID();
-    try {
-      const page = await json(`${client}/api/pages/${session.pageId}/navigate`, "POST", {
-        url: `${fixture}/fixture?run=${run}`,
-      });
-      const result = await json(`${client}/api/pages/${session.pageId}/resolve`, "POST", {
-        instruction: "Click the missing Contact button.",
-        contractVersion,
-        documentId: page.documentId,
-      });
-      assert.equal(result.outcome, "not_found");
-      assert.equal(result.target, null);
-      const message =
-        contractVersion === "4" ? result.actions[0].message : result.diagnostics.message;
-      assert.equal(
-        message,
-        contractVersion === "4"
-          ? "No matching element found in the current view."
-          : "No matching element found in the eligible current-page scope.",
-      );
-      if (contractVersion === "4") {
-        assert.equal(result.summary.notFound, 1);
-        assert.equal(result.summary.found, 0);
-      }
-      assert.equal(result.diagnostics.capture.complete, true);
-      assert.equal(result.diagnostics.modelInputComplete, true);
-    } finally {
-      await fetch(`${client}/api/sessions/${session.sessionId}`, { method: "DELETE" });
-    }
+test(`scope-client-response-preserves-current-view-absence`, async () => {
+  await json(`${fixture}/scenario`, "POST", {
+    name: "batch",
+    actions: [{ step: 1, instruction: "Click Contact", action: "click", outcome: "not_found" }],
   });
+  const session = await json(`${client}/api/sessions`, "POST");
+  const run = randomUUID();
+  try {
+    const page = await json(`${client}/api/pages/${session.pageId}/navigate`, "POST", {
+      url: `${fixture}/fixture?run=${run}`,
+    });
+    const result = await json(`${client}/api/pages/${session.pageId}/resolve`, "POST", {
+      instruction: "Click the missing Contact button.",
+      documentId: page.documentId,
+    });
+    assert.equal(result.outcome, "not_found");
+    assert.equal(result.target, null);
+    const message = result.actions[0].message;
+    assert.equal(message, "No matching element found in the current view.");
+    {
+      assert.equal(result.summary.notFound, 1);
+      assert.equal(result.summary.found, 0);
+    }
+    assert.equal(result.diagnostics.capture.complete, true);
+    assert.equal(result.diagnostics.modelInputComplete, true);
+  } finally {
+    await fetch(`${client}/api/sessions/${session.sessionId}`, { method: "DELETE" });
+  }
+});
 
 test("state-client-response-preserves-readiness-and-scoped-absence", async () => {
   const session = await json(`${client}/api/sessions`, "POST");
@@ -401,8 +378,6 @@ test("state-client-response-preserves-readiness-and-scoped-absence", async () =>
       if (result.actions[0].target) {
         assert.equal(result.actions[0].target.interactability.status, status);
         assert.equal(result.actions[0].target.interactability.action, action);
-        assert.equal(result.actions[0].target.state.version, "2");
-        assert.equal(result.diagnostics.promptVersion, "10");
         assert.equal(result.actions[0].target.xpaths.length, 1);
       } else assert.match(result.actions[0].message, /current view/);
       const input = JSON.stringify(await json(`${fixture}/provider-request`));

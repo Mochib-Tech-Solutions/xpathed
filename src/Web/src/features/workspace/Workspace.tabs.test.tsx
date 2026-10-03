@@ -52,7 +52,6 @@ function browserApi() {
     return page;
   };
   const result = (page: PageState, instruction: string) => ({
-    contractVersion: "4",
     outcome: "found",
     sessionId: session.sessionId,
     pageId: page.pageId,

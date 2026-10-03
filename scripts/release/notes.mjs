@@ -2,18 +2,9 @@ import { execFileSync } from "node:child_process";
 import { readFile, writeFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
 
-export function nextCandidateTag(version, tags) {
-  if (!/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(version))
-    throw new Error("Release version must be MAJOR.MINOR.PATCH");
-  if (tags.includes(`v${version}`))
-    throw new Error("Bump the package version after a stable release");
-  const prefix = `v${version}-rc.`;
-  const numbers = tags
-    .filter((tag) => tag.startsWith(prefix))
-    .map((tag) => tag.slice(prefix.length));
-  const last = Math.max(0, ...numbers.filter((n) => /^[1-9]\d*$/.test(n)).map(Number));
-  if (!Number.isSafeInteger(last + 1)) throw new Error("Release candidate number is invalid");
-  return `${prefix}${last + 1}`;
+export function releaseTag(commit) {
+  if (!/^[a-f\d]{40}$/.test(commit ?? "")) throw new Error("An exact Git commit is required");
+  return `release-${commit}`;
 }
 
 const ms = (value) => (Number.isFinite(value) ? `${value.toFixed(1)} ms` : "Unavailable");
@@ -25,7 +16,6 @@ const score = (value) =>
 export function releaseNotes({
   tag,
   profile,
-  policy,
   phases,
   qualified,
   mode = "live",
@@ -37,17 +27,16 @@ export function releaseNotes({
 }) {
   const lines = [
     mode === "deterministic"
-      ? "**Deterministic checks only. Live model qualification and approval are pending.**"
+      ? "**Deterministic checks only. Live evaluation is pending.**"
       : qualified
-        ? "**Qualification passed — awaiting explicit release approval.**"
-        : "**Qualification did not pass. This candidate is not approved.**",
+        ? "**Release checks passed.**"
+        : "**Release checks did not pass.**",
     "",
     "## Model and configuration",
     "",
-    `- Release version: \`${tag}\``,
+    `- Release identity: \`${tag}\``,
     `- Model: \`${profile.model}\``,
     `- Provider: \`${profile.provider}\` through OpenRouter`,
-    `- Profile: \`${profile.id}\`; prompt variant: \`${profile.variant}\``,
     `- Reasoning: \`${JSON.stringify(profile.reasoning)}\`; output limit: ${profile.maxTokens} tokens`,
     "- Acceptance: preserve every baseline pass; latency and cost are informational.",
     "",
@@ -62,7 +51,9 @@ export function releaseNotes({
       continue;
     }
     for (const group of phase.groups ?? [phase]) {
-      for (const arm of ["candidate", "baseline"]) {
+      for (const arm of group.comparison?.initialBaseline
+        ? ["candidate"]
+        : ["candidate", "baseline"]) {
         const stats = group.comparison?.[arm];
         lines.push(
           `| ${group.name} | ${arm} | ${score(stats)} | ${ms(stats?.p50)} | ${ms(stats?.p95)} |`,
@@ -90,7 +81,7 @@ export function releaseNotes({
   const known = calls.filter((call) => Number.isFinite(call.reportedUsd));
   lines.push(
     "",
-    `Retained provider calls: **${calls.length}** across both arms. Known reported subtotal: **$${known.reduce((sum, call) => sum + call.reportedUsd, 0).toFixed(8)} USD**; ${calls.length - known.length} calls have unknown cost.`,
+    `Retained provider calls: **${calls.length}** across evaluated arms. Known reported subtotal: **$${known.reduce((sum, call) => sum + call.reportedUsd, 0).toFixed(8)} USD**; ${calls.length - known.length} calls have unknown cost.`,
   );
   for (const phase of phases) {
     const reasons = phase.comparison?.reasons ?? [];
@@ -177,35 +168,15 @@ export async function phaseNotes(directory, name, profileId) {
 async function main() {
   const root = process.argv[2];
   if (!root || process.argv.length !== 3) throw new Error("Use release-notes.mjs RUN_DIRECTORY");
-  const gh = (...args) =>
-    execFileSync("gh", args, { encoding: "utf8", maxBuffer: 8 * 1024 * 1024 });
-  const { version } = JSON.parse(await readFile("package.json", "utf8"));
-  const releases = JSON.parse(gh("release", "list", "--limit", "1000", "--json", "tagName"));
-  const refs = JSON.parse(
-    gh("api", `repos/${process.env.GITHUB_REPOSITORY}/git/matching-refs/tags/v${version}`),
-  );
-  const tag = nextCandidateTag(version, [
-    ...releases.map((release) => release.tagName),
-    ...refs.map(({ ref }) => ref.slice("refs/tags/".length)),
-  ]);
   const preflight = JSON.parse(await readFile(join(root, "preflight.json"), "utf8"));
-  const { profile } = JSON.parse(await readFile(join(root, "bundle/configuration.json"), "utf8"));
-  const policy = JSON.parse(await readFile("evaluation/policy.json", "utf8"));
-  const phases = [];
-  for (const name of ["evaluation"])
-    phases.push(await phaseNotes(join(root, name), name, profile.id));
-  const generated = JSON.parse(
-    gh(
-      "api",
-      `repos/${process.env.GITHUB_REPOSITORY}/releases/generate-notes`,
-      "--method",
-      "POST",
-      "-f",
-      `tag_name=${tag}`,
-      "-f",
-      `target_commitish=${preflight.sourceSha}`,
-      ...(releases[0] ? ["-f", `previous_tag_name=${releases[0].tagName}`] : []),
-    ),
+  const manifest = JSON.parse(await readFile(join(root, "evaluation/manifest.json"), "utf8"));
+  const profile = manifest.profiles[0];
+  const tag = preflight.initialBaseline ? "v1.0.0" : releaseTag(preflight.sourceSha);
+  const phases = [await phaseNotes(join(root, "evaluation"), "Evaluation", profile.id)];
+  const changelog = execFileSync(
+    "git",
+    ["log", "--format=- %s", `${preflight.baselineCommit}..${preflight.headSha}`],
+    { encoding: "utf8" },
   );
   const qualified =
     (await optionalJson(join(root, "candidate.json")))?.status ===
@@ -213,11 +184,10 @@ async function main() {
   const notes = releaseNotes({
     tag,
     profile,
-    policy,
     phases,
     qualified,
     mode: preflight.mode,
-    changelog: generated.body,
+    changelog,
     caseChanges: await optionalJson(join(root, "case-changes.json")),
     sourceSha: preflight.sourceSha,
     bundleSha: (await readFile(join(root, "bundle-sha256.txt"), "utf8")).trim(),

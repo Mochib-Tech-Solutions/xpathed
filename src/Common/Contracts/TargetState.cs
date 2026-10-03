@@ -6,7 +6,6 @@ public sealed record TargetState(
     bool Enabled,
     bool Editable,
     bool? Checked,
-    string Version = "1",
     bool? AccessibilityExposed = null,
     bool? Readonly = null,
     bool? Selected = null,

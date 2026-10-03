@@ -1,3 +1,4 @@
+import { retiredReleaseCommit } from "./release-transition.mjs";
 import { readCollection } from "./datasets/collection.mjs";
 import { loadCases } from "./cases/load.mjs";
 import { executeOffline } from "./datasets/offline.mjs";
@@ -45,7 +46,8 @@ export async function savePairedTrial(directory, trial, runBaseline) {
   }
 }
 
-export const profiles = await json(new URL("./profiles.json", import.meta.url));
+import { profiles } from "./configuration.mjs";
+export { profiles };
 
 export function validateReleaseArtifact(artifact, sourceSha, profileIds) {
   const keys = (value, expected) =>
@@ -89,12 +91,12 @@ export function validateReleaseArtifact(artifact, sourceSha, profileIds) {
 }
 
 export function parseQualificationOptions(args) {
-  const extra = { profile: "deepseek", monitoring: false };
+  const extra = { monitoring: false };
   const rest = [],
     seen = new Set();
   for (let i = 0; i < args.length; i += 2) {
     const name = args[i].slice(2);
-    if (["profile", "suite", "monitoring"].includes(name)) {
+    if (["suite", "monitoring"].includes(name)) {
       if (seen.has(name) || !args[i + 1] || args[i + 1].startsWith("--"))
         throw new Error("Repeated or missing comparison option");
       seen.add(name);
@@ -108,12 +110,7 @@ export function parseQualificationOptions(args) {
     throw new Error("Release comparison uses one attempt per case");
   if (![false, "true"].includes(options.monitoring)) throw new Error("Use --monitoring true");
   options.monitoring = options.monitoring === "true";
-  options.profileIds = options.profile.split(",");
-  if (
-    new Set(options.profileIds).size !== options.profileIds.length ||
-    options.profileIds.some((id) => !profiles.some((p) => p.id === id))
-  )
-    throw new Error("Unknown or duplicate model profile");
+  options.profileIds = [profiles[0].id];
   return options;
 }
 
@@ -124,13 +121,11 @@ export function selectQualificationCases(cases, options = {}) {
     const reason =
       options.caseId && options.caseId !== item.id
         ? "case filter"
-        : item.track !== "offline-selection" && item.contractVersion !== "4"
-          ? "legacy contract CI coverage"
-          : item.mutation
-            ? "saved-locator CI coverage"
-            : item.provider?.fault || item.deterministicOnly || item.expected?.outcome === "error"
-              ? "deterministic fault coverage"
-              : null;
+        : item.mutation
+          ? "saved-locator CI coverage"
+          : item.provider?.fault || item.deterministicOnly || item.expected?.outcome === "error"
+            ? "deterministic fault coverage"
+            : null;
     if (reason) exclusions.push({ caseId: item.id, reason });
     else selected.push(item);
   }
@@ -213,7 +208,7 @@ export function summarizeMonitoring(manifest, trials, baseline) {
   }
   const report = compareMeasurements(entries, baseline);
   if (trials.length !== entries.length) report.status = "infrastructure_failure";
-  return { ...report, entries, defaultActivated: false };
+  return { ...report, entries };
 }
 
 function printSummary(summary) {
@@ -272,10 +267,16 @@ export async function main(args = process.argv.slice(2)) {
   const comparison = process.env.XPATHED_RELEASE_COMPARISON_JSON
     ? JSON.parse(process.env.XPATHED_RELEASE_COMPARISON_JSON)
     : undefined;
-  if (options.mode === "live" && !options.monitoring && !comparison)
-    throw new Error("Release comparison requires the approved baseline images");
+  const initialBaseline = process.env.XPATHED_INITIAL_BASELINE;
+  if (
+    initialBaseline &&
+    (initialBaseline !== retiredReleaseCommit || comparison || options.monitoring)
+  )
+    throw new Error("Invalid initial baseline transition");
+  if (options.mode === "live" && !options.monitoring && !comparison && !initialBaseline)
+    throw new Error("Release comparison requires the published baseline images");
   if (comparison && (selectedProfiles.length !== 1 || options.monitoring))
-    throw new Error("Use one candidate and one baseline; monitoring runs only the approved arm");
+    throw new Error("Use one candidate and one baseline; monitoring runs only the released arm");
   if (comparison)
     validateReleaseArtifact(comparison.artifact, comparison.artifact.sourceSha, [
       comparison.profile.id,
@@ -325,6 +326,9 @@ export async function main(args = process.argv.slice(2)) {
     sourceManifestHash: hash(suite),
     profiles: selectedProfiles,
     ...(comparison ? { comparison } : {}),
+    ...(process.env.XPATHED_INITIAL_BASELINE
+      ? { initialBaseline: process.env.XPATHED_INITIAL_BASELINE }
+      : {}),
     plan: buildMatrixPlan(cases, selectedProfiles, options),
     code,
     browserBinarySha256: process.env.XPATHED_BROWSER_BINARY_SHA256 ?? null,
@@ -335,7 +339,7 @@ export async function main(args = process.argv.slice(2)) {
       frozenAt: now,
     },
     measurement: {
-      latencyProtocol: "resolver-http-v1",
+      latencyProtocol: "resolver-http",
       latency:
         "Browser: complete Resolver HTTP response, independent setup and grading excluded. Offline: Resolver CLI inference process, preparation excluded.",
       serving: "standard",

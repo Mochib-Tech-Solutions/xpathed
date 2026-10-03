@@ -136,7 +136,7 @@ An independently established mapping from an expected action to its intended ele
 An assessment of resolver systems on the same independently labelled cases, with shared grading boundaries and separately recorded outcomes for each system.
 
 **Comparison pair**:
-Two resolution attempts on the same evaluation case with equivalent inputs and independently reset page state where applicable. A release comparison pairs the candidate with the approved baseline and retains both outcomes, including failures.
+Two resolution attempts on the same evaluation case with equivalent inputs and independently reset page state where applicable. A release comparison pairs the candidate with the release baseline and retains both outcomes, including failures.
 
 **Target-set completeness**:
 Whether the returned distinct elements exactly cover all independently labelled targets for the command, with no missing or extra elements. Correct interaction and passive state are assessed separately.
@@ -148,31 +148,28 @@ Checking whether a previously returned locator still identifies its intended ele
 A diagnostic signal that a resolution attempt needs investigation because of a detected problem. It does not by itself establish a model error or an expected target.
 
 **Resolver release**:
-An identified version of the resolver's code, strategy, prompt, model/provider configuration, and page processing settings that is assessed as a unit.
+The resolver code merged into the release branch, identified by its Git commit and published artifacts.
 
-**Approved default**:
-The qualified resolver release selected for deployment through the release process.
-
-**Qualification**:
-The evaluation of a resolver release against the agreed acceptance criteria before it can become an approved default.
+**Release checks**:
+The ordinary tests and live evaluation that must pass before a change is merged into the release branch.
 
 **Release baseline**:
-The approved resolver release retained as the comparison reference while a candidate is evaluated. Development changes do not replace it; approving a replacement establishes the next baseline.
+The existing release commit used as the reference for the next comparison. Merging a passing change establishes the next baseline.
 
 **Release comparison**:
-The assessment of a candidate and the approved baseline on the same frozen collection. A lost baseline pass is a case that the baseline passes and the candidate fails.
+The assessment of a proposed release and the existing release on the same frozen collection. A lost baseline pass is a case that the baseline passes and the proposed release fails.
 
-**Approved evaluation collection**:
-The evaluation set and expected observations frozen when a resolver release is approved. Repeating them detects lost passes and model drift; it does not establish unseen-data generalization.
+**Release evaluation collection**:
+The evaluation cases and expected observations frozen for a release. Repeating them detects lost passes and model drift; it does not establish unseen-data generalization.
 
 **Model drift**:
-A change in the observed behavior of an approved resolver configuration when its frozen cases are repeated against the hosted model.
+A change in the observed behavior of a released resolver using the same inference settings and cases against a hosted model.
 
-**Sentinel case**:
-A case in the smaller monitoring subset retained by historical approvals. New approvals monitor their complete approved evaluation collection.
+**Release publication**:
+Making the tested artifacts and evidence available for the merged release commit.
 
-**Release activation**:
-Deploying an explicitly approved release and checking that its exact components are running.
+**Deployment**:
+Starting released artifacts with environment-supplied configuration and checking their running identities and readiness.
 
 **Release rollback**:
-Explicitly selecting and activating a retained qualified compatible release. Restoring code cannot restore historical hosted model weights.
+Reverting a change in Git and releasing the passing result. Restoring code cannot restore historical hosted model weights.

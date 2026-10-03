@@ -48,14 +48,12 @@ public sealed partial class ResolutionService(
                 gateway.Provider,
                 result.ConfigurationId,
                 result.Diagnostics.Strategy,
-                result.Diagnostics.PromptVersion,
                 result.Diagnostics.ModelInputBudgetBytes,
                 outputTokens = ActionSelectionStrategy.OutputTokens,
                 effective = gateway.DescribeConfiguration(),
             }
         )!;
         var evidence = new ResolutionEvidence(
-            "1",
             sensitive ? "withheld_sensitive_instruction"
                 : input is null ? "model_input_unavailable"
                 : "sanitized",
@@ -83,12 +81,7 @@ public sealed partial class ResolutionService(
         CandidateCapture? capture = null;
         var providerCompleted = false;
         var strategy = ActionSelectionStrategy.Strategy;
-        var diagnostics = new ResolutionDiagnostics
-        {
-            Stage = "configuration",
-            Strategy = strategy,
-            PromptVersion = ActionSelectionStrategy.PromptVersion,
-        };
+        var diagnostics = new ResolutionDiagnostics { Stage = "configuration", Strategy = strategy };
         var configurationId = gateway.ConfigurationId();
         try
         {
@@ -322,7 +315,6 @@ public sealed partial class ResolutionService(
             }
             diagnostics.TimingsMs["total"] = timer.Elapsed.TotalMilliseconds;
             return new ResolutionResult(
-                request.ContractVersion,
                 outcome,
                 capture?.SessionId,
                 pageId,

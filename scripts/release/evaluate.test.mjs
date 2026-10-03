@@ -97,16 +97,7 @@ else if(args[0]==='compose'){
   const bundle = join(directory, "bundle");
   const created = spawnSync(
     process.execPath,
-    [
-      "scripts/release/bundle.mjs",
-      "create",
-      "--profile",
-      "deepseek",
-      "--source-sha",
-      sha,
-      "--output",
-      bundle,
-    ],
+    ["scripts/release/bundle.mjs", "create", "--source-sha", sha, "--output", bundle],
     { cwd, env, encoding: "utf8" },
   );
   assert.equal(created.status, 0, created.stderr);
@@ -121,8 +112,6 @@ else if(args[0]==='compose'){
       bundle,
       "--sha256",
       digest,
-      "--profile",
-      "deepseek",
       "--mode",
       "deterministic",
       "--output",
@@ -178,8 +167,7 @@ test("wrong digest, dirty source, source revision, profile and identity override
         work.bundle,
         "--sha256",
         failure === "digest" ? "f".repeat(64) : work.digest,
-        "--profile",
-        failure === "profile" ? "luna" : "deepseek",
+        ...(failure === "profile" ? ["--profile", "luna"] : []),
         "--mode",
         "deterministic",
         "--output",
@@ -215,8 +203,8 @@ test("paired qualification restores and attests the baseline as separate contain
     work.bundle,
     "--baseline-sha256",
     work.digest,
-    "--baseline-approval",
-    "none",
+    "--baseline-commit",
+    work.git("rev-parse", "HEAD"),
   );
   assert.equal(result.status, 0, result.stderr);
   const receipt = JSON.parse(readFileSync(join(work.cwd, work.output, "artifact-receipt.json")));

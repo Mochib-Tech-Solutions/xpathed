@@ -65,13 +65,11 @@
       ]
     },
     "oracleSentinels": ["QUALIFICATION_ORACLE_PRIVATE_37e2"],
-    "contractVersion": "4",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-fixture-source-review",
       "reviewedAt": "2026-10-01T14:02:32.742094+00:00"
     },
-    "setupRevision": "viewport-baseline-1",
     "labelProvenance": {
       "kind": "controlled-authored",
       "sourceCaseId": "color-only-reference",
@@ -103,8 +101,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "release-current-view-2",
-    "contractVersion": "4",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-release-label-review",
@@ -171,8 +167,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "release-current-view-2",
-    "contractVersion": "4",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-release-label-review",
@@ -239,8 +233,6 @@
       "height": 800,
       "tolerance": 1
     },
-    "setupRevision": "release-current-view-2",
-    "contractVersion": "4",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-release-label-review",
@@ -403,13 +395,11 @@
       ]
     },
     "oracleSentinels": ["QUALIFICATION_ORACLE_PRIVATE_37e2"],
-    "contractVersion": "4",
     "review": {
       "status": "reviewed",
       "reviewer": "independent-fixture-source-review",
       "reviewedAt": "2026-10-01T14:02:32.742091+00:00"
     },
-    "setupRevision": "viewport-baseline-1",
     "labelProvenance": {
       "kind": "controlled-authored",
       "sourceCaseId": "above-reference",

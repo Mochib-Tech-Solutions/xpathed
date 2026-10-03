@@ -29,7 +29,6 @@ const target = {
   geometry: { x: 20, y: 1200, width: 100, height: 40 },
 };
 const found = {
-  contractVersion: "4",
   outcome: "found",
   sessionId: session.sessionId,
   pageId: session.pageId,
@@ -221,18 +220,14 @@ describe("Workspace resolution", () => {
     },
   );
 
-  it.each([
-    ["4", "found"],
-    ["4", "not_found"],
-  ])(
-    "shows one shared action for version-%s targets with a %s second result",
-    async (contractVersion, secondOutcome) => {
+  it.each(["found", "not_found"])(
+    "shows one shared action with a %s second result",
+    async (secondOutcome) => {
       const missing = secondOutcome === "not_found";
       mockApi(() =>
         Promise.resolve(
           Response.json({
             ...found,
-            contractVersion,
             outcome: missing ? "partial" : "found",
             target: null,
             summary: {
@@ -278,8 +273,7 @@ describe("Workspace resolution", () => {
       await user.click(screen.getByRole("button", { name: "Resolve instruction" }));
       expect(
         await screen.findByText(
-          (missing ? "1 target found · 1 missing" : "2 targets found") +
-            (contractVersion === "4" ? " · current view" : ""),
+          (missing ? "1 target found · 1 missing" : "2 targets found") + " · current view",
         ),
       ).toBeVisible();
       expect(screen.getAllByText("Action: click")).toHaveLength(1);
@@ -303,9 +297,7 @@ describe("Workspace resolution", () => {
       expect(
         within(targets[1]!).getByText(
           missing
-            ? contractVersion === "4"
-              ? "I couldn’t find that element in the current view."
-              : "I couldn’t find that element in the current view."
+            ? "I couldn’t find that element in the current view."
             : "//button[@id='confirm-booking']",
         ),
       ).toBeVisible();
@@ -316,7 +308,6 @@ describe("Workspace resolution", () => {
           body: JSON.stringify({
             instruction: "Click all confirmation buttons in the list",
             documentId: "document-1",
-            contractVersion: "4",
           }),
         }),
       );
@@ -329,7 +320,6 @@ describe("Workspace resolution", () => {
       Promise.resolve(
         Response.json({
           ...found,
-          contractVersion: "4",
           outcome: "unsupported",
           action: "unsupported",
           target: null,
@@ -360,14 +350,13 @@ describe("Workspace resolution", () => {
   });
 
   it.each([
-    ["1", "double_click", "double-click"],
-    ["2", "type", "type"],
-  ])("shows the interpreted action in contract %s", async (contractVersion, action, label) => {
+    ["double_click", "double-click"],
+    ["type", "type"],
+  ])("shows the interpreted %s action", async (action, label) => {
     mockApi(() =>
       Promise.resolve(
         Response.json({
           ...found,
-          contractVersion,
           action,
           actions: [{ actionId: "a1", order: 1, action, outcome: "found", target: target }],
         }),
@@ -424,7 +413,6 @@ describe("Workspace resolution", () => {
       Promise.resolve(
         Response.json({
           ...found,
-          contractVersion: "4",
           target: null,
           action: null,
           inspectedActionId: "a1",
@@ -476,7 +464,6 @@ describe("Workspace resolution", () => {
   it("renders independent action results with one request cost and no inspection control", async () => {
     const batch = {
       ...found,
-      contractVersion: "4",
       outcome: "partial",
       action: "click",
       target: null,
@@ -541,7 +528,6 @@ describe("Workspace resolution", () => {
         body: JSON.stringify({
           instruction: "Click Pay now",
           documentId: "document-1",
-          contractVersion: "4",
         }),
       }),
     );
@@ -570,7 +556,6 @@ describe("Workspace resolution", () => {
                 target: {
                   ...target,
                   interactability: {
-                    version: status === "ready" ? "2" : "1",
                     action: "click",
                     status,
                     reasons,
@@ -623,7 +608,6 @@ describe("Workspace resolution", () => {
               target: {
                 ...target,
                 interactability: {
-                  version: "2",
                   action,
                   status: "blocked",
                   reasons,
@@ -709,7 +693,7 @@ describe("Workspace resolution", () => {
                 outcome: "found",
                 target: {
                   ...target,
-                  interactability: { version: "2", action, status, reasons: [], checks },
+                  interactability: { action, status, reasons: [], checks },
                 },
               },
             ],
@@ -850,7 +834,6 @@ describe("Workspace resolution", () => {
       Promise.resolve(
         Response.json({
           ...found,
-          contractVersion: "4",
           outcome: "error",
           target: null,
           actions: [],
@@ -1275,7 +1258,6 @@ describe("Workspace resolution", () => {
         body: JSON.stringify({
           instruction: "Click Fresh target",
           documentId: "document-2",
-          contractVersion: "4",
         }),
       }),
     );
@@ -1468,7 +1450,6 @@ describe("Workspace resolution", () => {
       Promise.resolve(
         Response.json({
           ...found,
-          contractVersion: "4",
           outcome,
           target: null,
           action: outcome === "unsupported" ? "unsupported" : "click",
@@ -1527,7 +1508,6 @@ describe("Workspace resolution", () => {
       Promise.resolve(
         Response.json({
           ...found,
-          contractVersion: "4",
           outcome,
           target: null,
           actions:
@@ -1591,53 +1571,49 @@ describe("Workspace resolution", () => {
     ).not.toBeInTheDocument();
   });
 
-  it.each(["1", "3", "4"])(
-    "labels ambiguous targets without guessing for contract %s",
-    async (contractVersion) => {
-      const message = "The instruction does not identify one intended target.";
-      mockApi(() =>
-        Promise.resolve(
-          Response.json({
-            ...found,
-            contractVersion,
-            outcome: "unsupported",
-            action: "unsupported",
-            target: null,
-            actions: [
-              {
-                actionId: "action-1",
-                order: 1,
-                step: 1,
-                instruction: "Click the button next to Community",
-                outcome: "unsupported",
-                action: "unsupported",
-                code: "ambiguous",
-                message,
-                target: null,
-              },
-            ],
-            diagnostics: { code: "ambiguous", message },
-          }),
-        ),
-      );
-      const user = await openWorkspace();
-      await user.type(
-        screen.getByRole("textbox", { name: "Describe an element" }),
-        "Click the button next to Community",
-      );
-      await user.click(screen.getByRole("button", { name: "Resolve instruction" }));
-      expect(await screen.findByRole("heading", { name: "Ambiguous target" })).toBeVisible();
-      expect(
-        screen.getByText(
-          "The instruction does not identify a unique target. Specify its exact name, section, or position, such as left or right.",
-        ),
-      ).toBeVisible();
-      expect(screen.queryByRole("button", { name: /Copy XPath/ })).not.toBeInTheDocument();
-      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-      expect(screen.queryByText("This interaction is not supported yet.")).not.toBeInTheDocument();
-      expect(screen.queryByText(/Departments|Business/)).not.toBeInTheDocument();
-    },
-  );
+  it("labels ambiguous targets without guessing", async () => {
+    const message = "The instruction does not identify one intended target.";
+    mockApi(() =>
+      Promise.resolve(
+        Response.json({
+          ...found,
+          outcome: "unsupported",
+          action: "unsupported",
+          target: null,
+          actions: [
+            {
+              actionId: "action-1",
+              order: 1,
+              step: 1,
+              instruction: "Click the button next to Community",
+              outcome: "unsupported",
+              action: "unsupported",
+              code: "ambiguous",
+              message,
+              target: null,
+            },
+          ],
+          diagnostics: { code: "ambiguous", message },
+        }),
+      ),
+    );
+    const user = await openWorkspace();
+    await user.type(
+      screen.getByRole("textbox", { name: "Describe an element" }),
+      "Click the button next to Community",
+    );
+    await user.click(screen.getByRole("button", { name: "Resolve instruction" }));
+    expect(await screen.findByRole("heading", { name: "Ambiguous target" })).toBeVisible();
+    expect(
+      screen.getByText(
+        "The instruction does not identify a unique target. Specify its exact name, section, or position, such as left or right.",
+      ),
+    ).toBeVisible();
+    expect(screen.queryByRole("button", { name: /Copy XPath/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.queryByText("This interaction is not supported yet.")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Departments|Business/)).not.toBeInTheDocument();
+  });
 
   it("distinguishes unsupported instructions from absence", async () => {
     mockApi(() =>
@@ -1724,7 +1700,6 @@ describe("Workspace resolution", () => {
         expect(JSON.parse(typeof options?.body === "string" ? options.body : "null")).toEqual({
           instruction: "Click Pay now",
           documentId: "document-1",
-          contractVersion: "4",
         });
         return Promise.resolve(Response.json(found));
       }

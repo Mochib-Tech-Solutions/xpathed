@@ -1,6 +1,6 @@
 # ClientApi guidance
 
-ClientApi forwards test-client requests to Browser and Resolver. Keep controllers as HTTP adapters using `HttpForwarder`; preserve upstream status, content type and response body, and propagate request cancellation. `/health` reports service liveness and the supported resolution contract.
+ClientApi forwards test-client requests to Browser and Resolver. Keep controllers as HTTP adapters using `HttpForwarder`; preserve upstream status, content type and response body, and propagate request cancellation. `/health` reports service liveness.
 
 Chat drafts and results belong to each tab in the Web workspace session. Evaluation runners own their saved artifacts. See [runtime](../../docs/runtime.md) for service routes and lifecycle ownership.
 
