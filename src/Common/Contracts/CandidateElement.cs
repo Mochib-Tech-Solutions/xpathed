@@ -13,5 +13,7 @@ public sealed record CandidateElement(
     TargetState State,
     ElementGeometry Geometry,
     TargetFrame? Frame = null,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] CandidateAppearance? Appearance = null
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] CandidateAppearance? Appearance = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ParentId = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] bool IsRepeatedItem = false
 );

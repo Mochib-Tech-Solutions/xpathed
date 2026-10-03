@@ -3761,5 +3761,431 @@
     "group": "context",
     "sourceIds": ["warehouse-scoped-plural"],
     "cardinality": "all"
+  },
+  {
+    "id": "context-product-card-under-backpack",
+    "group": "context",
+    "family": "spatial-product-grid",
+    "split": "development",
+    "category": "geometry",
+    "fixture": "spatial-product-grid",
+    "instruction": "click on the card of the item that is under the backpack card",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "review": {
+      "status": "reviewed",
+      "reviewer": "fixture-source-review",
+      "reviewedAt": "2026-10-03T22:15:00Z"
+    },
+    "expected": {
+      "outcome": "found",
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "target": {
+            "selector": "#bolt-shirt-card",
+            "frames": []
+          },
+          "state": {
+            "inViewport": true,
+            "enabled": true
+          },
+          "interactability": {
+            "status": "ready"
+          }
+        }
+      ],
+      "summary": {
+        "processingComplete": true
+      }
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "tag": "div",
+          "label": "View details for Sauce Labs Bolt T-Shirt Sauce Labs Bolt T-Shirt Product description for Sauce Labs Bolt T-Shirt. $15.99 Add to cart",
+          "scope": null,
+          "index": 0
+        }
+      ]
+    },
+    "labelProvenance": {
+      "kind": "controlled-authored",
+      "sourceReview": "Screenshot-reported product grid; independently labelled visual column/row and DOM identities before inference. Card selectors refer to whole cards, image selectors to image links.",
+      "browserReview": "Pending browser checks; this fixture is a reconstruction, not the original Sauce Demo capture."
+    }
+  },
+  {
+    "id": "context-product-image-under-backpack",
+    "group": "context",
+    "family": "spatial-product-grid",
+    "split": "development",
+    "category": "geometry",
+    "fixture": "spatial-product-grid",
+    "instruction": "Click the product image directly below Sauce Labs Backpack.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "review": {
+      "status": "reviewed",
+      "reviewer": "fixture-source-review",
+      "reviewedAt": "2026-10-03T22:15:00Z"
+    },
+    "expected": {
+      "outcome": "found",
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "target": {
+            "selector": "#bolt-shirt-photo",
+            "frames": []
+          },
+          "state": {
+            "inViewport": true,
+            "enabled": true
+          },
+          "interactability": {
+            "status": "ready"
+          }
+        }
+      ],
+      "summary": {
+        "processingComplete": true
+      }
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "tag": "img",
+          "label": "Sauce Labs Bolt T-Shirt",
+          "scope": null,
+          "index": 0
+        }
+      ]
+    },
+    "labelProvenance": {
+      "kind": "controlled-authored",
+      "sourceReview": "Screenshot-reported product grid; independently labelled visual column/row and DOM identities before inference. Card selectors refer to whole cards, image selectors to image links.",
+      "browserReview": "Pending browser checks; this fixture is a reconstruction, not the original Sauce Demo capture."
+    }
+  },
+  {
+    "id": "context-button-under-backpack-title",
+    "group": "context",
+    "family": "spatial-product-grid",
+    "split": "development",
+    "category": "geometry",
+    "fixture": "spatial-product-grid",
+    "instruction": "Click the Add to cart button under the Sauce Labs Backpack title.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "review": {
+      "status": "reviewed",
+      "reviewer": "fixture-source-review",
+      "reviewedAt": "2026-10-03T22:15:00Z"
+    },
+    "expected": {
+      "outcome": "found",
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "target": {
+            "selector": "#backpack-cart",
+            "frames": []
+          },
+          "state": {
+            "inViewport": true,
+            "enabled": true
+          },
+          "interactability": {
+            "status": "ready"
+          }
+        }
+      ],
+      "summary": {
+        "processingComplete": true
+      }
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "tag": "button",
+          "label": "Add to cart",
+          "index": 0
+        }
+      ]
+    },
+    "labelProvenance": {
+      "kind": "controlled-authored",
+      "sourceReview": "Screenshot-reported product grid; independently labelled visual column/row and DOM identities before inference. Card selectors refer to whole cards, image selectors to image links.",
+      "browserReview": "Pending browser checks; this fixture is a reconstruction, not the original Sauce Demo capture."
+    }
+  },
+  {
+    "id": "context-product-card-right-of-backpack",
+    "group": "context",
+    "family": "spatial-product-grid",
+    "split": "development",
+    "category": "geometry",
+    "fixture": "spatial-product-grid",
+    "instruction": "Click the product card to the right of Sauce Labs Backpack.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "review": {
+      "status": "reviewed",
+      "reviewer": "fixture-source-review",
+      "reviewedAt": "2026-10-03T22:15:00Z"
+    },
+    "expected": {
+      "outcome": "found",
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "target": {
+            "selector": "#bike-light-card",
+            "frames": []
+          },
+          "state": {
+            "inViewport": true,
+            "enabled": true
+          },
+          "interactability": {
+            "status": "ready"
+          }
+        }
+      ],
+      "summary": {
+        "processingComplete": true
+      }
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "tag": "div",
+          "label": "View details for Sauce Labs Bike Light Sauce Labs Bike Light Product description for Sauce Labs Bike Light. $9.99 Add to cart",
+          "scope": null,
+          "index": 0
+        }
+      ]
+    },
+    "labelProvenance": {
+      "kind": "controlled-authored",
+      "sourceReview": "Screenshot-reported product grid; independently labelled visual column/row and DOM identities before inference. Card selectors refer to whole cards, image selectors to image links.",
+      "browserReview": "Pending browser checks; this fixture is a reconstruction, not the original Sauce Demo capture."
+    }
+  },
+  {
+    "id": "context-product-card-above-shirt",
+    "group": "context",
+    "family": "spatial-product-grid",
+    "split": "development",
+    "category": "geometry",
+    "fixture": "spatial-product-grid",
+    "instruction": "Click the product card above Sauce Labs Bolt T-Shirt.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "review": {
+      "status": "reviewed",
+      "reviewer": "fixture-source-review",
+      "reviewedAt": "2026-10-03T22:15:00Z"
+    },
+    "expected": {
+      "outcome": "found",
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "target": {
+            "selector": "#backpack-card",
+            "frames": []
+          },
+          "state": {
+            "inViewport": true,
+            "enabled": true
+          },
+          "interactability": {
+            "status": "ready"
+          }
+        }
+      ],
+      "summary": {
+        "processingComplete": true
+      }
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "tag": "div",
+          "label": "View details for Sauce Labs Backpack Sauce Labs Backpack Product description for Sauce Labs Backpack. $29.99 Add to cart",
+          "scope": null,
+          "index": 0
+        }
+      ]
+    },
+    "labelProvenance": {
+      "kind": "controlled-authored",
+      "sourceReview": "Screenshot-reported product grid; independently labelled visual column/row and DOM identities before inference. Card selectors refer to whole cards, image selectors to image links.",
+      "browserReview": "Pending browser checks; this fixture is a reconstruction, not the original Sauce Demo capture."
+    }
+  },
+  {
+    "id": "context-product-card-under-backpack-with-reordered-dom",
+    "group": "context",
+    "family": "spatial-product-grid",
+    "split": "development",
+    "category": "geometry",
+    "fixture": "spatial-product-grid-reordered",
+    "instruction": "Click the product card directly below Sauce Labs Backpack.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "review": {
+      "status": "reviewed",
+      "reviewer": "fixture-source-review",
+      "reviewedAt": "2026-10-03T22:15:00Z"
+    },
+    "expected": {
+      "outcome": "found",
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "target": {
+            "selector": "#bike-light-card",
+            "frames": []
+          },
+          "state": {
+            "inViewport": true,
+            "enabled": true
+          },
+          "interactability": {
+            "status": "ready"
+          }
+        }
+      ],
+      "summary": {
+        "processingComplete": true
+      }
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "tag": "div",
+          "label": "View details for Sauce Labs Bike Light Sauce Labs Bike Light Product description for Sauce Labs Bike Light. $9.99 Add to cart",
+          "scope": null,
+          "index": 0
+        }
+      ]
+    },
+    "labelProvenance": {
+      "kind": "controlled-authored",
+      "sourceReview": "CSS visual order differs from DOM order: Backpack/Fleece first row, Bike Light/Bolt T-Shirt second row. Expected card is independently labelled from that layout.",
+      "browserReview": "Pending browser checks; this fixture is a reconstruction, not the original Sauce Demo capture."
+    }
+  },
+  {
+    "id": "context-item-under-backpack",
+    "group": "context",
+    "family": "spatial-product-grid",
+    "split": "development",
+    "category": "geometry",
+    "fixture": "spatial-product-grid",
+    "instruction": "click on the item under the sauce labs backpack",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "review": {
+      "status": "reviewed",
+      "reviewer": "fixture-source-review",
+      "reviewedAt": "2026-10-03T22:15:00Z"
+    },
+    "expected": {
+      "outcome": "found",
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "target": {
+            "selector": "#bolt-shirt-card",
+            "frames": []
+          },
+          "state": {
+            "inViewport": true,
+            "enabled": true
+          },
+          "interactability": {
+            "status": "ready"
+          }
+        }
+      ],
+      "summary": {
+        "processingComplete": true
+      }
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "tag": "div",
+          "label": "View details for Sauce Labs Bolt T-Shirt Sauce Labs Bolt T-Shirt Product description for Sauce Labs Bolt T-Shirt. $15.99 Add to cart",
+          "scope": null,
+          "index": 0
+        }
+      ]
+    },
+    "labelProvenance": {
+      "kind": "controlled-authored",
+      "sourceReview": "Screenshot-reported product grid; independently labelled visual column/row and DOM identities before inference. Card selectors refer to whole cards, image selectors to image links.",
+      "browserReview": "Pending browser checks; this fixture is a reconstruction, not the original Sauce Demo capture."
+    }
   }
 ]
