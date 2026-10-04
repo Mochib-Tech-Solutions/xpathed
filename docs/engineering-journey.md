@@ -31,7 +31,7 @@ The model selects candidate IDs from browser observations. Browser code builds X
 
 The remaining uncertainty is explicit: the model may select the wrong element. Independent expected targets measure that error. A disabled intended target can be correctly selected while remaining unavailable for the requested action.
 
-The runtime uses one selection call. DeepSeek V4.1 Flash through OpenRouter's Wafer provider is an inexpensive default for tests with live provider inference, with reasoning and provider fallback disabled and strict structured output. Its target accuracy, latency and cost must be measured on the project's cases. No model is trained here.
+The runtime uses one selection call. Gemini 3.8 Flash through OpenRouter's Google AI Studio provider is the owner-selected application default, with low reasoning, provider fallback disabled and strict structured output. DeepSeek/Wafer remains explicitly configured for cheap-route live checks. Its target accuracy, latency and cost must be measured on the project's cases. No model is trained here.
 
 Model, provider, prompt and schema settings form a configuration identity. Evaluate changes together on the same cases before approving them.
 
@@ -57,7 +57,7 @@ The evaluation set separately measures Saved-page selection, XPath construction 
 
 ### Compare Basic, Improved and Stagehand
 
-The refreshed Basic resolver and Improved resolver comparison uses the same DeepSeek V4.1 Flash model, Wafer provider and inference settings. The browser implementation makes three rules explicit:
+The refreshed Basic resolver and Improved resolver comparison uses Gemini 3.8 Flash, Google AI Studio and low reasoning across Basic, Improved and Stagehand. The browser implementation makes three rules explicit:
 
 - Match the requested control itself; headings, scope containers and repeated descendant text provide context.
 - Report missing targets within the current view. Completeness describes whether every requested target is represented, including absent targets.
@@ -67,7 +67,7 @@ The [recorded comparison](research/clean-evaluation-comparison.md) measures Basi
 
 The systems prepare their own DOM evidence and prompts; equal page state and independent labels make this a complete-system comparison. The current comparison includes spatial card context and open-shadow coverage, with all three arms remeasured on the expanded collection. The [matched-input rules](evaluation.md#matched-inputs-and-scoring) keep those boundaries explicit.
 
-Action interpretation matters separately from selecting the right element. Stagehand's stock `observe` does not return xpathed's full readiness or absence contract and requires a live page, so it has no saved-page score. The complete fresh saved-page run has no provider-limit refusals; it records both gains and lost passes, and Improved scores lower than Basic in this category despite its higher browser score. Earlier interrupted outcomes remain separate evidence. The [model comparison](research/model-comparison-2026-10-04.md) includes complete compatible Gemini measurements with its required low-reasoning setting, alongside DeepSeek and Luna with reasoning disabled. Failures, gains and regressions remain visible. Aggregate improvement does not override the release gate's no-regression requirement, and one attempt per case leaves model variation unresolved.
+Action interpretation matters separately from selecting the right element. Stagehand's stock `observe` does not return xpathed's full readiness or absence contract and requires a live page, so it has no saved-page score. The complete fresh saved-page run has no provider-limit refusals; it records both gains and lost passes, and every reported score is recalculated from the complete retained attempts. Earlier interrupted outcomes remain separate evidence. The earlier [model accuracy comparison](research/model-comparison-2026-10-04.md) selected Gemini using its compatible low-reasoning profile. The subsequent approach comparison holds Gemini constant across Basic, Enhanced (Improved) and Stagehand. Runtime now supplies Gemini reasoning directly; the earlier model-selection source and adaptation remain recorded. Failures, gains and regressions remain visible. Aggregate improvement does not override the release gate's no-regression requirement, and one attempt per case leaves model variation unresolved.
 
 Isolated workers run concurrently. Original evidence, charges, source identities, image identities and timing cohorts are preserved. The application carries one selected implementation; archived images and Git preserve Basic. Git commits and saved prompt bytes preserve reproducibility.
 
