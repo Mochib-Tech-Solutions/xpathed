@@ -1,6 +1,6 @@
 # Basic and Improved resolver: historical comparison
 
-For measurements on the final audited dataset, use the [current comparison](clean-evaluation-comparison.md). This report preserves its original historical evidence.
+For the frozen audited-set measurements from 3 October 2026, use the [recorded three-system comparison](clean-evaluation-comparison.md). Later spatial-item changes have a [separate pipeline check](spatial-item-selection.md). This report preserves its original historical evidence.
 
 **Historical comparison — 2 October 2026.** The saved-page scores below use the original collection before later semantic, prepared-input, uniqueness and instruction-contract audits excluded invalid expectations. They are not the clean-dataset baseline. Original scores and evidence remain unchanged; see the [active dataset contract](../evaluation.md#private-dataset-collection).
 

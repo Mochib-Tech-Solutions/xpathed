@@ -1,6 +1,10 @@
 # Evaluation figures
 
-## Fresh comparison
+## Recorded comparison and refresh
+
+The checked-in `clean-comparison.json` and SVG bind the pre-spatial 3 October 2026 configurations and frozen collection described in the [recorded report](../../research/clean-evaluation-comparison.md). Their Improved score does not describe subsequent source changes. Reproduce historical export with its recorded verifier and case definitions; the current exporter rejects incomplete coverage of the expanded collection.
+
+For a refreshed comparison, complete all browser arms and both saved-page arms on the same frozen collection and grading boundaries before updating tables or figures. Keep [spatial pipeline evidence](../../research/spatial-item-selection.md) separate; it cannot be substituted into the three-system chart.
 
 After all runs complete, export the browser comparison, both Saved-page selection arms and the controlled XPath run:
 

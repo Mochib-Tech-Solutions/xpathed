@@ -1,6 +1,8 @@
 # Comparison on the audited evaluation set
 
-This report measures the archived Basic resolver, the current Improved resolver and Stagehand using the final reviewed case definitions. The README and current comparison figure use the same verified aggregate data. Historical reports retain their original cases and scores separately.
+This report records measurements from **3 October 2026**, before the spatial-item fix. Basic is archived source `d533377945f67f99dbb2d23ab9b2ea04eef61569`; Improved is measured source `77ce7b631d823e2d81dda146e0985158fe8c0e59`; Stagehand is pinned to **4.1.0**. “Improved” names this measured configuration, rather than subsequent versions of `main`.
+
+The README's recorded-comparison table and figure use this report's verified aggregate. Later spatial changes have a [separate two-arm pipeline check](spatial-item-selection.md); Basic, Stagehand and saved-page selection were not remeasured there. Its expanded cases and full-contract score cannot replace these results. A new three-system comparison requires all arms on one frozen collection and grader.
 
 ## Dataset and measurement boundaries
 
@@ -8,7 +10,7 @@ This report measures the archived Basic resolver, the current Improved resolver 
 | ----------------------------------- | -------------: | -------------------------- | ----------------------------------------------------------------------------------------------------- |
 | Saved-page selection                |            569 | Basic, Improved            | Exact expected target set from reviewed saved candidates; real provider inference                     |
 | Live-browser comparison             |            183 | Basic, Improved, Stagehand | Correct action and exact target set on reset controlled browser pages; real provider inference        |
-| XPath construction and verification |            172 | Current Browser            | Controlled selections, independently labelled DOM targets and saved-locator mutations; no model calls |
+| XPath construction and verification |            172 | Recorded Browser           | Controlled selections, independently labelled DOM targets and saved-locator mutations; no model calls |
 
 The saved-page archive contains only the 569 admitted PhraseNode cases across 171 historical page families: 542 dev, 24 test and three train. All 515 excluded source records remain in the audit: 288 have insufficient evidence, 218 are ambiguous and nine have contradictory expectations. The original 1,084-case archive remains available for provenance. Exclusions were fixed before these runs; model failures do not remove cases from the denominator.
 
@@ -22,7 +24,7 @@ The browser catalog also contains controlled provider-failure and mutation cases
 | Improved resolver |             498/569 (87.5%) |          172/183 (94.0%) |
 | Stagehand         |              Not applicable |          114/183 (62.3%) |
 
-![Accuracy on the final audited dataset](../assets/evaluation/clean-comparison.svg)
+![Recorded accuracy on the frozen audited dataset](../assets/evaluation/clean-comparison.svg)
 
 Basic → Improved: **13 gains and 2 regressions** in browser action-and-target correctness; **36 gains and 39 regressions** in saved-page exact selection.
 
@@ -89,15 +91,15 @@ All case-level outcomes and complete browser/saved-page gain and regression list
 
 All paid arms use DeepSeek V4.1 Flash through OpenRouter's Wafer provider, reasoning disabled, provider fallback disabled and a 4,096-token output allowance. Each case has one original attempt per system, without retries or response reuse. Operational and model-output failures count as failures; missing charges remain unknown.
 
-Basic and Improved receive identical saved-page instructions and candidates, with identical independent expectations and prepared-input hash bindings. Basic retains its historical saved-page prompt; its browser path uses its archived current-view prompt. The current resolver shares one prompt across both categories. Configuration identities are therefore checked within each category, not forced to match across categories. Browser arms receive the same instruction and reset fixture state, with matching viewport and Chromium binary, and prepare their own model inputs. Stagehand uses stock `observe` and its own snapshot, prompt and selector generation. Singleton grading checks its first suggestion; plural grading checks its whole returned set. No arm executes the requested user action.
+Basic and Improved receive identical saved-page instructions and candidates, with identical independent expectations and prepared-input hash bindings. Basic retains its historical saved-page prompt; its browser path uses its archived current-view prompt. The measured Improved resolver shares one prompt across both categories. Configuration identities are therefore checked within each category, not forced to match across categories. Browser arms receive the same instruction and reset fixture state, with matching viewport and Chromium binary, and prepare their own model inputs. Stagehand uses stock `observe` and its own snapshot, prompt and selector generation. Singleton grading checks its first suggestion; plural grading checks its whole returned set. No arm executes the requested user action.
 
-Basic uses its original archived Browser and Resolver images. A private request-envelope adapter supplies the archived current-view contract selector; it leaves the native response and provider request unchanged. Provider-free checks verified singleton, plural and scoped-absence behavior before inference. The current resolver uses the same pinned image for the browser and saved-page measurements. The application retains one implementation.
+Basic uses its original archived Browser and Resolver images. A private request-envelope adapter supplies the archived current-view contract selector; it leaves the native response and provider request unchanged. Provider-free checks verified singleton, plural and scoped-absence behavior before inference. The measured Improved resolver uses the same pinned image for the browser and saved-page measurements. The application retains one implementation.
 
 The browser run began with three isolated streams. After a retained Stagehand response-body timeout, only its 24 unattempted cases continued in a separate timing cohort. Saved-page arms run concurrently in two isolated streams, each serial within its own arm. After a retained HTTP 429, their remaining attempts continued without retrying that case; original and continuation timings remain separate. Timing includes that execution environment and is reported separately by category and cohort. Saved-page timing measures the Resolver CLI inference process, excluding preparation; browser timing measures each resolver or observer request. Neither is a clean serial latency benchmark.
 
 ## Evidence and reproduction
 
-Measured on 3 October 2026. The current runtime source is `77ce7b631d823e2d81dda146e0985158fe8c0e59`; Basic uses archived source `d533377945f67f99dbb2d23ab9b2ea04eef61569`. XPath ran at `733eaccd6b678b64c79e4d833a9dc9ebda297a73`, with the same Browser runtime and case definitions. Later changes only repaired comparison failure handling and published the report.
+Measured on 3 October 2026. The measured Improved runtime source is `77ce7b631d823e2d81dda146e0985158fe8c0e59`; Basic uses archived source `d533377945f67f99dbb2d23ab9b2ea04eef61569`. XPath ran at `733eaccd6b678b64c79e4d833a9dc9ebda297a73`, with the same Browser runtime and case definitions. Changes through report publication repaired comparison failure handling and published the report; later source changes, including spatial-item capture, are outside these measurements.
 
 | Evidence            | Run ID                                 | Manifest SHA-256                                                   |
 | ------------------- | -------------------------------------- | ------------------------------------------------------------------ |
