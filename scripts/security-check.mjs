@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 
 const version = "8.30.1";
 const packages = {
@@ -55,16 +55,16 @@ try {
       [
         "dir",
         "--config",
-        ".gitleaks.toml",
+        resolve(".gitleaks.toml"),
         "--redact=100",
         "--no-banner",
         "--report-path",
         report,
         "--report-format",
         "json",
-        probe,
+        ".",
       ],
-      { stdio: "pipe" },
+      { stdio: "pipe", cwd: probe },
     );
   } catch (error) {
     if (error.status !== 1) throw error;
@@ -72,6 +72,8 @@ try {
   }
   if (!detected) throw new Error("Secret scanner negative control did not fail");
   const findings = JSON.parse(readFileSync(report, "utf8"));
+  if (findings.some((item) => item.StartLine !== 2))
+    throw new Error("Secret scanner allowlists did not exclude the known safe fixtures");
   if (
     !Object.keys(fixtures).every((name) =>
       findings.some(
