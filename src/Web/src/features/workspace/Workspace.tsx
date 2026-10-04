@@ -30,6 +30,7 @@ export default function Workspace() {
     resolve,
     setInstruction,
     resetChat,
+    spotlight,
     setAddress,
     dismissError,
   } = useWorkspace();
@@ -94,6 +95,7 @@ export default function Workspace() {
           onInstructionChange={setInstruction}
           onResolve={resolve}
           onReset={resetChat}
+          onSpotlight={spotlight}
           resetDisabled={!page || !!busy}
         />
         <section

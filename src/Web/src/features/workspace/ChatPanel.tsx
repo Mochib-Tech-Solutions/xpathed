@@ -99,6 +99,7 @@ type Props = {
   onInstructionChange: (instruction: string) => void;
   onResolve: () => void;
   onReset: () => void;
+  onSpotlight: (resolution: Resolution, actionId: string | null) => void;
 };
 
 export default function ChatPanel({
@@ -111,6 +112,7 @@ export default function ChatPanel({
   onInstructionChange,
   onResolve,
   onReset,
+  onSpotlight,
 }: Props) {
   const [copied, setCopied] = useState("");
   const [copyError, setCopyError] = useState<{ entryId: string; message: string } | null>(null);
@@ -250,7 +252,21 @@ export default function ChatPanel({
                   )}
                 </Button>
               </div>
-              <code className="block text-sm break-all whitespace-pre-wrap">{xpath}</code>
+              <code
+                className="block rounded-sm text-sm break-all whitespace-pre-wrap focus-visible:outline-2 focus-visible:outline-ring"
+                tabIndex={!resolution.historical && !disabled ? 0 : undefined}
+                onMouseEnter={() => onSpotlight(resolution, actionId)}
+                onMouseLeave={(event) => {
+                  if (document.activeElement !== event.currentTarget) onSpotlight(resolution, null);
+                }}
+                onFocus={() => onSpotlight(resolution, actionId)}
+                onBlur={(event) => {
+                  if (!event.currentTarget.matches(":hover")) onSpotlight(resolution, null);
+                }}
+                title={resolution.historical ? undefined : "Spotlight this target"}
+              >
+                {xpath}
+              </code>
             </div>
           );
           return (
@@ -330,7 +346,20 @@ export default function ChatPanel({
                         (reason) => interactionReasons[reason],
                       );
                       return (
-                        <section key={action.actionId} aria-label={`Target ${action.order}`}>
+                        <section
+                          key={action.actionId}
+                          aria-label={`Target ${action.order}`}
+                          className={
+                            actions.length > 1
+                              ? "space-y-3 rounded-xl border border-border bg-muted/20 p-3"
+                              : "space-y-3"
+                          }
+                        >
+                          {actions.length > 1 && (
+                            <p className="text-xs font-medium text-muted-foreground">
+                              Target {action.order}
+                            </p>
+                          )}
                           <p className="text-destructive">
                             Cannot {action.action?.replaceAll("_", "-") ?? "interact with"}{" "}
                             <bdi>

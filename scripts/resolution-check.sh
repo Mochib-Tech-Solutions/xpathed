@@ -24,7 +24,7 @@ if [ "$mode" = --live ]; then
   # Prove the direct resolver path without running the client.
   compose up --build --wait browser resolver resolution-fixture
   compose exec -T resolution-fixture node ready.mjs http://browser:8080/health http://resolver:8080/health http://resolution-fixture:8090/health
-  compose exec -T resolution-fixture node --test live.test.mjs
+  compose exec -T resolution-fixture node --test live.test.mjs cardinality.live.test.mjs
 else
   compose up --build --wait
   compose exec -T resolution-fixture node ready.mjs http://browser:8080/health http://resolver:8080/health http://resolution-fixture:8090/health http://client-api:8080/health
