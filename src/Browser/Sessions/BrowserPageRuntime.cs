@@ -16,6 +16,7 @@ internal sealed class BrowserPageRuntime(IPage page, long order)
     public string? CaptureId { get; set; }
     public BrowserPageCapture? Capture { get; set; }
     public Dictionary<string, ActionSelection>? ActionSelections { get; set; }
+    public SelectionRule? ActionSelectionRule { get; set; }
     private ICDPSession? protocol;
 
     public async Task InitializeAsync(IBrowserContext context, Action<BrowserPageRuntime> focused)
@@ -208,6 +209,7 @@ internal sealed class BrowserPageRuntime(IPage page, long order)
     {
         CaptureId = null;
         ActionSelections = null;
+        ActionSelectionRule = null;
     }
 
     public async Task ClearCaptureAsync()

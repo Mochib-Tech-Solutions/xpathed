@@ -6,6 +6,100 @@ import { setTimeout as delay } from "node:timers/promises";
 const client = "http://client-api:8080";
 const fixture = "http://resolution-fixture:8090";
 
+for (const [behavior, rule, mutation, expected] of [
+  [
+    "carousel-preserves-shadow-control",
+    { name: "Accept all", field: "label", kind: "control", scope: null },
+    "carousel",
+    "found",
+  ],
+  [
+    "new-competitor-invalidates",
+    { name: "Accept all", field: "label", kind: "control", scope: null },
+    "duplicate",
+    "stale_capture",
+  ],
+  [
+    "renamed-target-invalidates",
+    { name: "Accept all", field: "label", kind: "control", scope: null },
+    "rename",
+    "stale_capture",
+  ],
+  [
+    "replacement-invalidates",
+    { name: "Accept all", field: "label", kind: "control", scope: null },
+    "replace",
+    "stale_capture",
+  ],
+  ["null-rule-keeps-strict-comparison", null, "carousel", "stale_capture"],
+  [
+    "invalid-original-rule-is-rejected",
+    { name: "Other", field: "label", kind: "control", scope: null },
+    null,
+    "provider_invalid_selection_rule",
+  ],
+  [
+    "incomplete-fresh-comparison-is-rejected",
+    { name: "Accept all", field: "label", kind: "control", scope: null },
+    "oversized",
+    "validation_budget_exceeded",
+  ],
+]) {
+  test(`scope-resolver-${behavior}`, async () => {
+    const run = randomUUID();
+    await json(`${fixture}/scenario`, "POST", {
+      name: "found",
+      targetText: "Accept all",
+      rule,
+      mutation,
+      delayMs: 300,
+      run,
+    });
+    const session = await json(`${client}/api/sessions`, "POST");
+    try {
+      const page = await json(`${client}/api/pages/${session.pageId}/navigate`, "POST", {
+        url: `${fixture}/shadow?run=${run}&motion=1`,
+      });
+      const result = await json(`${client}/api/pages/${page.pageId}/resolve`, "POST", {
+        instruction: "Click the Accept all control.",
+        documentId: page.documentId,
+      });
+      assert.equal(result.diagnostics.modelCalls, 1, JSON.stringify(result));
+      if (expected === "found") {
+        assert.equal(result.outcome, "found", JSON.stringify(result));
+        const target = result.actions[0].target;
+        assert.equal(target.interactability.status, "ready");
+        await json(`${fixture}/oracle?run=${run}`, "POST", {
+          targets: [{ xpath: target.xpaths[0], shadowChain: target.shadowChain }],
+        });
+        let observed;
+        for (let attempt = 0; attempt < 100 && !observed; attempt++) {
+          observed = await json(`${fixture}/observation?run=${run}`);
+          if (!observed) await delay(50);
+        }
+        assert.deepEqual(observed.matches, [["consent"]]);
+        assert.equal(observed.mutationApplied, "carousel");
+        assert.equal(observed.clicks, 0);
+        assert.equal(observed.scrollY, 0);
+        const highlighted = await json(`${client}/api/pages/${page.pageId}/highlight`, "POST", {
+          documentId: page.documentId,
+          captureId: result.captureId,
+          actionId: "a1",
+        });
+        assert.equal(highlighted.target.candidateId, target.candidateId);
+      } else {
+        assert.equal(result.outcome, "error", JSON.stringify(result));
+        assert.equal(result.diagnostics.code, expected, JSON.stringify(result));
+      }
+      const provider = await json(`${fixture}/provider-request`);
+      assert.doesNotMatch(provider.messages[1].content, /PRIVATE_SHADOW_|data-oracle|consent-host/);
+      assert.ok(provider.response_format.json_schema.schema.properties.rule);
+    } finally {
+      await fetch(`${client}/api/sessions/${session.sessionId}`, { method: "DELETE" });
+    }
+  });
+}
+
 test("shadow-client-response-resolves-fixed-consent-with-native-root-context", async () => {
   await json(`${fixture}/scenario`, "POST", {
     name: "found",
@@ -633,3 +727,61 @@ test("tabs-client-routes-preserve-active-page-resolution-and-stable-viewer", asy
     await fetch(sessionUrl, { method: "DELETE" });
   }
 });
+
+for (const [instruction, missing] of [
+  ["cilck on the 3 buttons", true],
+  ["Click all buttons", false],
+]) {
+  test(`cardinality-explicit-count-${missing ? "preserves-missing-target" : "all-covers-visible-targets"}`, async () => {
+    const run = randomUUID();
+    const actions = [
+      { step: 1, instruction: "Click Save", action: "click", outcome: "found", label: "Save" },
+      {
+        step: missing ? 2 : 1,
+        instruction: "Click Cancel",
+        action: "click",
+        outcome: "found",
+        label: "Cancel",
+      },
+    ];
+    if (missing)
+      actions.push({
+        step: 3,
+        instruction: "Click the third requested button",
+        action: "click",
+        outcome: "not_found",
+      });
+    await json(`${fixture}/scenario`, "POST", { name: "batch", actions });
+    const session = await json(`${client}/api/sessions`, "POST");
+    try {
+      const page = await json(`${client}/api/pages/${session.pageId}/navigate`, "POST", {
+        url: `${fixture}/two-buttons?run=${run}`,
+      });
+      const result = await json(`${client}/api/pages/${session.pageId}/resolve`, "POST", {
+        instruction,
+        documentId: page.documentId,
+      });
+      assert.equal(result.outcome, missing ? "partial" : "found");
+      assert.equal(result.actions.length, missing ? 3 : 2);
+      assert.equal(result.summary.found, 2);
+      assert.equal(result.summary.notFound, missing ? 1 : 0);
+      assert.equal(result.diagnostics.modelCalls, 1);
+      assert.equal(result.diagnostics.selectionRule, null);
+      if (missing) assert.equal(result.actions[2].target, null);
+      await json(`${fixture}/oracle?run=${run}`, "POST", {
+        xpaths: result.actions
+          .filter((action) => action.target)
+          .map((action) => action.target.xpaths[0]),
+      });
+      let observed;
+      for (let attempt = 0; attempt < 100 && !observed; attempt++) {
+        observed = await json(`${fixture}/observation?run=${run}`);
+        if (!observed) await delay(50);
+      }
+      assert.deepEqual(observed?.matches, [["first-button"], ["second-button"]]);
+      assert.equal(observed.clicks, 0);
+    } finally {
+      await fetch(`${client}/api/sessions/${session.sessionId}`, { method: "DELETE" });
+    }
+  });
+}

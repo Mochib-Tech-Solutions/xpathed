@@ -84,7 +84,7 @@
       "from": "model",
       "to": "resolver",
       "y": 292,
-      "label": "Action + candidate IDs",
+      "label": "Action + IDs + optional rule",
       "variant": "return"
     },
     {
@@ -92,7 +92,7 @@
       "from": "resolver",
       "to": "browser",
       "y": 320,
-      "label": "IDs + capture ID",
+      "label": "Capture + IDs + rule",
       "variant": "default"
     },
     {

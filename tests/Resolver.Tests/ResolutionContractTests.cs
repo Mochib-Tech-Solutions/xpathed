@@ -12,6 +12,61 @@ namespace Xpathed.Resolver.Tests;
 
 public sealed class ResolutionContractTests
 {
+    [Fact]
+    public async Task ExactMatchingRuleIsForwardedAndRecordedWithoutAnotherModelCall()
+    {
+        var handler = new DeterministicServicesHandler
+        {
+            ProviderBody = ProviderSelection(
+                """{"complete":true,"rule":{"name":"Save","field":"label","kind":"control","scope":"Profile"},"actions":[{"step":1,"instruction":"Click Save in Profile","action":"click","outcome":"found","candidateId":"button-save","limitation":"none"}]}"""
+            ),
+        };
+        var result = await ResolveContextAsync(handler, "Click Save in Profile", false);
+        Assert.Equal("found", result.GetProperty("outcome").GetString());
+        Assert.Equal(1, handler.ProviderRequestCount);
+        Assert.Equal(1, handler.SelectionRequestCount);
+        Assert.Equal("Save", handler.SelectionRequest.GetProperty("rule").GetProperty("name").GetString());
+        Assert.Equal(
+            "Profile",
+            result.GetProperty("diagnostics").GetProperty("selectionRule").GetProperty("scope").GetString()
+        );
+    }
+
+    [Theory]
+    [InlineData(
+        "{\"name\":\"Other\",\"field\":\"label\",\"kind\":\"control\",\"scope\":null}",
+        "provider_invalid_selection_rule"
+    )]
+    [InlineData(
+        "{\"name\":\"Save\",\"field\":\"geometry\",\"kind\":\"control\",\"scope\":null}",
+        "provider_malformed_response"
+    )]
+    [InlineData(
+        "{\"name\":\"Save\",\"field\":\"label\",\"kind\":\"button\",\"scope\":null}",
+        "provider_malformed_response"
+    )]
+    [InlineData(
+        "{\"name\":\"Save\",\"field\":\"label\",\"kind\":\"control\",\"scope\":\"Other\"}",
+        "provider_invalid_selection_rule"
+    )]
+    [InlineData(
+        "{\"name\":\"Save\",\"field\":\"label\",\"kind\":\"control\",\"scope\":null,\"candidateId\":\"button-save\"}",
+        "provider_malformed_response"
+    )]
+    public async Task UnverifiableMatchingRuleFailsBeforeBrowserSelection(string rule, string code)
+    {
+        var selection = JsonNode.Parse(
+            """{"complete":true,"actions":[{"step":1,"instruction":"Click Save","action":"click","outcome":"found","candidateId":"button-save","limitation":"none"}]}"""
+        )!;
+        selection["rule"] = JsonNode.Parse(rule);
+        var handler = new DeterministicServicesHandler { ProviderBody = ProviderSelection(selection.ToJsonString()) };
+        var result = await ResolveContextAsync(handler, "Click Save", false);
+        Assert.Equal("error", result.GetProperty("outcome").GetString());
+        Assert.Equal(code, result.GetProperty("diagnostics").GetProperty("code").GetString());
+        Assert.Equal(1, handler.ProviderRequestCount);
+        Assert.Equal(0, handler.SelectionRequestCount);
+    }
+
     [Theory]
     [InlineData("/pages/page-1/capture", false)]
     [InlineData("/api/v1/chat/completions", false)]

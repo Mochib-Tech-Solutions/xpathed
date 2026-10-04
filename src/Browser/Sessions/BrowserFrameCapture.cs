@@ -21,10 +21,15 @@ internal sealed class BrowserFrameCapture(
     public BrowserFrameCapture? Parent { get; } = parent;
     public IElementHandle? Owner { get; } = owner;
     public HashSet<string> CandidateIds { get; } = new(StringComparer.Ordinal);
+    public CandidateElement[] Candidates { get; set; } = [];
     public IJSHandle? Highlight { get; set; }
     public string[] HighlightCandidateIds { get; set; } = [];
 
-    public async Task<int> RefreshAsync(int budgetMs, int scanBudget)
+    public async Task<(int ScannedCount, CandidateElement[] Candidates)> RefreshAsync(
+        int budgetMs,
+        int scanBudget,
+        bool replayRule
+    )
     {
         var timer = System.Diagnostics.Stopwatch.StartNew();
         string? environment = null;
@@ -54,12 +59,13 @@ internal sealed class BrowserFrameCapture(
             environment = info.GetProperty("environment").GetRawText();
         }
         var updated = await Handle.EvaluateAsync<JsonElement>(
-            "(capture, args) => capture.updateEnvironment(args.environment, args.budgetMs, args.scanBudget)",
+            "(capture, args) => capture.updateEnvironment(args.environment, args.budgetMs, args.scanBudget, args.replayRule)",
             new
             {
                 environment,
                 budgetMs = Math.Max(0, budgetMs - timer.ElapsedMilliseconds),
                 scanBudget,
+                replayRule,
             }
         );
         if (updated.TryGetProperty("errorCode", out var error))
@@ -73,7 +79,10 @@ internal sealed class BrowserFrameCapture(
                     : "Viewport observation exceeded its processing budget."
             );
         }
-        return updated.GetProperty("scannedCount").GetInt32();
+        return (
+            updated.GetProperty("scannedCount").GetInt32(),
+            replayRule ? updated.GetProperty("candidates").Deserialize<CandidateElement[]>(JsonOptions)! : []
+        );
     }
 
     private static bool SameShadowChain(JsonElement info, ShadowHost[]? expected)

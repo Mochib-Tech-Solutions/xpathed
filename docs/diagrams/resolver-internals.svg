@@ -455,8 +455,8 @@ rect.c-bg-rect { fill: var(--bg); }
         <!-- Connection paths (before components for correct z-order) -->
         <path data-edge-from="request" data-edge-to="capture" data-edge-label="page + document IDs" data-edge-key="0" data-composition-points="340,158;480,158" d="M 340 158 L 480 158" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
         <path data-edge-from="capture" data-edge-to="select" data-edge-label="sanitized candidates" data-edge-key="1" data-composition-points="760,158;900,158" d="M 760 158 L 900 158" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
-        <path data-edge-from="select" data-edge-to="validate" data-edge-label="action + candidate IDs" data-edge-key="2" data-composition-points="1040,196;1040,380" d="M 1040 196 L 1040 380" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
-        <path data-edge-from="validate" data-edge-to="verify" data-edge-label="capture ID + selections" data-edge-key="3" data-composition-points="900,418;760,418" d="M 900 418 L 760 418" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+        <path data-edge-from="select" data-edge-to="validate" data-edge-label="action + IDs + optional rule" data-edge-key="2" data-composition-points="1040,196;1040,380" d="M 1040 196 L 1040 380" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+        <path data-edge-from="validate" data-edge-to="verify" data-edge-label="capture + IDs + rule" data-edge-key="3" data-composition-points="900,418;760,418" d="M 900 418 L 760 418" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
         <path data-edge-from="verify" data-edge-to="result" data-edge-label="XPath + state + context" data-edge-key="4" data-composition-points="480,418;340,418" d="M 480 418 L 340 418" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
 
         <!-- Components -->
@@ -494,26 +494,26 @@ rect.c-bg-rect { fill: var(--bg); }
         <text x="1040" y="172" class="t-muted" font-size="9" text-anchor="middle">Model · instruction + sanitized candidates</text>
         </g>
 
-        <g id="node-validate" data-node-id="validate" data-node-label="4. Validate selection" tabindex="0" role="button" aria-label="Focus 4. Validate selection, Resolver · schema + captured ID set, Output validation boundary" aria-pressed="false" data-node-kind="backend" data-node-sublabel="Resolver · schema + captured ID set" data-node-context="Output validation boundary">
-          <title>4. Validate selection · Resolver · schema + captured ID set · Output validation boundary</title>
+        <g id="node-validate" data-node-id="validate" data-node-label="4. Validate selection" tabindex="0" role="button" aria-label="Focus 4. Validate selection, Resolver · IDs + original rule matches, Output validation boundary" aria-pressed="false" data-node-kind="backend" data-node-sublabel="Resolver · IDs + original rule matches" data-node-context="Output validation boundary">
+          <title>4. Validate selection · Resolver · IDs + original rule matches · Output validation boundary</title>
           <rect x="900" y="380" width="280" height="76" rx="6" class="c-mask"/>
           <rect x="900" y="380" width="280" height="76" rx="6" class="c-backend" stroke-width="1.5"/>
           <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(906 386) scale(0.6875)">
             <path d="M6 3 3 8l3 5M10 3l3 5-3 5"/>
           </g>
           <text data-node-label="" x="1040" y="416" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">4. Validate selection</text>
-        <text x="1040" y="432" class="t-muted" font-size="9" text-anchor="middle">Resolver · schema + captured ID set</text>
+        <text x="1040" y="432" class="t-muted" font-size="9" text-anchor="middle">Resolver · IDs + original rule matches</text>
         </g>
 
-        <g id="node-verify" data-node-id="verify" data-node-label="5. Build and verify XPath" tabindex="0" role="button" aria-label="Focus 5. Build and verify XPath, Browser · retained nodes + scoped XPath, Browser verification boundary" aria-pressed="false" data-node-kind="backend" data-node-sublabel="Browser · retained nodes + scoped XPath" data-node-context="Browser verification boundary">
-          <title>5. Build and verify XPath · Browser · retained nodes + scoped XPath · Browser verification boundary</title>
+        <g id="node-verify" data-node-id="verify" data-node-label="5. Build and verify XPath" tabindex="0" role="button" aria-label="Focus 5. Build and verify XPath, Browser · fresh set + same-node XPath, Browser verification boundary" aria-pressed="false" data-node-kind="backend" data-node-sublabel="Browser · fresh set + same-node XPath" data-node-context="Browser verification boundary">
+          <title>5. Build and verify XPath · Browser · fresh set + same-node XPath · Browser verification boundary</title>
           <rect x="480" y="380" width="280" height="76" rx="6" class="c-mask"/>
           <rect x="480" y="380" width="280" height="76" rx="6" class="c-backend" stroke-width="1.5"/>
           <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(486 386) scale(0.6875)">
             <path d="M6 3 3 8l3 5M10 3l3 5-3 5"/>
           </g>
           <text data-node-label="" x="620" y="416" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">5. Build and verify XPath</text>
-        <text x="620" y="432" class="t-muted" font-size="9" text-anchor="middle">Browser · retained nodes + scoped XPath</text>
+        <text x="620" y="432" class="t-muted" font-size="9" text-anchor="middle">Browser · fresh set + same-node XPath</text>
         </g>
 
         <g id="node-result" data-node-id="result" data-node-label="6. Return resolution" tabindex="0" role="button" aria-label="Focus 6. Return resolution, Resolver · verified observations + usage, Response boundary" aria-pressed="false" data-node-kind="backend" data-node-sublabel="Resolver · verified observations + usage" data-node-context="Response boundary">
@@ -536,13 +536,13 @@ rect.c-bg-rect { fill: var(--bg); }
           <rect x="777" y="138" width="106" height="14" rx="3" class="c-mask"/>
           <text x="830" y="148" class="t-muted" font-size="8" text-anchor="middle">sanitized candidates</text>
         </g>
-        <g data-edge-from="select" data-edge-to="validate" data-edge-label="action + candidate IDs" data-edge-key="2">
-          <rect x="982.2" y="276" width="115.6" height="14" rx="3" class="c-mask"/>
-          <text x="1040" y="286" class="t-muted" font-size="8" text-anchor="middle">action + candidate IDs</text>
+        <g data-edge-from="select" data-edge-to="validate" data-edge-label="action + IDs + optional rule" data-edge-key="2">
+          <rect x="967.8" y="276" width="144.4" height="14" rx="3" class="c-mask"/>
+          <text x="1040" y="286" class="t-muted" font-size="8" text-anchor="middle">action + IDs + optional rule</text>
         </g>
-        <g data-edge-from="validate" data-edge-to="verify" data-edge-label="capture ID + selections" data-edge-key="3">
-          <rect x="769.8" y="398" width="120.39999999999999" height="14" rx="3" class="c-mask"/>
-          <text x="830" y="408" class="t-muted" font-size="8" text-anchor="middle">capture ID + selections</text>
+        <g data-edge-from="validate" data-edge-to="verify" data-edge-label="capture + IDs + rule" data-edge-key="3">
+          <rect x="777" y="398" width="106" height="14" rx="3" class="c-mask"/>
+          <text x="830" y="408" class="t-muted" font-size="8" text-anchor="middle">capture + IDs + rule</text>
         </g>
         <g data-edge-from="verify" data-edge-to="result" data-edge-label="XPath + state + context" data-edge-key="4">
           <rect x="349.8" y="398" width="120.39999999999999" height="14" rx="3" class="c-mask"/>

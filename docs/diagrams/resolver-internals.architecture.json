@@ -59,7 +59,7 @@
       "id": "validate",
       "type": "backend",
       "label": "4. Validate selection",
-      "sublabel": "Resolver \u00b7 schema + captured ID set",
+      "sublabel": "Resolver \u00b7 IDs + original rule matches",
       "pos": [
         900,
         380
@@ -73,7 +73,7 @@
       "id": "verify",
       "type": "backend",
       "label": "5. Build and verify XPath",
-      "sublabel": "Browser \u00b7 retained nodes + scoped XPath",
+      "sublabel": "Browser \u00b7 fresh set + same-node XPath",
       "pos": [
         480,
         380
@@ -162,7 +162,7 @@
     {
       "from": "select",
       "to": "validate",
-      "label": "action + candidate IDs",
+      "label": "action + IDs + optional rule",
       "labelAt": [
         1040,
         286
@@ -171,7 +171,7 @@
     {
       "from": "validate",
       "to": "verify",
-      "label": "capture ID + selections"
+      "label": "capture + IDs + rule"
     },
     {
       "from": "verify",

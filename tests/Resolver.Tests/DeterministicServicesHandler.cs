@@ -28,6 +28,7 @@ internal sealed class DeterministicServicesHandler : HttpMessageHandler
     public string? SelectionBody { get; init; }
     public JsonElement ModelRequest { get; private set; }
     public JsonElement CaptureRequest { get; private set; }
+    public JsonElement SelectionRequest { get; private set; }
     public int SelectionRequestCount { get; private set; }
     public int ProviderRequestCount { get; private set; }
 
@@ -67,6 +68,7 @@ internal sealed class DeterministicServicesHandler : HttpMessageHandler
         {
             SelectionRequestCount++;
             var batch = await request.Content!.ReadFromJsonAsync<JsonElement>(cancellationToken);
+            SelectionRequest = batch;
             return Json(
                 SelectionBody
                     ?? JsonSerializer.Serialize(
