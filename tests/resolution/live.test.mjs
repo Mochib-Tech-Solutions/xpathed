@@ -135,60 +135,6 @@ test("provider-live-inference-resolves-plural-frame-targets-and-scoped-absence",
   }
 });
 
-test("scope-live-matching-rule-preserves-shadow-target-during-carousel-motion", async () => {
-  const session = await json(`${browser}/sessions`, "POST");
-  const run = randomUUID();
-  try {
-    const page = await json(`${browser}/pages/${session.pageId}/navigate`, "POST", {
-      url: `${fixture}/shadow?run=${run}&motion=auto`,
-    });
-    const result = await json(`${resolver}/pages/${session.pageId}/resolve`, "POST", {
-      instruction: "Click the Accept all button.",
-      documentId: page.documentId,
-    });
-    console.log(
-      JSON.stringify({
-        outcome: result.outcome,
-        code: result.diagnostics.code,
-        rule: result.diagnostics.selectionRule,
-        usage: result.diagnostics.usage,
-        costEstimate: result.diagnostics.costEstimate,
-        generationId: result.diagnostics.generationId,
-      }),
-    );
-    assert.equal(result.outcome, "found", JSON.stringify(result));
-    assert.equal(result.diagnostics.modelCalls, 1);
-    assert.deepEqual(result.diagnostics.selectionRule, {
-      name: "Accept all",
-      field: "label",
-      kind: "control",
-      scope: null,
-    });
-    const target = result.actions[0].target;
-    assert.equal(target.shadowChain.length, 1);
-    await json(`${fixture}/oracle?run=${run}`, "POST", {
-      targets: [{ xpath: target.xpaths[0], shadowChain: target.shadowChain }],
-    });
-    let observed;
-    for (let attempt = 0; attempt < 100 && !observed; attempt++) {
-      observed = await json(`${fixture}/observation?run=${run}`);
-      if (!observed) await delay(50);
-    }
-    assert.deepEqual(observed?.matches, [["consent"]]);
-    assert.equal(observed.clicks, 0);
-    assert.equal(observed.scrollY, 0);
-    await delay(1100);
-    const retained = await json(`${browser}/pages/${session.pageId}/highlight`, "POST", {
-      documentId: page.documentId,
-      captureId: result.captureId,
-      actionId: result.actions[0].actionId,
-    });
-    assert.equal(retained.target.candidateId, target.candidateId);
-  } finally {
-    await fetch(`${browser}/sessions/${session.sessionId}`, { method: "DELETE" });
-  }
-});
-
 test("cardinality-live-explicit-count-preserves-missing-target", async () => {
   const session = await json(`${browser}/sessions`, "POST");
   try {
@@ -209,7 +155,6 @@ test("cardinality-live-explicit-count-preserves-missing-target", async () => {
           outcome: result.outcome,
           summary: result.summary,
           actions: result.actions,
-          rule: result.diagnostics.selectionRule,
           usage: result.diagnostics.usage,
           generationId: result.diagnostics.generationId,
         }),

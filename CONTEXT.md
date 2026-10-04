@@ -99,9 +99,6 @@ The ordered open shadow hosts from a target's frame document to its own DOM tree
 **Candidate capture**:
 A temporary inventory of eligible candidate elements from a page, its open shadow roots and its supported frame documents. Its candidate identities refer only to that captured inventory.
 
-**Matching rule**:
-A bounded, model-declared description of the complete found target set using exact sanitized name/text, target kind and optional named scope. Replaying it on fresh current-view candidates checks whether the same retained nodes still form that set; it does not independently prove the interpretation of the instruction.
-
 **Off-screen element**:
 An element present in the current page content but outside the visible viewport. This is distinct from an element concealed by the application's display state.
 

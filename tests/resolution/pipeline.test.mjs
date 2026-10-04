@@ -6,51 +6,22 @@ import { setTimeout as delay } from "node:timers/promises";
 const client = "http://client-api:8080";
 const fixture = "http://resolution-fixture:8090";
 
-for (const [behavior, rule, mutation, expected] of [
-  [
-    "carousel-preserves-shadow-control",
-    { name: "Accept all", field: "label", kind: "control", scope: null },
-    "carousel",
-    "found",
-  ],
-  [
-    "new-competitor-invalidates",
-    { name: "Accept all", field: "label", kind: "control", scope: null },
-    "duplicate",
-    "stale_capture",
-  ],
-  [
-    "renamed-target-invalidates",
-    { name: "Accept all", field: "label", kind: "control", scope: null },
-    "rename",
-    "stale_capture",
-  ],
-  [
-    "replacement-invalidates",
-    { name: "Accept all", field: "label", kind: "control", scope: null },
-    "replace",
-    "stale_capture",
-  ],
-  ["null-rule-keeps-strict-comparison", null, "carousel", "stale_capture"],
-  [
-    "invalid-original-rule-is-rejected",
-    { name: "Other", field: "label", kind: "control", scope: null },
-    null,
-    "provider_invalid_selection_rule",
-  ],
-  [
-    "incomplete-fresh-comparison-is-rejected",
-    { name: "Accept all", field: "label", kind: "control", scope: null },
-    "oversized",
-    "validation_budget_exceeded",
-  ],
+for (const [mutation, expected, readiness] of [
+  ["carousel", "found", "ready"],
+  ["carousel-replace", "found", "ready"],
+  ["hidden-frame", "found", "ready"],
+  ["visible-frame", "found", "ready"],
+  ["duplicate", "found", "ready"],
+  ["disabled", "found", "blocked"],
+  ["rename", "stale_capture"],
+  ["replace", "stale_capture"],
+  ["offscreen", "stale_capture"],
 ]) {
-  test(`scope-resolver-${behavior}`, async () => {
+  test(`scope-resolver-target-validation-${mutation}`, async () => {
     const run = randomUUID();
     await json(`${fixture}/scenario`, "POST", {
       name: "found",
       targetText: "Accept all",
-      rule,
       mutation,
       delayMs: 300,
       run,
@@ -61,26 +32,27 @@ for (const [behavior, rule, mutation, expected] of [
         url: `${fixture}/shadow?run=${run}&motion=1`,
       });
       const result = await json(`${client}/api/pages/${page.pageId}/resolve`, "POST", {
-        instruction: "Click the Accept all control.",
+        instruction: "Click the Accept all button.",
         documentId: page.documentId,
       });
-      assert.equal(result.diagnostics.modelCalls, 1, JSON.stringify(result));
+      assert.equal(result.diagnostics.modelCalls, 1);
+      assert.equal(Object.hasOwn(result.diagnostics, "selectionRule"), false);
       if (expected === "found") {
         assert.equal(result.outcome, "found", JSON.stringify(result));
         const target = result.actions[0].target;
-        assert.equal(target.interactability.status, "ready");
+        assert.equal(target.interactability.status, readiness);
         await json(`${fixture}/oracle?run=${run}`, "POST", {
           targets: [{ xpath: target.xpaths[0], shadowChain: target.shadowChain }],
         });
-        let observed;
-        for (let attempt = 0; attempt < 100 && !observed; attempt++) {
-          observed = await json(`${fixture}/observation?run=${run}`);
-          if (!observed) await delay(50);
+        let observation;
+        for (let attempt = 0; attempt < 100 && !observation; attempt++) {
+          observation = await json(`${fixture}/observation?run=${run}`);
+          if (!observation) await delay(50);
         }
-        assert.deepEqual(observed.matches, [["consent"]]);
-        assert.equal(observed.mutationApplied, "carousel");
-        assert.equal(observed.clicks, 0);
-        assert.equal(observed.scrollY, 0);
+        assert.deepEqual(observation?.matches, [["consent"]]);
+        assert.equal(observation.mutationApplied, mutation);
+        assert.equal(observation.clicks, 0);
+        assert.equal(observation.scrollY, 0);
         const highlighted = await json(`${client}/api/pages/${page.pageId}/highlight`, "POST", {
           documentId: page.documentId,
           captureId: result.captureId,
@@ -89,11 +61,14 @@ for (const [behavior, rule, mutation, expected] of [
         assert.equal(highlighted.target.candidateId, target.candidateId);
       } else {
         assert.equal(result.outcome, "error", JSON.stringify(result));
-        assert.equal(result.diagnostics.code, expected, JSON.stringify(result));
+        assert.equal(result.diagnostics.code, expected);
       }
       const provider = await json(`${fixture}/provider-request`);
-      assert.doesNotMatch(provider.messages[1].content, /PRIVATE_SHADOW_|data-oracle|consent-host/);
-      assert.ok(provider.response_format.json_schema.schema.properties.rule);
+      assert.deepEqual(Object.keys(provider.response_format.json_schema.schema.properties).sort(), [
+        "actions",
+        "complete",
+      ]);
+      assert.doesNotMatch(provider.messages[1].content, /PRIVATE_SHADOW_|data-oracle/);
     } finally {
       await fetch(`${client}/api/sessions/${session.sessionId}`, { method: "DELETE" });
     }
@@ -766,7 +741,6 @@ for (const [instruction, missing] of [
       assert.equal(result.summary.found, 2);
       assert.equal(result.summary.notFound, missing ? 1 : 0);
       assert.equal(result.diagnostics.modelCalls, 1);
-      assert.equal(result.diagnostics.selectionRule, null);
       if (missing) assert.equal(result.actions[2].target, null);
       await json(`${fixture}/oracle?run=${run}`, "POST", {
         xpaths: result.actions

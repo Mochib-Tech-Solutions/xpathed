@@ -7,7 +7,6 @@ let targetText = "About us";
 let targetAction = "click";
 let plannedActions = [];
 let planComplete = true;
-let selectionRule = null;
 let providerDelayMs = 0;
 let inferenceMutation = null;
 let scenarioRun = null;
@@ -25,6 +24,15 @@ setInterval(async () => {
  if (mutation) {
    const target = document.querySelector('#consent-host')?.shadowRoot?.querySelector('button') ?? document.querySelector('#expected-target');
    if (mutation === 'carousel') document.querySelector('#carousel').style.transform='translateX(-400px)';
+   if (mutation === 'carousel-replace') document.querySelector('#carousel').innerHTML='<img alt="Partner D" width="200" height="40">';
+   if (mutation === 'hidden-frame' || mutation === 'visible-frame') {
+     const frame = document.createElement('iframe');
+     if (mutation === 'hidden-frame') frame.hidden = true;
+     frame.srcdoc='<button>Accept all</button>';
+     document.body.append(frame);
+   }
+   if (mutation === 'disabled') target.disabled = true;
+   if (mutation === 'offscreen') target.parentElement.style.top='1400px';
    if (mutation === 'duplicate') document.body.insertAdjacentHTML('beforeend','<a href="#">Accept all</a>');
    if (mutation === 'rename') target.textContent='Customize';
    if (mutation === 'replace') target.outerHTML='<button data-oracle="replacement">Accept all</button>';
@@ -200,7 +208,6 @@ const server = createServer(async (request, response) => {
       targetAction = body.action ?? "click";
       plannedActions = body.actions ?? [];
       planComplete = body.complete ?? true;
-      selectionRule = body.rule ?? null;
       providerDelayMs = body.delayMs ?? 0;
       inferenceMutation = body.mutation ?? null;
       scenarioRun = body.run ?? null;
@@ -243,7 +250,6 @@ const server = createServer(async (request, response) => {
                 scenario === "batch"
                   ? {
                       complete: planComplete,
-                      rule: selectionRule,
                       actions: plannedActions.map((item) => ({
                         step: item.step,
                         instruction: item.instruction,
@@ -267,7 +273,6 @@ const server = createServer(async (request, response) => {
                     }
                   : {
                       complete: true,
-                      rule: selectionRule,
                       actions: [
                         {
                           step: 1,

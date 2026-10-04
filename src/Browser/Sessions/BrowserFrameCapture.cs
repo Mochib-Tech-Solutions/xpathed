@@ -21,16 +21,15 @@ internal sealed class BrowserFrameCapture(
     public BrowserFrameCapture? Parent { get; } = parent;
     public IElementHandle? Owner { get; } = owner;
     public HashSet<string> CandidateIds { get; } = new(StringComparer.Ordinal);
-    public CandidateElement[] Candidates { get; set; } = [];
     public IJSHandle? Highlight { get; set; }
     public string[] HighlightCandidateIds { get; set; } = [];
 
-    public async Task<(int ScannedCount, CandidateElement[] Candidates)> RefreshAsync(
-        int budgetMs,
-        int scanBudget,
-        bool replayRule
-    )
+    public async Task RefreshAsync(int budgetMs, string[] candidateIds)
     {
+        if (Frame.IsDetached)
+        {
+            throw new ApiException(409, "stale_capture", "A target frame was detached after capture.");
+        }
         var timer = System.Diagnostics.Stopwatch.StartNew();
         string? environment = null;
         if (Parent is not null)
@@ -59,13 +58,12 @@ internal sealed class BrowserFrameCapture(
             environment = info.GetProperty("environment").GetRawText();
         }
         var updated = await Handle.EvaluateAsync<JsonElement>(
-            "(capture, args) => capture.updateEnvironment(args.environment, args.budgetMs, args.scanBudget, args.replayRule)",
+            "(capture, args) => capture.updateEnvironment(args.environment, args.budgetMs, args.candidateIds)",
             new
             {
                 environment,
                 budgetMs = Math.Max(0, budgetMs - timer.ElapsedMilliseconds),
-                scanBudget,
-                replayRule,
+                candidateIds,
             }
         );
         if (updated.TryGetProperty("errorCode", out var error))
@@ -79,10 +77,6 @@ internal sealed class BrowserFrameCapture(
                     : "Viewport observation exceeded its processing budget."
             );
         }
-        return (
-            updated.GetProperty("scannedCount").GetInt32(),
-            replayRule ? updated.GetProperty("candidates").Deserialize<CandidateElement[]>(JsonOptions)! : []
-        );
     }
 
     private static bool SameShadowChain(JsonElement info, ShadowHost[]? expected)

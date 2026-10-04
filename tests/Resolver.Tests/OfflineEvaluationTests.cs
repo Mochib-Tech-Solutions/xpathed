@@ -63,9 +63,6 @@ public sealed class OfflineEvaluationTests
     [InlineData("truncated", "provider_truncated_response")]
     [InlineData("rate_limited", "provider_rate_limited")]
     [InlineData("missing_usage", null)]
-    [InlineData("matching_rule", null)]
-    [InlineData("sensitive_rule", null)]
-    [InlineData("invalid_rule", "provider_invalid_selection_rule")]
     public async Task SavedPageInferenceReusesSelectionValidationAndReportsOneSharedChargeWithoutBrowserClaims(
         string scenario,
         string? expectedCode
@@ -89,16 +86,6 @@ public sealed class OfflineEvaluationTests
                     """{"complete":true,"actions":[{"step":1,"instruction":"Click Save","outcome":"found","action":"click","candidateId":"c1","limitation":"none"}]}""";
                 var content = scenario switch
                 {
-                    "matching_rule" or "sensitive_rule" => valid.Replace(
-                        "\"complete\":true",
-                        "\"complete\":true,\"rule\":{\"name\":\"Save\",\"field\":\"label\",\"kind\":\"control\",\"scope\":null}",
-                        StringComparison.Ordinal
-                    ),
-                    "invalid_rule" => valid.Replace(
-                        "\"complete\":true",
-                        "\"complete\":true,\"rule\":{\"name\":\"Other\",\"field\":\"label\",\"kind\":\"control\",\"scope\":null}",
-                        StringComparison.Ordinal
-                    ),
                     "plural" => valid.Replace(
                         "]}",
                         """,{"step":2,"instruction":"Click Cancel","outcome":"found","action":"click","candidateId":"c2","limitation":"none"}]}""",
@@ -119,13 +106,6 @@ public sealed class OfflineEvaluationTests
                     ),
                     _ => valid,
                 };
-                if (scenario == "sensitive_rule")
-                {
-                    content = content
-                        .Replace("Save", "Billing account 123", StringComparison.Ordinal)
-                        .Replace("Click", "Fill", StringComparison.Ordinal)
-                        .Replace("click", "fill", StringComparison.Ordinal);
-                }
                 context.Response.StatusCode = scenario == "rate_limited" ? 429 : 200;
                 await context.Response.WriteAsJsonAsync(
                     new
@@ -158,12 +138,6 @@ public sealed class OfflineEvaluationTests
             scenario == "plural"
                 ? """{"instruction":"Click Save and Cancel","candidates":[{"id":"c1","tag":"button","label":"Save"},{"id":"c2","tag":"button","label":"Cancel"}]}"""
                 : """{"instruction":"Click Save","candidates":[{"id":"c1","tag":"button","label":"Save"}]}""";
-        if (scenario == "sensitive_rule")
-        {
-            input = input
-                .Replace("Save", "Billing account 123", StringComparison.Ordinal)
-                .Replace("Click", "Fill", StringComparison.Ordinal);
-        }
         var (_, preparedOutput) = await RunAsync(
             input,
             prepareOnly: true,
@@ -186,7 +160,7 @@ public sealed class OfflineEvaluationTests
         Assert.Equal(expectedCode is null ? "found" : "error", result.GetProperty("outcome").GetString());
         if (expectedCode is null)
         {
-            Assert.Equal(scenario == "sensitive_rule" ? "fill" : "click", result.GetProperty("action").GetString());
+            Assert.Equal("click", result.GetProperty("action").GetString());
             Assert.Equal("c1", result.GetProperty("actions")[0].GetProperty("candidateId").GetString());
             Assert.Equal(scenario == "plural" ? 2 : 1, result.GetProperty("actions").GetArrayLength());
             if (scenario == "plural")
@@ -212,14 +186,6 @@ public sealed class OfflineEvaluationTests
         }
         Assert.True(result.GetProperty("providerLatencyMs").GetDouble() >= 0);
         Assert.Equal(1, result.GetProperty("diagnostics").GetProperty("modelCalls").GetInt32());
-        if (scenario == "sensitive_rule")
-        {
-            Assert.Equal(
-                "[redacted]",
-                result.GetProperty("diagnostics").GetProperty("selectionRule").GetProperty("name").GetString()
-            );
-            Assert.DoesNotContain("Billing account 123", output, StringComparison.Ordinal);
-        }
         Assert.Equal(1, calls);
         Assert.False(result.TryGetProperty("xpaths", out _));
         Assert.DoesNotContain("synthetic-api-key", output, StringComparison.Ordinal);
