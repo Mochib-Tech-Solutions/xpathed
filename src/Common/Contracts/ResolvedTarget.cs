@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace Xpathed.Common.Contracts;
 
 public sealed record ResolvedTarget(
@@ -10,5 +12,6 @@ public sealed record ResolvedTarget(
     ActionInteractability? Interactability = null,
     TargetFrame? Frame = null,
     string? Role = null,
-    string? AccessibleName = null
+    string? AccessibleName = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] ShadowHost[]? ShadowChain = null
 );

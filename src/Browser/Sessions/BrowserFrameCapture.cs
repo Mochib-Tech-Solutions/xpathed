@@ -13,6 +13,8 @@ internal sealed class BrowserFrameCapture(
     IElementHandle? owner
 )
 {
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+
     public IFrame Frame { get; } = frame;
     public IJSHandle Handle { get; } = handle;
     public TargetFrame Identity { get; } = identity;
@@ -44,6 +46,7 @@ internal sealed class BrowserFrameCapture(
                 !info.GetProperty("environment").GetProperty("exposed").GetBoolean()
                 || !info.GetProperty("environment").GetProperty("geometrySupported").GetBoolean()
                 || info.GetProperty("xpath").GetString() != Identity.Chain[^1].Xpath
+                || !SameShadowChain(info, Identity.Chain[^1].ShadowChain)
             )
             {
                 throw new ApiException(409, "stale_capture", "An ancestor frame changed after capture.");
@@ -71,5 +74,13 @@ internal sealed class BrowserFrameCapture(
             );
         }
         return updated.GetProperty("scannedCount").GetInt32();
+    }
+
+    private static bool SameShadowChain(JsonElement info, ShadowHost[]? expected)
+    {
+        var actual = info.TryGetProperty("shadowChain", out var chain)
+            ? chain.Deserialize<ShadowHost[]>(JsonOptions)
+            : null;
+        return (actual ?? []).SequenceEqual(expected ?? []);
     }
 }

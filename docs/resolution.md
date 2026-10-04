@@ -19,11 +19,11 @@ JSON field names use camelCase:
 
 | Field                                                       | Meaning                                                                      |
 | ----------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| `outcome`                                                   | `found`, `not_found`, `unsupported`, `partial`, or `error`                              |
+| `outcome`                                                   | `found`, `not_found`, `unsupported`, `partial`, or `error`                   |
 | `sessionId`, `pageId`, `documentId`, `captureId`, `frameId` | Browser-owned identities; fields unavailable before capture are null         |
 | `traceId`, `attemptId`, `configurationId`                   | Request correlation, distinct attempt, and non-secret resolver configuration |
 | `action`                                                    | Interpreted interaction; null when interpretation is unavailable             |
-| `target`                                                    | Always null; verified targets are in `actions`                              |
+| `target`                                                    | Always null; verified targets are in `actions`                               |
 | `diagnostics`                                               | Coverage, provider evidence, stage timings, and a safe failure code/message  |
 
 `found` means the model selected a candidate and the returned XPath uniquely matches that exact captured node. It does not establish semantic accuracy or action success. Independent fixture labels test semantic accuracy. `not_found` represents absence in the supported inspected scope. `unsupported` represents instructions or target scopes outside this slice. Processing failures, incomplete capture, excess input size and provider failures are `error`.
@@ -89,17 +89,50 @@ The browser exposes these internal operations:
 
 A capture includes `scope: "current_view"`, session/page/document/capture/frame identities, its timestamp, candidates, coverage and `unsupportedBoundaryCount`. Candidates contain an opaque capture-scoped ID, tag, role, text, label, placeholder, structural scope, observed state and geometry. Real browser objects and the candidate-to-node mapping remain inside Browser. A new capture replaces the previous capture for that page; session closure or navigation invalidates it. Stable DOM during a request is assumed. Failed identity validation is an error; it does not trigger automatic retries or recovery.
 
-Capture visits the main document and nested same-origin or cross-origin frames in deterministic document order (main-document candidates first, then each frame subtree). Each candidate/target carries `frame: {id, documentId, chain}`. `main` identifies the main document; child IDs are capture-scoped. Each chain entry is `{frameId, xpath, label}`: evaluate its XPath in the preceding document to locate the frame owner, then enter that document. The target's sole `xpaths` entry is evaluated only in its own frame document. These are separate standard document XPaths, never a compound pseudo-XPath. Resolver checks returned frame identity and chain against the selected candidate. Frame document identities are opaque capture-owned references, not restorable browser handles.
+Capture visits the main document and nested same-origin or cross-origin frames in deterministic document order (main-document candidates first, then each frame subtree). Each candidate/target carries `frame: {id, documentId, chain}`. `main` identifies the main document; child IDs are capture-scoped. Each chain entry is `{frameId, xpath, label, shadowChain?}`: enter any listed open shadow roots in the preceding document, evaluate the frame-owner XPath there, then enter its document. The target's sole `xpaths` entry is evaluated in its frame document, or inside its final open shadow root when `shadowChain` is present. These are separate standard document XPaths, never a compound pseudo-XPath. Resolver checks returned frame identity, frame chain and shadow chain against the selected candidate. Frame document identities are opaque capture-owned references, not restorable browser handles.
 
 Candidate scope retains sanitized section/row context outside containing frames as well as context inside the target document. Browser retains nodes and frame owners, applies ancestor-frame accessibility/rendering/disabled state, uses bounded, batched native IntersectionObserver observations per document for viewport clipping, then intersects through containing frames, and checks pointer reception at the same main-viewport point in every ancestor document. Cross-origin access uses Browser's existing Playwright ownership; page script receives no cross-origin privilege. The Chromium node overlay follows the selected frame node through manual scrolling and resizing. Capture never scrolls or focuses a target.
 
-Accessibility-hidden frame subtrees are excluded. Detected open shadow roots, missing frame documents and frames with rotation, skew, reflection, perspective or 3D transforms count as unsupported boundaries; their contents cannot substantiate absence. Ordinary translated/positively scaled frames are supported. Closed shadow roots cannot be detected. A frame inspection failure is operational, rather than fabricated absence. Navigation, frame attachment/detachment, tab switches and closure invalidate the entire capture. A changed frame-owner XPath or newly hidden/unsupported ancestor also fails revalidation.
+Accessibility-hidden frame and shadow subtrees are excluded. Missing frame documents and frames with rotation, skew, reflection, perspective or 3D transforms count as unsupported boundaries; their contents cannot substantiate absence. Ordinary translated/positively scaled frames are supported. Closed shadow roots remain unsupported and cannot be detected reliably; capture completeness covers supported DOM trees only. A frame inspection failure is operational, rather than fabricated absence. Navigation, frame attachment/detachment, tab switches and closure invalidate the entire capture. A changed frame-owner XPath or newly hidden/unsupported ancestor also fails revalidation.
+
+### Open Shadow DOM and locator context
+
+Capture traverses open shadow roots, including nested roots, roots added dynamically, zero-height hosts and `display:contents` hosts. Native intersection observations test each target's clipped rectangle, rather than requiring its host to have a visible box. Composed host/slot ancestry supplies scope, accessibility exclusion, inert/disabled state and privacy filtering. Accessible-name references remain local to their DOM tree; slot text is included without forwarding editable values. Pointer hit-testing descends open roots at the inspected point. Resolution and highlights remain passive.
+
+A shadow candidate and found target carry optional `shadowChain: [{xpath, label}, ...]`, ordered outermost host first. Each host XPath uniquely identifies the actual host within the preceding document or shadow tree. Enter that host's open `shadowRoot` before evaluating the next expression. An iframe inside a shadow root carries the same context on its frame-chain entry. A slotted light-DOM target retains its ordinary document XPath; its rendered slot ancestry does not move its DOM identity into the shadow tree.
+
+XPath cannot cross a shadow boundary, and Chromium rejects a `ShadowRoot` itself as an XPath context. Evaluate a root-scoped XPath with that root's `firstElementChild` as context; native absolute XPath then searches that shadow tree. No copied DOM, compound selector syntax or fabricated document XPath is used. Browser requires exactly one match in that tree and identity with the retained live target. The chat shows shadow-host XPaths separately and labels where the target XPath must be evaluated. [ADR-0027](adr/0027-keep-shadow-context-separate-from-xpath.md) records this contract.
+
+For a target in the main document, a consuming caller can resolve its context as follows (frame targets first require their ordered frame chain):
+
+```js
+const doc = document;
+let root = doc;
+const unique = (xpath) => {
+  const matches = doc.evaluate(
+    xpath,
+    root === doc ? doc : root.firstElementChild,
+    null,
+    XPathResult.ORDERED_NODE_SNAPSHOT_TYPE,
+    null,
+  );
+  if (matches.snapshotLength !== 1) throw new Error("Locator is no longer unique");
+  return matches.snapshotItem(0);
+};
+for (const host of target.shadowChain ?? []) {
+  root = unique(host.xpath).shadowRoot;
+  if (!root) throw new Error("Open shadow root is no longer available");
+}
+const element = unique(target.xpaths[0]);
+```
+
+Both capture and revalidation share the existing element, candidate, byte and time budgets across light DOM, open roots and frames. New visible shadow candidates invalidate a retained absence; replaced/detached roots, changed host locators or target membership invalidate found selections. Standard XPath uniqueness is checked across the target's entire DOM tree, including off-screen duplicates in that tree.
 
 The compact representation preserves Unicode and uses allowlisted fields. Current editable input, textarea and select values, editable content, cookies, storage and URL attributes are excluded. The displayed labels of `input[type=button|submit|reset]` are the narrow exception: they are captured as button labels, while checkbox/radio values remain excluded. Candidate `checked` state is null; only the selected target reports its actual checked state. Model input omits empty optional fields, exact duplicate label/text, constant eligibility fields and null checked/selected placeholders, while retaining every candidate and meaningful false state flags. Labels, safe text and ancestor headings describe controls without forwarding raw accessibility snapshots. Safe hidden label references may name exposed controls, while those referenced hidden nodes remain excluded as targets. This intentionally omits embedded control values from accessible names. The model receives page text as untrusted data, has no tools and returns only a selection. Browser constructs XPath from the live DOM. Highlighting uses Browser-owned, pointer-transparent decorations around the retained verified nodes. Their closure-owned state and closed shadow content stay outside candidate data; decorations are excluded from capture and accessibility; decorations are removed before a new capture and preserve target attributes, layout, focus and form state. They are temporary DOM additions, so page mutation observers can notice them. The highlights follow verified nodes through manual scrolling and layout movement. See [ADR-0015](adr/0015-keep-target-highlights-until-user-input.md) for the trade-off.
 
 ## Eligibility and action observations
 
-The policy follows [WAI-ARIA tree inclusion/exclusion](https://www.w3.org/TR/wai-aria-1.2/#tree_exclusion), [accessible-name hidden references](https://www.w3.org/TR/accname-1.2/#computation-steps) and [HTML hidden/inert semantics](https://html.spec.whatwg.org/multipage/interaction.html), with deterministic Chromium checks. It is a sanitized DOM policy applied in each captured document and through its containing frames, not a complete accessibility compliance implementation.
+The policy follows [WAI-ARIA tree inclusion/exclusion](https://www.w3.org/TR/wai-aria-1.2/#tree_exclusion), [accessible-name hidden references](https://www.w3.org/TR/accname-1.2/#computation-steps) and [HTML hidden/inert semantics](https://html.spec.whatwg.org/multipage/interaction.html), with deterministic Chromium checks. It is a sanitized DOM policy applied in each captured document and open shadow tree, through its containing hosts, slots and frames, not a complete accessibility compliance implementation.
 
 | Page condition                                                                                                        | Candidate policy and observations                                                                                                             |
 | --------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -108,8 +141,8 @@ The policy follows [WAI-ARIA tree inclusion/exclusion](https://www.w3.org/TR/wai
 | `hidden` attribute                                                                                                    | Excluded by browser CSS unless the page overrides the hidden display style                                                                    |
 | Explicit or modal background inertness                                                                                | Excluded; a top-layer modal dialog escapes an ancestor's inertness, as in Chromium                                                            |
 | `aria-hidden=true` ancestor                                                                                           | Excluded even if a child sets false; a currently focused subtree retains Chromium's focus exposure exception                                  |
-| Off-screen or zero intersection                                                                                       | Excluded from current-view captures                                                 |
-| Partially intersecting, opacity-zero, covered, disabled, readonly                                                     | Eligible when intersecting the view; readiness is assessed separately                 |
+| Off-screen or zero intersection                                                                                       | Excluded from current-view captures                                                                                                           |
+| Partially intersecting, opacity-zero, covered, disabled, readonly                                                     | Eligible when intersecting the view; readiness is assessed separately                                                                         |
 | Hidden label/name references                                                                                          | Used only for safe name text; `aria-labelledby` precedes `aria-label`, then native labels and supported name-from-content/attribute fallbacks |
 
 Modal exposure uses Chromium's focused modal or top-layer backdrop hit, rather than DOM order. If several open modals cannot be distinguished without interaction, capture is incomplete with `capture_exposure_unknown`; it cannot substantiate absence.
@@ -184,12 +217,12 @@ Timeout results with unresolved provider accounting show “Cost pending”; bac
 
 The selected route is `deepseek/deepseek-v4.1-flash` via OpenRouter's `wafer` provider with reasoning disabled, strict JSON schema, 4,096 output tokens, and no fallback, context compression, response healing or tools. Runtime requests do not include a provider price filter. The explicit smoke with live provider inference makes two small current-view requests: a scoped nested-frame plural result and a scoped absence check. It requires reported cost below half a cent per call and one cent total.
 
-| Setting | Purpose |
-| --- | --- |
-| `OPENROUTER_API_KEY` | Ignored local `.env`; mapped to `OpenRouter__ApiKey` |
-| `OPENROUTER_MODEL` / `OPENROUTER_PROVIDER` | Selected deployment route; changing it requires fresh evaluation |
-| `OpenRouter__BaseUrl` | OpenRouter API by default; deterministic tests use a local provider double |
-| `OpenRouter__TimeoutSeconds` | Provider timeout, default 30 seconds; greater than zero and at most 600 |
+| Setting                                    | Purpose                                                                    |
+| ------------------------------------------ | -------------------------------------------------------------------------- |
+| `OPENROUTER_API_KEY`                       | Ignored local `.env`; mapped to `OpenRouter__ApiKey`                       |
+| `OPENROUTER_MODEL` / `OPENROUTER_PROVIDER` | Selected deployment route; changing it requires fresh evaluation           |
+| `OpenRouter__BaseUrl`                      | OpenRouter API by default; deterministic tests use a local provider double |
+| `OpenRouter__TimeoutSeconds`               | Provider timeout, default 30 seconds; greater than zero and at most 600    |
 
 `configurationId` hashes the normalized endpoint, model, provider, timeout, prompt/schema and effective request settings. Configuration metadata identifies what ran. API keys, instructions and page content are excluded. Saved-page selection records identify their narrower scope. Git commits and content hashes identify the source, prompt and schema.
 
@@ -201,20 +234,20 @@ Ambiguous instructions retain `outcome: "unsupported"` with `code: "ambiguous"` 
 
 Client response labels follow the resolver outcome and reason code:
 
-| Resolver result                            | Client response                                               |
-| ------------------------------------------ | ------------------------------------------------------------- |
+| Resolver result                            | Client response                                                                          |
+| ------------------------------------------ | ---------------------------------------------------------------------------------------- |
 | `found`                                    | Element identity, XPath and reported readiness; blocked actions show one red explanation |
-| `not_found`                                | Target not found, in the current view         |
-| `unsupported` / `ambiguous`                | Ambiguous target                                              |
-| `unsupported` / `unsupported_action`       | Unsupported interaction                                       |
-| `unsupported` / `current_state_dependency` | Page change required                                          |
-| `unsupported` / `appearance_unavailable`   | Appearance unavailable                                        |
-| `unsupported` / `unsupported_scope`        | Unsupported page content                                      |
-| Other `unsupported` reasons                | Unsupported instruction, retaining the resolver's explanation |
-| `partial`                                  | Partial result with separate target outcomes                  |
-| `error` / `decomposition_incomplete`       | Incomplete response                                           |
-| Other `error` codes                        | Resolution failed with the resolver's explanation             |
-| Request/transport failure without a result | Request failed                                                |
+| `not_found`                                | Target not found, in the current view                                                    |
+| `unsupported` / `ambiguous`                | Ambiguous target                                                                         |
+| `unsupported` / `unsupported_action`       | Unsupported interaction                                                                  |
+| `unsupported` / `current_state_dependency` | Page change required                                                                     |
+| `unsupported` / `appearance_unavailable`   | Appearance unavailable                                                                   |
+| `unsupported` / `unsupported_scope`        | Unsupported page content                                                                 |
+| Other `unsupported` reasons                | Unsupported instruction, retaining the resolver's explanation                            |
+| `partial`                                  | Partial result with separate target outcomes                                             |
+| `error` / `decomposition_incomplete`       | Incomplete response                                                                      |
+| Other `error` codes                        | Resolution failed with the resolver's explanation                                        |
+| Request/transport failure without a result | Request failed                                                                           |
 
 Semantic limitations are not technical-error alerts. Per-target failures retain their own messages without a duplicate generic request error; successful targets remain visible beside failures. Unknown, blocked or unsupported readiness stays separate from target discovery.
 

@@ -58,7 +58,7 @@ Saved-page selection cases use the Resolver's shared prompt/schema with saved ca
 
 `evaluate:xpath` reuses the browser case definitions and independent DOM labels. It captures a real page, materializes the fixture's controlled selected IDs, and calls Browser's `/pages/{pageId}/selections` endpoint directly. It starts Browser and the fixture only. No Resolver or model call occurs. The raw browser response is retained alongside a grader adapter; the adapter is not evidence that the Resolver ran.
 
-The category checks document-wide XPath uniqueness, intended-node identity, frame identity, state/readiness and passive behavior. Saved-locator mutations also check old XPath reuse and fresh construction after a page change. Cases without a found target and provider/Resolver-error cases are excluded with explicit reasons in the manifest. They remain covered by Resolver evaluation and existing engineering checks. Original case IDs and source split metadata stay intact.
+The category checks XPath uniqueness within the target document or open shadow tree, intended-node identity, frame/shadow context, state/readiness and passive behavior. Saved-locator mutations also check old XPath reuse and fresh construction after a page change. Cases without a found target and provider/Resolver-error cases are excluded with explicit reasons in the manifest. They remain covered by Resolver evaluation and existing engineering checks. Original case IDs and source split metadata stay intact.
 
 ## Example cases and metrics
 
@@ -173,7 +173,7 @@ Authentication, transport failures, provider rejection and missing resolution re
 
 ### Resolver comparison
 
-The [recorded report](research/clean-evaluation-comparison.md) and [figure data](assets/evaluation/clean-comparison.json) use the frozen audited collection measured on 3 October 2026, before spatial-item capture was added. The exporter verifies category membership and paired input/label identities against the checkout used to export it. Reproduce that report from its recorded revision; a new checkout with additional cases requires complete new measurements.
+The [recorded report](research/clean-evaluation-comparison.md) and [figure data](assets/evaluation/clean-comparison.json) use the frozen audited collection measured on 3 October 2026, before spatial-item capture and open-shadow support were added. The exporter verifies category membership and paired input/label identities against the checkout used to export it. Reproduce that report from its recorded revision; a new checkout with additional cases requires complete new measurements.
 
 Use **Basic resolver**, **Improved resolver** and **Stagehand** in reports and charts. Git commits and image identities belong in saved evidence. For a new comparison, Basic must be a verified bundle implementing the same current API contract; Improved is built from the current checkout, with its source fingerprint and exact image IDs recorded. To reproduce the published historical Basic comparison, check out the recorded runner revision from its evidence first: the current runner does not adapt retired numbered contracts or bundle formats. The application keeps one implementation.
 

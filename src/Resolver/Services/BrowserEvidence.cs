@@ -52,6 +52,7 @@ internal static partial class BrowserEvidence
                 || candidate.Geometry is null
                 || !ValidCurrentViewCandidate(candidate)
                 || !ValidFrame(candidate.Frame, documentId)
+                || !ValidShadowChain(candidate.ShadowChain)
             )
             || capture.Candidates.Select(candidate => candidate.Id).Distinct(StringComparer.Ordinal).Count()
                 != capture.Candidates.Length
@@ -105,7 +106,7 @@ internal static partial class BrowserEvidence
                             verified.Target,
                             selection.CandidateId,
                             selection.Action,
-                            capture.Candidates.Single(candidate => candidate.Id == selection.CandidateId).Frame
+                            capture.Candidates.Single(candidate => candidate.Id == selection.CandidateId)
                         )
                             || verified.Target?.State?.InViewport != true
                         : verified.Target is not null
@@ -156,9 +157,15 @@ internal static partial class BrowserEvidence
     )]
     private static partial Regex OpaqueColor();
 
-    private static bool ValidTarget(ResolvedTarget? target, string? candidateId, string action, TargetFrame? frame) =>
+    private static bool ValidTarget(
+        ResolvedTarget? target,
+        string? candidateId,
+        string action,
+        CandidateElement candidate
+    ) =>
         target is not null
-        && SameFrame(target.Frame, frame)
+        && SameFrame(target.Frame, candidate.Frame)
+        && SameShadowChain(target.ShadowChain, candidate.ShadowChain)
         && target.CandidateId == candidateId
         && target.Xpaths is { Length: 1 }
         && !target.Xpaths.Any(string.IsNullOrWhiteSpace)
@@ -181,6 +188,7 @@ internal static partial class BrowserEvidence
                 && !string.IsNullOrWhiteSpace(ancestor.FrameId)
                 && !string.IsNullOrWhiteSpace(ancestor.Xpath)
                 && ancestor.Label is not null
+                && ValidShadowChain(ancestor.ShadowChain)
             )
             && frame.Chain.Select(ancestor => ancestor.FrameId).Distinct(StringComparer.Ordinal).Count()
                 == frame.Chain.Length;
@@ -192,7 +200,25 @@ internal static partial class BrowserEvidence
                 && actual.Id == expected.Id
                 && actual.DocumentId == expected.DocumentId
                 && actual.Chain is not null
-                && actual.Chain.SequenceEqual(expected.Chain);
+                && actual.Chain.Length == expected.Chain.Length
+                && actual
+                    .Chain.Zip(expected.Chain)
+                    .All(pair =>
+                        pair.First is not null
+                        && pair.Second is not null
+                        && pair.First.FrameId == pair.Second.FrameId
+                        && pair.First.Xpath == pair.Second.Xpath
+                        && pair.First.Label == pair.Second.Label
+                        && SameShadowChain(pair.First.ShadowChain, pair.Second.ShadowChain)
+                    );
+
+    private static bool ValidShadowChain(ShadowHost[]? chain) =>
+        chain is null
+        || chain is { Length: > 0 and <= 63 }
+            && chain.All(host => host is not null && !string.IsNullOrWhiteSpace(host.Xpath) && host.Label is not null);
+
+    private static bool SameShadowChain(ShadowHost[]? actual, ShadowHost[]? expected) =>
+        ValidShadowChain(actual) && (actual ?? []).SequenceEqual(expected ?? []);
 
     private static bool ValidInteractability(ResolvedTarget target, string action)
     {

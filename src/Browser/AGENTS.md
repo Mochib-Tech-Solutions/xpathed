@@ -6,7 +6,7 @@ For capture, XPath or readiness changes, read [resolution](../../docs/resolution
 
 `Sessions/BrowserSessions.cs` serializes operations through the session gate and handles cancellation of live commands. Keep new page operations on that path; a cancelled in-flight browser command cannot safely leave its page available for a later operation. `Viewing/` owns display relay behavior.
 
-Resolve and highlight passively. Preserve scrolling, focus and form state; inspecting readiness must not click, type or trigger application handlers. Frame context belongs beside the XPath, since an XPath is evaluated within one document.
+Resolve and highlight passively. Preserve scrolling, focus and form state; inspecting readiness must not click, type or trigger application handlers. Frame and open-shadow host context belong beside XPath, since each expression is evaluated within one DOM tree. Follow [ADR-0027](../../docs/adr/0027-keep-shadow-context-separate-from-xpath.md); preserve composed exposure, native clipped geometry, scoped names, private-value exclusion and retained node/root identity.
 
 ## Code Review Rules
 

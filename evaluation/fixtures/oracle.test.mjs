@@ -159,3 +159,21 @@ test("oracle-multiselect-changes-are-detected-despite-unchanged-first-value", as
   );
   assert.equal(result.passiveStateUnchanged, false);
 });
+
+test("oracle-shadow-field-edits-are-detected-without-plaintext-values", async () => {
+  const [baseline, result] = await observe(
+    '<div id="host"></div>',
+    { expected: [], actions: [] },
+    (doc) => {
+      doc.getElementById("host").shadowRoot.querySelector("input").value = "PRIVATE_CHANGED";
+    },
+    (doc) => {
+      doc.getElementById("host").attachShadow({ mode: "open" }).innerHTML =
+        '<input type="password" value="PRIVATE_ORIGINAL">';
+    },
+  );
+  assert.equal(baseline.initialState.length, 2);
+  assert.equal(baseline.documentChecksum.length, 2);
+  assert.equal(result.passiveStateUnchanged, false);
+  assert.equal(JSON.stringify([baseline, result]).includes("PRIVATE_"), false);
+});

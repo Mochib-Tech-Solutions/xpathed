@@ -6,6 +6,49 @@ import { setTimeout as delay } from "node:timers/promises";
 const client = "http://client-api:8080";
 const fixture = "http://resolution-fixture:8090";
 
+test("shadow-client-response-resolves-fixed-consent-with-native-root-context", async () => {
+  await json(`${fixture}/scenario`, "POST", {
+    name: "found",
+    targetText: "Accept all",
+    action: "click",
+  });
+  const session = await json(`${client}/api/sessions`, "POST");
+  const run = randomUUID();
+  try {
+    const page = await json(`${client}/api/pages/${session.pageId}/navigate`, "POST", {
+      url: `${fixture}/shadow?run=${run}`,
+    });
+    const result = await json(`${client}/api/pages/${page.pageId}/resolve`, "POST", {
+      instruction: "Click the Accept all button.",
+      documentId: page.documentId,
+    });
+    assert.equal(result.outcome, "found", JSON.stringify(result));
+    const target = result.actions[0].target;
+    assert.equal(target.accessibleName, "Accept all");
+    assert.equal(target.shadowChain.length, 1);
+    assert.equal(target.interactability.status, "ready");
+    assert.equal(result.diagnostics.modelCalls, 1);
+    await json(`${fixture}/oracle?run=${run}`, "POST", {
+      targets: [{ xpath: target.xpaths[0], shadowChain: target.shadowChain }],
+    });
+    let observation;
+    for (let attempt = 0; attempt < 100 && !observation; attempt++) {
+      observation = await json(`${fixture}/observation?run=${run}`);
+      if (!observation) await delay(50);
+    }
+    assert.deepEqual(observation?.matches, [["consent"]]);
+    assert.equal(observation.clicks, 0);
+    assert.equal(observation.scrollY, 0);
+    const provider = await json(`${fixture}/provider-request`);
+    assert.doesNotMatch(
+      provider.messages[1].content,
+      /PRIVATE_SHADOW_|data-oracle|consent-host|\/\/div/,
+    );
+  } finally {
+    await fetch(`${client}/api/sessions/${session.sessionId}`, { method: "DELETE" });
+  }
+});
+
 test("frames-client-response-preserves-nested-frame-chains-and-actions", async () => {
   await json(`${fixture}/scenario`, "POST", {
     name: "batch",

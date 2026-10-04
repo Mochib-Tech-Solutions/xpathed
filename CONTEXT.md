@@ -55,7 +55,7 @@ A distinct peer in a named visual direction. Nearness and alignment describe pag
 An approach for proposing target elements and their XPath expressions from an instruction and page context. Different strategies address the same resolution task.
 
 **XPath expression**:
-An expression that locates nodes within a document. A resolved XPath is intended to locate the target element on the current page.
+An expression that locates nodes within one DOM tree: a document or an open shadow root. A resolved XPath is intended to locate the target element on the current page.
 
 **Browser session**:
 A managed browsing instance containing related tabs and their shared browsing state. The client and resolver refer to the same session.
@@ -93,8 +93,11 @@ A document embedded within a page or another frame. Its target locations are rel
 **Frame chain**:
 The ordered containing frames from the main page to a target's frame document.
 
+**Shadow chain**:
+The ordered open shadow hosts from a target's frame document to its own DOM tree. It is locator context separate from the target XPath.
+
 **Candidate capture**:
-A temporary inventory of eligible candidate elements from a page and its supported frame documents. Its candidate identities refer only to that captured inventory.
+A temporary inventory of eligible candidate elements from a page, its open shadow roots and its supported frame documents. Its candidate identities refer only to that captured inventory.
 
 **Off-screen element**:
 An element present in the current page content but outside the visible viewport. This is distinct from an element concealed by the application's display state.

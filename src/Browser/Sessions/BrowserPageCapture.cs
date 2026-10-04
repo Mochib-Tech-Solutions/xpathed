@@ -131,7 +131,10 @@ internal sealed class BrowserPageCapture(BrowserPageRuntime page) : IAsyncDispos
                         new FrameAncestor(
                             id,
                             info.GetProperty("xpath").GetString()!,
-                            info.GetProperty("label").GetString()!
+                            info.GetProperty("label").GetString()!,
+                            info.TryGetProperty("shadowChain", out var shadowChain)
+                                ? shadowChain.Deserialize<ShadowHost[]>(JsonOptions)
+                                : null
                         )
                     )
                     .ToArray();
