@@ -2,6 +2,7 @@
 import fcntl
 import json
 import os
+import re
 from pathlib import Path
 import shutil
 import signal
@@ -11,6 +12,40 @@ import time
 import urllib.request
 
 SERVICES = ("browser", "resolver", "client-api", "web")
+
+
+def obsolete_images(references, current):
+    keep = {current["revision"], current.get("previousRevision")}
+    pattern = r"xpathed/(browser|resolver|client-api|web):([a-f0-9]{40})"
+    return {reference for reference in references
+            if (match := re.fullmatch(pattern, reference)) and match.group(2) not in keep}
+
+
+def cleanup(current):
+    def output(*args):
+        return subprocess.check_output(["sudo", "-n", "docker", *args], text=True).splitlines()
+    references = output("image", "ls", "--format", "{{.Repository}}:{{.Tag}}")
+    obsolete = obsolete_images(references, current)
+    # Remove only stopped containers belonging to this stack and obsolete source images.
+    containers = output("ps", "-a", "--filter", "label=com.docker.compose.project=xpathed-hosted",
+                        "--filter", "status=exited", "--filter", "status=dead",
+                        "--format", "{{.ID}} {{.Image}}")
+    for container in containers:
+        identity, reference = container.split()
+        if reference in obsolete:
+            subprocess.run(["sudo", "-n", "docker", "container", "rm", identity], check=True)
+    for reference in sorted(obsolete):
+        # Docker refuses removal of an image still used by any container. Never force it.
+        subprocess.run(["sudo", "-n", "docker", "image", "rm", reference], check=True)
+    print(json.dumps({"cleanup": "completed", "obsoleteImageReferences": len(obsolete)}))
+
+
+def cleanup_safely(current):
+    try:
+        cleanup(current)
+    except (OSError, subprocess.CalledProcessError) as error:
+        # Cleanup failure must not roll back an already healthy application.
+        print(f"Cleanup incomplete ({type(error).__name__}); application remains deployed.", file=sys.stderr)
 
 
 def compose(base, state, *arguments):
@@ -43,10 +78,11 @@ def wait_healthy(base, state, check=healthy):
             time.sleep(5)
 
 
-def deploy(base, source, revision, fingerprint, run=compose, check=wait_healthy):
+def deploy(base, source, revision, fingerprint, run=compose, check=wait_healthy, clean=cleanup_safely):
     state_path = base / "deploy/current.json"
     previous = json.loads(state_path.read_text())
     if previous["fingerprint"] == fingerprint:
+        clean(previous)
         print(json.dumps({"status": "unchanged", "revision": previous["revision"]}))
         return
     release = base / "deployments" / revision
@@ -62,7 +98,7 @@ def deploy(base, source, revision, fingerprint, run=compose, check=wait_healthy)
                "labels": {"org.opencontainers.image.revision": revision}}
         for name in SERVICES}}))
     candidate = {"revision": revision, "fingerprint": fingerprint,
-                 "source": str(release), "override": str(override)}
+                 "source": str(release), "override": str(override), "previousRevision": previous["revision"]}
     # A failed build leaves the running stack and successful receipt untouched.
     run(base, candidate, "build", *SERVICES)
     try:
@@ -77,6 +113,7 @@ def deploy(base, source, revision, fingerprint, run=compose, check=wait_healthy)
         check(base, previous)
         raise
     print(json.dumps({"status": "deployed", "revision": revision, "fingerprint": fingerprint}))
+    clean(candidate)
 
 
 if __name__ == "__main__":
