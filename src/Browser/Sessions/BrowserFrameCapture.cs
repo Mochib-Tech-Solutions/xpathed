@@ -20,6 +20,7 @@ internal sealed class BrowserFrameCapture(
     public IElementHandle? Owner { get; } = owner;
     public HashSet<string> CandidateIds { get; } = new(StringComparer.Ordinal);
     public IJSHandle? Highlight { get; set; }
+    public string[] HighlightCandidateIds { get; set; } = [];
 
     public async Task<int> RefreshAsync(int budgetMs, int scanBudget)
     {

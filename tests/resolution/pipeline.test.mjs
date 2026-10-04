@@ -158,6 +158,18 @@ test("cardinality-client-response-preserves-found-blocked-and-missing-targets", 
       actionId: "a2",
     });
     assert.equal(inspected.target.candidateId, result.actions[1].target.candidateId);
+    for (const actionId of ["a2", null]) {
+      const spotlight = await fetch(`${client}/api/pages/${page.pageId}/spotlight`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          documentId: page.documentId,
+          captureId: result.captureId,
+          actionId,
+        }),
+      });
+      assert.equal(spotlight.status, 204);
+    }
     assert.deepEqual((await observeXpaths(run, [])).events, before.events);
     const provider = await json(`${fixture}/provider-request`);
     assert.equal(provider.max_tokens, 4096);

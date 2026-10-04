@@ -54,4 +54,12 @@ public sealed class PagesController(IHttpClientFactory clients) : ControllerBase
             clients.CreateClient("resolver"),
             $"/pages/{Uri.EscapeDataString(id)}/inspect"
         );
+
+    [HttpPost("{id}/spotlight")]
+    public Task Spotlight(string id) =>
+        HttpForwarder.ForwardAsync(
+            HttpContext,
+            clients.CreateClient("browser"),
+            $"/pages/{Uri.EscapeDataString(id)}/spotlight"
+        );
 }

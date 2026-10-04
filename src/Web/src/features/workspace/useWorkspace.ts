@@ -60,6 +60,7 @@ export default function useWorkspace() {
   const pending = useRef(false);
   const revision = useRef(0);
   const snapshotRevision = useRef(0);
+  const spotlightQueue = useRef(Promise.resolve());
 
   useEffect(
     () => () => {
@@ -288,6 +289,38 @@ export default function useWorkspace() {
       });
     });
   }
+  function spotlight(entry: Resolution, actionId: string | null) {
+    const result = entry.result;
+    if (
+      pending.current ||
+      entry.historical ||
+      !result?.captureId ||
+      result.pageId !== page?.pageId ||
+      result.documentId !== page.documentId
+    )
+      return;
+    const startedAt = revision.current;
+    const snapshotAt = snapshotRevision.current;
+    spotlightQueue.current = spotlightQueue.current.then(async () => {
+      if (
+        pending.current ||
+        revision.current !== startedAt ||
+        snapshotRevision.current !== snapshotAt
+      )
+        return;
+      try {
+        await request(`/pages/${result.pageId}/spotlight`, "POST", {
+          documentId: result.documentId,
+          captureId: result.captureId,
+          actionId,
+        });
+      } catch (failure) {
+        if (revision.current === startedAt && snapshotRevision.current === snapshotAt) {
+          setError(failure instanceof Error ? failure.message : "Unable to spotlight this target.");
+        }
+      }
+    });
+  }
   function setInstruction(instruction: string) {
     if (page)
       setWorkspace((previous) => ({
@@ -297,6 +330,8 @@ export default function useWorkspace() {
   }
   function resetChat() {
     if (!page || pending.current) return;
+    const latest = chat.history.at(-1);
+    if (latest) spotlight(latest, null);
     setWorkspace((previous) => ({
       ...previous,
       tabs: {
@@ -335,6 +370,7 @@ export default function useWorkspace() {
     resolve,
     setInstruction,
     resetChat,
+    spotlight,
     setAddress,
     dismissError: () => setError(""),
   };

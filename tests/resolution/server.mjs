@@ -41,6 +41,7 @@ const server = createServer(async (request, response) => {
     if (
       [
         "/fixture",
+        "/login",
         "/second",
         "/privacy",
         "/quotes",
@@ -54,6 +55,16 @@ const server = createServer(async (request, response) => {
       ].includes(path)
     ) {
       let html = fixture;
+      if (path === "/login")
+        html = html.replace(
+          /<nav.*?<\/nav>/s,
+          `<header><button data-oracle="header-login">Log in</button></header><aside><section aria-label="Get responses tailored to you"><h2>Get responses tailored to you</h2><button data-oracle="sidebar-login">Log in</button></section></aside>`,
+        );
+      if (path === "/login" && url.searchParams.has("covered"))
+        html = html.replace(
+          "</aside>",
+          `</aside><style>aside{position:fixed;bottom:8px}#cookies{position:fixed;bottom:0;left:0;width:100%;height:64px;background:white;z-index:10}</style><div id="cookies">We use cookies</div>`,
+        );
       if (path === "/confirmations")
         html = html.replace(
           /<nav.*?<\/nav>/s,
