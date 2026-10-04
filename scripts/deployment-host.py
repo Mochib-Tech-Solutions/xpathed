@@ -82,6 +82,7 @@ def deploy(base, source, revision, fingerprint, run=compose, check=wait_healthy,
     state_path = base / "deploy/current.json"
     previous = json.loads(state_path.read_text())
     if previous["fingerprint"] == fingerprint:
+        check(base, previous)
         clean(previous)
         print(json.dumps({"status": "unchanged", "revision": previous["revision"]}))
         return
