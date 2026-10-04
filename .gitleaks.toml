@@ -1,0 +1,28 @@
+title = "xpathed credential checks"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "generic-api-key"
+
+[[rules.allowlists]]
+description = "Source-file SHA256 provenance, not credentials"
+condition = "AND"
+paths = ['''docs/assets/evaluation/.*\.json$''']
+regexTarget = "match"
+regexes = ['''^Api(Error|ErrorHandling|Exception)\.cs": "[a-f0-9]{64}"$''']
+
+[[rules.allowlists]]
+description = "Historical evaluation prose, not a credential assignment"
+condition = "AND"
+paths = ['''docs/evaluation\.md$''']
+regexTarget = "match"
+regexes = ['''^API contracts, missing/duplicate $''']
+
+[[rules.allowlists]]
+description = "Exact dummy value used to test credential redaction"
+condition = "AND"
+paths = ['''tests/Resolver\.Tests/ResolutionContractTests\.cs$''']
+regexTarget = "match"
+regexes = ['''^API_KEY=violet-cactus-782"$''']
