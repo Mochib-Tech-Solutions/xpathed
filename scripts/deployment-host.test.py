@@ -16,6 +16,14 @@ def load(name, filename):
 
 host = load("host", "deployment-host.py")
 receiver = load("receiver", "deployment-receiver.py")
+deploy = host.deploy
+
+
+def without_cleanup(*args, **kwargs):
+    return deploy(*args, **kwargs, clean=lambda state: None)
+
+
+host.deploy = without_cleanup
 
 
 class DeploymentTests(unittest.TestCase):
@@ -85,6 +93,12 @@ class DeploymentTests(unittest.TestCase):
             receiver.receive(self.base, "deploy " + "a" * 40 + " " + "b" * 64, stream)
         self.assertFalse((self.base / "escaped").exists())
         self.assertEqual(list((self.base / "incoming").iterdir()), [])
+
+    def test_cleanup_keeps_active_previous_and_unrelated_images(self):
+        current = {"revision": "a" * 40, "previousRevision": "b" * 40}
+        references = [f"xpathed/web:{revision * 40}" for revision in ("a", "b", "c")]
+        references += ["nginx:latest", "xpathed/browser:development", "other/web:" + "c" * 40]
+        self.assertEqual(host.obsolete_images(references, current), {"xpathed/web:" + "c" * 40})
 
 
 if __name__ == "__main__":
