@@ -1,3 +1,5 @@
+import { profile } from "../configuration.mjs";
+
 export const stagehandVersion = "4.1.0";
 
 // Stagehand's generated paths cross document boundaries; standard XPath cannot.
@@ -66,16 +68,27 @@ export function deterministicObservation(params, plan = {}) {
   };
 }
 
-export async function requestObservation(params, url, { fetchImpl = fetch } = {}) {
+export async function requestObservation(
+  params,
+  url,
+  { fetchImpl = fetch, modelProfile = profile } = {},
+) {
   const response = await fetchImpl(url, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: "Bearer comparison-only" },
     signal: AbortSignal.timeout(45000),
     body: JSON.stringify({
-      model: "deepseek/deepseek-v4.1-flash",
-      provider: { only: ["wafer"], allow_fallbacks: false },
+      model: modelProfile.model,
+      stream: false,
+      provider: {
+        only: [modelProfile.provider],
+        order: [modelProfile.provider],
+        allow_fallbacks: false,
+        require_parameters: true,
+      },
       max_tokens: 4096,
-      reasoning: { enabled: false },
+      reasoning: modelProfile.reasoning,
+      plugins: [{ id: "context-compression", enabled: false }],
       messages: [
         { role: "system", content: params.systemPrompt },
         ...params.messages.map((message) => ({

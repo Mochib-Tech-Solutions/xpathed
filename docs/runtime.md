@@ -134,7 +134,7 @@ A call allowance is not a dollar cap: request sizes, route prices and restarts a
 | `ResolverUrl`                                        | Client API resolver URL, `http://resolver:8080`                                                                           |
 | `OPENROUTER_API_KEY`                                 | Ignored local `.env` key used only by Resolver; manual browsing requires no key                                           |
 | `OPENROUTER_EVAL_API_KEY`                            | Dedicated key for explicitly requested live provider inference in evaluation; never replaces the application key          |
-| `OPENROUTER_MODEL` / `OPENROUTER_PROVIDER`           | Initial route `deepseek/deepseek-v4.1-flash` / `wafer`; see [resolution configuration](resolution.md#model-configuration) |
+| `OPENROUTER_MODEL` / `OPENROUTER_PROVIDER`           | Default route `google/gemini-3.8-flash` / `google-ai-studio` with low reasoning; see [resolution configuration](resolution.md#model-configuration) |
 | `OPENROUTER_BASE_URL` / `OPENROUTER_TIMEOUT_SECONDS` | OpenRouter endpoint (default `https://openrouter.ai/api/v1/`) and request timeout in seconds (default `30`)               |
 | `ViewerOrigins`                                      | Comma-separated exact allowed viewer origins; Compose includes localhost and 127.0.0.1                                    |
 | `MaxSessions`                                        | Browser capacity, default 4; allowed 1–16                                                                                 |

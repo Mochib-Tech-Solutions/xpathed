@@ -51,8 +51,8 @@ Setup creates an ignored `.env` from `.env.example` without replacing an existin
 
 ```dotenv
 OPENROUTER_API_KEY=your-key-here
-OPENROUTER_MODEL=deepseek/deepseek-v4.1-flash
-OPENROUTER_PROVIDER=wafer
+OPENROUTER_MODEL=google/gemini-3.8-flash
+OPENROUTER_PROVIDER=google-ai-studio
 ```
 
 ```sh
@@ -111,11 +111,19 @@ Saved-page selection evaluates steps 3–4 with saved inputs. XPath construction
 
 ### Model and configuration
 
-The development default is **`deepseek/deepseek-v4.1-flash` through OpenRouter's `wafer` provider**, configured in `.env.example` and `docker/compose.yaml`.
+The development default is **`google/gemini-3.8-flash` through OpenRouter's `google-ai-studio` provider with low reasoning**, configured in `.env.example` and `docker/compose.yaml`. Existing `.env` and hosted runtime settings take precedence; update both model and provider there to adopt this default.
+
+Switch models by setting both values in the ignored `.env`, then restart this checkout with `pnpm dev`. Hosted deployments use their private `deploy/application.env` instead. The prompt and resolution contract stay the same.
+
+| `OPENROUTER_MODEL`             | `OPENROUTER_PROVIDER` | Effective reasoning          |
+| ------------------------------ | --------------------- | ---------------------------- |
+| `google/gemini-3.8-flash`      | `google-ai-studio`    | Low; reasoning text excluded |
+| `deepseek/deepseek-v4.1-flash` | `wafer`               | Disabled                     |
+| `openai/gpt-6-luna`            | `openai`              | Disabled                     |
 
 The repository keeps one implementation and one prompt/schema, updated in place. Git tracks their history; code has no manual prompt or behavior revision numbers. See [ADR-0024](docs/adr/0024-keep-one-resolution-implementation.md).
 
-`ActionSelectionStrategy` owns the shared runtime and saved-page prompt, schema and selection validation. `OpenRouterGateway` pins the provider, disables reasoning and fallback, and limits output to 4,096 tokens. A configuration hash identifies effective settings. No model is trained here; changes to the pretrained model, prompt or context require evaluation. Docker/environment variables supply OpenRouter credentials, endpoint, model and provider. Release artifacts do not override deployment configuration.
+`ActionSelectionStrategy` owns the shared runtime and saved-page prompt, schema and selection validation. `OpenRouterGateway` pins the provider, enables low reasoning for Gemini 3.8 Flash while excluding reasoning from returned text, disables reasoning for other models, disables fallback, and limits output to 4,096 tokens. A configuration hash identifies effective settings. No model is trained here; changes to the pretrained model, prompt or context require evaluation. Docker/environment variables supply OpenRouter credentials, endpoint, model and provider. Release artifacts do not override deployment configuration.
 
 Illustrative saved click result:
 
@@ -161,25 +169,9 @@ These are actual cases from the shared evaluation set. Expected selectors belong
 
 See [case IDs, fixtures and metric definitions](docs/evaluation.md#example-cases-and-metrics), and [actual outcomes across the three systems](docs/research/clean-evaluation-comparison.md#case-examples).
 
-### Refreshed comparison: Basic resolver, Improved resolver and Stagehand
+### 1. Select the model using accuracy
 
-Measured on **4 October 2026**: archived Basic `d5333779`, current Improved runtime `d444176c`, and Stagehand **4.1.0**. All three were refreshed on **190 shared browser cases**, including spatial and shadow behavior; both saved-page arms use all **569 reviewed cases**. Each case has one original attempt per system. Stagehand requires a live page and has no saved-page score.
-
-The saved-page table comes from a **fresh complete run** after the key allowance was restored: one new original attempt on every reviewed case per arm, with zero spending-limit refusals. The [interrupted run](docs/research/comparison-2026-10-04-interrupted.md) remains separate, preserving every original failure.
-
-| System            | Saved-page exact-target selection | Browser action + targets |
-| ----------------- | --------------------------------- | ------------------------ |
-| Basic resolver    | 502/569 (88.2%)                   | 159/190 (83.7%)          |
-| Improved resolver | 481/569 (84.5%)                   | 176/190 (92.6%)          |
-| Stagehand         | Not applicable                    | 111/190 (58.4%)          |
-
-[![Refreshed comparison, on complete latest evaluation sets](docs/assets/evaluation/clean-comparison.svg)](docs/research/clean-evaluation-comparison.md)
-
-Basic → Improved gained **21 browser passes and lost 4**. Saved-page exact-target selection gained **32 and lost 53**, on the complete new run. Controlled XPath verification passed **180/180**, with **22/22 saved-locator mutations** and **22/22 fresh resolutions after mutation**, without model calls.
-
-The system comparison retains **1,708 original provider requests**, **$0.83601567 known reported cost** and **0 unreported charges**. Tables and figures use the [same verified aggregate](docs/assets/evaluation/clean-comparison.json). The [report](docs/research/clean-evaluation-comparison.md) separates common action/target scores, target-only and full-contract scores, behavior categories, timings and evidence identities. Singleton Stagehand requests grade its first suggestion; plural requests grade its entire set. [Earlier results](docs/research/comparison-2026-10-03.md) remain historical.
-
-### Refreshed model comparison
+We first compared **DeepSeek, Luna and Gemini with the same enhanced Resolver**, prompt/schema and evaluation inputs at measured source `d444176c`. Each model completed **190 browser cases and 569 reviewed saved-page cases**, with one original attempt and no retries. Gemini had the highest observed accuracy in both categories, so we selected it as the application default.
 
 | Model / pinned provider                              | Browser action + targets | Saved-page exact-target selection |
 | ---------------------------------------------------- | ------------------------ | --------------------------------- |
@@ -187,9 +179,27 @@ The system comparison retains **1,708 original provider requests**, **$0.8360156
 | GPT-6 Luna / OpenAI                                  | 183/190 (96.3%)          | 512/569 (90.0%)                   |
 | Gemini 3.8 Flash / Google AI Studio (reasoning: low) | 190/190 (100.0%)         | 547/569 (96.1%)                   |
 
-[![Models with the current Resolver](docs/assets/evaluation/model-comparison.svg)](docs/research/model-comparison-2026-10-04.md)
+[![Model-selection accuracy with the enhanced Resolver](docs/assets/evaluation/model-comparison.svg)](docs/research/model-comparison-2026-10-04.md)
 
-All three model profiles completed 569 fresh saved-page attempts, with zero spending-limit refusals. Gemini uses an evaluation-only low-reasoning profile because its route requires reasoning; DeepSeek and Luna disable reasoning. The application configuration is unchanged. All three model browser scores use the newest 190 cases. The [model report](docs/research/model-comparison-2026-10-04.md) retains all attempts, paired outcomes, costs and compatibility evidence. Timing cohorts differ, so no fastest-model claim follows. Model defaults remain unchanged. These measurements do not establish unseen-site accuracy or release approval.
+Gemini requires low reasoning; DeepSeek and Luna disable reasoning. The earlier model-selection experiment supplied Gemini's compatible reasoning setting through a recorded adapter. The current application supplies it directly, and real Gemini browser and chat checks passed. The [model-selection report](docs/research/model-comparison-2026-10-04.md) retains the original source, paired gains/losses, durations, costs and evidence. Its measurements stay separate from the approach comparison below. The model decision is based on observed accuracy on this evaluation set; timing cohorts differ.
+
+### 2. Compare approaches using the selected Gemini model
+
+With **Gemini 3.8 Flash / Google AI Studio and low reasoning held constant**, we then compare **Basic, Enhanced (Improved), and Stagehand**. Enhanced is the implementation used by the application. Measured runtime `1cc50794`, archived Basic `d5333779`, Stagehand **4.1.0**. All **190 shared browser cases** and **569 reviewed saved-page cases per applicable arm** completed with one original attempt and no retries. Stagehand requires a live page and has no saved-page arm.
+
+| System            | Saved-page exact-target selection | Browser action + targets |
+| ----------------- | --------------------------------- | ------------------------ |
+| Basic resolver    | 532/569 (93.5%)                   | 182/190 (95.8%)          |
+| Improved resolver | 551/569 (96.8%)                   | 190/190 (100.0%)         |
+| Stagehand         | Not applicable                    | 123/190 (64.7%)          |
+
+[![Complete approach comparison using Gemini](docs/assets/evaluation/clean-comparison.svg)](docs/research/clean-evaluation-comparison.md)
+
+Basic → Improved: **8 browser gains / 0 lost passes**, **27 saved-page gains / 8 lost passes**. Controlled XPath: **180/180**, including **22/22 saved-locator mutations** and **22/22 fresh resolutions after mutation**, with no model calls. Scores have separate denominators.
+
+[![Approach median and p95 duration using Gemini](docs/assets/evaluation/system-duration.svg)](docs/research/clean-evaluation-comparison.md#duration-and-cost)
+
+The approach comparison retains **1,708 original requests**, **$12.70015050 known reported cost** and **0 unreported charges**. Tables, accuracy and duration figures use the [same verified aggregate](docs/assets/evaluation/clean-comparison.json). The [report](docs/research/clean-evaluation-comparison.md) separates common, target-only and full-contract scores, behavior categories and timing cohorts. Basic's archived request needs a reasoning-only compatibility adaptation; Improved and Stagehand send Gemini settings directly. Earlier comparisons and incomplete runs remain separate evidence and are not pooled into these scores. See the [presentation statistics](docs/research/presentation-statistics.md) for the figures and their measurement boundaries.
 
 ```sh
 pnpm check                              # local checks

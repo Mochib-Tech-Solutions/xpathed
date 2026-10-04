@@ -3,6 +3,8 @@ services:
     environment:
       OpenRouter__BaseUrl: http://resolution-fixture:8090/api/v1/
       OpenRouter__ApiKey: deterministic-fixture-only
+      OpenRouter__Model: deepseek/deepseek-v4.1-flash
+      OpenRouter__Provider: wafer
       # Isolated trusted checks exercise behavior without public-demo throttling.
       RateLimits__RequestsPerMinute: 100000
       RateLimits__ConcurrentRequests: 32

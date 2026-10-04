@@ -2226,12 +2226,62 @@ public sealed class ResolutionContractTests
     }
 
     [Fact]
-    public async Task ProviderRequestPinsSupportedSettingsAndPreservesUnicodeLabels()
+    public async Task DefaultGeminiRequestUsesLowReasoningAndRecordsTheEffectiveSettings()
+    {
+        var handler = new DeterministicServicesHandler();
+        await using var application = CreateApplication(
+            handler,
+            new Dictionary<string, string?> { ["OpenRouter:Model"] = null, ["OpenRouter:Provider"] = null }
+        );
+        using var client = application.CreateClient();
+        client.DefaultRequestHeaders.Add("X-Xpathed-Attempt-Id", Guid.NewGuid().ToString("N"));
+        using var response = await client.PostAsJsonAsync(
+            "/internal/pages/page-1/resolve",
+            new { instruction = "Click Save", documentId = "document-1" }
+        );
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var envelope = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("found", envelope.GetProperty("result").GetProperty("outcome").GetString());
+        var request = handler.ModelRequest;
+        Assert.Equal("google/gemini-3.8-flash", request.GetProperty("model").GetString());
+        Assert.Equal("google-ai-studio", request.GetProperty("provider").GetProperty("only")[0].GetString());
+        Assert.True(request.GetProperty("reasoning").GetProperty("enabled").GetBoolean());
+        Assert.Equal("low", request.GetProperty("reasoning").GetProperty("effort").GetString());
+        Assert.True(request.GetProperty("reasoning").GetProperty("exclude").GetBoolean());
+        Assert.False(request.GetProperty("provider").GetProperty("allow_fallbacks").GetBoolean());
+        Assert.Equal(4096, request.GetProperty("max_tokens").GetInt32());
+        Assert.True(
+            request.GetProperty("response_format").GetProperty("json_schema").GetProperty("strict").GetBoolean()
+        );
+        using var configuration = JsonDocument.Parse(
+            envelope.GetProperty("evidence").GetProperty("configurationJson").GetString()!
+        );
+        var effective = configuration.RootElement.GetProperty("effective");
+        Assert.Equal(
+            request.GetProperty("reasoning").GetRawText(),
+            effective.GetProperty("request").GetProperty("reasoning").GetRawText()
+        );
+        Assert.Equal(
+            envelope.GetProperty("result").GetProperty("configurationId").GetString(),
+            Convert.ToHexStringLower(
+                System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(effective.GetRawText()))
+            )
+        );
+        Assert.Equal(1, handler.ProviderRequestCount);
+    }
+
+    [Theory]
+    [InlineData("deepseek/deepseek-v4.1-flash", "wafer")]
+    [InlineData("openai/gpt-6-luna", "openai")]
+    public async Task ProviderRequestPinsSupportedSettingsAndPreservesUnicodeLabels(string model, string provider)
     {
         var capture = JsonNode.Parse(new DeterministicServicesHandler().CaptureBody)!;
         capture["candidates"]![0]!["label"] = "Sauvegarder 東京";
         var handler = new DeterministicServicesHandler { CaptureBody = capture.ToJsonString() };
-        await using var application = CreateApplication(handler);
+        await using var application = CreateApplication(
+            handler,
+            new Dictionary<string, string?> { ["OpenRouter:Model"] = model, ["OpenRouter:Provider"] = provider }
+        );
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
@@ -2239,11 +2289,11 @@ public sealed class ResolutionContractTests
         );
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = handler.ModelRequest;
-        Assert.Equal("deepseek/deepseek-v4.1-flash", body.GetProperty("model").GetString());
+        Assert.Equal(model, body.GetProperty("model").GetString());
         Assert.False(body.GetProperty("reasoning").GetProperty("enabled").GetBoolean());
         Assert.False(body.TryGetProperty("service_tier", out _));
         Assert.Equal(4096, body.GetProperty("max_tokens").GetInt32());
-        Assert.Equal("wafer", body.GetProperty("provider").GetProperty("only")[0].GetString());
+        Assert.Equal(provider, body.GetProperty("provider").GetProperty("only")[0].GetString());
         Assert.False(body.GetProperty("provider").TryGetProperty("max_price", out _));
         Assert.False(body.GetProperty("provider").GetProperty("allow_fallbacks").GetBoolean());
         Assert.True(body.GetProperty("provider").GetProperty("require_parameters").GetBoolean());
@@ -2449,7 +2499,14 @@ public sealed class ResolutionContractTests
             builder.ConfigureAppConfiguration(
                 (_, configuration) =>
                     configuration
-                        .AddInMemoryCollection(new Dictionary<string, string?> { ["OpenRouter:ApiKey"] = "test-token" })
+                        .AddInMemoryCollection(
+                            new Dictionary<string, string?>
+                            {
+                                ["OpenRouter:ApiKey"] = "test-token",
+                                ["OpenRouter:Model"] = "deepseek/deepseek-v4.1-flash",
+                                ["OpenRouter:Provider"] = "wafer",
+                            }
+                        )
                         .AddInMemoryCollection(settings ?? [])
             );
             builder.ConfigureServices(services =>

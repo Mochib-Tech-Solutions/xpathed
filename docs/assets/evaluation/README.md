@@ -1,36 +1,35 @@
 # Evaluation figures
 
-## Recorded comparison and refresh
+## Model selection, then approach comparison
 
-The checked-in `clean-comparison.json` and SVG describe the refreshed comparison in the [current report](../../research/clean-evaluation-comparison.md). The complete browser arms, both saved-page arms and controlled XPath run share their recorded source, collection and grading boundaries.
+First, the [complete model-selection comparison](../../research/model-comparison-2026-10-04.md) holds the enhanced Resolver, prompt/schema and inputs fixed at its recorded source. Gemini had the highest observed accuracy and became the application default. Its original `model-comparison.json` and SVG remain unchanged; they include the recorded Gemini reasoning adaptation and grading-envelope reconciliation.
 
-`comparison-2026-10-03.json` and SVG preserve the earlier measured configurations and frozen collection in the [historical report](../../research/comparison-2026-10-03.md). Supplementary [spatial pipeline evidence](../../research/spatial-item-selection.md) remains separate.
+Second, the [Gemini approach comparison](../../research/clean-evaluation-comparison.md) tests Basic, Improved (Enhanced) and Stagehand with Gemini / Google AI Studio, low reasoning and the same output allowance. The [presentation statistics](../../research/presentation-statistics.md) keeps the two measurements and their source identities separate. No additional DeepSeek/Luna refresh is included.
 
-After all runs complete, export the browser comparison, both Saved-page selection arms and the controlled XPath run:
+Regenerate the Gemini approach accuracy and duration figures from complete original evidence, without provider calls:
 
 ```sh
-uv run docs/assets/evaluation/clean-comparison-plot.py BROWSER_RUN BASIC_SAVED_RUN IMPROVED_SAVED_RUN XPATH_RUN
+uv run docs/assets/evaluation/clean-comparison-plot.py SYSTEM_BROWSER_RUN GEMINI_SAVED_RUN/basic GEMINI_SAVED_RUN/current XPATH_RUN
+uv run docs/assets/evaluation/comparison-figures.py
 ```
 
-This provider-free command writes `clean-comparison.json` and `clean-comparison.svg`. It requires live-provider evidence, exactly one retained original attempt per planned case and arm, the complete current browser case definitions, matching saved-page inputs and labels, and the complete currently admitted saved-page collection. The six deterministic browser compatibility trials are separately bound and excluded from inference counts. It rejects missing or extra trials, changed manifest hashes, reused provider records, unverified successful provider identities and response-cache hits. Recorded browser common/full grades and saved-page grades must exactly match the existing graders under the recorded grader hashes; counts and charges must match saved summaries. Completed operational failures remain in the denominator, including a failed final attempt that stopped further scheduling; missing attempts and integrity failures block export.
+The exporter verifies browser and saved-page grades under the recorded graders, complete case/arm membership, original trials/provider files, pinned semantic input/label/prepared-input hashes, matched model/provider/reasoning/output limits, actual images and contemporaneous runtime receipts. Six provider-free Basic compatibility trials are bound separately and excluded from paid totals. The archived Basic Gemini request adapts only reasoning; both native/upstream request hashes are verified. Raw inputs, prompts, requests and responses remain private.
 
-The JSON retains original outcome IDs, evidence hashes, failure categories, separate browser common/full-contract/target-only scores, paired gains and regressions, unknown charges and separate timing cohorts. Only explicitly unsupported browser instructions leave the target-only denominator. Raw instructions, candidates, requests and responses remain private. Stagehand has no saved-page arm and is shown as unavailable. The current graph shows complete browser action-and-target correctness and complete fresh saved-page exact-target selection, with separate denominators. The `comparison-2026-10-04-interrupted` assets preserve the earlier run as passes, provider-limit refusals and other failures; those run-success percentages must not be presented as model accuracy.
+Missing or extra attempts, evidence drift, identity violations and response-cache hits block export. Completed provider failures remain failed outcomes and stay in denominators. Authentication/spending refusals prevent an affected run from replacing presentation accuracy; preserve its outcomes as separate operational evidence. Unavailable charges never mean zero cost. Billing availability does not alter grades. Retained provider-free XPath evidence replays separately under its recorded grader.
 
-The browser directory must retain `basic-runtime-receipt.json` and `basic-bundle-lineage.json`. Their allowlisted source, native image and adapter-file hashes bind the executed Basic adapter to the projected bundle without publishing raw payloads.
+The accuracy figure keeps browser action/target and saved-page exact-target denominators separate. Target-only and full-contract scores, behavior categories, paired gains/lost passes and original evidence hashes remain in `clean-comparison.json`. Stagehand has no saved-page arm. The duration figure uses the conventional median (averaging the two middle durations for an even count) and nearest-rank p95. It includes every original attempt, reports unavailable measurements and keeps browser and CLI boundaries separate; its renderer rejects pooling multiple cohorts.
 
-A continued browser run must retain its hashed amendment and complete parent evidence snapshot. Original attempts must remain byte-identical; timing groups follow the amendment’s retained/pending partition. The saved-page directories must share the frozen launcher plan, helper hashes, amendment test receipts and preparation records. Saved-page continuation receipts must also bind every copied original trial and provider record, preserve the disjoint retained/pending partition, and identify each trial’s execution cohort. Both tracks must bind the same native Resolver images.
+The exporters write `clean-comparison.svg` and `system-duration.svg`, with accessible descriptions and temporary PNG previews. Matplotlib is pinned. Review both previews before publishing. Retain original evidence and historical aggregate/figure bytes before replacing current assets.
 
-The fourth input is the completed XPath construction and verification run. The exporter checks it against the current XPath case selection, replays the existing grader and retains trial hashes, pass counts and saved-locator/fresh-resolution counts separately. It performs no provider calls.
+## Retained completed and interrupted measurements
 
-The generator pins Matplotlib and writes an accessible SVG plus a temporary PNG preview. Review the preview after exporting. It updates only the new clean-comparison files; historical reports and figures below remain unchanged.
+- `gemini-saved-key-limit-2026-10-04.json` retains the [original Gemini-default saved-page attempts with key-limit refusals](../../research/gemini-saved-key-limit-2026-10-04.md); full-set selection accuracy is unavailable.
 
-## Current model figure
+- `comparison-2026-10-04-deepseek.json` and SVG retain the [completed DeepSeek system comparison](../../research/comparison-2026-10-04-deepseek.md).
+- The `comparison-2026-10-04-interrupted` assets retain spending-limit refusals and other failures. Their run-success percentages are not model accuracy.
+- `comparison-2026-10-03.json` and SVG retain the [3 October comparison](../../research/comparison-2026-10-03.md). Supplementary [spatial pipeline results](../../research/spatial-item-selection.md) remain separate.
 
-`model-comparison.json` and SVG describe the [4 October current-Resolver model comparison](../../research/model-comparison-2026-10-04.md). DeepSeek references the refreshed Improved evidence above; Luna uses the same runtime, prompt/schema, cases and reviewed inputs. Gemini is tested on all 190 browser and 569 saved-page cases using its required low-reasoning research profile. DeepSeek and Luna disable reasoning. Current figures show complete first-attempt scores; the earlier interrupted figures and Gemini configuration rejections remain dated historical evidence.
-
-The model aggregate binds all 190 Luna and 190 compatible Gemini browser attempts, 569 fresh saved-page attempts each, and the earlier 190 rejected Gemini browser attempts separately, paired outcomes, source/image identities, collector/exporter hashes and unavailable accounting. The private collector's common-grader envelope omitted `strategy` and the call count; reconciliation restores only the documented `custom` strategy and retained native diagnostics count, while preserving original evidence and full-contract grades. Actual native request parity and prepared-input review bindings are verified before export. Current regeneration uses the retained private calculation helpers identified by hashes in both aggregates; no application or checked-in tooling changes were needed. They verify the Basic receipt phase, all new prepared-input bindings, and the evaluation-only Gemini reasoning adaptation while replaying the existing graders. The original exporter command above describes the repository workflow; reproducing this reconciliation also requires those hash-bound private helpers and retained evidence.
-
-For this refresh, Basic's container receipt was taken during explicitly labelled post-completion image restoration. A complete hash snapshot verifies that every original manifest, trial and provider record remained unchanged. The aggregate retains this receipt phase rather than presenting it as contemporaneous measurement evidence.
+Earlier receipt phases and reconciliation limitations remain attached to those historical measurements. Current runs have contemporaneous native runtime receipts and verified original grades.
 
 ## Historical figures
 

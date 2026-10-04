@@ -78,9 +78,15 @@ test("OpenRouter callback forwards Stagehand schema, route and bounded settings 
   const fetchImpl = async (_url, options) => {
     calls++;
     const body = JSON.parse(options.body);
-    assert.deepEqual(body.provider, { only: ["wafer"], allow_fallbacks: false });
+    assert.equal(body.model, "google/gemini-3.8-flash");
+    assert.deepEqual(body.provider, {
+      only: ["google-ai-studio"],
+      order: ["google-ai-studio"],
+      allow_fallbacks: false,
+      require_parameters: true,
+    });
     assert.equal(body.max_tokens, 4096);
-    assert.deepEqual(body.reasoning, { enabled: false });
+    assert.deepEqual(body.reasoning, { enabled: true, effort: "low", exclude: true });
     assert.deepEqual(body.response_format.json_schema.schema, params.responseFormat.schema);
     assert.equal(body.messages[0].content, "original");
     return new Response(

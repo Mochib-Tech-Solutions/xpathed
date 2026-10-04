@@ -198,7 +198,7 @@ for container in $(docker ps -aq --filter "label=com.docker.compose.project=$COM
   service=$(docker inspect --format '{{ index .Config.Labels "com.docker.compose.service" }}' "$container")
   case "$service" in
     browser|resolver|evaluation-fixture) ;;
-    browser-basic|resolver-basic|stagehand) if [ "$comparison" != true ]; then echo "Unexpected comparison service" >&2; exit 2; fi ;;
+    browser-basic|resolver-basic|resolver-basic-native|stagehand) if [ "$comparison" != true ]; then echo "Unexpected comparison service" >&2; exit 2; fi ;;
     browser-baseline|resolver-baseline) if [ -z "${XPATHED_RELEASE_COMPARISON_JSON:-}" ]; then echo "Unexpected baseline service" >&2; exit 2; fi ;;
     *) echo "Evaluation project contains a non-evaluation service: $service" >&2; exit 2 ;;
   esac
@@ -279,6 +279,8 @@ if [ "$comparison" = true ]; then
   browser_binary_hash=$(compose exec -T browser sh -c 'sha256sum /ms-playwright/chromium-*/chrome-linux*/chrome' | awk '{print $1}')
   basic_binary_hash=$(compose exec -T browser-basic sh -c 'sha256sum /ms-playwright/chromium-*/chrome-linux*/chrome' | awk '{print $1}')
   if [ "$browser_binary_hash" != "$basic_binary_hash" ]; then echo "Browser parity mismatch: Chromium binary" >&2; exit 2; fi
+  native_basic_image=$(docker inspect --format '{{.Image}}' $(compose ps -q resolver-basic-native))
+  if [ "$native_basic_image" != "$XPATHED_BASIC_RESOLVER" ]; then echo "Basic resolver image mismatch" >&2; exit 2; fi
   current_images=$(docker inspect --format '{{ index .Config.Labels "com.docker.compose.service" }} {{.Image}}' $(compose ps -q browser resolver stagehand))
   XPATHED_ENGINEERING_ARTIFACTS=$(node -e 'process.stdout.write(JSON.stringify({basic:JSON.parse(process.argv[1]),currentImages:Object.fromEntries(process.argv[2].trim().split("\n").map(row=>row.split(" ")))}))' "$XPATHED_BASIC_ARTIFACT" "$current_images")
   if [ "$resume" != true ]; then

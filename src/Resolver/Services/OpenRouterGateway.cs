@@ -18,8 +18,8 @@ public sealed class OpenRouterGateway(
     ModelUsageLimits usageLimits
 )
 {
-    public string Model { get; } = configuration["OpenRouter:Model"] ?? "deepseek/deepseek-v4.1-flash";
-    public string Provider { get; } = configuration["OpenRouter:Provider"] ?? "wafer";
+    public string Model { get; } = configuration["OpenRouter:Model"] ?? "google/gemini-3.8-flash";
+    public string Provider { get; } = configuration["OpenRouter:Provider"] ?? "google-ai-studio";
 
     private readonly string? apiKey = configuration["OpenRouter:ApiKey"];
     private readonly string endpoint =
@@ -97,7 +97,15 @@ public sealed class OpenRouterGateway(
             model = Model,
             stream = false,
             max_tokens = ActionSelectionStrategy.OutputTokens,
-            reasoning = new { enabled = false },
+            reasoning = Model == "google/gemini-3.8-flash"
+                ? (object)
+                    new
+                    {
+                        enabled = true,
+                        effort = "low",
+                        exclude = true,
+                    }
+                : new { enabled = false },
             provider = new
             {
                 only = new[] { Provider },

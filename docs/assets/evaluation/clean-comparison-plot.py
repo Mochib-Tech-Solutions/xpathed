@@ -8,6 +8,7 @@ import json
 import math
 import re
 import subprocess
+from statistics import median
 from html import escape
 from pathlib import Path
 from tempfile import gettempdir
@@ -54,6 +55,20 @@ def load(directory, browser):
         const spec=cases.get(trial.caseId);
         assert.ok(spec,'Unknown trial case');
         assertProviderIntegrity(trial);
+        const profiles=browser?body.profiles?.[trial.arm]:body.profiles;
+        if(profiles) for(const call of trial.evidence?.provider??[]) {
+          const expected=profiles.find(p=>p.id===call.profileId);assert.ok(expected);
+          if(call.forwarded) {
+            assert.equal(call.request.model,expected.model);
+            assert.deepEqual(call.request.reasoning,expected.reasoning);
+            if(expected.nativeReasoning) {
+              assert.deepEqual(call.nativeRequest.reasoning,expected.nativeReasoning);
+              assert.deepEqual(call.request,{...call.nativeRequest,reasoning:expected.reasoning});
+              assert.equal(hash(call.nativeRequest),call.requestAdaptation.nativeRequestSha256);
+              assert.equal(hash(call.request),call.requestAdaptation.upstreamRequestSha256);
+            }
+          }
+        }
         if(!browser && trial.evidence?.modelInput) assert.equal(hash(JSON.parse(trial.evidence.modelInput)),spec.labelReview.preparedInputHash);
         assert.deepEqual(trial.grade,browser?gradeComparison(spec,trial):gradeTrial(spec,trial),'Recorded grade differs from replay: '+trial.id);
         if(browser && trial.arm!=='stagehand') assert.deepEqual(trial.contractGrade,gradeTrial(spec,trial),'Recorded full contract grade differs from replay: '+trial.id);
@@ -141,12 +156,14 @@ def totals(rows):
         group = [row for row in rows if row.get("_reportingCohort", row.get("execution", {}).get("cohort", "serial")) == name]
         times = sorted(row["elapsedMs"] for row in group if isinstance(row.get("elapsedMs"), (float, int)) and math.isfinite(row["elapsedMs"]) and row["elapsedMs"] >= 0)
         cohorts[name] = {"attempts": len(group), "measured": len(times), "unavailable": len(group) - len(times),
-                         "medianMs": times[math.ceil(len(times) * .5) - 1] if times else None,
+                         "medianMs": median(times) if times else None,
                          "p95Ms": times[math.ceil(len(times) * .95) - 1] if times else None}
     settings = {json.dumps({k: call.get("request", {}).get(k) for k in ["model", "provider", "reasoning", "max_tokens"]}, sort_keys=True) for call in calls}
     return {"settings": [json.loads(value) for value in sorted(settings)],
             "total": len(rows), "passed": sum(row["grade"]["passed"] for row in rows),
             "providerCalls": len(calls), "knownReportedUsd": sum(amounts),
+            "providerStatuses": {str(status): sum(call.get("status") == status for call in calls) for status in sorted({call.get("status") for call in calls}, key=str)},
+            "providerAccessRefusals": sum(call.get("status") in {401, 402, 403} for call in calls),
             "unknownCharges": len(calls) - len(amounts), "latencyCohorts": cohorts}
 
 
@@ -181,11 +198,11 @@ def provenance(directory, manifest):
                                         "trialSha256": file_hash(directory / "trials" / f"{row['id']}.json")}
                                        for row in read(compatibility)]} if compatibility.exists() else {})
     return {**gates,"runId": manifest["id"], "createdAt": manifest["createdAt"],
-            "manifestSha256": file_hash(directory / "manifest.json"),
+            "manifestSha256": file_hash(directory / "manifest.json"), "manifestContentHash": manifest["contentHash"],
             "summarySha256": file_hash(directory / "summary.json"),
-            "source": manifest["code"]["revision"], "sourceFiles": manifest["code"]["files"],
+            "source": manifest["code"]["revision"], "sourceFiles": {name: {"sha256": digest} for name, digest in manifest["code"]["files"].items()},
             "resolverImage": manifest.get("resolverImage"), "artifacts": manifest.get("artifacts"),
-            "stagehand": manifest.get("stagehand")}
+            "stagehand": manifest.get("stagehand"), "profiles": manifest.get("profiles"), "basicCompatibility": manifest.get("basicCompatibility")}
 
 
 def basic_provenance(directory, manifest):
@@ -205,9 +222,19 @@ def basic_provenance(directory, manifest):
     assert containers["resolver"]["imageId"] == manifest["artifacts"]["currentImages"]["resolver"]
     adapter_files = {key: receipt["adapterFiles"][key] for key in ["basic-envelope.mjs", "basic-compose.yaml", "run-browser.sh"]}
     assert all(re.fullmatch(r"[a-f0-9]{64}", value) for value in adapter_files.values())
+    if manifest.get("basicCompatibility"):
+        assert receipt["phase"] == "during-original-run", "A contemporaneous Basic image receipt is required"
+        envelope_path = ROOT.parents[2] / "evaluation/research/basic-envelope.mjs"
+        # The manifest hashes JavaScript's Buffer JSON; the runtime receipt hashes file bytes.
+        buffer_json = json.dumps({"type": "Buffer", "data": list(envelope_path.read_bytes())}, separators=(",", ":"))
+        assert hashlib.sha256(buffer_json.encode()).hexdigest() == manifest["basicCompatibility"]["envelopeSourceHash"]
+        assert adapter_files["basic-envelope.mjs"] == manifest["code"]["files"]["evaluation/research/basic-envelope.mjs"]
+        assert adapter_files["basic-envelope.mjs"] == file_hash(ROOT.parents[2] / "evaluation/research/basic-envelope.mjs")
+        assert adapter_files["basic-compose.yaml"] == file_hash(ROOT.parents[2] / "docker/compose.comparison.yaml")
+        assert adapter_files["run-browser.sh"] == file_hash(ROOT.parents[2] / "scripts/evaluate.sh")
     assert re.fullmatch(r"[a-f0-9]{64}", lineage["originalManifestSha256"])
     return {"runtimeReceiptSha256": file_hash(receipt_path), "lineageReceiptSha256": file_hash(lineage_path),
-            "archivedSource": receipt["archivedSource"], "adapterFiles": adapter_files,
+            "archivedSource": receipt["archivedSource"], "phase": receipt.get("phase", "historical receipt"), "adapterFiles": adapter_files,
             "containers": [{key: containers[service][key] for key in ["service", "containerId", "imageId"]}
                            for service in ["resolver", "browser-basic", "resolver-basic-native", "resolver-basic"]],
             "originalManifestSha256": lineage["originalManifestSha256"],
@@ -265,6 +292,7 @@ def continuation_provenance(directory, manifest, trials):
 
 
 def saved_provenance(basic_dir, improved_dir, saved):
+    keys = ("basic", "current")
     assert basic_dir.parent == improved_dir.parent, "Saved arms require their shared frozen launcher plan"
     parent = basic_dir.parent
     plan = read(parent / "plan.json")
@@ -297,7 +325,7 @@ def saved_provenance(basic_dir, improved_dir, saved):
     prepared = read(parent / "prepared.json")
     assert prepared["planHash"] == plan["contentHash"]
     preparation = {}
-    for arm, key, directory in [("basic", "basic", basic_dir), ("improved", "current", improved_dir)]:
+    for arm, key, directory in [("basic", keys[0], basic_dir), ("improved", keys[1], improved_dir)]:
         manifest, _, specs, _ = saved[arm]
         assert plan["manifests"][key] == manifest["contentHash"]
         assert plan["images"][key] == manifest["resolverImage"]
@@ -308,10 +336,24 @@ def saved_provenance(basic_dir, improved_dir, saved):
         for row in receipt["records"]:
             assert row["preparedInputHash"] == specs[row["caseId"]]["labelReview"]["preparedInputHash"]
         preparation[arm] = {"receiptSha256": file_hash(directory / "preparation.json"), "records": len(receipt["records"])}
+    runtime_path = parent / "runtime-receipt.json"
+    if saved["basic"][0]["profiles"][0].get("nativeReasoning"):
+        assert runtime_path.exists(), "Archived Gemini adaptation requires contemporaneous runtime evidence"
+    runtime = None
+    if runtime_path.exists():
+        receipt = read(runtime_path)
+        assert receipt["phase"] == "during-original-run" and receipt["sourceRevision"] == plan["sourceRevision"]
+        assert len(receipt["containers"]) == len(keys)
+        for key, arm in zip(keys, ["basic", "improved"]):
+            row = next(row for row in receipt["containers"] if row["arm"] == key)
+            profile = saved[arm][0]["profiles"][0]
+            assert row["imageId"] == plan["images"][key]
+            assert row["model"] == profile["model"] and row["provider"] == profile["provider"]
+        runtime = {"receiptSha256": file_hash(runtime_path), "phase": receipt["phase"], "containers": receipt["containers"]}
     amendments = {key: {field: value[field] for field in ["previousPlanHash", "testReceiptHash"]}
                   for key, value in plan.items() if key.endswith("Amendment")}
     return {"planSha256": file_hash(parent / "plan.json"), "planContentHash": plan["contentHash"],
-            "preparedReceiptSha256": file_hash(parent / "prepared.json"), "preparation": preparation,
+            "preparedReceiptSha256": file_hash(parent / "prepared.json"), "preparation": preparation, "runtime": runtime,
             **{key: plan[key] for key in ["sourceRevision", "images", "manifests", "caseCount", "plannedAttempts", "retries", "launcherHash", "requestBindingHash", "execution"]},
             "amendments": amendments, "continuation": saved_continuation(parent, plan, saved)}
 
@@ -424,6 +466,19 @@ def export(browser_dir, basic_dir, improved_dir, xpath_dir):
       console.log(JSON.stringify({sourceCases:selected.sourceCases,exclusions:selected.exclusions}));
     """, str(browser_dir / "manifest.json")], cwd=ROOT.parents[2], text=True))
     saved = {"basic": load(basic_dir, False), "improved": load(improved_dir, False)}
+    assert all(all(arm[0]["code"][key] == bm["code"][key] for key in ["revision", "node", "files"]) for arm in saved.values()), "Browser and saved-page measurements require the same runtime and evaluation sources"
+    for path, digest in bm["code"]["files"].items():
+        full = ROOT.parents[2] / path
+        assert (not full.exists()) if digest == "unavailable" else file_hash(full) == digest, "Measured source changed: " + path
+    provider_ids, generation_ids = set(), set()
+    for trial in browser + saved["basic"][3] + saved["improved"][3]:
+        for call in trial.get("evidence", {}).get("provider", []):
+            assert call["id"] not in provider_ids, "Duplicate provider attempt across categories"
+            provider_ids.add(call["id"])
+            generation = call.get("response", {}).get("id")
+            if generation:
+                assert generation not in generation_ids, "Duplicate provider generation across categories"
+                generation_ids.add(generation)
     basic_images = {row["component"]: row["id"] for row in bm["artifacts"]["basic"]["images"]}
     assert saved["basic"][0]["resolverImage"] == basic_images["resolver"]
     assert saved["improved"][0]["resolverImage"] == bm["artifacts"]["currentImages"]["resolver"]
@@ -496,6 +551,12 @@ def export(browser_dir, basic_dir, improved_dir, xpath_dir):
         rows = output[track]["trials"]
         rows.sort(key=lambda t: (t["caseId"], t["arm"]))
         output[track]["basicToImproved"] = paired(rows, "basic", "improved", "passed")
+    for name, left_arm, right_arm in [("basicToStagehand", "basic", "stagehand"), ("improvedToStagehand", "improved", "stagehand")]:
+        output["browser"][name] = paired(output["browser"]["trials"], left_arm, right_arm, "passed")
+    settings = [setting for track in ["browser", "savedPage"] for arm in output[track]["arms"].values() for setting in arm["settings"]]
+    identities = {(setting["model"], tuple(setting["provider"]["only"]), json.dumps(setting["reasoning"], sort_keys=True), setting["max_tokens"]) for setting in settings}
+    assert len(identities) == 1, "All system arms must share model, route, reasoning and output cap"
+    output["comparisonProfile"] = {key: settings[0][key] for key in ["model", "provider", "reasoning", "max_tokens"]}
     output["browser"]["basicToImprovedFullContract"] = paired(output["browser"]["trials"], "basic", "improved", "fullContractPassed")
     assert output["browser"]["basicToImproved"]["gains"] == sorted(bs["changes"]["gained"])
     assert output["browser"]["basicToImproved"]["regressions"] == sorted(bs["changes"]["lost"])
@@ -508,16 +569,22 @@ def export(browser_dir, basic_dir, improved_dir, xpath_dir):
 
 
 def plot(data):
+    assert not any(score.get("providerAccessRefusals", 0) for track in ["browser", "savedPage"] for score in data[track]["arms"].values()), "Provider access/spending refusals cannot replace presentation accuracy; retain this run as operational evidence."
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     plt.rcParams.update({"font.family": "DejaVu Sans", "font.size": 11, "figure.facecolor": "#0d1117",
                          "axes.facecolor": "#0d1117", "text.color": "#e6edf3", "axes.labelcolor": "#e6edf3",
                          "xtick.color": "#adb8c6", "ytick.color": "#e6edf3", "svg.hashsalt": "xpathed-clean-comparison"})
+    profile = data["comparisonProfile"]
+    model = {"google/gemini-3.8-flash": "Gemini 3.8 Flash", "deepseek/deepseek-v4.1-flash": "DeepSeek V4.1 Flash", "openai/gpt-6-luna": "GPT-6 Luna"}.get(profile["model"], profile["model"])
+    figure_title = "System comparison using " + model
+    reasoning = "low reasoning" if profile["reasoning"].get("effort") == "low" else "reasoning disabled"
+    route = " / ".join(profile["provider"]["only"])
     fig, axes = plt.subplots(1, 2, figsize=(13, 5.8))
     fig.subplots_adjust(left=.17, right=.96, top=.71, bottom=.25, wspace=.6)
-    fig.text(.045, .93, "Comparison on the audited evaluation set", fontsize=23, weight="bold")
-    fig.text(.045, .86, "Live provider inference · one original attempt per case and system · failures included", color="#adb8c6")
+    fig.text(.045, .93, figure_title, fontsize=23, weight="bold")
+    fig.text(.045, .86, f"{model} / {route} · {reasoning} · every original failure included", color="#adb8c6")
     for ax, track, title, subtitle in zip(axes, ["browser", "savedPage"],
                                         ["Live-browser Resolver", "Saved-page selection"],
                                         ["Correct action and target set", "Exact expected target set"]):
@@ -545,10 +612,10 @@ def plot(data):
     fig.text(.045, .07, "Separate metrics; no combined score. Full browser-contract and target-only results are in the report.", fontsize=10, color="#adb8c6")
     description = "Basic and Improved on identical reviewed saved-page cases; Basic, Improved and Stagehand on shared live-browser cases. Counts include all original failed attempts."
     path = ROOT / "clean-comparison.svg"
-    fig.savefig(path, metadata={"Date": None, "Title": "Comparison on the audited evaluation set", "Description": description})
+    fig.savefig(path, metadata={"Date": None, "Title": figure_title, "Description": description})
     svg = path.read_text().replace('<svg ', '<svg role="img" aria-labelledby="title description" ', 1)
     start = svg.index('>', svg.index('<svg')) + 1
-    svg = svg[:start] + f'\n<title id="title">Comparison on the audited evaluation set</title><desc id="description">{escape(description)}</desc>' + svg[start:]
+    svg = svg[:start] + f'\n<title id="title">{escape(figure_title)}</title><desc id="description">{escape(description)}</desc>' + svg[start:]
     path.write_text("\n".join(line.rstrip() for line in svg.splitlines()) + "\n")
     fig.savefig(Path(gettempdir()) / "xpathed-clean-comparison.png", dpi=160)
     plt.close(fig)

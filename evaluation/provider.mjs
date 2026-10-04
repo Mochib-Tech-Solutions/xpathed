@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { createServer } from "node:http";
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
@@ -28,6 +28,10 @@ function declaredProfiles(profiles) {
       typeof profile.provider !== "string" ||
       !/^[a-zA-Z0-9._/-]+$/.test(profile.provider) ||
       !object(profile.reasoning) ||
+      (profile.nativeReasoning != null &&
+        (profile.model !== "google/gemini-3.8-flash" ||
+          !equal(profile.nativeReasoning, { enabled: false }) ||
+          !equal(profile.reasoning, { enabled: true, effort: "low", exclude: true }))) ||
       (profile.maxTokens != null &&
         (!Number.isInteger(profile.maxTokens) ||
           profile.maxTokens < 1 ||
@@ -174,7 +178,10 @@ function boundedRequest(body, profile) {
   ))
     if (!Number.isInteger(limit) || limit < 1 || limit > 4096)
       throw new Error("Output limit must be at most 4096 tokens");
-  if ((profile.strict || body.reasoning != null) && !equal(body.reasoning, profile.reasoning))
+  if (
+    (profile.strict || body.reasoning != null) &&
+    !equal(body.reasoning, profile.nativeReasoning ?? profile.reasoning)
+  )
     throw new Error("Reasoning must match the declared profile");
   if (
     (profile.promptCacheOptions != null || body.prompt_cache_options != null) &&
@@ -517,7 +524,21 @@ export async function createBudgetProxy({
       record.profileId = profile.id;
       record.pricing = pricing;
       record.requestedIdentity = { model: profile.model, provider: profile.provider };
-      const body = boundedRequest(JSON.parse(Buffer.concat(chunks).toString("utf8")), profile);
+      const native = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+      const body = boundedRequest(native, profile);
+      if (profile.nativeReasoning != null) {
+        if (!isDeepStrictEqual(body, { ...native, reasoning: profile.reasoning }))
+          throw new Error("Archived compatibility may change only reasoning; no paid call made");
+        record.nativeRequest = safe(native);
+        const digest = (value) => createHash("sha256").update(JSON.stringify(value)).digest("hex");
+        record.requestAdaptation = {
+          field: "reasoning",
+          native: profile.nativeReasoning,
+          upstream: profile.reasoning,
+          nativeRequestSha256: digest(native),
+          upstreamRequestSha256: digest(body),
+        };
+      }
       if (current.preparedRequest && !isDeepStrictEqual(body, current.preparedRequest))
         throw new Error("Inference differs from its frozen prepared request; no paid call made");
       record.request = safe(body);
@@ -583,7 +604,7 @@ export async function createBudgetProxy({
       }
       if (reservation.reportedUsd == null)
         record.accountingWarning = "Provider charge is unavailable";
-      if (profile.strict && (!record.identityValid || record.responseCacheHit)) {
+      if (profile.strict && ((result.ok && !record.identityValid) || record.responseCacheHit)) {
         blocked = true;
         record.error =
           "Provider identity mismatch or response cache hit; further qualification calls are blocked";
@@ -597,7 +618,7 @@ export async function createBudgetProxy({
       await retain(record);
       send(result.status, payload);
     } catch (error) {
-      blocked ||= current.reservation != null && !receivingProvider;
+      blocked ||= current.reservation != null && record.forwarded !== true;
       record.error = safe(String(error.message));
       const generationId = record.headers?.["x-generation-id"];
       if (current.reservation && record.reportedUsd == null && generationId) {

@@ -26,7 +26,7 @@ const releaseArtifact = (sourceSha) => ({
   version: 1,
   bundleManifestSha256: "b".repeat(64),
   sourceSha,
-  profileId: "deepseek",
+  profileId: "gemini",
   platform: { os: "linux", architecture: "amd64" },
   images: ["browser", "resolver"].map((component, index) => ({
     component,
@@ -81,10 +81,10 @@ test("replay preserves absent planned attempts and rejects swapped trial identit
   ])
     files[path] = digest(await readFile(new URL(`../${path}`, import.meta.url), "utf8"));
   const spec = loadCases().cases[0];
-  const planned = { id: "test", caseId: spec.id, profileId: "deepseek", repetition: 1, attempt: 1 };
+  const planned = { id: "test", caseId: spec.id, profileId: "gemini", repetition: 1, attempt: 1 };
   const manifest = {
     kind: "model-qualification",
-    profiles: [{ id: "deepseek" }],
+    profiles: [{ id: "gemini" }],
     cases: [spec],
     plan: { trials: [planned] },
     code: { files },
@@ -94,13 +94,13 @@ test("replay preserves absent planned attempts and rejects swapped trial identit
   assert.equal((await readRun(directory)).trials.length, 0);
   await writeFile(
     join(directory, "trials", "test.json"),
-    JSON.stringify({ ...planned, profileId: "gemini" }),
+    JSON.stringify({ ...planned, profileId: "other" }),
   );
   await assert.rejects(readRun(directory), /identity mismatch/);
   await writeFile(join(directory, "trials", "test.json"), JSON.stringify(planned));
   assert.equal((await readRun(directory)).trials.length, 1);
   manifest.code.revision = "a".repeat(40);
-  manifest.profiles = [{ id: "deepseek" }];
+  manifest.profiles = [{ id: "gemini" }];
   const artifact = releaseArtifact(manifest.code.revision);
   manifest.qualification = { artifact };
   delete manifest.contentHash;
@@ -151,7 +151,7 @@ test("a changed prepared input is retained without starting the paired baseline"
 
 test("release selection reuses every reviewed current case without a phase or split gate", () => {
   const options = parseQualificationOptions([]);
-  assert.deepEqual(options.profileIds, ["deepseek"]);
+  assert.deepEqual(options.profileIds, ["gemini"]);
   for (const args of [
     ["--phase", "pilot"],
     ["--pilot", "previous"],
@@ -227,13 +227,13 @@ test("release selection reuses every reviewed current case without a phase or sp
 test("artifact identities must bind both components to the tested source and profile", () => {
   const sha = "a".repeat(40),
     artifact = releaseArtifact(sha);
-  assert.equal(validateReleaseArtifact(artifact, sha, ["deepseek"]), artifact);
+  assert.equal(validateReleaseArtifact(artifact, sha, ["gemini"]), artifact);
   for (const broken of [
     { ...artifact, sourceSha: "b".repeat(40) },
     { ...artifact, images: artifact.images.slice(0, 1) },
     { ...artifact, profileId: "unknown" },
   ])
-    assert.throws(() => validateReleaseArtifact(broken, sha, ["deepseek"]));
+    assert.throws(() => validateReleaseArtifact(broken, sha, ["gemini"]));
 });
 
 test("nightly requires independent live generation IDs without matching the saved reference IDs", () => {
