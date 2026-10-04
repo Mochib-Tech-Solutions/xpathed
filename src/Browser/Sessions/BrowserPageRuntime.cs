@@ -16,7 +16,6 @@ internal sealed class BrowserPageRuntime(IPage page, long order)
     public string? CaptureId { get; set; }
     public BrowserPageCapture? Capture { get; set; }
     public Dictionary<string, ActionSelection>? ActionSelections { get; set; }
-    public SelectionRule? ActionSelectionRule { get; set; }
     private ICDPSession? protocol;
 
     public async Task InitializeAsync(IBrowserContext context, Action<BrowserPageRuntime> focused)
@@ -66,18 +65,19 @@ internal sealed class BrowserPageRuntime(IPage page, long order)
                 // Playwright's CDP session restores emulated focus when the document changes.
                 _ = RestoreNativeFocusAsync(focused);
             }
-            InvalidateCapture();
-            _ = ClearHighlightAsync();
+            if (frame == Page.MainFrame || Capture?.UsesFrame(frame) == true)
+            {
+                InvalidateCapture();
+                _ = ClearHighlightAsync();
+            }
         };
-        Page.FrameDetached += (_, _) =>
+        Page.FrameDetached += (_, frame) =>
         {
-            InvalidateCapture();
-            _ = ClearHighlightAsync();
-        };
-        Page.FrameAttached += (_, _) =>
-        {
-            InvalidateCapture();
-            _ = ClearHighlightAsync();
+            if (Capture?.UsesFrame(frame) == true)
+            {
+                InvalidateCapture();
+                _ = ClearHighlightAsync();
+            }
         };
         protocol = await context.NewCDPSessionAsync(Page);
         await protocol.SendAsync(
@@ -209,7 +209,6 @@ internal sealed class BrowserPageRuntime(IPage page, long order)
     {
         CaptureId = null;
         ActionSelections = null;
-        ActionSelectionRule = null;
     }
 
     public async Task ClearCaptureAsync()

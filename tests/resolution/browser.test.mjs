@@ -440,13 +440,11 @@ async function withFixture(markup, check) {
   }
 }
 
-test("scope-unrelated-repeating-carousel-does-not-invalidate-a-fixed-target", async () => {
+test("scope-unrelated-carousel-replacement-preserves-a-fixed-target", async () => {
   await withFixture(
     `<button id="expected-target" style="position:fixed;top:20px;left:20px">Login</button>
-    <ul style="position:absolute;top:200px;left:100px;display:flex;gap:40px;animation:slide 4s linear infinite alternate">
-      <li><img alt="Partner A" width="20" height="20"><img alt="Partner B" width="20" height="20"></li>
-      <li><img alt="Partner C" width="20" height="20"><img alt="Partner D" width="20" height="20"></li>
-    </ul><style>@keyframes slide {to {transform:translateX(100px)}}</style>`,
+    <div id="carousel" style="position:absolute;top:200px;overflow:hidden;width:200px"><img alt="Partner A" width="200" height="40"></div>
+    <script>window.mutateXpathFixture = () => document.querySelector('#carousel').innerHTML='<img alt="Partner B" width="200" height="40">';</script>`,
     async (session, page) => {
       const before = await observe();
       const capture = await request(`/pages/${session.pageId}/capture`, {
@@ -454,242 +452,69 @@ test("scope-unrelated-repeating-carousel-does-not-invalidate-a-fixed-target", as
       });
       const candidate = capture.candidates.find((candidate) => candidate.label === "Login");
       assert.ok(candidate);
-      await new Promise((resolve) => setTimeout(resolve, 250));
+      await observe({ mutateXpath: true });
       const selected = await request(`/pages/${session.pageId}/selections`, {
         documentId: page.documentId,
         captureId: capture.captureId,
         actions: [{ actionId: "a1", candidateId: candidate.id, action: "click" }],
-        rule: { name: "Login", field: "label", kind: "control", scope: null },
       });
-      const target = selected.actions[0].target;
-      assert.deepEqual((await verify(target.xpaths)).matches, [["expected-target"]]);
-      assert.equal(target.interactability.status, "ready");
-      const after = await observe();
-      assert.equal(after.scrollY, before.scrollY);
-      assert.equal(after.activeElement, before.activeElement);
-      assert.equal(after.clicks, before.clicks);
-    },
-  );
-});
-
-const namedControlRule = (name) => ({ name, field: "label", kind: "control", scope: null });
-
-test("scope-matching-rule-rejects-a-competitor-entering-a-retained-frame", async () => {
-  await withFixture(
-    (path) =>
-      path === "/child"
-        ? "<button>Other</button>"
-        : `<button id="expected-target">Login</button><iframe title="Details" src="/child" style="width:400px;height:200px"></iframe>
-    <script>window.mutateXpathFixture=()=>document.querySelector('iframe').contentDocument.querySelector('button').textContent='Login';</script>`,
-    async (session, page) => {
-      const capture = await request(`/pages/${page.pageId}/capture`, {
-        documentId: page.documentId,
-      });
-      assert.ok(
-        capture.candidates.some(
-          (candidate) => candidate.label === "Other" && candidate.frame.id !== "main",
-        ),
-      );
-      const candidate = capture.candidates.find((candidate) => candidate.label === "Login");
-      await observe({ mutateXpath: true });
-      await expectError(
-        `/pages/${page.pageId}/selections`,
-        {
-          documentId: page.documentId,
-          captureId: capture.captureId,
-          actions: [{ actionId: "a1", candidateId: candidate.id, action: "click" }],
-          rule: namedControlRule("Login"),
-        },
-        409,
-        "stale_capture",
-      );
-    },
-  );
-});
-
-test("scope-matching-rule-rejects-a-changed-requested-scope", async () => {
-  await withFixture(
-    `<section aria-label="Employee"><button id="expected-target">Login</button></section><aside><a href="#">Login</a></aside>
-    <script>window.mutateXpathFixture=()=>document.querySelector('section').setAttribute('aria-label','Manager');</script>`,
-    async (session, page) => {
-      const capture = await request(`/pages/${page.pageId}/capture`, {
-        documentId: page.documentId,
-      });
-      const candidate = capture.candidates.find((candidate) => candidate.tag === "button");
-      const body = {
-        documentId: page.documentId,
-        captureId: capture.captureId,
-        actions: [{ actionId: "a1", candidateId: candidate.id, action: "click" }],
-        rule: { ...namedControlRule("Login"), scope: "Employee" },
-      };
-      const original = await request(`/pages/${page.pageId}/selections`, body);
-      assert.deepEqual((await verify(original.actions[0].target.xpaths)).matches, [
+      assert.deepEqual((await verify(selected.actions[0].target.xpaths)).matches, [
         ["expected-target"],
       ]);
-      await observe({ mutateXpath: true });
-      await expectError(`/pages/${page.pageId}/selections`, body, 409, "stale_capture");
-    },
-  );
-});
-
-test("scope-matching-rule-survives-carousel-membership-and-open-shadow-target", async () => {
-  await withFixture(
-    `<div id="host"></div><div style="position:absolute;top:200px;width:200px;overflow:hidden">
-    <div id="track" style="display:flex;width:600px"><img alt="Partner A" width="200" height="40"><img alt="Partner B" width="200" height="40"><img alt="Partner C" width="200" height="40"></div></div>
-    <script>document.querySelector('#host').attachShadow({mode:'open'}).innerHTML='<button data-oracle="consent" style="position:fixed;top:20px;left:20px">Accept all</button>';
-    window.mutateXpathFixture=()=>document.querySelector('#track').style.transform='translateX(-400px)';</script>`,
-    async (session, page) => {
-      const capture = await request(`/pages/${page.pageId}/capture`, {
-        documentId: page.documentId,
-      });
-      assert.ok(capture.candidates.some((candidate) => candidate.label === "Partner A"));
-      assert.ok(!capture.candidates.some((candidate) => candidate.label === "Partner C"));
-      const candidate = capture.candidates.find((candidate) => candidate.label === "Accept all");
-      const before = await observe({ mutateXpath: true });
-      const result = await request(`/pages/${page.pageId}/selections`, {
-        documentId: page.documentId,
-        captureId: capture.captureId,
-        actions: [{ actionId: "a1", candidateId: candidate.id, action: "click" }],
-        rule: namedControlRule("Accept all"),
-      });
-      const target = result.actions[0].target;
-      assert.equal(target.candidateId, candidate.id);
-      assert.equal(target.interactability.status, "ready");
-      assert.deepEqual(
-        (
-          await observe({
-            locators: [{ xpath: target.xpaths[0], shadowChain: target.shadowChain }],
-          })
-        ).shadowMatches,
-        [["consent"]],
-      );
-      const inspected = await request(`/pages/${page.pageId}/highlight`, {
-        documentId: page.documentId,
-        captureId: capture.captureId,
-        actionId: "a1",
-      });
-      assert.equal(inspected.target.candidateId, candidate.id);
-      await request(`/pages/${page.pageId}/spotlight`, {
-        documentId: page.documentId,
-        captureId: capture.captureId,
-        actionId: "a1",
-      });
+      assert.equal(selected.actions[0].target.interactability.status, "ready");
       const after = await observe();
+      assert.equal(after.clicks, before.clicks);
       assert.equal(after.scrollY, before.scrollY);
       assert.equal(after.activeElement, before.activeElement);
-      assert.deepEqual(after.events, before.events);
     },
   );
 });
 
-for (const [behavior, mutation] of [
-  [
-    "new-link-competitor",
-    "document.body.insertAdjacentHTML('beforeend','<a href=\"#\">Login</a>')",
-  ],
-  ["renamed-target", "document.querySelector('#expected-target').textContent='Other'"],
-  [
-    "replaced-target",
-    "document.querySelector('#expected-target').outerHTML='<button id=\"expected-target\">Login</button>'",
-  ],
-  ["entering-target", "document.querySelector('#offscreen').style.left='300px'"],
-  [
-    "new-shadow-competitor",
-    "document.querySelector('#host').shadowRoot.innerHTML='<button>Login</button>'",
-  ],
-]) {
-  test(`scope-matching-rule-rejects-${behavior}`, async () => {
-    await withFixture(
-      `<button id="expected-target">Login</button><button id="offscreen" style="position:fixed;left:1800px">Login</button><div id="host"></div>
-      <script>document.querySelector('#host').attachShadow({mode:'open'});window.mutateXpathFixture=()=>{${mutation}};</script>`,
-      async (session, page) => {
-        const capture = await request(`/pages/${page.pageId}/capture`, {
-          documentId: page.documentId,
-        });
-        const candidate = capture.candidates.find((candidate) => candidate.label === "Login");
-        await observe({ mutateXpath: true });
-        await expectError(
-          `/pages/${page.pageId}/selections`,
-          {
+for (const visibility of ["hidden", "offscreen", "visible"]) {
+  for (const mutation of ["attach", "navigate", "detach"]) {
+    test(`scope-unrelated-${visibility}-frame-${mutation}-preserves-target`, async () => {
+      const style =
+        visibility === "hidden"
+          ? "display:none"
+          : visibility === "offscreen"
+            ? "position:absolute;top:1800px"
+            : "";
+      await withFixture(
+        `<button id="expected-target">Login</button>
+        ${mutation === "attach" ? "" : `<iframe id="changing-frame" style="${style}" srcdoc="<p>Unrelated content</p>"></iframe>`}
+        <script>window.mutateXpathFixture = () => {
+          ${mutation === "attach" ? `const frame = document.createElement('iframe'); frame.id='changing-frame'; frame.style='${style}'; frame.srcdoc='<button>Login</button>'; document.body.append(frame);` : mutation === "navigate" ? `document.querySelector('#changing-frame').srcdoc='<button>Login</button>';` : `document.querySelector('#changing-frame').remove();`}
+        };</script>`,
+        async (session, page) => {
+          const before = await observe();
+          const capture = await request(`/pages/${session.pageId}/capture`, {
+            documentId: page.documentId,
+          });
+          const candidate = capture.candidates.find((c) => c.label === "Login");
+          const body = {
             documentId: page.documentId,
             captureId: capture.captureId,
             actions: [{ actionId: "a1", candidateId: candidate.id, action: "click" }],
-            rule: namedControlRule("Login"),
-          },
-          409,
-          "stale_capture",
-        );
-      },
-    );
-  });
-}
-
-test("scope-matching-rule-rechecks-whole-plural-set-and-current-readiness", async () => {
-  await withFixture(
-    `<button id="expected-target">Approval</button><button id="second" disabled>Approval</button><span id="unrelated">Old</span>
-    <script>window.mutateXpathFixture=()=>{document.querySelector('#unrelated').textContent='New';document.querySelector('#expected-target').disabled=true}</script>`,
-    async (session, page) => {
-      const capture = await request(`/pages/${page.pageId}/capture`, {
-        documentId: page.documentId,
-      });
-      const ids = capture.candidates
-        .filter((candidate) => candidate.tag === "button")
-        .map((candidate) => candidate.id);
-      const body = {
-        documentId: page.documentId,
-        captureId: capture.captureId,
-        actions: ids.map((candidateId, index) => ({
-          actionId: `a${index + 1}`,
-          candidateId,
-          action: "click",
-        })),
-        rule: namedControlRule("Approval"),
-      };
-      await observe({ mutateXpath: true });
-      const result = await request(`/pages/${page.pageId}/selections`, body);
-      assert.deepEqual(
-        result.actions.map((action) => action.target.candidateId),
-        ids,
-      );
-      assert.ok(
-        result.actions.every((action) => action.target.interactability.status === "blocked"),
-      );
-      assert.deepEqual(
-        (await verify(result.actions.flatMap((action) => action.target.xpaths))).matches,
-        [["expected-target"], ["second"]],
-      );
-      const inspected = await request(`/pages/${page.pageId}/highlight`, {
-        documentId: page.documentId,
-        captureId: capture.captureId,
-        actionId: "a2",
-      });
-      assert.equal(inspected.target.candidateId, ids[1]);
-    },
-  );
-});
-
-test("scope-matching-rule-rejects-an-incomplete-original-target-set", async () => {
-  await withFixture('<button>Login</button><a href="#">Login</a>', async (session, page) => {
-    const capture = await request(`/pages/${page.pageId}/capture`, { documentId: page.documentId });
-    await expectError(
-      `/pages/${page.pageId}/selections`,
-      {
-        documentId: page.documentId,
-        captureId: capture.captureId,
-        actions: [
-          {
+          };
+          await request(`/pages/${session.pageId}/selections`, body);
+          await observe({ mutateXpath: true });
+          await new Promise((resolve) => setTimeout(resolve, 100));
+          const result = await request(`/pages/${session.pageId}/highlight`, {
+            documentId: page.documentId,
+            captureId: capture.captureId,
             actionId: "a1",
-            candidateId: capture.candidates.find((candidate) => candidate.tag === "button").id,
-            action: "click",
-          },
-        ],
-        rule: namedControlRule("Login"),
-      },
-      400,
-      "invalid_selection_rule",
-    );
-  });
-});
+          });
+          assert.deepEqual((await verify(result.target.xpaths)).matches, [["expected-target"]]);
+          assert.equal(result.target.interactability.status, "ready");
+          const after = await observe();
+          assert.equal(after.scrollY, before.scrollY);
+          assert.equal(after.clicks, before.clicks);
+          assert.equal(after.activeElement, before.activeElement);
+        },
+      );
+    });
+  }
+}
 
 test("targeting-independent-target-is-captured-and-highlighted-without-execution", async () => {
   await withFixture(targetMarkup, async (session, page) => {
@@ -784,17 +609,13 @@ test("context-repeated-cards-retain-whole-item-identity-and-child-controls", asy
         assert.equal(target.interactability.status, "ready");
       }
       await observe({ mutateXpath: true });
-      await expectError(
-        `/pages/${page.pageId}/selection`,
-        {
-          documentId: page.documentId,
-          captureId: capture.captureId,
-          candidateId: shirt.id,
-          action: "click",
-        },
-        409,
-        "stale_capture",
-      );
+      const retained = await request(`/pages/${page.pageId}/selection`, {
+        documentId: page.documentId,
+        captureId: capture.captureId,
+        candidateId: shirt.id,
+        action: "click",
+      });
+      assert.deepEqual((await verify(retained.target.xpaths)).matches, [["shirt"]]);
     },
   );
 });
@@ -936,7 +757,7 @@ test("appearance-css-evidence-reports-uncertainty-without-pixels-or-private-styl
   );
 });
 
-test("scope-viewport-change-invalidates-selection-even-for-visible-fixed-target", async () => {
+test("scope-scroll-change-preserves-a-visible-fixed-target", async () => {
   await withFixture(
     `<style>body{height:2400px}#expected-target{position:fixed;left:10px;top:10px}</style><button id="expected-target">Approval</button><button style="position:absolute;top:850px">Another approval</button>`,
     async (session, page) => {
@@ -946,6 +767,29 @@ test("scope-viewport-change-invalidates-selection-even-for-visible-fixed-target"
       });
       const candidate = capture.candidates.find((c) => c.label === "Approval");
       await observe({ scrollToY: 150 });
+      const result = await request(`/pages/${page.pageId}/selection`, {
+        documentId: page.documentId,
+        captureId: capture.captureId,
+        candidateId: candidate.id,
+        action: "click",
+      });
+      assert.deepEqual((await verify(result.target.xpaths)).matches, [["expected-target"]]);
+      assert.equal((await observe()).scrollY, 150);
+    },
+  );
+});
+
+test("scope-nested-scroll-outside-view-invalidates-selected-target", async () => {
+  await withFixture(
+    `<div id="list" style="height:100px;overflow:auto"><button id="expected-target">Approval</button><div style="height:150px"></div><button>Another approval</button></div>`,
+    async (session, page) => {
+      const capture = await request(`/pages/${page.pageId}/capture`, {
+        documentId: page.documentId,
+        scope: "current_view",
+      });
+      assert.equal(capture.coverage.complete, true);
+      const candidate = capture.candidates.find((c) => c.label === "Approval");
+      await observe({ scrollElement: { selector: "#list", y: 100 } });
       await expectError(
         `/pages/${page.pageId}/selection`,
         {
@@ -961,33 +805,8 @@ test("scope-viewport-change-invalidates-selection-even-for-visible-fixed-target"
   );
 });
 
-test("scope-nested-scroll-change-invalidates-selection", async () => {
-  await withFixture(
-    `<div id="list" style="height:100px;overflow:auto"><button id="expected-target">Approval</button><div style="height:150px"></div><button>Another approval</button></div>`,
-    async (session, page) => {
-      const capture = await request(`/pages/${page.pageId}/capture`, {
-        documentId: page.documentId,
-        scope: "current_view",
-      });
-      assert.equal(capture.coverage.complete, true);
-      await observe({ scrollElement: { selector: "#list", y: 100 } });
-      await expectError(
-        `/pages/${page.pageId}/selection`,
-        {
-          documentId: page.documentId,
-          captureId: capture.captureId,
-          candidateId: null,
-          action: "unsupported",
-        },
-        409,
-        "stale_capture",
-      );
-    },
-  );
-});
-
 for (const change of ["leave", "enter", "insert"])
-  test(`scope-changed-target-membership-invalidates-absence-${change}`, async () => {
+  test(`scope-absence-retains-captured-evidence-after-${change}`, async () => {
     await withFixture(
       `<style>body{min-height:3000px}</style><button id="expected-target" style="position:absolute;top:${change === "leave" ? 10 : 2000}px">Approval</button>
       <script>window.mutateXpathFixture = () => {
@@ -1002,17 +821,13 @@ for (const change of ["leave", "enter", "insert"])
         assert.equal(capture.candidates.length, change === "leave" ? 1 : 0);
         const before = await observe();
         await observe({ mutateXpath: true });
-        await expectError(
-          `/pages/${page.pageId}/selection`,
-          {
-            documentId: page.documentId,
-            captureId: capture.captureId,
-            candidateId: null,
-            action: "click",
-          },
-          409,
-          "stale_capture",
-        );
+        const result = await request(`/pages/${page.pageId}/selection`, {
+          documentId: page.documentId,
+          captureId: capture.captureId,
+          candidateId: null,
+          action: "click",
+        });
+        assert.equal(result.target, null);
         const after = await observe();
         assert.equal(after.scrollY, before.scrollY);
         assert.equal(after.activeElement, before.activeElement);
@@ -1098,7 +913,7 @@ for (const location of ["main", "scroll-container", "frame"])
     );
   });
 
-test("scope-revalidation-shares-dom-scan-budget-across-frames", async () => {
+test("scope-target-validation-does-not-rescan-unrelated-frame-dom", async () => {
   await withFixture(
     (path) =>
       path === "/fixture"
@@ -1122,12 +937,17 @@ test("scope-revalidation-shares-dom-scan-budget-across-frames", async () => {
       };
       assert.equal((await request(`/pages/${page.pageId}/selection`, selection)).target, null);
       await observe({ mutateXpath: true }, "/second");
-      await expectError(
-        `/pages/${page.pageId}/selection`,
-        selection,
-        409,
-        "validation_budget_exceeded",
+      assert.equal((await request(`/pages/${page.pageId}/selection`, selection)).target, null);
+      const candidate = capture.candidates.find(
+        (c) => c.frame.chain[0]?.label === "First" && c.label === "Approval",
       );
+      assert.ok(candidate);
+      const result = await request(`/pages/${page.pageId}/selection`, {
+        ...selection,
+        candidateId: candidate.id,
+      });
+      assert.equal(result.target.candidateId, candidate.id);
+      assert.equal(result.target.interactability.status, "ready");
     },
   );
 });
@@ -1551,7 +1371,7 @@ test("highlights-all-selected-targets-are-shown-together", async () => {
   });
 });
 
-test("highlights-completed-selection-persists-while-pending-selection-becomes-stale", async () => {
+test("highlights-selection-remains-valid-after-in-view-scrolling", async () => {
   await withFixture(
     `${highlightFixture}<style>body{height:2400px}</style>`,
     async (session, page) => {
@@ -1574,7 +1394,9 @@ test("highlights-completed-selection-persists-while-pending-selection-becomes-st
           ],
           true,
         );
-        await expectError(`/pages/${page.pageId}/selections`, batch, 409, "stale_capture");
+        const refreshed = await request(`/pages/${page.pageId}/selections`, batch);
+        assert.equal(refreshed.actions.length, 2);
+        assert.ok(refreshed.actions.every((action) => action.target));
       });
     },
   );
@@ -2319,7 +2141,7 @@ test("scope-stale-captures-fabricated-candidates-and-replaced-nodes-are-rejected
     );
     await verify([], true);
     await expectError(selectionPath, selection, 409, "stale_capture");
-    await expectError(selectionPath, { ...selection, candidateId: null }, 409, "stale_capture");
+    assert.equal((await request(selectionPath, { ...selection, candidateId: null })).target, null);
     await verify([], false, true);
     let current = page;
     for (let attempt = 0; attempt < 30 && current.documentId === page.documentId; attempt++) {
@@ -2523,17 +2345,16 @@ test("frames-nested-target-retains-document-xpath-and-viewport-geometry", async 
       });
       await observe({ scrollToY: 20 }, "/inner");
       await observe({ scrollToY: 50 }, "/fixture");
-      await expectError(
-        `/pages/${page.pageId}/selection`,
-        {
-          documentId: page.documentId,
-          captureId: capture.captureId,
-          candidateId: candidate.id,
-          action: "hover",
-        },
-        409,
-        "stale_capture",
-      );
+      const retained = await request(`/pages/${page.pageId}/selection`, {
+        documentId: page.documentId,
+        captureId: capture.captureId,
+        candidateId: candidate.id,
+        action: "hover",
+      });
+      assert.equal(retained.target.geometry.y, 80);
+      assert.deepEqual((await observe({ xpaths: retained.target.xpaths }, "/inner")).matches, [
+        ["expected-target"],
+      ]);
       const refreshed = await request(`/pages/${page.pageId}/capture`, {
         documentId: page.documentId,
       });
@@ -2627,17 +2448,13 @@ test("shadow-dynamic-fixed-content-is-detected-without-a-host-box", async () => 
       const observation = await observe({ click: "#show" });
       assert.equal(observation.events.hostHeight, 0);
       assert.equal(observation.events.buttonVisible, true);
-      await expectError(
-        `/pages/${session.pageId}/selection`,
-        {
-          documentId: page.documentId,
-          captureId: before.captureId,
-          candidateId: null,
-          action: "click",
-        },
-        409,
-        "stale_capture",
-      );
+      const capturedAbsence = await request(`/pages/${session.pageId}/selection`, {
+        documentId: page.documentId,
+        captureId: before.captureId,
+        candidateId: null,
+        action: "click",
+      });
+      assert.equal(capturedAbsence.target, null);
       const capture = await request(`/pages/${session.pageId}/capture`, {
         documentId: page.documentId,
       });

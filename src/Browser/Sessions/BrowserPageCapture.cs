@@ -11,6 +11,9 @@ internal sealed class BrowserPageCapture(BrowserPageRuntime page) : IAsyncDispos
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private readonly List<BrowserFrameCapture> frames = [];
     private bool complete;
+    private readonly HashSet<BrowserFrameCapture> selectedFrames = [];
+
+    public bool UsesFrame(IFrame frame) => selectedFrames.Any(captured => captured.Frame == frame);
 
     public async Task<CandidateCapture> CaptureAsync(string sessionId, string documentId, string captureId)
     {
@@ -84,7 +87,6 @@ internal sealed class BrowserPageCapture(BrowserPageRuntime page) : IAsyncDispos
             unsupported += result.UnsupportedBoundaryCount;
             candidates.AddRange(result.Candidates);
             captured.CandidateIds.UnionWith(result.Candidates.Select(candidate => candidate.Id));
-            captured.Candidates = result.Candidates;
             if (
                 !result.Coverage.Complete
                 || scanned > 20000
@@ -161,67 +163,35 @@ internal sealed class BrowserPageCapture(BrowserPageRuntime page) : IAsyncDispos
         }
     }
 
-    public async Task<ActionSelectionValidation> SelectAsync(ActionSelection[] actions, SelectionRule? rule = null)
+    public async Task<ActionSelectionValidation> SelectAsync(ActionSelection[] actions)
     {
         if (!complete)
         {
             throw new ApiException(409, "capture_budget_exceeded", "The capture is incomplete.");
         }
         var timer = Stopwatch.StartNew();
-        var scanBudget = 20000;
-        var expected = actions.Select(action => action.CandidateId).OfType<string>().ToHashSet(StringComparer.Ordinal);
-        if (
-            rule is not null
-            && (
-                !rule.IsValid
-                || actions.Any(action => action.CandidateId is null)
-                || expected.Count != actions.Length
-                || !frames
-                    .SelectMany(frame => frame.Candidates)
-                    .Where(rule.Matches)
-                    .Select(candidate => candidate.Id)
-                    .ToHashSet(StringComparer.Ordinal)
-                    .SetEquals(expected)
-            )
-        )
+        selectedFrames.Clear();
+        selectedFrames.Add(frames[0]);
+        foreach (var action in actions.Where(action => action.CandidateId is not null))
         {
-            throw new ApiException(
-                400,
-                "invalid_selection_rule",
-                "The matching rule must reproduce the complete captured target set."
-            );
+            var frame =
+                frames.FirstOrDefault(frame => frame.CandidateIds.Contains(action.CandidateId!))
+                ?? throw new ApiException(409, "unknown_candidate", "The target is outside this capture.");
+            for (var current = frame; current is not null; current = current.Parent)
+            {
+                selectedFrames.Add(current);
+            }
         }
-        var fresh = new List<CandidateElement>();
-        foreach (var frame in frames)
+        foreach (var frame in frames.Where(selectedFrames.Contains))
         {
             CheckBudget(timer);
-            var observation = await frame.RefreshAsync(
-                (int)(2000 - timer.ElapsedMilliseconds),
-                scanBudget,
-                rule is not null
-            );
-            scanBudget -= observation.ScannedCount;
-            fresh.AddRange(observation.Candidates);
-            if (fresh.Count > 2000 || JsonSerializer.SerializeToUtf8Bytes(fresh, JsonOptions).Length > 512000)
-            {
-                throw new ApiException(
-                    409,
-                    "validation_budget_exceeded",
-                    "The complete matching-rule comparison exceeds its observation budget."
-                );
-            }
+            var ids = actions
+                .Select(action => action.CandidateId)
+                .OfType<string>()
+                .Where(frame.CandidateIds.Contains)
+                .ToArray();
+            await frame.RefreshAsync((int)(2000 - timer.ElapsedMilliseconds), ids);
             await SelectFrameAsync(frame, null, "unsupported", timer);
-        }
-        if (
-            rule is not null
-            && !fresh
-                .Where(rule.Matches)
-                .Select(candidate => candidate.Id)
-                .ToHashSet(StringComparer.Ordinal)
-                .SetEquals(expected)
-        )
-        {
-            throw new ApiException(409, "stale_capture", "The matching target set changed after capture.");
         }
         var validated = new List<ValidatedAction>();
         foreach (var action in actions)

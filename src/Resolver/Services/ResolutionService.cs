@@ -176,14 +176,14 @@ public sealed partial class ResolutionService(
                 throw new ApiException(502, code, "OpenRouter could not return a valid selection.");
             }
             cancellationToken.ThrowIfCancellationRequested();
-            var selections = ActionSelectionStrategy.Select(completion.Content!, capture, out var rule);
-            diagnostics = diagnostics with { Stage = "selection", SelectionRule = rule };
+            var selections = ActionSelectionStrategy.Select(completion.Content!, capture);
+            diagnostics = diagnostics with { Stage = "selection" };
             var requestedActions = selections
                 .Select((item, index) => new ActionSelection($"a{index + 1}", item.CandidateId, item.Action))
                 .ToArray();
             using var response = await browser.PostAsJsonAsync(
                 $"/pages/{Uri.EscapeDataString(pageId)}/selections",
-                new ActionSelectionRequest(request.DocumentId, capture.CaptureId, requestedActions, rule),
+                new ActionSelectionRequest(request.DocumentId, capture.CaptureId, requestedActions),
                 cancellationToken
             );
             await EnsureBrowserSuccessAsync(response, cancellationToken);

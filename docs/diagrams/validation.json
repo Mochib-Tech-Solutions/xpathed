@@ -76,14 +76,14 @@
       "name": "resolution-flow",
       "diagram_type": "sequence",
       "specification": {
-        "sha256": "7d0a5fe8fa26838186b58a9ca6915ce7fcd7bb2dcbe72d2769983cebadfb8ce8",
-        "bytes": 2348
+        "sha256": "858fd12a5272aecd1678ae580aa63d08e71724ddc6223a42c312f33102ad79fd",
+        "bytes": 2338
       },
       "artifact": {
-        "sha256": "b41c9d3005e1cd112ed723b23650017456e8a924f085c19c10fb01d9e5c1781c",
-        "bytes": 802189
+        "sha256": "e81162f587e2bca234e58b3dc43b3f0a827066910b57efdcc687c4263852a350",
+        "bytes": 802170
       },
-      "svg_sha256": "f1c08f7f25dbffe45cb1611c0f3a1cec718285fed93c3898e415798dbd19cc13",
+      "svg_sha256": "9d0f6cf7f4998996035c4189f1545567a08ac90a9421ccd90ed94e192a5edf97",
       "validation": {
         "checksPassed": 9,
         "checkCount": 9,
@@ -128,7 +128,7 @@
         "dark"
       ],
       "visual_review": "passed",
-      "correction_rounds": 0,
+      "correction_rounds": 2,
       "embedded_svg_review": {
         "image_width_px": 900,
         "themes": [
@@ -138,8 +138,7 @@
         "status": "passed",
         "primary_text_px": 12.375,
         "secondary_text_px": 10.125
-      },
-      "date": "2026-10-04"
+      }
     },
     {
       "name": "evaluation-release",
@@ -214,14 +213,14 @@
       "date": "2026-10-04",
       "diagram_type": "architecture",
       "specification": {
-        "sha256": "88fc1c44faa863dbe186582d585b7ea08fe14ec5c6c668f2b2fb6add81ce7e82",
-        "bytes": 3986
+        "sha256": "9ae0b2c0e6499038476f30d30daaca877ab4ea8dd23146d46af2a8c5ec8d00f8",
+        "bytes": 3982
       },
       "artifact": {
-        "sha256": "f6a7f346d4a3fc11ee3b48883849ba2d413f42bdb236d3b141b987a7e4dc40b1",
-        "bytes": 805401
+        "sha256": "259f0c44bd107344463eaafdda0cab9efbed630c9fb093843e8c39a2a9d691f9",
+        "bytes": 805405
       },
-      "svg_sha256": "4c9f08544ea0b344db875fec4d8a7cab9aa6ad278f204f23cc23d935f8d2ff05",
+      "svg_sha256": "79c0afc869daf7c4dfaf71faa9c403dfd87343e247a50ad2cbe967dc45eee5b3",
       "validation": {
         "checksPassed": 9,
         "checkCount": 9,
@@ -266,15 +265,7 @@
         "dark"
       ],
       "visual_review": "passed",
-      "correction_rounds": 0,
-      "embedded_svg_review": {
-        "image_width_px": 800,
-        "themes": [
-          "light",
-          "dark"
-        ],
-        "status": "passed"
-      }
+      "correction_rounds": 0
     }
   ]
 }
