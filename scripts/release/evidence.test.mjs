@@ -163,7 +163,7 @@ async function workspace(t, { qualificationPolicy = "current", bootstrapBaseline
     `file://${cwd}/evaluation/policy.mjs`
   );
   const defaultPolicy = policyForSuite(suite);
-  const profile = profiles.find((item) => item.id === "deepseek");
+  const profile = profiles.find((item) => item.id === "gemini");
   const code = await fingerprints(cwd);
   const build = (phase, pilot) => {
     const selected = selectQualificationCases(
@@ -445,8 +445,8 @@ test("seal, replay and archive bind distinct category configurations to exact te
   assert.equal(candidate.pilot, undefined);
   assert.equal(candidate.evaluation, work.evaluation.path);
   assert.deepEqual(Object.keys(candidate.configurations).sort(), [
-    "deepseek:browser",
-    "deepseek:offline-selection",
+    "gemini:browser",
+    "gemini:offline-selection",
     "release-baseline:browser",
     "release-baseline:offline-selection",
   ]);

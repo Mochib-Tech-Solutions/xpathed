@@ -236,6 +236,133 @@ test("frozen request accepts equivalent key order and cannot be changed by its c
   assert.equal(JSON.parse(calls[0].options.body).messages[0].content, "Find Save");
 });
 
+test("archived Gemini compatibility changes only declared reasoning and rejects prepared-request drift", async (t) => {
+  const profile = {
+    id: "basic",
+    model: "google/gemini-3.8-flash",
+    provider: "google-ai-studio",
+    reasoning: { enabled: true, effort: "low", exclude: true },
+    nativeReasoning: { enabled: false },
+    maxTokens: 4096,
+  };
+  const native = {
+    model: profile.model,
+    stream: false,
+    messages: [{ role: "user", content: "Find Save" }],
+    max_tokens: 4096,
+    reasoning: { enabled: false },
+    provider: {
+      only: [profile.provider],
+      order: [profile.provider],
+      allow_fallbacks: false,
+      require_parameters: true,
+    },
+    plugins: [{ id: "context-compression", enabled: false }],
+    response_format: {
+      type: "json_schema",
+      json_schema: { strict: true, schema: { type: "object" } },
+    },
+  };
+  const { proxy, post, calls } = await setup(t, {
+    profiles: [profile],
+    metadata: {
+      data: {
+        endpoints: [
+          {
+            tag: "google-ai-studio",
+            provider_name: "Google AI Studio",
+            supported_parameters: [
+              "response_format",
+              "structured_outputs",
+              "reasoning",
+              "max_tokens",
+            ],
+            pricing: { prompt: "0.00000075", completion: "0.00000375" },
+          },
+        ],
+      },
+    },
+    completion: () =>
+      Response.json({
+        id: "gemini-basic-original",
+        model: profile.model,
+        provider: "Google AI Studio",
+        usage: { cost: 0.001 },
+        choices: [],
+      }),
+  });
+  proxy.beginAttempt("original", "basic", Infinity, native);
+  assert.equal((await post(native)).status, 200);
+  await proxy.awaitIdle();
+  assert.deepEqual(JSON.parse(calls[0].options.body), { ...native, reasoning: profile.reasoning });
+  assert.deepEqual(proxy.records[0].nativeRequest, native);
+  assert.equal(
+    proxy.records[0].requestAdaptation.nativeRequestSha256,
+    createHash("sha256").update(JSON.stringify(native)).digest("hex"),
+  );
+  assert.equal(
+    proxy.records[0].requestAdaptation.upstreamRequestSha256,
+    createHash("sha256").update(calls[0].options.body).digest("hex"),
+  );
+  proxy.beginAttempt("drift", "basic", Infinity, native);
+  assert.equal(
+    (await post({ ...native, messages: [{ role: "user", content: "Changed" }] })).status,
+    400,
+  );
+  assert.equal(calls.length, 1);
+});
+
+test("declared profiles retain provider failures and continue distinct planned attempts", async (t) => {
+  for (const malformed of [false, true]) {
+    await t.test(malformed ? "malformed provider body" : "provider HTTP 503", async (t) => {
+      let count = 0;
+      const { proxy, post, calls } = await setup(t, {
+        profiles: [
+          {
+            id: "pinned",
+            model,
+            provider: "wafer",
+            reasoning: { enabled: false },
+            maxTokens: 4096,
+          },
+        ],
+        completion: () =>
+          ++count === 1
+            ? malformed
+              ? new Response("invalid JSON")
+              : Response.json({ error: { message: "Unavailable" } }, { status: 503 })
+            : Response.json({
+                id: "next-original",
+                model,
+                provider: "Wafer",
+                usage: { cost: 0.001 },
+              }),
+      });
+      const body = {
+        ...input,
+        reasoning: { enabled: false },
+        provider: {
+          only: ["wafer"],
+          order: ["wafer"],
+          allow_fallbacks: false,
+          require_parameters: true,
+        },
+        response_format: { type: "json_schema", json_schema: { strict: true } },
+      };
+      proxy.beginAttempt("failed-original");
+      assert.equal((await post(body)).status, malformed ? 502 : 503);
+      await proxy.awaitIdle();
+      proxy.beginAttempt("next-original");
+      assert.equal((await post(body)).status, 200);
+      await proxy.awaitIdle();
+      assert.equal(calls.filter((call) => call.url.endsWith("/chat/completions")).length, 2);
+      assert.equal(proxy.records[0].attemptId, "failed-original");
+      assert.equal(proxy.records[1].attemptId, "next-original");
+      assert.equal(proxy.records[1].reportedUsd, 0.001);
+    });
+  }
+});
+
 async function setup(
   t,
   {

@@ -51,8 +51,8 @@ Setup creates an ignored `.env` from `.env.example` without replacing an existin
 
 ```dotenv
 OPENROUTER_API_KEY=your-key-here
-OPENROUTER_MODEL=deepseek/deepseek-v4.1-flash
-OPENROUTER_PROVIDER=wafer
+OPENROUTER_MODEL=google/gemini-3.8-flash
+OPENROUTER_PROVIDER=google-ai-studio
 ```
 
 ```sh
@@ -111,11 +111,11 @@ Saved-page selection evaluates steps 3–4 with saved inputs. XPath construction
 
 ### Model and configuration
 
-The development default is **`deepseek/deepseek-v4.1-flash` through OpenRouter's `wafer` provider**, configured in `.env.example` and `docker/compose.yaml`.
+The development default is **`google/gemini-3.8-flash` through OpenRouter's `google-ai-studio` provider with low reasoning**, configured in `.env.example` and `docker/compose.yaml`. Existing `.env` and hosted runtime settings take precedence; update both model and provider there to adopt this default.
 
 The repository keeps one implementation and one prompt/schema, updated in place. Git tracks their history; code has no manual prompt or behavior revision numbers. See [ADR-0024](docs/adr/0024-keep-one-resolution-implementation.md).
 
-`ActionSelectionStrategy` owns the shared runtime and saved-page prompt, schema and selection validation. `OpenRouterGateway` pins the provider, disables reasoning and fallback, and limits output to 4,096 tokens. A configuration hash identifies effective settings. No model is trained here; changes to the pretrained model, prompt or context require evaluation. Docker/environment variables supply OpenRouter credentials, endpoint, model and provider. Release artifacts do not override deployment configuration.
+`ActionSelectionStrategy` owns the shared runtime and saved-page prompt, schema and selection validation. `OpenRouterGateway` pins the provider, enables low reasoning for Gemini 3.8 Flash while excluding reasoning from returned text, disables reasoning for other models, disables fallback, and limits output to 4,096 tokens. A configuration hash identifies effective settings. No model is trained here; changes to the pretrained model, prompt or context require evaluation. Docker/environment variables supply OpenRouter credentials, endpoint, model and provider. Release artifacts do not override deployment configuration.
 
 Illustrative saved click result:
 
@@ -189,7 +189,7 @@ The system comparison retains **1,708 original provider requests**, **$0.8360156
 
 [![Models with the current Resolver](docs/assets/evaluation/model-comparison.svg)](docs/research/model-comparison-2026-10-04.md)
 
-All three model profiles completed 569 fresh saved-page attempts, with zero spending-limit refusals. Gemini uses an evaluation-only low-reasoning profile because its route requires reasoning; DeepSeek and Luna disable reasoning. The application configuration is unchanged. All three model browser scores use the newest 190 cases. The [model report](docs/research/model-comparison-2026-10-04.md) retains all attempts, paired outcomes, costs and compatibility evidence. Timing cohorts differ, so no fastest-model claim follows. Model defaults remain unchanged. These measurements do not establish unseen-site accuracy or release approval.
+All three model profiles completed 569 fresh saved-page attempts, with zero spending-limit refusals. Gemini was measured using an evaluation-only low-reasoning adaptation because its route requires reasoning; DeepSeek and Luna disable reasoning. The owner subsequently selected that Gemini profile as the development default; the runtime now sends its required reasoning settings directly. All three model browser scores use the newest 190 cases. The [model report](docs/research/model-comparison-2026-10-04.md) retains all attempts, paired outcomes, costs and compatibility evidence. Timing cohorts differ, so no fastest-model claim follows. Gemini gained 73 saved-page passes and lost seven against DeepSeek; the default change is an explicit owner choice, not release qualification. These measurements do not establish unseen-site accuracy or release approval.
 
 ```sh
 pnpm check                              # local checks

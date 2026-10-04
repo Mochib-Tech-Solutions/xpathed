@@ -3,8 +3,8 @@ services:
     environment: &comparison-provider
       OpenRouter__BaseUrl: http://evaluation-fixture:8091/api/v1/
       OpenRouter__ApiKey: evaluation-worker-1
-      OpenRouter__Model: deepseek/deepseek-v4.1-flash
-      OpenRouter__Provider: wafer
+      OpenRouter__Model: ${OPENROUTER_MODEL:-google/gemini-3.8-flash}
+      OpenRouter__Provider: ${OPENROUTER_PROVIDER:-google-ai-studio}
   browser-basic:
     image: ${XPATHED_BASIC_BROWSER:?Set the verified basic browser image}
     init: true
@@ -15,16 +15,26 @@ services:
       MaxSessions: 4
       Logging__LogLevel__Default: Warning
     stop_grace_period: 20s
-  resolver-basic:
+  resolver-basic-native:
     image: ${XPATHED_BASIC_RESOLVER:?Set the verified basic resolver image}
     environment:
       <<: *comparison-provider
       OpenRouter__ApiKey: evaluation-worker-0
       BrowserUrl: http://browser-basic:8080
       Logging__LogLevel__Default: Warning
+  resolver-basic:
+    image: node:24.16.0-bookworm-slim@sha256:2c87ef9bd3c6a3bd4b472b4bec2ce9d16354b0c574f736c476489d09f560a203
+    command: ["node", "/comparison/basic-envelope.mjs"]
+    volumes:
+      - ./evaluation/research/basic-envelope.mjs:/comparison/basic-envelope.mjs:ro
+    environment:
+      BASIC_BACKEND_URL: http://resolver-basic-native:8080
+    depends_on: [resolver-basic-native]
   evaluation-fixture:
     environment:
       OPENROUTER_EVAL_API_KEY: ${OPENROUTER_EVAL_API_KEY:-}
+      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-google/gemini-3.8-flash}
+      OPENROUTER_PROVIDER: ${OPENROUTER_PROVIDER:-google-ai-studio}
   stagehand:
     build:
       context: .
@@ -34,4 +44,6 @@ services:
     security_opt: ["seccomp=./docker/browser/seccomp.json"]
     environment:
       STAGEHAND_MODEL_URL: http://evaluation-fixture:8091/api/v1/chat/completions
+      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-google/gemini-3.8-flash}
+      OPENROUTER_PROVIDER: ${OPENROUTER_PROVIDER:-google-ai-studio}
     stop_grace_period: 20s

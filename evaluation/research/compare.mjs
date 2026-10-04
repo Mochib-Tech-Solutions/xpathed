@@ -1,3 +1,4 @@
+import { profile } from "../configuration.mjs";
 import { loadCases } from "../cases/load.mjs";
 import { createHash, randomUUID } from "node:crypto";
 import { readFile, writeFile, mkdir, readdir } from "node:fs/promises";
@@ -348,6 +349,27 @@ export async function main(args = process.argv.slice(2)) {
     graderHash,
     artifacts: JSON.parse(process.env.XPATHED_ENGINEERING_ARTIFACTS ?? "null"),
     browserBinarySha256: process.env.XPATHED_BROWSER_BINARY_SHA256,
+    profiles: Object.fromEntries(
+      arms.map((arm) => [
+        arm,
+        [
+          {
+            ...profile,
+            ...(arm === "basic" && profile.model === "google/gemini-3.8-flash"
+              ? { nativeReasoning: { enabled: false } }
+              : {}),
+          },
+        ],
+      ]),
+    ),
+    basicCompatibility: {
+      contractVersion: "4",
+      envelopeSourceHash: hash(await readFile(new URL("./basic-envelope.mjs", import.meta.url))),
+      reasoning:
+        profile.model === "google/gemini-3.8-flash"
+          ? "declared native-to-low adaptation"
+          : "unchanged",
+    },
     stagehand: {
       version: "4.1.0",
       packageLockHash: hash(
@@ -548,6 +570,7 @@ export async function main(args = process.argv.slice(2)) {
       await mkdir(join(output, "provider"), { recursive: true });
       for (const arm of arms) {
         const proxy = await createBudgetProxy({
+          profiles: manifest.profiles[arm],
           ledgerPath: join(output, `accounting-${arm}.json`),
           githubRepository: "",
           githubToken: "",

@@ -16,4 +16,4 @@ These saved-page scores use the fresh complete run with zero spending-limit refu
 
 Controlled XPath verification: **180/180**, including **22/22** saved-locator mutations and **22/22** fresh resolutions after mutation. Categories have separate denominators.
 
-The application runtime and recorded image identities are unchanged. The [system report](clean-evaluation-comparison.md) and [model report](model-comparison-2026-10-04.md) bind original attempts, independent labels, costs, source/image hashes and limits. Earlier interrupted results remain separate and are not used as selection-accuracy scores.
+The recorded comparison runtime and image identities are unchanged. The owner subsequently selected Gemini / Google AI Studio with low reasoning as the development default; these scores remain bound to the original measured runs. The [system report](clean-evaluation-comparison.md) and [model report](model-comparison-2026-10-04.md) bind original attempts, independent labels, costs, source/image hashes and limits. Earlier interrupted results remain separate and are not used as selection-accuracy scores.
