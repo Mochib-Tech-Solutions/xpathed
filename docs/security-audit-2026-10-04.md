@@ -14,4 +14,6 @@ PR/merge-group jobs are provider-free and receive no deployment secret. Deployme
 
 The new Credential scan status uses a checksum-pinned scanner, redaction, and negative controls inside each allowlist category. Native main-branch protection is recorded in .github/branch-protection.json; enforcement must be verified through GitHub, independently of this audit or review instruction files. A stale review guide was aligned with the current-view/single-XPath contract.
 
+The first hosted scan also flagged two copies of the same historical prose and dummy test value in the scanner's own control fixtures. The exact-value exclusions cover that helper as well, with a credential-shaped control in its path. Controls explicitly require detection by the generic-api-key rule; failing scans report locations and rule IDs while omitting matched values.
+
 Limits: no scanner proves the absence of every possible secret. Historical Actions log bytes, every provider-free CI artifact and retired Docker archives were not exhaustively rescanned; their retention remains unchanged. The owner-selected public demo permits paid requests without revealing the runtime key, and source origin checks do not authenticate visitors. Reverify protections and native secret-scanning availability before changing repository visibility.
