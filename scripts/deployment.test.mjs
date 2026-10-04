@@ -59,6 +59,10 @@ test("host deployment builds first, skips unchanged inputs, and rolls back failu
   execFileSync("python3", ["-B", "scripts/deployment-host.test.py"], { stdio: "pipe" });
 });
 
+test("hosted network isolation fails closed during failures and container restarts", () => {
+  execFileSync("python3", ["-B", "scripts/deployment-network.test.py"], { stdio: "pipe" });
+});
+
 test("deployment secrets are available only after Check on a main push", () => {
   const workflow = readFileSync(".github/workflows/check.yml", "utf8");
   const deployment = workflow.match(/\n  deploy:\n([\s\S]*?)(?=\n  [\w-]+:|$)/)?.[1] ?? "";

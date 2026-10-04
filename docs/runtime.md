@@ -147,6 +147,8 @@ Development startup serializes runners through a checkout-and-project-specific l
 
 The default deployment is a local development tool. Session/page IDs are capabilities, not user authentication. Local HTTP/WebSocket origin checks prevent unrelated websites from controlling it. Browser/resolver control endpoints reject browser-originated requests; the client API checks same-origin requests, restricts hostnames to localhost/127.0.0.1 and its Compose names, and the dev proxy preserves foreign origins for rejection. Hosted delivery requires an explicit access policy and network restrictions before exposing these endpoints. The owner-selected public hosted demo and its source deployment are documented in [deployment operations](deployment.md). Only Chromium is implemented and validated; wire contracts contain no Chromium handles.
 
+The [public hosted profile](deployment.md#public-browser-isolation) additionally filters Browser packets before startup, excludes private/VPS destinations, disables outbound IPv6 initiation and bounds container resources. It preserves DNS and the trusted local viewer relay. These restrictions apply to public hosting, not local development or trusted evaluation. The gateway validates public origins before translating the accepted origin for ClientApi/viewer contracts and supplies HTTPS/security headers on both success and denial responses. Headerless API clients are still possible; origin checks are not authentication.
+
 ## Sandbox and supported environment
 
 Chromium runs as `pwuser` with `ChromiumSandbox = true`. The Compose service uses an init process, 1 GiB of shared memory and a pinned seccomp profile. It does not use `privileged`, `SYS_ADMIN`, host IPC, or `--no-sandbox`.
