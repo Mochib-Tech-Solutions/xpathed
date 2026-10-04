@@ -274,7 +274,7 @@ jobs:
   deploy:
     name: Deploy hosted workspace
     needs: check
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: ${{ !cancelled() && needs.check.result == 'success' && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
     concurrency:

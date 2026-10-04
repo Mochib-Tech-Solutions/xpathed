@@ -63,6 +63,7 @@ test("deployment secrets are available only after Check on a main push", () => {
   const workflow = readFileSync(".github/workflows/check.yml", "utf8");
   const deployment = workflow.slice(workflow.indexOf("\n  deploy:"));
   assert.match(deployment, /needs: check/);
+  assert.match(deployment, /!cancelled\(\) && needs\.check\.result == 'success'/);
   assert.match(deployment, /github.event_name == 'push' && github.ref == 'refs\/heads\/main'/);
   assert.match(deployment, /cancel-in-progress: false/);
   assert.match(deployment, /persist-credentials: false/);
