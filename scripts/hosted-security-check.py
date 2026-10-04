@@ -13,6 +13,15 @@ import urllib.error
 import urllib.request
 
 
+def private_navigation_rejected(result):
+    status, _, body = result
+    try:
+        error = json.loads(body)
+    except (ValueError, TypeError):
+        return False
+    return status == 502 and isinstance(error, dict) and error.get("code") == "browser_operation_failed"
+
+
 def check(base):
     parsed = urlsplit(base)
     if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.path not in ("", "/"):
@@ -62,8 +71,8 @@ def check(base):
     try:
         page = "/api/pages/" + session["pageId"]
         result = request(page + "/navigate", "POST", {"url": "http://resolver:8080/health"})
-        if result[0] == 200:
-            raise RuntimeError("Public Browser reached the private Resolver health endpoint")
+        if not private_navigation_rejected(result):
+            raise RuntimeError("Private navigation did not produce the expected Browser network rejection")
         print("PASS private service navigation rejected", flush=True)
         expect("public browser navigation", request(page + "/navigate", "POST",
             {"url": "https://www.saucedemo.com/"}), 200)
