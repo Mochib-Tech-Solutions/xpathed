@@ -133,6 +133,8 @@ There is one complete comparison, with no required pilot or fresh held-out phase
 
 Live-browser Resolver timing is the Resolver HTTP duration, including capture, provider selection and live verification. Fixture setup and independent grading are outside the timer. Test-client rendering is outside this system boundary. One-attempt results are observations of this run, not statistical guarantees.
 
+Trusted evaluation and resolution-check Compose overlays explicitly raise the public-demo HTTP and model-call allowances. This preserves the frozen case plan and parallel worker coverage; a throttled attempt remains an operational failure, never an exclusion or an automatic retry. Limits still use positive settings and the shared gateway, and effective configuration records model allowances. Saved-page workers start separate Resolver processes, so process-local call counters are not an aggregate evaluation budget. Provider-side limits on the dedicated evaluation key govern spending; see [runtime limits](runtime.md#backend-and-model-usage-limits).
+
 ## Private dataset collection
 
 `evaluation/datasets/collection.json` pins the active private archive, its digest and inventory. This derived archive contains only admitted cases, with unchanged instructions, candidates, expected labels and original splits. The original source archive and complete exclusion audit remain separate provenance. Payloads live under ignored `.artifacts/datasets/`; raw or derived page inputs are not committed to source.

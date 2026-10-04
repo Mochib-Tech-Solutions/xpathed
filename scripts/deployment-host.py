@@ -64,6 +64,12 @@ def healthy(base, state):
         with urllib.request.urlopen(url + path, timeout=10) as response:
             if response.status != 200:
                 raise RuntimeError("Hosted health check failed")
+            if (response.headers.get("X-Frame-Options") != "DENY"
+                    or response.headers.get("X-Content-Type-Options") != "nosniff"
+                    or "object-src 'none'" not in response.headers.get("Content-Security-Policy", "")
+                    or not response.headers.get("Strict-Transport-Security")):
+                raise RuntimeError("Hosted security headers are missing")
+    subprocess.run(["sudo", "-n", "python3", "/usr/local/lib/xpathed/network-policy.py", "--verify"], check=True)
     compose(base, state, "exec", "-T", "web", "wget", "-q", "-O", "/dev/null", "http://resolver:8080/health")
 
 
@@ -82,6 +88,7 @@ def deploy(base, source, revision, fingerprint, run=compose, check=wait_healthy,
     state_path = base / "deploy/current.json"
     previous = json.loads(state_path.read_text())
     if previous["fingerprint"] == fingerprint:
+        check(base, previous)
         clean(previous)
         print(json.dumps({"status": "unchanged", "revision": previous["revision"]}))
         return

@@ -105,6 +105,28 @@ Operation errors use `{code, message, traceId}`. Controller validation returns t
 
 ## Configuration
 
+### Backend and model usage limits
+
+ClientApi and Resolver each enforce a shared fixed-window API allowance and a concurrent-request cap with the native ASP.NET Core rate limiter. Limits apply before controller work and span all callers and routes except `/health`. Requests exceeding either limit return HTTP 429 with an `ApiError` containing `request_rate_limited`, a useful message and a `Retry-After` header. ClientApi preserves an upstream `Retry-After`. There is no request queue or automatic retry. These global allowances do not depend on session IDs, IP addresses or untrusted forwarded headers; one visitor can exhaust the shared allowance. Existing Browser session and capture limits remain separate.
+
+Resolver's singleton `ModelUsageLimits` reserves capacity immediately before `OpenRouterGateway` starts paid inference. Public resolution, diagnostic resolution and saved-page selection all use this gateway. Quota rejection returns the existing resolution error outcome with `model_usage_limited`, a retry message, zero `diagnostics.modelCalls` and no provider usage or charge. It does not select a target or become `not_found`. Admitted failures consume call allowance. A caller disconnect does not release the model slot: the provider attempt completes under its existing timeout and shutdown token, and late usage/cost retains its original accounting identity. Output remains capped at 4,096 tokens and oversized complete inputs remain explicit errors rather than truncated candidates.
+
+All counters are local to one process and reset on restart. Fixed windows begin when their limiter is first used; the daily allowance is a 24-hour window, not a UTC calendar-day budget. Reservations count conservatively when a later allowance rejects admission. Multiple replicas have independent counters. Resolver remains stateless for page inputs and outcomes; resource counters and the pricing cache are shared operational state.
+
+| Compose environment variable | .NET configuration | Default |
+| --- | --- | --- |
+| `API_REQUESTS_PER_MINUTE` | `RateLimits:RequestsPerMinute` | 120 |
+| `API_CONCURRENT_REQUESTS` | `RateLimits:ConcurrentRequests` | 8 |
+| `MODEL_CALLS_PER_MINUTE` | `ModelUsage:CallsPerMinute` | 20 |
+| `MODEL_CALLS_PER_DAY` | `ModelUsage:CallsPerDay` | 1000 |
+| `MODEL_CONCURRENT_CALLS` | `ModelUsage:ConcurrentCalls` | 2 |
+
+Values must be positive integers; zero is invalid rather than a protection bypass. Compose reads these variables from the ignored environment file. Standalone .NET hosts use their configuration keys, such as `ModelUsage__ConcurrentCalls`. Effective provider configuration records the model allowances without credentials. Trusted resolution-check and evaluation overlays explicitly use higher positive allowances so resource throttling cannot alter or shrink the evaluation denominator. Saved-page workers are separate processes; their aggregate spending is governed by the evaluation key and frozen plan.
+
+A call allowance is not a dollar cap: request sizes, route prices and restarts affect spending. Set a credit limit on a dedicated OpenRouter application key, with a daily reset if desired, in [OpenRouter key settings](https://openrouter.ai/settings/keys); keep the evaluation key separate. OpenRouter rejects requests after that key's allowance is used, as described in [provider authentication and limits](https://openrouter.ai/docs/api/reference/authentication). Provider enforcement survives application restarts and multiple replicas. Reported and estimated charges remain informational and are never subtracted from a speculative local dollar budget.
+
+### Service settings
+
 | Setting                                              | Default / purpose                                                                                                         |
 | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
 | `XPATHED_PORT`                                       | Host web port, `8080`; export before Compose                                                                              |
@@ -124,6 +146,8 @@ Operation errors use `{code, message, traceId}`. Controller validation returns t
 Development startup serializes runners through a checkout-and-project-specific loopback control socket. A second invocation requests that the previous runner stop its watcher and project containers before releasing ownership. Startup then prepares configuration, checks Compose working-directory labels, stops any legacy attached watcher through project-scoped `down`, and starts `up --build --watch`. The runner signals its own child process group so the Docker frontend and Compose plugin stop together. It retains its Compose project and port environment for cleanup, and interrupted startup cannot authorize cleanup from an incomplete ownership check. A crashed runner releases its socket automatically; the next startup stops its remaining project containers. Neither replacement nor Ctrl+C removes `.env`. The default project is `xpathed`; separate checkouts require distinct `COMPOSE_PROJECT_NAME` and `XPATHED_PORT` values. A foreign listener on the control port or containers owned by another checkout cause startup to fail safely.
 
 The default deployment is a local development tool. Session/page IDs are capabilities, not user authentication. Local HTTP/WebSocket origin checks prevent unrelated websites from controlling it. Browser/resolver control endpoints reject browser-originated requests; the client API checks same-origin requests, restricts hostnames to localhost/127.0.0.1 and its Compose names, and the dev proxy preserves foreign origins for rejection. Hosted delivery requires an explicit access policy and network restrictions before exposing these endpoints. The owner-selected public hosted demo and its source deployment are documented in [deployment operations](deployment.md). Only Chromium is implemented and validated; wire contracts contain no Chromium handles.
+
+The [public hosted profile](deployment.md#public-browser-isolation) additionally filters Browser packets before startup, excludes private/VPS destinations, disables outbound IPv6 initiation and bounds container resources. It preserves DNS and the trusted local viewer relay. These restrictions apply to public hosting, not local development or trusted evaluation. The gateway validates public origins before translating the accepted origin for ClientApi/viewer contracts and supplies HTTPS/security headers on both success and denial responses. Headerless API clients are still possible; origin checks are not authentication.
 
 ## Sandbox and supported environment
 

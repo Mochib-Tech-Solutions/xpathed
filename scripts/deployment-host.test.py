@@ -52,7 +52,17 @@ class DeploymentTests(unittest.TestCase):
                     check=lambda *args: None, **kwargs)
 
     def test_unchanged_does_not_build_or_restart(self):
-        host.deploy(self.base, self.source, "c" * 40, "b" * 64, run=self.run_compose)
+        host.deploy(self.base, self.source, "c" * 40, "b" * 64, run=self.run_compose,
+                    check=lambda base, state: self.calls.append((state["revision"], ("health",))))
+        self.assertEqual(self.calls, [(self.old["revision"], ("health",))])
+        self.assertEqual(json.loads(self.state.read_text()), self.old)
+
+    def test_unhealthy_unchanged_inputs_fail_without_build_or_cleanup(self):
+        def unhealthy(base, state):
+            raise RuntimeError("existing deployment is unhealthy")
+        with self.assertRaisesRegex(RuntimeError, "existing deployment is unhealthy"):
+            deploy(self.base, self.source, "c" * 40, "b" * 64, run=self.run_compose,
+                   check=unhealthy, clean=lambda state: self.calls.append(("cleanup",)))
         self.assertEqual(self.calls, [])
         self.assertEqual(json.loads(self.state.read_text()), self.old)
 
@@ -87,6 +97,10 @@ class DeploymentTests(unittest.TestCase):
         class Handler(BaseHTTPRequestHandler):
             def do_GET(self):
                 self.send_response(200 if self.path in routes else 404)
+                self.send_header("X-Frame-Options", "DENY")
+                self.send_header("X-Content-Type-Options", "nosniff")
+                self.send_header("Content-Security-Policy", "object-src 'none'")
+                self.send_header("Strict-Transport-Security", "max-age=15552000")
                 self.end_headers()
 
             def log_message(self, *args):
@@ -97,8 +111,11 @@ class DeploymentTests(unittest.TestCase):
         thread.start()
         try:
             (self.base / "deploy/public-url").write_text(f"http://127.0.0.1:{server.server_port}")
-            with patch.object(host, "compose", side_effect=self.run_compose):
+            with (patch.object(host, "compose", side_effect=self.run_compose),
+                  patch.object(host.subprocess, "run") as protection):
                 host.healthy(self.base, self.old)
+            protection.assert_called_once_with(["sudo", "-n", "python3",
+                "/usr/local/lib/xpathed/network-policy.py", "--verify"], check=True)
             self.assertEqual(self.calls, [(self.old["revision"],
                 ("exec", "-T", "web", "wget", "-q", "-O", "/dev/null", "http://resolver:8080/health"))])
         finally:

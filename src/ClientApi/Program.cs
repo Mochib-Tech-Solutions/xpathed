@@ -3,6 +3,7 @@ using Xpathed.Common.Http;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddApiControllers();
+builder.Services.AddApiRateLimits(builder.Configuration);
 builder.Configuration["AllowedHosts"] = "localhost;127.0.0.1;client-api;web";
 foreach (var service in new[] { "browser", "resolver" })
 {
@@ -19,5 +20,6 @@ foreach (var service in new[] { "browser", "resolver" })
 var app = builder.Build();
 app.UseApiErrors();
 app.UseMiddleware<SameOriginMiddleware>();
+app.UseRateLimiter();
 app.MapControllers();
 app.Run();

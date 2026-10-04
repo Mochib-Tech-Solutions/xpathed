@@ -4,6 +4,7 @@ using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Threading.RateLimiting;
 using Microsoft.Extensions.Caching.Memory;
 using Xpathed.Common.Contracts;
 using Xpathed.Common.Http;
@@ -13,7 +14,8 @@ namespace Xpathed.Resolver.Services;
 public sealed class OpenRouterGateway(
     IHttpClientFactory clients,
     IConfiguration configuration,
-    IMemoryCache pricingCache
+    IMemoryCache pricingCache,
+    ModelUsageLimits usageLimits
 )
 {
     public string Model { get; } = configuration["OpenRouter:Model"] ?? "deepseek/deepseek-v4.1-flash";
@@ -80,6 +82,12 @@ public sealed class OpenRouterGateway(
             modelInputBudgetBytes = ActionSelectionStrategy.InputBudgetBytes,
             responseCache = false,
             maximumActions = ActionSelectionStrategy.MaximumActions,
+            usageLimits = new
+            {
+                usageLimits.ConcurrentCalls,
+                usageLimits.CallsPerMinute,
+                usageLimits.CallsPerDay,
+            },
             request = CreateRequest(string.Empty),
         };
 
@@ -115,12 +123,24 @@ public sealed class OpenRouterGateway(
             },
         };
 
-    internal async Task<ProviderCompletion> CompleteAsync(
+    internal Task<ProviderCompletion> CompleteAsync(
         string input,
         CancellationToken cancellationToken,
         Action<ResolutionDiagnostics>? observeUsage = null
     )
     {
+        cancellationToken.ThrowIfCancellationRequested();
+        return CompleteCoreAsync(input, observeUsage, usageLimits.Acquire(), cancellationToken);
+    }
+
+    private async Task<ProviderCompletion> CompleteCoreAsync(
+        string input,
+        Action<ResolutionDiagnostics>? observeUsage,
+        RateLimitLease lease,
+        CancellationToken cancellationToken
+    )
+    {
+        using var reservation = lease;
         using var client = clients.CreateClient("openrouter");
         client.BaseAddress = new Uri(endpoint);
         client.Timeout = TimeSpan.FromSeconds(timeoutSeconds);

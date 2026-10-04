@@ -24,6 +24,10 @@ internal static class HttpForwarder
         );
         context.Response.StatusCode = (int)response.StatusCode;
         context.Response.ContentType = response.Content.Headers.ContentType?.ToString();
+        if (response.Headers.RetryAfter is { } retryAfter)
+        {
+            context.Response.Headers.RetryAfter = retryAfter.ToString();
+        }
         await response.Content.CopyToAsync(context.Response.Body, context.RequestAborted);
     }
 }
