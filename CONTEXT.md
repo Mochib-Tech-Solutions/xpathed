@@ -78,6 +78,12 @@ One attempt to resolve an instruction, including its target results or operation
 **Diagnostic evidence**:
 The sanitized observations and configuration associated with a resolution attempt that support later investigation. Evidence can be incomplete and does not by itself reconstruct the original browser state.
 
+**Model usage limit**:
+A shared allowance controlling how often and how many model attempts can start together. Reaching it prevents a new attempt; it does not change the outcome or charge of an attempt already started.
+
+**Provider credit limit**:
+A monetary allowance enforced by the model provider for a dedicated API key. It is separate from model-call quotas and informational cost estimates.
+
 **Page document**:
 The current document within a managed page. Navigation can replace the document while keeping the managed page itself.
 

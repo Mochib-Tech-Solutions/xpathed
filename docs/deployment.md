@@ -16,6 +16,8 @@ The gateway exposes only HTTPS/HTTP; Web's direct port stays bound to loopback a
 
 ## Operations
 
+The source stack supplies the positive request/concurrency/model-call defaults documented in [runtime limits](runtime.md#backend-and-model-usage-limits). Override them in the host's private `deploy/application.env` before applying a deployment. Health checks remain available when traffic is throttled. Keep a dedicated application key with a provider-side credit limit for restart-safe dollar spending protection; local call counters reset on deployment and rollback. A daily call allowance alone is not a daily dollar budget. Trusted evaluation overlays are not appropriate for the public hosted stack.
+
 Check the deployment job and `deploy/current.json` to identify the running source. A docs-only merge can leave an earlier revision running because its application fingerprint is unchanged. To retry a failed deployment, rerun the entire push CI workflow while that revision remains the current `main` head; ordinary CI receipts require one complete attempt. If a newer revision exists, use its full successful push run instead. Manual CI dispatch validates source without deployment.
 
 Rollback failure is a failed deployment requiring administrative repair; the previous receipt remains unchanged. Inspect container state without printing environment values. Retained source and images permit restoring the previous Compose files with `up -d --no-build`. This pipeline neither publishes a GitHub release nor changes the release baseline or evaluation route.

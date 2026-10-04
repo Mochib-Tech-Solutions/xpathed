@@ -105,6 +105,28 @@ Operation errors use `{code, message, traceId}`. Controller validation returns t
 
 ## Configuration
 
+### Backend and model usage limits
+
+ClientApi and Resolver each enforce a shared fixed-window API allowance and a concurrent-request cap with the native ASP.NET Core rate limiter. Limits apply before controller work and span all callers and routes except `/health`. Requests exceeding either limit return HTTP 429 with an `ApiError` containing `request_rate_limited`, a useful message and a `Retry-After` header. ClientApi preserves an upstream `Retry-After`. There is no request queue or automatic retry. These global allowances do not depend on session IDs, IP addresses or untrusted forwarded headers; one visitor can exhaust the shared allowance. Existing Browser session and capture limits remain separate.
+
+Resolver's singleton `ModelUsageLimits` reserves capacity immediately before `OpenRouterGateway` starts paid inference. Public resolution, diagnostic resolution and saved-page selection all use this gateway. Quota rejection returns the existing resolution error outcome with `model_usage_limited`, a retry message, zero `diagnostics.modelCalls` and no provider usage or charge. It does not select a target or become `not_found`. Admitted failures consume call allowance. A caller disconnect does not release the model slot: the provider attempt completes under its existing timeout and shutdown token, and late usage/cost retains its original accounting identity. Output remains capped at 4,096 tokens and oversized complete inputs remain explicit errors rather than truncated candidates.
+
+All counters are local to one process and reset on restart. Fixed windows begin when their limiter is first used; the daily allowance is a 24-hour window, not a UTC calendar-day budget. Reservations count conservatively when a later allowance rejects admission. Multiple replicas have independent counters. Resolver remains stateless for page inputs and outcomes; resource counters and the pricing cache are shared operational state.
+
+| Compose environment variable | .NET configuration | Default |
+| --- | --- | --- |
+| `API_REQUESTS_PER_MINUTE` | `RateLimits:RequestsPerMinute` | 120 |
+| `API_CONCURRENT_REQUESTS` | `RateLimits:ConcurrentRequests` | 8 |
+| `MODEL_CALLS_PER_MINUTE` | `ModelUsage:CallsPerMinute` | 20 |
+| `MODEL_CALLS_PER_DAY` | `ModelUsage:CallsPerDay` | 1000 |
+| `MODEL_CONCURRENT_CALLS` | `ModelUsage:ConcurrentCalls` | 2 |
+
+Values must be positive integers; zero is invalid rather than a protection bypass. Compose reads these variables from the ignored environment file. Standalone .NET hosts use their configuration keys, such as `ModelUsage__ConcurrentCalls`. Effective provider configuration records the model allowances without credentials. Trusted resolution-check and evaluation overlays explicitly use higher positive allowances so resource throttling cannot alter or shrink the evaluation denominator. Saved-page workers are separate processes; their aggregate spending is governed by the evaluation key and frozen plan.
+
+A call allowance is not a dollar cap: request sizes, route prices and restarts affect spending. Set a credit limit on a dedicated OpenRouter application key, with a daily reset if desired, in [OpenRouter key settings](https://openrouter.ai/settings/keys); keep the evaluation key separate. OpenRouter rejects requests after that key's allowance is used, as described in [provider authentication and limits](https://openrouter.ai/docs/api/reference/authentication). Provider enforcement survives application restarts and multiple replicas. Reported and estimated charges remain informational and are never subtracted from a speculative local dollar budget.
+
+### Service settings
+
 | Setting                                              | Default / purpose                                                                                                         |
 | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
 | `XPATHED_PORT`                                       | Host web port, `8080`; export before Compose                                                                              |
