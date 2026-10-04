@@ -8,6 +8,41 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import threading
+from urllib.parse import urlsplit
+
+
+def forward_output(base, command):
+    url = (base / "deploy/public-url").read_text().strip()
+    addresses = [url, urlsplit(url).hostname]
+    private_values = base / "deploy/private-log-values"
+    if private_values.exists():
+        addresses += private_values.read_text().splitlines()
+    pattern = re.compile("|".join(re.escape(value) for value in addresses if value), re.IGNORECASE)
+    lock = threading.Lock()
+    output_open = True
+    def forward(stream):
+        nonlocal output_open
+        for line in stream:
+            with lock:
+                if output_open:
+                    try:
+                        print(pattern.sub("[deployment address]", line), end="", flush=True)
+                    except OSError:
+                        # Continue draining the worker if the SSH client disconnects.
+                        output_open = False
+    with subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                          text=True, errors="replace") as process:
+        readers = [threading.Thread(target=forward, args=(stream,)) for stream in (process.stdout, process.stderr)]
+        for reader in readers:
+            reader.start()
+        for reader in readers:
+            reader.join()
+        status = process.wait()
+        if status != 0:
+            if output_open:
+                print(f"Deployment worker exited with status {status}.", flush=True)
+            raise RuntimeError("Deployment worker failed; inspect the redacted output")
 
 
 def receive(base, command, stream):
@@ -31,8 +66,8 @@ def receive(base, command, stream):
         source.mkdir()
         with tarfile.open(archive) as bundle:
             bundle.extractall(source, filter="data")
-        subprocess.run(["python3", str(source / "scripts/deployment-host.py"),
-                        str(base), str(source), revision, fingerprint], check=True)
+        forward_output(base, ["python3", str(source / "scripts/deployment-host.py"),
+                              str(base), str(source), revision, fingerprint])
     finally:
         shutil.rmtree(directory)
 
@@ -40,4 +75,8 @@ def receive(base, command, stream):
 if __name__ == "__main__":
     os.umask(0o077)
     signal.signal(signal.SIGHUP, signal.SIG_IGN)
-    receive(Path.home() / "xpathed", os.environ.get("SSH_ORIGINAL_COMMAND", ""), sys.stdin.buffer)
+    try:
+        receive(Path.home() / "xpathed", os.environ.get("SSH_ORIGINAL_COMMAND", ""), sys.stdin.buffer)
+    except Exception as error:
+        print(f"Deployment receiver failed ({type(error).__name__}); inspect the redacted output.", file=sys.stderr)
+        sys.exit(1)

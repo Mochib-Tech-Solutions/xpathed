@@ -295,6 +295,7 @@ jobs:
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
           DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
           DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          DEPLOY_PUBLIC_URL: ${{ secrets.DEPLOY_PUBLIC_URL }}
         run: node scripts/deployment.mjs
 
   deployment-result:
