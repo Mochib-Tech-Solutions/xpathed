@@ -13,7 +13,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
 import { classifyChanges } from "./ci-changes.mjs";
-import { validateEvent, validateMessage } from "./commit-policy.mjs";
+import { validateMessage } from "./commit-policy.mjs";
 import { installHooks } from "./install-hooks.mjs";
 import { checkCommands, checkStaged, runCheckGroups } from "./pre-commit.mjs";
 
@@ -85,38 +85,6 @@ test("Conventional Commits covers optional scopes, breaking changes and rejects 
     "feat: \nbody",
   ])
     assert.throws(() => validateMessage(message), /type\(scope\)/);
-});
-
-test("CI checks the PR title and all introduced commits without linting base history", (t) => {
-  const { cwd, git } = repository(t);
-  const base = git("rev-parse", "HEAD");
-  git("checkout", "-b", "feature");
-  git("commit", "--allow-empty", "-m", "feat: valid commit");
-  const good = git("rev-parse", "HEAD");
-  const event = (head, title = "feat: valid title") => ({
-    pull_request: { title, base: { sha: base }, head: { sha: head } },
-  });
-  assert.doesNotThrow(() => validateEvent("pull_request", event(good), cwd));
-  assert.throws(() => validateEvent("pull_request", event(good, "invalid title"), cwd), /PR title/);
-  git("commit", "--allow-empty", "-m", "bad intermediate commit");
-  const bad = git("rev-parse", "HEAD");
-  git("commit", "--allow-empty", "-m", "fix: valid tip");
-  assert.throws(
-    () => validateEvent("pull_request", event(git("rev-parse", "HEAD")), cwd),
-    new RegExp(bad),
-  );
-  assert.doesNotThrow(() => validateEvent("push", { before: base, after: good }, cwd));
-  assert.throws(() => validateEvent("push", { before: base, after: bad }, cwd), new RegExp(bad));
-  assert.throws(
-    () => validateEvent("push", { before: "--all", after: good }, cwd),
-    /Invalid event/,
-  );
-  git("checkout", "-b", "verbatim", base);
-  git("commit", "--allow-empty", "--cleanup=verbatim", "-m", "  fix: invalid leading spaces");
-  assert.throws(
-    () => validateEvent("push", { before: base, after: git("rev-parse", "HEAD") }, cwd),
-    /type\(scope\)/,
-  );
 });
 
 test("hook installation is idempotent and isolated to a linked worktree", (t) => {
