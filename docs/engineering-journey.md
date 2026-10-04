@@ -23,7 +23,7 @@ We measured Basic and Improved as complete systems. There is no isolated accurac
 
 A request for the item below Backpack on Sauce Demo could select Backpack's Add to cart button or Bike Light beside it. Geometry existed, but product wrappers were missing and controls lacked item grouping. Browser now retains generic repeated whole-item containers and parent identities; Resolver supplies a named layout of nearest aligned neighbors and distinguishes cards from their images and controls. All original candidates remain available. Relationships follow measured geometry, including reordered CSS grids, and are revalidated before returning a result.
 
-The [spatial investigation](research/spatial-item-selection.md) records the exact requests, five passing real-page checks and a separate complete paired pipeline run: pre-fix main 160/191, final candidate 169/191, nine gains and zero lost passes. It also retains the initial variant's lost absence pass and the final 22 shared failures. This is an additional Improved change; it has no updated Basic/Stagehand or saved-page score.
+The [spatial investigation](research/spatial-item-selection.md) records the exact requests, five passing real-page checks and a separate complete paired pipeline run: pre-fix main 160/191, final candidate 169/191, nine gains and zero lost passes. It also retains the initial variant's lost absence pass and the final 22 shared failures. That supplementary run compares two Improved revisions; the [current three-system refresh](research/clean-evaluation-comparison.md) separately remeasures Basic, Stagehand and saved-page selection.
 
 ## Give the model a bounded job
 
@@ -57,7 +57,7 @@ The evaluation set separately measures Saved-page selection, XPath construction 
 
 ### Compare Basic, Improved and Stagehand
 
-The recorded pre-spatial Basic resolver and Improved resolver comparison uses the same DeepSeek V4.1 Flash model, Wafer provider and inference settings. The browser implementation makes three rules explicit:
+The refreshed Basic resolver and Improved resolver comparison uses the same DeepSeek V4.1 Flash model, Wafer provider and inference settings. The browser implementation makes three rules explicit:
 
 - Match the requested control itself; headings, scope containers and repeated descendant text provide context.
 - Report missing targets within the current view. Completeness describes whether every requested target is represented, including absent targets.
@@ -65,9 +65,9 @@ The recorded pre-spatial Basic resolver and Improved resolver comparison uses th
 
 The [recorded comparison](research/clean-evaluation-comparison.md) measures Basic and Improved on the same admitted saved-page inputs, and all three systems on the same final browser cases. Its tables and charts are generated from complete original attempts, with separate denominators for saved-page selection, browser action-and-target correctness, target selection alone and the full resolver contract.
 
-The systems prepare their own DOM evidence and prompts; equal page state and independent labels make this a complete-system comparison. Current Improved adds spatial card context, so refreshing the comparison requires all three arms on the expanded collection. The [matched-input rules](evaluation.md#matched-inputs-and-scoring) keep those boundaries explicit.
+The systems prepare their own DOM evidence and prompts; equal page state and independent labels make this a complete-system comparison. The current comparison includes spatial card context and open-shadow coverage, with all three arms remeasured on the expanded collection. The [matched-input rules](evaluation.md#matched-inputs-and-scoring) keep those boundaries explicit.
 
-Action interpretation matters separately from selecting the right element. Stagehand's stock `observe` does not return xpathed's full readiness or absence contract and requires a live page, so it has no saved-page score. Failures, gains and regressions remain visible. Aggregate improvement does not override the release gate's no-regression requirement, and one attempt per case leaves model variation unresolved.
+Action interpretation matters separately from selecting the right element. Stagehand's stock `observe` does not return xpathed's full readiness or absence contract and requires a live page, so it has no saved-page score. The saved-page refresh retains key-limit refusals; its first-attempt success cannot isolate model quality. The [model comparison](research/model-comparison-2026-10-04.md) records compatibility and operational limits separately. Failures, gains and regressions remain visible. Aggregate improvement does not override the release gate's no-regression requirement, and one attempt per case leaves model variation unresolved.
 
 Isolated workers run concurrently. Original evidence, charges, source identities, image identities and timing cohorts are preserved. The application carries one selected implementation; archived images and Git preserve Basic. Git commits and saved prompt bytes preserve reproducibility.
 

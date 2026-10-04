@@ -1,5 +1,7 @@
 # Fast-model qualification report
 
+Historical qualification evidence for the September configuration and case set. The [4 October model comparison](model-comparison-2026-10-04.md) remeasures the current Resolver and expanded cases, with explicit configuration and provider-limit failures. These are separate measurements.
+
 Measured 2026-09-30 for issue #9. **No configuration qualifies for default promotion.** Gemini meets the confirmation accuracy and latency thresholds, but the development color-reference failure remains a blocking capability gap. Application defaults are unchanged.
 
 ## Measured results

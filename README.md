@@ -161,27 +161,35 @@ These are actual cases from the shared evaluation set. Expected selectors belong
 
 See [case IDs, fixtures and metric definitions](docs/evaluation.md#example-cases-and-metrics), and [actual outcomes across the three systems](docs/research/clean-evaluation-comparison.md#case-examples).
 
-### Recorded comparison: Basic resolver, Improved resolver and Stagehand
+### Refreshed comparison: Basic resolver, Improved resolver and Stagehand
 
-Measured on **3 October 2026**, before the spatial-item fix. Basic is archived source `d5333779`; Improved is measured source `77ce7b63`; Stagehand is pinned to **4.1.0**. These names identify the recorded systems, rather than moving versions of `main`.
+Measured on **4 October 2026**: archived Basic `d5333779`, current Improved runtime `d444176c`, and Stagehand **4.1.0**. All three were refreshed on **190 shared browser cases**, including spatial and shadow behavior; both saved-page arms use all **569 reviewed cases**. Each case has one original attempt per system. Stagehand requires a live page and has no saved-page score.
 
-Each system has one original attempt per case. Basic and Improved use the same 569 reviewed saved-page inputs. All three use the same 183 controlled browser cases, reset independently with matching browser state and inference settings. Each prepares its own model context: this compares complete systems, not identical prompts or DOM representations. Stagehand requires a live page, so it has no saved-page score.
+**Saved-page limitation:** the evaluation key reached its spending limit, refusing **115 Basic** and **105 Improved** requests. These remain failed attempts in the scores below; the scores cannot isolate model quality.
 
-| System            | Saved-page target selection | Browser action + targets |
-| ----------------- | --------------------------: | -----------------------: |
-| Basic resolver    |             501/569 (88.0%) |          161/183 (88.0%) |
-| Improved resolver |             498/569 (87.5%) |          172/183 (94.0%) |
-| Stagehand         |              Not applicable |          114/183 (62.3%) |
+| System            | Saved-page first-attempt success | Browser action + targets |
+| ----------------- | -------------------------------- | ------------------------ |
+| Basic resolver    | 403/569 (70.8%)                  | 159/190 (83.7%)          |
+| Improved resolver | 376/569 (66.1%)                  | 176/190 (92.6%)          |
+| Stagehand         | Not applicable                   | 111/190 (58.4%)          |
 
-[![Recorded comparison on the audited evaluation set](docs/assets/evaluation/clean-comparison.svg)](docs/research/clean-evaluation-comparison.md)
+[![Refreshed comparison, including provider-limit failures](docs/assets/evaluation/clean-comparison.svg)](docs/research/clean-evaluation-comparison.md)
 
-Basic → Improved gained **13 browser passes and lost 2**. Saved-page selection gained **36 passes and lost 39**. These are separate measurements; failures remain in each denominator. The [report](docs/research/clean-evaluation-comparison.md) includes full resolver-contract scores, target-only scores, behavior categories, every gain and regression, timing cohorts and source/image identities.
+Basic → Improved gained **21 browser passes and lost 4**. Saved-page first-attempt success gained **26 and lost 53**, including unequal provider refusals. Controlled XPath verification passed **180/180**, with **22/22 saved-locator mutations** and **22/22 fresh resolutions after mutation**, without model calls.
 
-Controlled XPath verification passed **172/172 cases**, including **22/22 saved-locator mutations** and **22/22 fresh resolutions after mutation**, without model calls.
+The system comparison retains **1,708 original provider requests**, **$0.70667422 known reported cost** and **220 unreported charges**. Tables and figures use the [same verified aggregate](docs/assets/evaluation/clean-comparison.json). The [report](docs/research/clean-evaluation-comparison.md) separates common action/target scores, target-only and full-contract scores, behavior categories, timings and evidence identities. Singleton Stagehand requests grade its first suggestion; plural requests grade its entire set. [Earlier results](docs/research/comparison-2026-10-03.md) remain historical.
 
-The paid comparison retains **1,687 original provider calls**, with **$0.79015806 known reported cost** and **2 unreported charges**. The table and figure above derive from the [same verified aggregate](docs/assets/evaluation/clean-comparison.json). Earlier reports retain their original datasets and are clearly marked historical. These authored/reviewed cases do not establish unseen-site accuracy or release approval.
+### Refreshed model comparison
 
-The browser table measures **action and exact targets**, including applicable safety checks. [Target-only and full-contract scores](docs/research/clean-evaluation-comparison.md#browser-scoring-boundaries) are separate; Stagehand does not expose xpathed's readiness and capture-coverage contract. Singleton requests grade its first suggestion; plural requests grade its entire returned set, without oracle-guided filtering.
+| Model / pinned provider             | Browser action + targets                  | Saved-page first-attempt success |
+| ----------------------------------- | ----------------------------------------- | -------------------------------- |
+| DeepSeek V4.1 Flash / Wafer         | 176/190 (92.6%)                           | 376/569 (66.1%)                  |
+| GPT-6 Luna / OpenAI                 | 183/190 (96.3%)                           | 249/569 (43.8%)                  |
+| Gemini 3.8 Flash / Google AI Studio | Unavailable: 190 configuration rejections | Not run: incompatible settings   |
+
+[![Models with the current Resolver](docs/assets/evaluation/model-comparison.svg)](docs/research/model-comparison-2026-10-04.md)
+
+Saved-page totals include **105 DeepSeek** and **293 Luna** key-limit refusals; they cannot support a model-quality ranking. Gemini requires reasoning on the observed route, while the current Resolver disables it. The [model report](docs/research/model-comparison-2026-10-04.md) retains all attempts, paired outcomes, costs and compatibility evidence. Timing cohorts differ, so no fastest-model claim follows. Model defaults remain unchanged. These measurements do not establish unseen-site accuracy or release approval.
 
 ```sh
 pnpm check                              # local checks
