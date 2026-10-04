@@ -14,7 +14,7 @@ const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1983" height="793" v
     </filter>
     <mask id="reveal" maskUnits="userSpaceOnUse" x="0" y="0" width="1983" height="793">
       <circle cx="991.5" cy="396.5" r="1500" fill="white" filter="url(#ink)">
-        <animate attributeName="r" values="0;0;1500" dur="11s" begin="0s" fill="freeze" calcMode="spline" keyTimes="0;0.0909;1" keySplines="0 0 1 1;0.22 0.61 0.36 1"/>
+        <animate attributeName="r" values="0;0;1500" dur="9s" begin="0s" fill="freeze" calcMode="spline" keyTimes="0;0.0556;1" keySplines="0 0 1 1;0.22 0.61 0.36 1"/>
       </circle>
     </mask>
   </defs>
