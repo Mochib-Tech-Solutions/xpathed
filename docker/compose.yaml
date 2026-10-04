@@ -12,6 +12,8 @@ services:
     environment:
       BrowserUrl: http://browser:8080
       ResolverUrl: http://resolver:8080
+      RateLimits__RequestsPerMinute: ${API_REQUESTS_PER_MINUTE:-120}
+      RateLimits__ConcurrentRequests: ${API_CONCURRENT_REQUESTS:-8}
       Logging__LogLevel__Default: Warning
     depends_on:
       resolver: { condition: service_started }
@@ -24,6 +26,11 @@ services:
       OpenRouter__ApiKey: ${OPENROUTER_API_KEY:-}
       OpenRouter__Model: ${OPENROUTER_MODEL:-deepseek/deepseek-v4.1-flash}
       OpenRouter__Provider: ${OPENROUTER_PROVIDER:-wafer}
+      RateLimits__RequestsPerMinute: ${API_REQUESTS_PER_MINUTE:-120}
+      RateLimits__ConcurrentRequests: ${API_CONCURRENT_REQUESTS:-8}
+      ModelUsage__CallsPerMinute: ${MODEL_CALLS_PER_MINUTE:-20}
+      ModelUsage__CallsPerDay: ${MODEL_CALLS_PER_DAY:-1000}
+      ModelUsage__ConcurrentCalls: ${MODEL_CONCURRENT_CALLS:-2}
       Logging__LogLevel__Default: Warning
     depends_on: [browser]
   browser:

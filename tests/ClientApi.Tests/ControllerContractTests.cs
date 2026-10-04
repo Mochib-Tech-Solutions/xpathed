@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Xpathed.ClientApi.Controllers;
 
@@ -61,6 +62,115 @@ public sealed class ControllerContractTests
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
         Assert.Null(upstream.Path);
     }
+
+    [Fact]
+    public async Task UpstreamRateLimitPreservesBodyStatusAndRetryAfter()
+    {
+        using var upstream = new ResolverHandler(
+            HttpStatusCode.TooManyRequests,
+            "{\"code\":\"request_rate_limited\",\"message\":\"Try later\"}"
+        )
+        {
+            RetryAfter = TimeSpan.FromSeconds(37),
+        };
+        await using var app = Application(upstream);
+        using var client = app.CreateClient();
+        using var response = await client.PostAsJsonAsync(
+            "/api/pages/page-1/resolve",
+            new { instruction = "Click Save", documentId = "document-1" }
+        );
+        Assert.Equal(HttpStatusCode.TooManyRequests, response.StatusCode);
+        Assert.Equal(TimeSpan.FromSeconds(37), response.Headers.RetryAfter?.Delta);
+        Assert.Equal(
+            "Try later",
+            (await response.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("message").GetString()
+        );
+    }
+
+    [Fact]
+    public async Task SharedRateLimitCannotBeBypassedWithDifferentPageOrForwardedAddress()
+    {
+        using var upstream = new ResolverHandler(HttpStatusCode.OK, "{}");
+        await using var app = LimitedApplication(upstream, "RateLimits:RequestsPerMinute", "1");
+        using var client = app.CreateClient();
+        using var first = await client.PostAsJsonAsync(
+            "/api/pages/page-1/resolve",
+            new { instruction = "Click Save", documentId = "document-1" }
+        );
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+        client.DefaultRequestHeaders.Add("X-Forwarded-For", "198.51.100.8");
+        using var rejected = await client.PostAsJsonAsync(
+            "/api/pages/different-page/resolve",
+            new { instruction = "Click Save", documentId = "document-1" }
+        );
+        Assert.Equal(HttpStatusCode.TooManyRequests, rejected.StatusCode);
+        Assert.True(rejected.Headers.RetryAfter?.Delta > TimeSpan.Zero);
+        Assert.Equal(
+            "request_rate_limited",
+            (await rejected.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("code").GetString()
+        );
+        Assert.Equal(1, upstream.RequestCount);
+        using var health = await client.GetAsync("/health");
+        Assert.Equal(HttpStatusCode.OK, health.StatusCode);
+    }
+
+    [Fact]
+    public async Task ConcurrentRequestLimitRejectsWithoutQueuingAndReleasesAfterCompletion()
+    {
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var finish = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        using var upstream = new ResolverHandler(HttpStatusCode.OK, "{}")
+        {
+            BeforeRespondAsync = async token =>
+            {
+                started.TrySetResult();
+                await finish.Task.WaitAsync(token);
+            },
+        };
+        await using var app = LimitedApplication(upstream, "RateLimits:ConcurrentRequests", "1");
+        using var client = app.CreateClient();
+        var pending = client.PostAsJsonAsync(
+            "/api/pages/page-1/resolve",
+            new { instruction = "Click Save", documentId = "document-1" }
+        );
+        try
+        {
+            await started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            using var rejected = await client
+                .PostAsJsonAsync(
+                    "/api/pages/page-2/resolve",
+                    new { instruction = "Click Save", documentId = "document-1" }
+                )
+                .WaitAsync(TimeSpan.FromSeconds(2));
+            Assert.Equal(HttpStatusCode.TooManyRequests, rejected.StatusCode);
+            Assert.Equal(1, upstream.RequestCount);
+        }
+        finally
+        {
+            finish.TrySetResult();
+        }
+        using var completed = await pending;
+        Assert.Equal(HttpStatusCode.OK, completed.StatusCode);
+        using var next = await client.PostAsJsonAsync(
+            "/api/pages/page-1/resolve",
+            new { instruction = "Click Save", documentId = "document-1" }
+        );
+        Assert.Equal(HttpStatusCode.OK, next.StatusCode);
+        Assert.Equal(2, upstream.RequestCount);
+    }
+
+    private static WebApplicationFactory<HealthController> LimitedApplication(
+        ResolverHandler upstream,
+        string setting,
+        string value
+    ) =>
+        Application(upstream)
+            .WithWebHostBuilder(builder =>
+                builder.ConfigureAppConfiguration(
+                    (_, configuration) =>
+                        configuration.AddInMemoryCollection(new Dictionary<string, string?> { [setting] = value })
+                )
+            );
 
     private static WebApplicationFactory<HealthController> Application(ResolverHandler upstream) =>
         new WebApplicationFactory<HealthController>().WithWebHostBuilder(builder =>

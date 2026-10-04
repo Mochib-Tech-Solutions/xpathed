@@ -52,6 +52,7 @@ public static class OfflineSelectionEvaluation
             builder.Services.AddHttpClient("openrouter");
             builder.Services.AddMemoryCache();
             builder.Services.AddTransient<OpenRouterGateway>();
+            builder.Services.AddSingleton<ModelUsageLimits>();
             using var host = builder.Build();
             var gateway = host.Services.GetRequiredService<OpenRouterGateway>();
             configurationId = gateway.ConfigurationId("offline");
@@ -75,8 +76,10 @@ public static class OfflineSelectionEvaluation
             }
             diagnostics = diagnostics with { Stage = "configuration" };
             gateway.EnsureConfigured();
-            diagnostics = diagnostics with { Stage = "model", ModelCalls = 1 };
-            var completion = await gateway.CompleteAsync(input, CancellationToken.None);
+            diagnostics = diagnostics with { Stage = "model" };
+            var pending = gateway.CompleteAsync(input, CancellationToken.None);
+            diagnostics = diagnostics with { ModelCalls = 1 };
+            var completion = await pending;
             diagnostics = completion.Diagnostics with
             {
                 Stage = "selection",

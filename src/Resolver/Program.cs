@@ -10,6 +10,7 @@ if (args.FirstOrDefault() == "--evaluate-offline")
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddApiControllers();
+builder.Services.AddApiRateLimits(builder.Configuration);
 builder.Services.AddHttpClient(
     "browser",
     client => client.BaseAddress = new Uri(builder.Configuration["BrowserUrl"] ?? "http://browser:8080")
@@ -19,8 +20,11 @@ builder.Services.AddMemoryCache();
 builder.Services.AddTransient<OpenRouterGateway>();
 builder.Services.AddTransient<ResolutionService>();
 builder.Services.AddSingleton<ProviderAccounting>();
+builder.Services.AddSingleton<ModelUsageLimits>();
 var app = builder.Build();
+_ = app.Services.GetRequiredService<ModelUsageLimits>();
 app.UseApiErrors();
 app.UseMiddleware<ServiceOriginMiddleware>();
+app.UseRateLimiter();
 app.MapControllers();
 app.Run();
