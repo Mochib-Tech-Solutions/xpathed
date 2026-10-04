@@ -6,6 +6,8 @@ Every job checks out `github.sha`: the synthetic merge commit for a pull request
 
 ## Parallel execution
 
+After **Check** succeeds on a `main` push, **Deploy hosted workspace** compares the candidate's application fingerprint with the last successful deployment. It skips unchanged application inputs and superseded revisions; runtime changes use serialized SSH deployment with health checks and rollback. Its credentials are unavailable to PR, merge-group and manual-dispatch jobs. See [deployment operations](deployment.md).
+
 `pnpm check`, `pnpm test` and `pnpm build` run their independent .NET, Web and tooling groups concurrently using pnpm's script selection. Web formatting, lint, tests and the typechecked build also overlap; tooling formatting, syntax checks and tests overlap. Selected pre-commit groups run concurrently, while .NET restore/build commands stay ordered because they share output directories. Every started group finishes and any failed check fails the command.
 
 The Live-browser Resolver runner with deterministic provider fixtures schedules individual cases across up to four workers inside one run. Each case gets a fresh managed session, Chromium process and display. The fixture provider routes by the propagated request trace, including fresh mutation resolutions. Trial files remain independent; manifest writes are serialized. The gate still requires every original case exactly once, with no retries, and independently replays the complete evidence.
