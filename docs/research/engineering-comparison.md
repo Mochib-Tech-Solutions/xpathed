@@ -1,6 +1,6 @@
 # Basic resolver, Improved resolver and Stagehand
 
-For the frozen audited-set measurements from 3 October 2026, use the [recorded three-system comparison](clean-evaluation-comparison.md). Later spatial-item changes have a [separate pipeline check](spatial-item-selection.md). This report preserves its original historical evidence.
+For the frozen audited-set measurements from 3 October 2026, use the [3 October comparison](comparison-2026-10-03.md). The [current comparison](clean-evaluation-comparison.md) measures the expanded browser cases and fresh complete saved-page runs. The [spatial pipeline check](spatial-item-selection.md) is separate historical evidence. This report preserves its original historical scores.
 
 **Historical comparison — 2 October 2026.** These results retain their original source and case definitions. Later review clarified one instruction and added required reason codes to five cases. They are not a fresh measurement of the current evaluation set.
 
