@@ -2,9 +2,9 @@
 
 ## Recorded comparison and refresh
 
-The checked-in `clean-comparison.json` and SVG bind the pre-spatial 3 October 2026 configurations and frozen collection described in the [recorded report](../../research/clean-evaluation-comparison.md). Their Improved score does not describe subsequent source changes. Reproduce historical export with its recorded verifier and case definitions; the current exporter rejects incomplete coverage of the expanded collection.
+The checked-in `clean-comparison.json` and SVG describe the refreshed comparison in the [current report](../../research/clean-evaluation-comparison.md). The complete browser arms, both saved-page arms and controlled XPath run share their recorded source, collection and grading boundaries.
 
-For a refreshed comparison, complete all browser arms and both saved-page arms on the same frozen collection and grading boundaries before updating tables or figures. Keep [spatial pipeline evidence](../../research/spatial-item-selection.md) separate; it cannot be substituted into the three-system chart.
+`comparison-2026-10-03.json` and SVG preserve the earlier measured configurations and frozen collection in the [historical report](../../research/comparison-2026-10-03.md). Supplementary [spatial pipeline evidence](../../research/spatial-item-selection.md) remains separate.
 
 After all runs complete, export the browser comparison, both Saved-page selection arms and the controlled XPath run:
 
@@ -23,6 +23,14 @@ A continued browser run must retain its hashed amendment and complete parent evi
 The fourth input is the completed XPath construction and verification run. The exporter checks it against the current XPath case selection, replays the existing grader and retains trial hashes, pass counts and saved-locator/fresh-resolution counts separately. It performs no provider calls.
 
 The generator pins Matplotlib and writes an accessible SVG plus a temporary PNG preview. Review the preview after exporting. It updates only the new clean-comparison files; historical reports and figures below remain unchanged.
+
+## Current model figure
+
+`model-comparison.json` and SVG describe the [4 October current-Resolver model comparison](../../research/model-comparison-2026-10-04.md). DeepSeek references the refreshed Improved evidence above; Luna uses the same runtime, prompt/schema, cases and reviewed inputs. Gemini is configuration-incompatible and has no accuracy estimate. Saved-page first-attempt totals include provider-limit refusals, displayed directly in both figures.
+
+The model aggregate binds all 380 original browser attempts and all 569 Luna saved-page attempts, paired outcomes, source/image identities, collector/exporter hashes and unavailable accounting. The private collector's common-grader envelope omitted `strategy` and the call count; reconciliation restores only the documented `custom` strategy and retained native diagnostics count, while preserving original evidence and full-contract grades. Actual native request parity and prepared-input review bindings are verified before export. Model regeneration uses the retained private calculation helpers identified by their hashes; no application or checked-in tooling changes were needed.
+
+For this refresh, Basic's container receipt was taken during explicitly labelled post-completion image restoration. A complete hash snapshot verifies that every original manifest, trial and provider record remained unchanged. The aggregate retains this receipt phase rather than presenting it as contemporaneous measurement evidence.
 
 ## Historical figures
 
