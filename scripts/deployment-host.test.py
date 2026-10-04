@@ -1,10 +1,14 @@
 import importlib.util
 import io
 import json
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
+import re
 import tempfile
 import tarfile
+from threading import Thread
 import unittest
+from unittest.mock import patch
 
 
 def load(name, filename):
@@ -75,6 +79,32 @@ class DeploymentTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "build failed"):
             host.deploy(self.base, self.source, "c" * 40, "d" * 64, run=run)
         self.assertEqual(json.loads(self.state.read_text()), self.old)
+
+    def test_health_uses_the_web_proxy_routes_and_private_resolver(self):
+        nginx = (Path(__file__).resolve().parents[1] / "docker/web/nginx.conf").read_text()
+        routes = {"/", *re.findall(r"location = (\S+) \{ proxy_pass http://[^;]+/health;", nginx)}
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                self.send_response(200 if self.path in routes else 404)
+                self.end_headers()
+
+            def log_message(self, *args):
+                pass
+
+        server = HTTPServer(("127.0.0.1", 0), Handler)
+        thread = Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            (self.base / "deploy/public-url").write_text(f"http://127.0.0.1:{server.server_port}")
+            with patch.object(host, "compose", side_effect=self.run_compose):
+                host.healthy(self.base, self.old)
+            self.assertEqual(self.calls, [(self.old["revision"],
+                ("exec", "-T", "web", "wget", "-q", "-O", "/dev/null", "http://resolver:8080/health"))])
+        finally:
+            server.shutdown()
+            thread.join()
+            server.server_close()
 
     def test_receiver_rejects_other_commands_without_consuming_input(self):
         for command in ("", "id", "deploy ../bad hash", "deploy " + "a" * 40 + " " + "b" * 64 + "; id"):

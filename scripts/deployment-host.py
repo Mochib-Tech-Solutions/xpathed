@@ -60,7 +60,7 @@ def compose(base, state, *arguments):
 
 def healthy(base, state):
     url = (base / "deploy/public-url").read_text().strip()
-    for path in ("/", "/health", "/api/browser/health"):
+    for path in ("/", "/health", "/view/health"):
         with urllib.request.urlopen(url + path, timeout=10) as response:
             if response.status != 200:
                 raise RuntimeError("Hosted health check failed")
