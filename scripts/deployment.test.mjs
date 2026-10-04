@@ -4,7 +4,21 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { fingerprint } from "./deployment.mjs";
+import { fingerprint, secretFile } from "./deployment.mjs";
+
+test("deployment key remains parseable when secret storage strips newline or uses CRLF", () => {
+  const directory = mkdtempSync(join(tmpdir(), "deployment-key-test-"));
+  try {
+    const key = join(directory, "key");
+    execFileSync("ssh-keygen", ["-q", "-t", "ed25519", "-N", "", "-f", key]);
+    const publicKey = execFileSync("ssh-keygen", ["-y", "-f", key], { encoding: "utf8" });
+    const value = readFileSync(key, "utf8").trim().replaceAll("\n", "\r\n");
+    writeFileSync(key, secretFile(value), { mode: 0o600 });
+    assert.equal(execFileSync("ssh-keygen", ["-y", "-f", key], { encoding: "utf8" }), publicKey);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
 
 test("deployment fingerprint skips docs and tests, and detects missed runtime changes and deletions", () => {
   const directory = mkdtempSync(join(tmpdir(), "deployment-test-"));

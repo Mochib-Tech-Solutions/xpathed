@@ -191,6 +191,8 @@ Ordinary CI stays provider-free. A source merge validates the selected implement
 
 ## Read more
 
+See [security and contribution protection](SECURITY.md) for credential handling, the history scan and required PR-review policy.
+
 - [System walkthrough](docs/how-it-works.md): request flow and integration.
 - [Engineering decisions](docs/engineering-journey.md): tradeoffs, quality and next steps.
 - [Demo guide](docs/demo.md): present the working system.
