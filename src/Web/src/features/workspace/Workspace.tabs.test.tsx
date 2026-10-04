@@ -330,7 +330,24 @@ describe("Browser tabs and chat", () => {
     await waitFor(() => expect(composer()).toBeEnabled());
     await user.type(composer(), "Click Second{Enter}");
     await screen.findByText("Second target", { selector: "bdi" });
+    await user.type(composer(), "Draft for Second");
     await user.click(screen.getByRole("button", { name: "Reset chat" }));
+    const dialog = screen.getByRole("alertdialog", { name: "Reset chat?" });
+    expect(within(dialog).getByRole("button", { name: "Cancel" })).toHaveFocus();
+    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    expect(screen.getByText("Second target", { selector: "bdi" })).toBeInTheDocument();
+    expect(composer()).toHaveValue("Draft for Second");
+    await waitFor(() => expect(screen.getByRole("button", { name: "Reset chat" })).toHaveFocus());
+    await user.keyboard("{Enter}");
+    expect(screen.getByRole("alertdialog", { name: "Reset chat?" })).toBeInTheDocument();
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+    expect(screen.getByText("Second target", { selector: "bdi" })).toBeInTheDocument();
+    expect(composer()).toHaveValue("Draft for Second");
+    await user.click(screen.getByRole("button", { name: "Reset chat" }));
+    await user.click(
+      within(screen.getByRole("alertdialog")).getByRole("button", { name: "Reset chat" }),
+    );
     expect(screen.queryByText("Second target", { selector: "bdi" })).not.toBeInTheDocument();
     expect(composer()).toHaveValue("");
     expect(composer()).toHaveFocus();
