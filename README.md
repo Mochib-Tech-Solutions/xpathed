@@ -113,6 +113,15 @@ Saved-page selection evaluates steps 3–4 with saved inputs. XPath construction
 
 The development default is **`google/gemini-3.8-flash` through OpenRouter's `google-ai-studio` provider with low reasoning**, configured in `.env.example` and `docker/compose.yaml`. Existing `.env` and hosted runtime settings take precedence; update both model and provider there to adopt this default.
 
+Switch models by setting both values in the ignored `.env`, then restart this checkout with `pnpm dev`. Hosted deployments use their private `deploy/application.env` instead. The prompt and resolution contract stay the same.
+
+| `OPENROUTER_MODEL` | `OPENROUTER_PROVIDER` | Effective reasoning |
+| --- | --- | --- |
+| `google/gemini-3.8-flash` | `google-ai-studio` | Low; reasoning text excluded |
+| `deepseek/deepseek-v4.1-flash` | `wafer` | Disabled |
+| `openai/gpt-6-luna` | `openai` | Disabled |
+
+
 The repository keeps one implementation and one prompt/schema, updated in place. Git tracks their history; code has no manual prompt or behavior revision numbers. See [ADR-0024](docs/adr/0024-keep-one-resolution-implementation.md).
 
 `ActionSelectionStrategy` owns the shared runtime and saved-page prompt, schema and selection validation. `OpenRouterGateway` pins the provider, enables low reasoning for Gemini 3.8 Flash while excluding reasoning from returned text, disables reasoning for other models, disables fallback, and limits output to 4,096 tokens. A configuration hash identifies effective settings. No model is trained here; changes to the pretrained model, prompt or context require evaluation. Docker/environment variables supply OpenRouter credentials, endpoint, model and provider. Release artifacts do not override deployment configuration.

@@ -9,5 +9,6 @@ COPY --from=node /usr/local/bin/node /usr/local/bin/node
 WORKDIR /adapter
 COPY --from=node /adapter/ ./stagehand/
 COPY evaluation/research/stagehand*.mjs ./
+COPY evaluation/configuration.mjs /configuration.mjs
 USER pwuser
 ENTRYPOINT ["xvfb-run", "-a", "--server-args=-screen 0 1280x800x24", "node", "stagehand-server.mjs"]

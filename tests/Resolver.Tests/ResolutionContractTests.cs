@@ -2270,13 +2270,18 @@ public sealed class ResolutionContractTests
         Assert.Equal(1, handler.ProviderRequestCount);
     }
 
-    [Fact]
-    public async Task ProviderRequestPinsSupportedSettingsAndPreservesUnicodeLabels()
+    [Theory]
+    [InlineData("deepseek/deepseek-v4.1-flash", "wafer")]
+    [InlineData("openai/gpt-6-luna", "openai")]
+    public async Task ProviderRequestPinsSupportedSettingsAndPreservesUnicodeLabels(string model, string provider)
     {
         var capture = JsonNode.Parse(new DeterministicServicesHandler().CaptureBody)!;
         capture["candidates"]![0]!["label"] = "Sauvegarder 東京";
         var handler = new DeterministicServicesHandler { CaptureBody = capture.ToJsonString() };
-        await using var application = CreateApplication(handler);
+        await using var application = CreateApplication(
+            handler,
+            new Dictionary<string, string?> { ["OpenRouter:Model"] = model, ["OpenRouter:Provider"] = provider }
+        );
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
@@ -2284,11 +2289,11 @@ public sealed class ResolutionContractTests
         );
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = handler.ModelRequest;
-        Assert.Equal("deepseek/deepseek-v4.1-flash", body.GetProperty("model").GetString());
+        Assert.Equal(model, body.GetProperty("model").GetString());
         Assert.False(body.GetProperty("reasoning").GetProperty("enabled").GetBoolean());
         Assert.False(body.TryGetProperty("service_tier", out _));
         Assert.Equal(4096, body.GetProperty("max_tokens").GetInt32());
-        Assert.Equal("wafer", body.GetProperty("provider").GetProperty("only")[0].GetString());
+        Assert.Equal(provider, body.GetProperty("provider").GetProperty("only")[0].GetString());
         Assert.False(body.GetProperty("provider").TryGetProperty("max_price", out _));
         Assert.False(body.GetProperty("provider").GetProperty("allow_fallbacks").GetBoolean());
         Assert.True(body.GetProperty("provider").GetProperty("require_parameters").GetBoolean());
