@@ -28,6 +28,8 @@ GitHub is the live source of requirements and progress. These files are maintain
 
 ## Architecture and ownership
 
+Hosted workspace deployment follows successful `main` push checks; see [deployment operations](docs/deployment.md). Preserve comparison with the last successful application fingerprint, pinned SSH host identity, serialized deployments and verified rollback. Keep runtime keys on the host and deployment access in Actions secrets; the hosted demo's public access is an explicit owner choice. Source deployment does not qualify or publish a release.
+
 For XPath text changes, preserve the distinction between sanitized candidate names and XPath string values. Verify saved locators after DOM mutations and keep hidden/editable values out of generated text predicates; see the [preferred XPath policy](docs/resolution.md#preferred-xpath).
 
 Keep Resolver independently usable by API callers and evaluation runners. Browser integration uses `BrowserUrl` and serialized Common contracts; replacement implementations must preserve the documented semantics. Playwright/Chromium is the only verified implementation. Keep browser handles and implementation dependencies inside Browser, and client display concerns outside Resolver.
