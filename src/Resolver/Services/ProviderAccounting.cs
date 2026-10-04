@@ -16,13 +16,23 @@ public sealed partial class ProviderAccounting(IHostApplicationLifetime lifetime
             Interlocked.Decrement(ref active);
             throw new ApiException(503, "provider_capacity_exceeded", "Provider accounting is at capacity.");
         }
+        Task<ProviderCompletion> pending;
+        try
+        {
+            pending = complete(lifetime.ApplicationStopping);
+        }
+        catch
+        {
+            Interlocked.Decrement(ref active);
+            throw;
+        }
         return RunAsync();
 
         async Task<ProviderCompletion> RunAsync()
         {
             try
             {
-                return await complete(lifetime.ApplicationStopping);
+                return await pending;
             }
             finally
             {

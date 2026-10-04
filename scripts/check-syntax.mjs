@@ -7,8 +7,8 @@ for (const directory of ["scripts", "evaluation", "tests/resolution"])
     if (/\.(mjs|js)$/.test(path) && !path.split("/").includes("node_modules"))
       execFileSync(process.execPath, ["--check", join(directory, path)], { stdio: "inherit" });
 
-for (const path of readdirSync("scripts").filter(
-  (path) => path.startsWith("deployment-") && path.endsWith(".py"),
+for (const path of readdirSync("scripts").filter((path) =>
+  /^(deployment-|hosted-).*\.py$/.test(path),
 ))
   execFileSync(
     "python3",

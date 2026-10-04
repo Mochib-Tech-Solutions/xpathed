@@ -26,3 +26,10 @@ condition = "AND"
 paths = ['''^(tests/Resolver\.Tests/ResolutionContractTests\.cs|scripts/security-check\.mjs)$''']
 regexTarget = "match"
 regexes = ['''^API_KEY=violet-cactus-782"$''']
+
+[[rules.allowlists]]
+description = "Exact fixed nonsecret UUID fixture for Browser startup nonce tests"
+condition = "AND"
+paths = ['''^(scripts/deployment-network\.test\.py|scripts/security-check\.mjs)$''']
+regexTarget = "match"
+regexes = ['''^TOKEN = "aabbccdd-0011-2233-4455-66778899aabb"$''']

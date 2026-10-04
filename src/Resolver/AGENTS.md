@@ -8,6 +8,8 @@ Keep orchestration in `ResolutionService`, candidate serialization in `Candidate
 
 The model chooses captured candidate IDs. Browser verification supplies the XPath and same-node evidence; provider text cannot replace that verification. Partial capture/input must remain explicit rather than turning an incomplete search into a confident absence.
 
+`ModelUsageLimits` owns shared, process-local provider admission, enforced by `OpenRouterGateway` for public, diagnostic and saved-page calls. Keep admission synchronous so rejection occurs before accounting marks a model call started. Hold an admitted lease through actual completion even after caller cancellation; never refund attempted calls or replace request-owned charges with quota estimates. HTTP quotas remain in the shared middleware with health exempt. The stateless resolution contract permits resource counters and pricing caches, not cross-request page or outcome storage.
+
 ## Code Review Rules
 
 - Flag diagnostics that change semantic outcomes or collapse `not_found`, unsupported scope and technical failure into one category.

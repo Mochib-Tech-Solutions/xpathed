@@ -1,0 +1,42 @@
+{$XPATHED_HOST} {
+    route {
+        header {
+            -Server
+            Strict-Transport-Security "max-age=15552000"
+            X-Content-Type-Options nosniff
+            Referrer-Policy no-referrer
+            X-Frame-Options DENY
+            Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+            Content-Security-Policy "default-src 'self'; base-uri 'none'; object-src 'none'; form-action 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' wss://{$XPATHED_HOST}; frame-ancestors 'none'"
+            Cache-Control no-store
+        }
+        @foreign_origin {
+            header Origin *
+            not header Origin https://{$XPATHED_HOST}
+        }
+        respond @foreign_origin 403
+        @foreign_fetch {
+            path /api/* /view/*
+            header Sec-Fetch-Site cross-site
+            header Sec-Fetch-Site same-site
+        }
+        respond @foreign_fetch 403
+        @private_path path /.* /internal/*
+        respond @private_path 404
+        request_header /health -Origin
+        @browser_origin header Origin https://{$XPATHED_HOST}
+        request_header @browser_origin Origin http://localhost:8080
+        reverse_proxy web:8080 {
+            header_up Host localhost:8080
+            header_up -Authorization
+            header_down -Server
+            header_down -Strict-Transport-Security
+            header_down -Content-Security-Policy
+            header_down -X-Content-Type-Options
+            header_down -Referrer-Policy
+            header_down -X-Frame-Options
+            header_down -Permissions-Policy
+            header_down -Cache-Control
+        }
+    }
+}
