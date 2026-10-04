@@ -45,6 +45,8 @@ cd xpathed
 pnpm run setup
 ```
 
+Setup installs local `pre-commit` and `commit-msg` hooks. Conventional Commits validation runs through `commit-msg` only; see [local commit checks](docs/ci.md#local-commit-checks).
+
 Setup creates an ignored `.env` from `.env.example` without replacing an existing file. Supply the application settings:
 
 ```dotenv
