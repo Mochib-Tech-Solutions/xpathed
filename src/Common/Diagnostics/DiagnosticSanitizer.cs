@@ -92,6 +92,7 @@ public static partial class DiagnosticSanitizer
                     sensitive
                     && key
                         is "instruction"
+                            or "name"
                             or "label"
                             or "accessiblename"
                             or "labels"

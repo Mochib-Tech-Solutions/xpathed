@@ -347,6 +347,61 @@ describe("Workspace resolution", () => {
     },
   );
 
+  it("preserves a ready named target beside a missing target in a partial result", async () => {
+    const xpath = "//article[h3/a[@title='A Light in the Attic']]//button";
+    mockApi(() =>
+      Promise.resolve(
+        Response.json({
+          ...found,
+          outcome: "partial",
+          summary: { total: 2, found: 1, notFound: 1, unsupported: 0, errors: 0, blocked: 0 },
+          actions: [
+            {
+              ...found.actions[0],
+              instruction: "Add to basket for A Light in the Attic",
+              target: {
+                ...target,
+                label: "Add to basket",
+                xpaths: [xpath],
+                state: { ...target.state, enabled: true, inViewport: true },
+                interactability: { action: "click", status: "ready", reasons: [], checks: {} },
+              },
+            },
+            {
+              actionId: "a2",
+              order: 2,
+              instruction: "Add to basket for The Missing Book",
+              action: "click",
+              outcome: "not_found",
+              target: null,
+              message: "No matching element found in the current view.",
+            },
+          ],
+        }),
+      ),
+    );
+    const user = await openWorkspace();
+    await user.type(
+      screen.getByRole("textbox", { name: "Describe an element" }),
+      "Add to basket for A Light in the Attic and The Missing Book",
+    );
+    await user.click(screen.getByRole("button", { name: "Resolve instruction" }));
+    expect(await screen.findByRole("heading", { name: "Partial result" })).toBeVisible();
+    expect(screen.getByText("1 target found · 1 missing · current view")).toBeVisible();
+    expect(screen.getAllByText("Action: click")).toHaveLength(1);
+    const cards = screen.getAllByRole("region", { name: /Target [12]/ });
+    expect(cards).toHaveLength(2);
+    expect(within(cards[0]!).getByText(xpath)).toBeVisible();
+    expect(within(cards[0]!).getByRole("button", { name: "Copy XPath 1" })).toBeVisible();
+    expect(within(cards[1]!).getByText(/The Missing Book/)).toBeVisible();
+    expect(
+      within(cards[1]!).getByText("I couldn’t find that element in the current view."),
+    ).toBeVisible();
+    expect(within(cards[1]!).queryByRole("button", { name: /Copy XPath/ })).not.toBeInTheDocument();
+    expect(screen.queryByText("Resolution failed")).not.toBeInTheDocument();
+    expect(screen.getAllByText("Cost unavailable")).toHaveLength(1);
+  });
+
   it.each(["found", "not_found"])(
     "shows one shared action with a %s second result",
     async (secondOutcome) => {
