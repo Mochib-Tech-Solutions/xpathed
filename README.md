@@ -177,12 +177,6 @@ The paid comparison retains **1,687 original provider calls**, with **$0.7901580
 
 The browser table measures **action and exact targets**, including applicable safety checks. [Target-only and full-contract scores](docs/research/clean-evaluation-comparison.md#browser-scoring-boundaries) are separate; Stagehand does not expose xpathed's readiness and capture-coverage contract. Singleton requests grade its first suggestion; plural requests grade its entire returned set, without oracle-guided filtering.
 
-### Spatial-item fix on main
-
-[PR #102](https://github.com/Mochib-Tech-Solutions/xpathed/pull/102), merged as `0499a5c`, adds whole-item candidates, parent identities and measured spatial neighbors. Both original Sauce Demo requests now select the whole Bolt T-Shirt card below Backpack; all five real-page checks passed.
-
-A separate paired **full Resolver pipeline** check used 191 identical cases: pre-fix main `b1789373` passed **160/191**; the final spatial candidate passed **169/191**, with **nine gains and zero lost passes**. All seven new spatial cases passed; 22 shared failures remain. Basic, Stagehand and saved-page selection were not remeasured in this check. These scores cannot replace or be ranked against the three-system table above. The [spatial investigation](docs/research/spatial-item-selection.md) preserves the initial variant's lost pass, final results and measurement limits. A refreshed three-system comparison must run every arm on the same expanded collection and grader; see [matched comparisons](docs/evaluation.md#matched-inputs-and-scoring).
-
 ```sh
 pnpm check                              # local checks
 pnpm evaluate                           # all three categories, including paid model calls
@@ -209,8 +203,8 @@ Imported-case review also binds the prepared model input after privacy sanitizat
 
 ## References and acknowledgements
 
-- **PhraseNode** — Panupong Pasupat, Tian-Shun Jiang, Evan Liu, Kelvin Guu and Percy Liang. [*Mapping natural language commands to web elements*](https://aclanthology.org/D18-1540/), EMNLP 2018. This dataset supplies the saved-page target-selection cases. The [authors’ dataset page](https://nlp.stanford.edu/projects/phrasenode/) licenses crowdsourced commands under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) and processed pages under [ODC-By 1.0](https://opendatacommons.org/licenses/by/1-0/).
-- **Mind2Web** — Xiang Deng, Yu Gu, Boyuan Zheng, Shijie Chen, Samuel Stevens, Boshi Wang, Huan Sun and Yu Su. [*Mind2Web: Towards a Generalist Agent for the Web*](https://arxiv.org/abs/2306.06070), NeurIPS 2023. Its [dataset](https://github.com/OSU-NLP-Group/Mind2Web#licensing-information) is licensed under CC BY 4.0. We used it for an import/adaptation pilot; it contributes no cases to the current saved-page comparison. See the [adaptation and provenance notes](docs/research/mind2web-import-feasibility.md).
+- **PhraseNode** — Panupong Pasupat, Tian-Shun Jiang, Evan Liu, Kelvin Guu and Percy Liang. [_Mapping natural language commands to web elements_](https://aclanthology.org/D18-1540/), EMNLP 2018. This dataset supplies the saved-page target-selection cases. The [authors’ dataset page](https://nlp.stanford.edu/projects/phrasenode/) licenses crowdsourced commands under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) and processed pages under [ODC-By 1.0](https://opendatacommons.org/licenses/by/1-0/).
+- **Mind2Web** — Xiang Deng, Yu Gu, Boyuan Zheng, Shijie Chen, Samuel Stevens, Boshi Wang, Huan Sun and Yu Su. [_Mind2Web: Towards a Generalist Agent for the Web_](https://arxiv.org/abs/2306.06070), NeurIPS 2023. Its [dataset](https://github.com/OSU-NLP-Group/Mind2Web#licensing-information) is licensed under CC BY 4.0. We used it for an import/adaptation pilot; it contributes no cases to the current saved-page comparison. See the [adaptation and provenance notes](docs/research/mind2web-import-feasibility.md).
 - **Stagehand** — [Browserbase and the Stagehand contributors](https://github.com/browserbase/stagehand). Its observation API provides the independently graded browser comparison baseline described above.
 
 Our imported cases are reviewed derivatives: page evidence is sanitized, candidate inputs are prepared for xpathed, and unsuitable labels are explicitly excluded. Original source identities, splits, checksums and review decisions remain recorded in the [dataset provenance and review](docs/evaluation.md#private-dataset-collection). These adapted results are not the datasets’ original published benchmark scores, and attribution does not imply endorsement by their authors.
