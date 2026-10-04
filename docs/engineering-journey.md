@@ -17,7 +17,13 @@ The progression below explains what changed and why. **Basic** is the archived e
 | Consolidate the implementation | Share one prompt and schema between browser resolution and Saved-page selection; remove retired runtime paths | Keep future changes in one place, with earlier implementations recoverable through Git and image archives |
 | Compare the result             | Run Basic, Improved and Stagehand against the same independently labelled browser cases                       | Measure the combined effect, expose regressions and separate action interpretation from target selection  |
 
-We measured Basic and Improved as complete systems. There is no isolated accuracy measurement for each intermediate step. The [comparison report](research/clean-evaluation-comparison.md) contains category results, paired gains and losses, costs and original evidence identities.
+We measured Basic and Improved as complete systems. There is no isolated accuracy measurement for each intermediate step. The [recorded 3 October comparison](research/clean-evaluation-comparison.md) contains category results, paired gains and losses, costs and original evidence identities for its pinned configurations. It predates the spatial-item change below.
+
+### Preserve whole-item spatial identity
+
+A request for the item below Backpack on Sauce Demo could select Backpack's Add to cart button or Bike Light beside it. Geometry existed, but product wrappers were missing and controls lacked item grouping. Browser now retains generic repeated whole-item containers and parent identities; Resolver supplies a named layout of nearest aligned neighbors and distinguishes cards from their images and controls. All original candidates remain available. Relationships follow measured geometry, including reordered CSS grids, and are revalidated before returning a result.
+
+The [spatial investigation](research/spatial-item-selection.md) records the exact requests, five passing real-page checks and a separate complete paired pipeline run: pre-fix main 160/191, final candidate 169/191, nine gains and zero lost passes. It also retains the initial variant's lost absence pass and the final 22 shared failures. This is an additional Improved change; it has no updated Basic/Stagehand or saved-page score.
 
 ## Give the model a bounded job
 
@@ -51,13 +57,15 @@ The evaluation set separately measures Saved-page selection, XPath construction 
 
 ### Compare Basic, Improved and Stagehand
 
-The recorded Basic resolver and Improved resolver comparison uses the same DeepSeek V4.1 Flash model, Wafer provider and inference settings. The browser implementation makes three rules explicit:
+The recorded pre-spatial Basic resolver and Improved resolver comparison uses the same DeepSeek V4.1 Flash model, Wafer provider and inference settings. The browser implementation makes three rules explicit:
 
 - Match the requested control itself; headings, scope containers and repeated descendant text provide context.
 - Report missing targets within the current view. Completeness describes whether every requested target is represented, including absent targets.
 - Recheck viewport membership after inference before returning found or absent results.
 
-The [current comparison](research/clean-evaluation-comparison.md) measures Basic and Improved on the same admitted saved-page inputs, and all three systems on the same final browser cases. Its tables and charts are generated from complete original attempts, with separate denominators for saved-page selection, browser action-and-target correctness, target selection alone and the full resolver contract.
+The [recorded comparison](research/clean-evaluation-comparison.md) measures Basic and Improved on the same admitted saved-page inputs, and all three systems on the same final browser cases. Its tables and charts are generated from complete original attempts, with separate denominators for saved-page selection, browser action-and-target correctness, target selection alone and the full resolver contract.
+
+The systems prepare their own DOM evidence and prompts; equal page state and independent labels make this a complete-system comparison. Current Improved adds spatial card context, so refreshing the comparison requires all three arms on the expanded collection. The [matched-input rules](evaluation.md#matched-inputs-and-scoring) keep those boundaries explicit.
 
 Action interpretation matters separately from selecting the right element. Stagehand's stock `observe` does not return xpathed's full readiness or absence contract and requires a live page, so it has no saved-page score. Failures, gains and regressions remain visible. Aggregate improvement does not override the release gate's no-regression requirement, and one attempt per case leaves model variation unresolved.
 
@@ -89,9 +97,9 @@ Tooling tests check the runners, graders, accounting and release scripts themsel
 
 Resolution responses carry attempt and trace IDs, configuration, timings and reason codes. Evaluation runners save their own evidence for investigation and replay. Operational logs separate capture, provider, contract, stale-page and target-selection failures; they cannot establish the user’s intended target.
 
-Ordinary CI remains provider-free. Release evaluation compares exact candidate and published images on the same complete collection, with one original attempt per case and no automatic retries. Approval requires no lost baseline pass and valid contract, safety and artifact checks. Latency and cost remain descriptive; missing charges remain unknown.
+Ordinary CI remains provider-free. Release publication is deferred; the retained release evaluation procedure compares exact candidate and published images on the same complete collection, with one original attempt per case and no automatic retries. Approval requires no lost baseline pass and valid contract, safety and artifact checks. Latency and cost remain descriptive; missing charges remain unknown.
 
-Activation is explicit. Nightly monitoring repeats release cases and reports drift without changing the running application. Replay regrades retained evidence; it cannot recreate an arbitrary historical website.
+Activation is explicit. The retained nightly workflow requires published images and measurements before it can report release drift; it never changes the running application. Replay regrades retained evidence; it cannot recreate an arbitrary historical website.
 
 ## What to improve next
 

@@ -1,5 +1,7 @@
 # Release workflow
 
+**Release publication is deferred.** Use [source setup](../README.md#clone-and-run-locally) for the runnable application. This retained runbook describes tooling and requirements if publication resumes; it does not identify an available application release or establish that monitoring is operational. Application release assets are currently unavailable.
+
 **Passing checks → merge into `release` → publish that commit → use it as the next baseline.** Git is the source of release identity. [ADR-0026](adr/0026-use-the-release-branch-as-the-baseline.md) records the decision.
 
 ## Required checks before merge
@@ -35,7 +37,7 @@ Prerequisites: Docker with Compose and authenticated `gh` access to the reposito
 No clone or Node installation is needed:
 
 ```sh
-gh release download v1.0.0 --repo Mochib-Tech-Solutions/xpathed --dir xpathed-release
+gh release download PUBLISHED_TAG --repo Mochib-Tech-Solutions/xpathed --dir xpathed-release
 cd xpathed-release
 cat browser-resolver-images.tar.gz.part-* | gzip -dc > images.tar
 shasum -a 256 -c SHA256SUMS
@@ -56,20 +58,20 @@ curl --fail http://localhost:8083/health
 docker compose --env-file .env --env-file images.env -f compose.release.yaml logs --tail 100
 ```
 
-| File | Purpose |
-| --- | --- |
-| `release.json` | Final release commit, tested source, evidence and deployment-file digests |
-| `bundle/manifest.json` | Browser and Resolver component names, image IDs, platform, source and checksums |
-| `browser-resolver-images.tar.gz.part-0000`, etc. | Ordered compressed image archive parts, reassembled and verified by the downloader |
-| `bundle/images.tar` | Both exact tested images, loaded into Docker |
-| `bundle/source.tar` | Exact tested source, excluding ignored environment files |
-| `compose.release.yaml` | Browser and Resolver services; no build definitions |
-| `browser-seccomp.json` | Browser sandbox policy from the tested source |
-| `release.env.example` | Template for the operator's `.env` |
-| `SHA256SUMS` | Checksums for all standalone payload files and reconstructed `images.tar` |
-| `images.env` | Exact Browser and Resolver image IDs; contains no provider settings |
-| `monitoring-baseline.json` | Original measurements for nightly comparison |
-| `candidate.json`, `release-evidence.json.gz` | Published evaluation provenance and original evidence, included in the standalone download; fetched separately when using the clone-based downloader |
+| File                                             | Purpose                                                                                                                                              |
+| ------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `release.json`                                   | Final release commit, tested source, evidence and deployment-file digests                                                                            |
+| `bundle/manifest.json`                           | Browser and Resolver component names, image IDs, platform, source and checksums                                                                      |
+| `browser-resolver-images.tar.gz.part-0000`, etc. | Ordered compressed image archive parts, reassembled and verified by the downloader                                                                   |
+| `bundle/images.tar`                              | Both exact tested images, loaded into Docker                                                                                                         |
+| `bundle/source.tar`                              | Exact tested source, excluding ignored environment files                                                                                             |
+| `compose.release.yaml`                           | Browser and Resolver services; no build definitions                                                                                                  |
+| `browser-seccomp.json`                           | Browser sandbox policy from the tested source                                                                                                        |
+| `release.env.example`                            | Template for the operator's `.env`                                                                                                                   |
+| `SHA256SUMS`                                     | Checksums for all standalone payload files and reconstructed `images.tar`                                                                            |
+| `images.env`                                     | Exact Browser and Resolver image IDs; contains no provider settings                                                                                  |
+| `monitoring-baseline.json`                       | Original measurements for nightly comparison                                                                                                         |
+| `candidate.json`, `release-evidence.json.gz`     | Published evaluation provenance and original evidence, included in the standalone download; fetched separately when using the clone-based downloader |
 
 Docker image names are `xpathed/browser:TESTED_COMMIT` and `xpathed/resolver:TESTED_COMMIT`; Compose pins the immutable image IDs in `images.env`. Browser uses 1 GiB shared memory, the recorded seccomp policy and its nonroot image user. Resolver addresses `http://browser:8080` inside the network. Host ports bind to loopback; `.env` can change `BROWSER_PORT`, `RESOLVER_PORT`, `VIEWER_ORIGINS` and `BROWSER_MAX_SESSIONS`. Keep each deployment in its own directory and use `-p PROJECT_NAME` plus distinct ports for parallel deployments.
 
@@ -124,4 +126,4 @@ Monitoring runs at 02:17 UTC or through manual dispatch. It resolves `release`, 
 
 `pnpm release:monitor` performs the same check locally. `pnpm release:monitor --notification-test` fails deliberately without inference. Original results and failures are retained as workflow artifacts. A schedule or failed job is not evidence that email was delivered.
 
-The maintainer requested retiring the old release and recreating `v1.0.0`. The one-time transition is tied to the retired release branch commit `a9a0d7caf0b7abc46902f9c7831aa3c1339298a6`: run the complete collection once with live provider inference against the candidate, retain all outcomes and charges, and establish fresh measurements. Do not compare with or adapt the old implementation. After that merge, every release requires the paired comparison against published images; missing assets fail explicitly. Remove the old GitHub release/tag only when the replacement checks are ready. Monitoring starts after the new assets are published. Hosted publication and execution with live provider inference must be verified separately from local deterministic tests.
+The existing tooling retains a historical one-time initial-release transition tied to commit `a9a0d7caf0b7abc46902f9c7831aa3c1339298a6`. Removing published assets does not reset that transition. Before resuming publication, verify the release branch, baseline assets and acceptance policy explicitly; missing required assets fail rather than falling back to another implementation. Monitoring requires published images and measurements. Hosted publication and live execution must be verified separately from local deterministic tests.

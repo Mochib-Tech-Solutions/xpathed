@@ -4,7 +4,7 @@ Present the Resolver API through its manual test client, then explain its implem
 
 ## Prepare
 
-Follow the [README setup](../README.md#run-locally). Rehearse on an authorized website with a named control, repeated labels and a disabled or covered control. Keep targets visible. Confirm the model key works and record the effective configuration without exposing credentials.
+Follow the [README setup](../README.md#clone-and-run-locally). Rehearse on an authorized website with a named control, repeated labels and a disabled or covered control. Keep targets visible. Confirm the model key works and record the effective configuration without exposing credentials.
 
 Keep a saved evaluation pass and failure ready. Label saved evidence as a previous run if the live provider is unavailable.
 
@@ -36,9 +36,9 @@ A test platform can call Resolver directly for a page owned by the configured br
 
 Walk through a saved case: instruction, independent expected target, captured evidence, response and grade. The recorded listbox-option failure found the correct option but changed `click` to `select`; explain why it fails despite a valid XPath. The current case is `state-listbox-option-for-click`; its `sourceIds` link it to the saved evidence.
 
-Show how attempt/trace IDs connect configuration, error stage and available evidence. Describe the three evaluation categories: Saved-page selection from reviewed PhraseNode inputs, XPath construction and verification from controlled selections, and Live-browser Resolver through the complete API pipeline in real Chromium. State separately whether a run uses deterministic provider fixtures or live provider inference. Keep scores separate, with dates and denominators; use regression to describe a lost pass in a comparison.
+Show how attempt/trace IDs connect configuration, error stage and available evidence. Describe the three evaluation categories: Saved-page selection from reviewed PhraseNode inputs, XPath construction and verification from controlled selections, and Live-browser Resolver through the complete API pipeline in real Chromium. State separately whether a run uses deterministic provider fixtures or live provider inference. Keep scores separate, with dates, measured source identities and denominators; use regression to describe a lost pass in a comparison. The recorded three-system table predates spatial-item capture. Present the [spatial check](research/spatial-item-selection.md) separately: it measures two Improved revisions with the full pipeline grader, rather than updating Basic or Stagehand.
 
-Describe the current release gate: exact candidate/baseline images, the complete reviewed collection, no lost baseline pass, deployment and nightly monitoring.
+Describe ordinary CI and retained research evidence. Release publication is deferred; present the retained release gate and monitoring workflow as future procedures, with exact images, the complete reviewed collection and no lost baseline pass required before resuming.
 
 ## 4. Discuss tradeoffs · 10 minutes
 
