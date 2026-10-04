@@ -55,35 +55,6 @@ Open **[localhost:8080](http://localhost:8080)**, enter a website address and su
 
 All four services run in Docker. Ctrl+C or `pnpm docker:down` removes development containers while preserving configuration. A separate checkout needs its own `COMPOSE_PROJECT_NAME`, `XPATHED_PORT` and `.env`.
 
-## Run the published Docker release
-
-The release contains **Browser** and **Resolver** images for **Linux ARM64**, matching CI. Install Docker with Compose and authenticate `gh` for this private repository. Download the release assets, reassemble and verify the image archive, then supply your runtime settings:
-
-```sh
-gh release download v1.0.0 --repo Mochib-Tech-Solutions/xpathed --dir xpathed-release
-cd xpathed-release
-cat browser-resolver-images.tar.gz.part-* | gzip -dc > images.tar
-shasum -a 256 -c SHA256SUMS
-docker image load --input images.tar
-cp release.env.example .env
-# Edit .env: supply OPENROUTER_API_KEY, OPENROUTER_MODEL and OPENROUTER_PROVIDER.
-docker compose --env-file .env --env-file images.env -f compose.release.yaml up -d --no-build --pull never
-curl --fail http://localhost:8082/health  # Browser
-curl --fail http://localhost:8083/health  # Resolver
-```
-
-Run each step only after the previous one succeeds. On Linux, `sha256sum --check SHA256SUMS` is equivalent to `shasum`. The [GitHub Releases page](https://github.com/Mochib-Tech-Solutions/xpathed/releases) lists available tags; use a fresh download directory for each deployment. No repository clone, Node or pnpm is needed for this path. `images.env` pins the exact Docker IDs. Compose starts those images without rebuilding; `pnpm dev` builds the current local checkout instead. Local source builds support the Docker host's architecture.
-
-From an existing clone, `pnpm release:download --output .artifacts/deployment` performs download, integrity checks and image loading for the current `release` commit automatically, then supplies the same Compose files.
-
-Browser listens on `localhost:8082`; Resolver on `localhost:8083`, and connects to Browser over the Compose network. These are API services; the chat workspace is available through the source setup above. See the [API example](docs/releases.md#use-the-apis) and [release files and configuration](docs/releases.md#run-the-published-browser-and-resolver).
-
-Stop this deployment from its directory:
-
-```sh
-docker compose --env-file .env --env-file images.env -f compose.release.yaml down
-```
-
 ## Architecture
 
 The Resolver accepts instructions from a client or evaluation runner, coordinates capture and model selection, and returns targets verified by the browser service. Browser implementations connect through the [browser API contract](docs/runtime.md#browser-integration). The bundled implementation uses Playwright/Chromium.
@@ -172,9 +143,11 @@ These are actual cases from the shared evaluation set. Expected selectors belong
 
 See [case IDs, fixtures and metric definitions](docs/evaluation.md#example-cases-and-metrics), and [actual outcomes across the three systems](docs/research/clean-evaluation-comparison.md#case-examples).
 
-### Current comparison: Basic resolver, Improved resolver and Stagehand
+### Recorded comparison: Basic resolver, Improved resolver and Stagehand
 
-Fresh measurements on the **final audited dataset**, with one original provider attempt per case and system. Basic and Improved use the same 569 reviewed saved-page inputs. All three systems use the same 183 controlled browser cases. Stagehand requires a live page, so it has no saved-page score.
+Measured on **3 October 2026**, before the spatial-item fix. Basic is archived source `d5333779`; Improved is measured source `77ce7b63`; Stagehand is pinned to **4.1.0**. These names identify the recorded systems, rather than moving versions of `main`.
+
+Each system has one original attempt per case. Basic and Improved use the same 569 reviewed saved-page inputs. All three use the same 183 controlled browser cases, reset independently with matching browser state and inference settings. Each prepares its own model context: this compares complete systems, not identical prompts or DOM representations. Stagehand requires a live page, so it has no saved-page score.
 
 | System            | Saved-page target selection | Browser action + targets |
 | ----------------- | --------------------------: | -----------------------: |
@@ -182,13 +155,21 @@ Fresh measurements on the **final audited dataset**, with one original provider 
 | Improved resolver |             498/569 (87.5%) |          172/183 (94.0%) |
 | Stagehand         |              Not applicable |          114/183 (62.3%) |
 
-[![Fresh comparison on the audited evaluation set](docs/assets/evaluation/clean-comparison.svg)](docs/research/clean-evaluation-comparison.md)
+[![Recorded comparison on the audited evaluation set](docs/assets/evaluation/clean-comparison.svg)](docs/research/clean-evaluation-comparison.md)
 
 Basic → Improved gained **13 browser passes and lost 2**. Saved-page selection gained **36 passes and lost 39**. These are separate measurements; failures remain in each denominator. The [report](docs/research/clean-evaluation-comparison.md) includes full resolver-contract scores, target-only scores, behavior categories, every gain and regression, timing cohorts and source/image identities.
 
 Controlled XPath verification passed **172/172 cases**, including **22/22 saved-locator mutations** and **22/22 fresh resolutions after mutation**, without model calls.
 
-The paid comparison retains **1,687 original provider calls**, with **$0.79015806 known reported cost** and **2 unreported charges**. All current tables and the figure derive from the [same verified aggregate](docs/assets/evaluation/clean-comparison.json). Earlier reports retain their original datasets and are clearly marked historical. These authored/reviewed cases do not establish unseen-site accuracy or release approval.
+The paid comparison retains **1,687 original provider calls**, with **$0.79015806 known reported cost** and **2 unreported charges**. The table and figure above derive from the [same verified aggregate](docs/assets/evaluation/clean-comparison.json). Earlier reports retain their original datasets and are clearly marked historical. These authored/reviewed cases do not establish unseen-site accuracy or release approval.
+
+The browser table measures **action and exact targets**, including applicable safety checks. [Target-only and full-contract scores](docs/research/clean-evaluation-comparison.md#browser-scoring-boundaries) are separate; Stagehand does not expose xpathed's readiness and capture-coverage contract. Singleton requests grade its first suggestion; plural requests grade its entire returned set, without oracle-guided filtering.
+
+### Spatial-item fix on main
+
+[PR #102](https://github.com/Mochib-Tech-Solutions/xpathed/pull/102), merged as `0499a5c`, adds whole-item candidates, parent identities and measured spatial neighbors. Both original Sauce Demo requests now select the whole Bolt T-Shirt card below Backpack; all five real-page checks passed.
+
+A separate paired **full Resolver pipeline** check used 191 identical cases: pre-fix main `b1789373` passed **160/191**; the final spatial candidate passed **169/191**, with **nine gains and zero lost passes**. All seven new spatial cases passed; 22 shared failures remain. Basic, Stagehand and saved-page selection were not remeasured in this check. These scores cannot replace or be ranked against the three-system table above. The [spatial investigation](docs/research/spatial-item-selection.md) preserves the initial variant's lost pass, final results and measurement limits. A refreshed three-system comparison must run every arm on the same expanded collection and grader; see [matched comparisons](docs/evaluation.md#matched-inputs-and-scoring).
 
 ```sh
 pnpm check                              # local checks
@@ -200,7 +181,7 @@ pnpm evaluate:replay RUN_DIRECTORY       # regrade saved evidence
 
 Category commands accept `--case CASE_ID` and `--output DIRECTORY`. `pnpm evaluate -- --output DIRECTORY` stores each category beneath that directory. Live-browser Resolver with a controlled provider uses up to four isolated sessions; `--concurrency 1` selects serial timing. Category runs with live provider inference are serial. CI uses `evaluate:resolver` and stays provider-free. The other apps' unit and integration commands are unchanged.
 
-The fresh `v1.0.0` establishes its baseline after ordinary CI and complete live checks, retiring the old release. Subsequent release PRs run ordinary CI and the complete live comparison against the exact images published for the current `release` commit. Evidence verifies Live-browser Resolver and Saved-page selection configurations separately within each arm. Once checks pass and the PR merges, that commit becomes the release and next baseline. Publication retains the tested images and evidence. Nightly monitoring tests that release without changing the running app. See [release operations](docs/releases.md).
+Ordinary CI stays provider-free. A source merge validates the selected implementation; recorded evaluation results retain their own source, cases and grading identities.
 
 ## Read more
 
@@ -208,6 +189,6 @@ The fresh `v1.0.0` establishes its baseline after ordinary CI and complete live 
 - [Engineering decisions](docs/engineering-journey.md): tradeoffs, quality and next steps.
 - [Demo guide](docs/demo.md): present the working system.
 - [Runtime](docs/runtime.md) and [resolution contract](docs/resolution.md): API and configuration reference.
-- [Evaluation](docs/evaluation.md) and [releases](docs/releases.md): run, compare and deploy.
+- [Evaluation](docs/evaluation.md): run, compare and replay retained evidence.
 
 Imported-case review also binds the prepared model input after privacy sanitization. The host verifies this hash before provider inference; see the [prepared-input audit](docs/research/2026-10-03-prepared-input-audit.md).
