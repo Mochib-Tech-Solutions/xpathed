@@ -40,6 +40,7 @@ try {
     "docs/assets/evaluation/probe.json": `ApiError.cs": "${"a".repeat(64)}"`,
     "docs/evaluation.md": "API contracts, missing/duplicate ",
     "tests/Resolver.Tests/ResolutionContractTests.cs": 'API_KEY=violet-cactus-782"',
+    "scripts/security-check.mjs": "API contracts, missing/duplicate ",
   };
   for (const [name, safe] of Object.entries(fixtures)) {
     const file = join(probe, name);
@@ -74,27 +75,49 @@ try {
   if (
     !Object.keys(fixtures).every((name) =>
       findings.some(
-        (item) => item.File.endsWith(name) && item.StartLine === 2 && item.Secret === "REDACTED",
+        (item) =>
+          item.RuleID === "generic-api-key" &&
+          item.File.endsWith(name) &&
+          item.StartLine === 2 &&
+          item.Secret === "REDACTED",
       ),
     )
   )
     throw new Error("An allowlist suppressed a credential-shaped negative control");
-  execFileSync(
-    binary,
-    [
-      "git",
-      "--config",
-      ".gitleaks.toml",
-      "--redact=100",
-      "--no-banner",
-      "--ignore-gitleaks-allow",
-      "--gitleaks-ignore-path",
-      directory,
-      "--log-opts=--all",
-      ".",
-    ],
-    { stdio: "inherit" },
-  );
+  const historyReport = join(directory, "history.json");
+  try {
+    execFileSync(
+      binary,
+      [
+        "git",
+        "--config",
+        ".gitleaks.toml",
+        "--redact=100",
+        "--no-banner",
+        "--report-format",
+        "json",
+        "--report-path",
+        historyReport,
+        "--ignore-gitleaks-allow",
+        "--gitleaks-ignore-path",
+        directory,
+        "--log-opts=--all",
+        ".",
+      ],
+      { stdio: "inherit" },
+    );
+  } catch (error) {
+    if (error.status === 1) {
+      const locations = JSON.parse(readFileSync(historyReport, "utf8")).map((item) => ({
+        rule: item.RuleID,
+        file: item.File,
+        line: item.StartLine,
+        commit: item.Commit,
+      }));
+      console.error("Credential findings (matched values omitted):", JSON.stringify(locations));
+    }
+    throw error;
+  }
   console.log("Credential scan and negative control passed.");
 } finally {
   rmSync(directory, { recursive: true, force: true });
