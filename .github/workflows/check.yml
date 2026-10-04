@@ -296,3 +296,16 @@ jobs:
           DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
           DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
         run: node scripts/deployment.mjs
+
+  deployment-result:
+    name: Verify deployment result
+    needs: [check, deploy]
+    if: ${{ !cancelled() && needs.check.result == 'success' && github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    permissions: {}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 1
+    steps:
+      - name: Require a successful deployment job
+        env:
+          DEPLOY_RESULT: ${{ needs.deploy.result }}
+        run: test "$DEPLOY_RESULT" = success

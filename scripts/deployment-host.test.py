@@ -52,7 +52,17 @@ class DeploymentTests(unittest.TestCase):
                     check=lambda *args: None, **kwargs)
 
     def test_unchanged_does_not_build_or_restart(self):
-        host.deploy(self.base, self.source, "c" * 40, "b" * 64, run=self.run_compose)
+        host.deploy(self.base, self.source, "c" * 40, "b" * 64, run=self.run_compose,
+                    check=lambda base, state: self.calls.append((state["revision"], ("health",))))
+        self.assertEqual(self.calls, [(self.old["revision"], ("health",))])
+        self.assertEqual(json.loads(self.state.read_text()), self.old)
+
+    def test_unhealthy_unchanged_inputs_fail_without_build_or_cleanup(self):
+        def unhealthy(base, state):
+            raise RuntimeError("existing deployment is unhealthy")
+        with self.assertRaisesRegex(RuntimeError, "existing deployment is unhealthy"):
+            deploy(self.base, self.source, "c" * 40, "b" * 64, run=self.run_compose,
+                   check=unhealthy, clean=lambda state: self.calls.append(("cleanup",)))
         self.assertEqual(self.calls, [])
         self.assertEqual(json.loads(self.state.read_text()), self.old)
 

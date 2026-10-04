@@ -1,4 +1,4 @@
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -61,10 +61,28 @@ test("host deployment builds first, skips unchanged inputs, and rolls back failu
 
 test("deployment secrets are available only after Check on a main push", () => {
   const workflow = readFileSync(".github/workflows/check.yml", "utf8");
-  const deployment = workflow.slice(workflow.indexOf("\n  deploy:"));
+  const deployment = workflow.match(/\n  deploy:\n([\s\S]*?)(?=\n  [\w-]+:|$)/)?.[1] ?? "";
   assert.match(deployment, /needs: check/);
   assert.match(deployment, /!cancelled\(\) && needs\.check\.result == 'success'/);
   assert.match(deployment, /github.event_name == 'push' && github.ref == 'refs\/heads\/main'/);
   assert.match(deployment, /cancel-in-progress: false/);
   assert.match(deployment, /persist-credentials: false/);
+});
+
+test("successful main checks cannot hide a skipped or failed deployment", () => {
+  const workflow = readFileSync(".github/workflows/check.yml", "utf8");
+  const verification =
+    workflow.match(/\n  deployment-result:\n([\s\S]*?)(?=\n  [\w-]+:|$)/)?.[1] ?? "";
+  assert.match(verification, /needs: \[check, deploy\]/);
+  assert.match(verification, /!cancelled\(\) && needs\.check\.result == 'success'/);
+  assert.match(verification, /github.event_name == 'push' && github.ref == 'refs\/heads\/main'/);
+  assert.match(verification, /DEPLOY_RESULT: \$\{\{ needs\.deploy\.result \}\}/);
+  const command = verification.match(/^\s+run: (.+)$/m)?.[1];
+  assert.ok(command, "The deployment result must be checked by an executed step");
+  for (const result of ["success", "failure", "cancelled", "skipped"]) {
+    const outcome = spawnSync("sh", ["-c", command], {
+      env: { ...process.env, DEPLOY_RESULT: result },
+    });
+    assert.equal(outcome.status === 0, result === "success", result);
+  }
 });

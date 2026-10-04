@@ -28,7 +28,7 @@ GitHub is the live source of requirements and progress. These files are maintain
 
 ## Architecture and ownership
 
-Hosted workspace deployment follows successful `main` push checks; see [deployment operations](docs/deployment.md). Preserve comparison with the last successful application fingerprint, pinned SSH host identity, serialized deployments and verified rollback. Keep runtime keys on the host and deployment access in Actions secrets; the hosted demo's public access is an explicit owner choice. Source deployment does not qualify or publish a release.
+Hosted workspace deployment follows successful `main` push checks; see [deployment operations](docs/deployment.md). Intentionally skipped test jobs must not suppress deployment after a successful aggregate; keep the independent deployment-result check. Preserve comparison with the last successful application fingerprint, health verification for unchanged inputs without rebuilding or restarting, pinned SSH host identity, serialized deployments and verified rollback. Keep runtime keys on the host and deployment access in Actions secrets; the hosted demo's public access is an explicit owner choice. Source deployment does not qualify or publish a release.
 
 For XPath text changes, preserve the distinction between sanitized candidate names and XPath string values. Verify saved locators after DOM mutations and keep hidden/editable values out of generated text predicates; see the [preferred XPath policy](docs/resolution.md#preferred-xpath).
 

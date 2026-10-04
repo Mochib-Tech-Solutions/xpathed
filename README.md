@@ -59,7 +59,7 @@ All four services run in Docker. Ctrl+C or `pnpm docker:down` removes developmen
 
 ## Hosted workspace
 
-The hosted workspace can follow successful `main` pushes through the change-aware deployment job. App changes build on the VPS, pass health checks and restore the previous images on failure; docs-only changes skip rebuilding. SSH settings use Actions secrets, while runtime provider credentials remain on the host. See [hosted deployment](docs/deployment.md) for setup, access and rollback behavior. This source deployment is separate from published-image releases.
+The hosted workspace can follow successful `main` pushes through the change-aware deployment job. App changes build on the VPS, pass health checks and restore the previous images on failure; unchanged inputs skip rebuilding and restarting but still verify health. CI fails if deployment is unexpectedly skipped after successful checks. SSH settings use Actions secrets, while runtime provider credentials remain on the host. See [hosted deployment](docs/deployment.md) for setup, access and rollback behavior. This source deployment is separate from published-image releases.
 
 ## Architecture
 
