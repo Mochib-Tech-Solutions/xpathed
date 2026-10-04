@@ -727,3 +727,61 @@ test("tabs-client-routes-preserve-active-page-resolution-and-stable-viewer", asy
     await fetch(sessionUrl, { method: "DELETE" });
   }
 });
+
+for (const [instruction, missing] of [
+  ["cilck on the 3 buttons", true],
+  ["Click all buttons", false],
+]) {
+  test(`cardinality-explicit-count-${missing ? "preserves-missing-target" : "all-covers-visible-targets"}`, async () => {
+    const run = randomUUID();
+    const actions = [
+      { step: 1, instruction: "Click Save", action: "click", outcome: "found", label: "Save" },
+      {
+        step: missing ? 2 : 1,
+        instruction: "Click Cancel",
+        action: "click",
+        outcome: "found",
+        label: "Cancel",
+      },
+    ];
+    if (missing)
+      actions.push({
+        step: 3,
+        instruction: "Click the third requested button",
+        action: "click",
+        outcome: "not_found",
+      });
+    await json(`${fixture}/scenario`, "POST", { name: "batch", actions });
+    const session = await json(`${client}/api/sessions`, "POST");
+    try {
+      const page = await json(`${client}/api/pages/${session.pageId}/navigate`, "POST", {
+        url: `${fixture}/two-buttons?run=${run}`,
+      });
+      const result = await json(`${client}/api/pages/${session.pageId}/resolve`, "POST", {
+        instruction,
+        documentId: page.documentId,
+      });
+      assert.equal(result.outcome, missing ? "partial" : "found");
+      assert.equal(result.actions.length, missing ? 3 : 2);
+      assert.equal(result.summary.found, 2);
+      assert.equal(result.summary.notFound, missing ? 1 : 0);
+      assert.equal(result.diagnostics.modelCalls, 1);
+      assert.equal(result.diagnostics.selectionRule, null);
+      if (missing) assert.equal(result.actions[2].target, null);
+      await json(`${fixture}/oracle?run=${run}`, "POST", {
+        xpaths: result.actions
+          .filter((action) => action.target)
+          .map((action) => action.target.xpaths[0]),
+      });
+      let observed;
+      for (let attempt = 0; attempt < 100 && !observed; attempt++) {
+        observed = await json(`${fixture}/observation?run=${run}`);
+        if (!observed) await delay(50);
+      }
+      assert.deepEqual(observed?.matches, [["first-button"], ["second-button"]]);
+      assert.equal(observed.clicks, 0);
+    } finally {
+      await fetch(`${client}/api/sessions/${session.sessionId}`, { method: "DELETE" });
+    }
+  });
+}

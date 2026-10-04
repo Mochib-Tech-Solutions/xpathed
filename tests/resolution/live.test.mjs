@@ -188,3 +188,44 @@ test("scope-live-matching-rule-preserves-shadow-target-during-carousel-motion", 
     await fetch(`${browser}/sessions/${session.sessionId}`, { method: "DELETE" });
   }
 });
+
+test("cardinality-live-explicit-count-preserves-missing-target", async () => {
+  const session = await json(`${browser}/sessions`, "POST");
+  try {
+    for (const [instruction, missing] of [
+      ["cilck on the 3 buttons", true],
+      ["Click all buttons", false],
+    ]) {
+      const page = await json(`${browser}/pages/${session.pageId}/navigate`, "POST", {
+        url: `${fixture}/two-buttons?run=${randomUUID()}`,
+      });
+      const result = await json(`${resolver}/pages/${session.pageId}/resolve`, "POST", {
+        instruction,
+        documentId: page.documentId,
+      });
+      console.log(
+        JSON.stringify({
+          instruction,
+          outcome: result.outcome,
+          summary: result.summary,
+          actions: result.actions,
+          rule: result.diagnostics.selectionRule,
+          usage: result.diagnostics.usage,
+          generationId: result.diagnostics.generationId,
+        }),
+      );
+      assert.equal(result.outcome, missing ? "partial" : "found");
+      assert.equal(result.summary.found, 2);
+      assert.equal(result.summary.notFound, missing ? 1 : 0);
+      assert.equal(result.actions.length, missing ? 3 : 2);
+      assert.equal(result.diagnostics.modelCalls, 1);
+      assert.deepEqual(
+        result.actions.filter((action) => action.target).map((action) => action.target.label),
+        ["Save", "Cancel"],
+      );
+      if (missing) assert.equal(result.actions[2].target, null);
+    }
+  } finally {
+    await fetch(`${browser}/sessions/${session.sessionId}`, { method: "DELETE" });
+  }
+});

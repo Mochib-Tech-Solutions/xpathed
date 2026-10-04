@@ -72,6 +72,7 @@ const server = createServer(async (request, response) => {
         "/offscreen",
         "/batch",
         "/confirmations",
+        "/two-buttons",
         "/frames",
         "/shadow",
       ].includes(path)
@@ -86,6 +87,11 @@ const server = createServer(async (request, response) => {
         html = html.replace(
           "</aside>",
           `</aside><style>aside{position:fixed;bottom:8px}#cookies{position:fixed;bottom:0;left:0;width:100%;height:64px;background:white;z-index:10}</style><div id="cookies">We use cookies</div>`,
+        );
+      if (path === "/two-buttons")
+        html = html.replace(
+          /<nav.*?<\/nav>/s,
+          `<section aria-label="Actions"><button data-oracle="first-button">Save</button><button data-oracle="second-button">Cancel</button></section>`,
         );
       if (path === "/confirmations")
         html = html.replace(
