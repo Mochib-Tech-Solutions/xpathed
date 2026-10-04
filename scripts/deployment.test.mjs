@@ -61,6 +61,7 @@ test("host deployment builds first, skips unchanged inputs, and rolls back failu
 
 test("hosted network isolation fails closed during failures and container restarts", () => {
   execFileSync("python3", ["-B", "scripts/deployment-network.test.py"], { stdio: "pipe" });
+  execFileSync("python3", ["-B", "scripts/hosted-security.test.py"], { stdio: "pipe" });
 });
 
 test("deployment secrets are available only after Check on a main push", () => {
