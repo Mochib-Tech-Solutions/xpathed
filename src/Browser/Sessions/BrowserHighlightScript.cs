@@ -6,6 +6,7 @@ internal static class BrowserHighlightScript
         selectedNodes => {
           let host, canvas, animation, spotlightStarted;
           const nodes = [...new Set(selectedNodes)];
+          let spotlightNodes = [];
           const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
           const clear = () => {
             cancelAnimationFrame(animation);
@@ -41,20 +42,21 @@ internal static class BrowserHighlightScript
               for (const rect of node.getClientRects()) {
                 const x = Math.max(left, rect.left), y = Math.max(top, rect.top);
                 const width = Math.min(right, rect.right) - x, height = Math.min(bottom, rect.bottom) - y;
-                if (width > 0 && height > 0) boxes.push({x, y, width, height});
+                if (width > 0 && height > 0) boxes.push({x, y, width, height, node});
               }
             }
             if (spotlightStarted === undefined && boxes.some(box => box.width <= 24 || box.height <= 24)) {
               spotlightStarted = performance.now();
             }
-            const opacity = reducedMotion.matches || spotlightStarted === undefined
+            const hovering = spotlightNodes.length > 0;
+            const opacity = hovering ? 0.35 : reducedMotion.matches || spotlightStarted === undefined
               ? 0 : 0.35 * Math.min(1, Math.max(0, (1200 - (performance.now() - spotlightStarted)) / 600));
             if (opacity > 0 && boxes.length) {
               context.fillStyle = `rgba(0,0,0,${opacity})`;
               context.fillRect(0, 0, innerWidth, innerHeight);
               context.globalCompositeOperation = 'destination-out';
               context.fillStyle = 'black';
-              for (const box of boxes) {
+              for (const box of boxes.filter(box => !hovering || spotlightNodes.includes(box.node))) {
                 const width = Math.max(48, box.width + 24), height = Math.max(48, box.height + 24);
                 context.beginPath();
                 context.roundRect(box.x + (box.width-width)/2, box.y + (box.height-height)/2, width, height, 12);
@@ -85,7 +87,10 @@ internal static class BrowserHighlightScript
           document.documentElement.append(host);
           host.showPopover();
           draw();
-          return {clear};
+          return {clear, spotlight(index) {
+            spotlightNodes = nodes[index] ? [nodes[index]] : [];
+            if (index < 0) spotlightStarted = -Infinity;
+          }};
         }
         """;
 }

@@ -61,6 +61,18 @@ public sealed class ControllerContractTests(WebApplicationFactory<HealthControll
     }
 
     [Theory]
+    [InlineData("{}")]
+    [InlineData("{\"documentId\":\"doc\",\"captureId\":null,\"actionId\":\"a1\"}")]
+    [InlineData("{\"documentId\":\"doc\",\"captureId\":\"capture\",\"actionId\":\"\"}")]
+    public async Task InvalidSpotlightIdentityIsRejectedBeforePageLookup(string body)
+    {
+        using var client = application.CreateClient();
+        using var content = new StringContent(body, Encoding.UTF8, "application/json");
+        using var response = await client.PostAsync("/pages/missing/spotlight", content);
+        await AssertErrorAsync(response, HttpStatusCode.BadRequest, "invalid_request");
+    }
+
+    [Theory]
     [InlineData("file:///etc/passwd")]
     [InlineData("https://name:secret@example.com")]
     public async Task InvalidNavigationUrlIsRejectedBeforePageLookup(string url)

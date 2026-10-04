@@ -1032,6 +1032,85 @@ async function selectHighlights(page, plural = false, scope = "current_view") {
   return batch;
 }
 
+async function expectSpotlightPixels(frame, samples) {
+  let observed;
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const image = await frame();
+    observed = samples.map(([x, y]) => image.pixels[(y * image.width + x) * 4]);
+    if (
+      samples.every(([, , clear], index) => (clear ? observed[index] > 240 : observed[index] < 210))
+    )
+      return;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  assert.fail(
+    `Spotlight samples ${JSON.stringify(samples)} had pixels ${JSON.stringify(observed)}`,
+  );
+}
+
+for (const reducedMotion of [false, true])
+  test(`highlights-hover-spotlight-persists-and-preserves-all-outlines-motion-${reducedMotion}`, async () => {
+    await withFixture(
+      `${highlightFixture}${reducedMotion ? `<script>const nativeMatchMedia = matchMedia; window.matchMedia = query => query === '(prefers-reduced-motion: reduce)' ? {matches:true} : nativeMatchMedia(query);</script>` : ""}`,
+      async (session, page) => {
+        const before = await observe();
+        const batch = await selectHighlights(page, true);
+        const spotlight = (actionId) =>
+          request(`/pages/${page.pageId}/spotlight`, {
+            documentId: page.documentId,
+            captureId: batch.captureId,
+            actionId,
+          });
+        await spotlight("a0");
+        await new Promise((resolve) => setTimeout(resolve, 1400));
+        await withFramebuffer(session, async (frame) => {
+          const image = await frame();
+          const red = (x, y) => image.pixels[(y * image.width + x) * 4];
+          assert.ok(
+            red(40, 40) < 210,
+            "Hover keeps surroundings dimmed beyond the brief spotlight",
+          );
+          assert.ok(red(150, 150) > 240, "Hovered target interior stays clear");
+          assert.ok(
+            red(495, 150) > 225 && red(492, 150) < 30,
+            "Other selected target keeps both outline edges",
+          );
+        });
+        await spotlight("a1");
+        await withFramebuffer(session, async (frame) => {
+          await expectSpotlightPixels(frame, [
+            [90, 150, false],
+            [490, 150, true],
+          ]);
+        });
+        await spotlight(null);
+        await withFramebuffer(session, async (frame) => {
+          await expectSpotlightPixels(frame, [[40, 40, true]]);
+          const image = await frame();
+          assert.ok(image.pixels[(40 * image.width + 40) * 4] > 240, "Exit removes dimming");
+          assert.ok(image.pixels[(150 * image.width + 95) * 4] > 225, "Exit preserves outlines");
+        });
+        await expectError(
+          `/pages/${page.pageId}/spotlight`,
+          { documentId: page.documentId, captureId: batch.captureId, actionId: "invented" },
+          409,
+          "unknown_action",
+        );
+        const after = await observe();
+        assert.equal(after.targetMarkup, before.targetMarkup);
+        assert.equal(after.activeElement, before.activeElement);
+        assert.equal(after.scrollY, before.scrollY);
+        await request(`/pages/${page.pageId}/capture`, { documentId: page.documentId });
+        await expectError(
+          `/pages/${page.pageId}/spotlight`,
+          { documentId: page.documentId, captureId: batch.captureId, actionId: "a0" },
+          409,
+          "stale_capture",
+        );
+      },
+    );
+  });
+
 test("highlights-outlines-leave-target-pixels-unchanged", async () => {
   await withFixture(
     `<style>body{margin:0;background:#888}button{position:absolute;left:100px;top:100px;width:240px;height:100px;border:2px solid #c23;background:white;color:black}button+button{left:340px;width:8px;height:8px;padding:0}</style>
@@ -1276,6 +1355,22 @@ for (const crossOrigin of [false, true])
             ],
             true,
           );
+          await request(`/pages/${page.pageId}/spotlight`, {
+            documentId: page.documentId,
+            captureId: batch.captureId,
+            actionId: "a2",
+          });
+          await expectSpotlightPixels(frame, [
+            [120, 570, false],
+            [190, 350, true],
+            [40, 40, true],
+          ]);
+          await request(`/pages/${page.pageId}/spotlight`, {
+            documentId: page.documentId,
+            captureId: batch.captureId,
+            actionId: null,
+          });
+          await expectSpotlightPixels(frame, [[120, 570, true]]);
           input.pointer(280, 350);
           await new Promise((resolve) => setTimeout(resolve, 100));
           await expectHighlights(
@@ -1300,6 +1395,16 @@ for (const crossOrigin of [false, true])
             false,
           );
           await expectError(`/pages/${page.pageId}/selections`, batch, 409, "stale_capture");
+          await expectError(
+            `/pages/${page.pageId}/spotlight`,
+            {
+              documentId: page.documentId,
+              captureId: batch.captureId,
+              actionId: "a2",
+            },
+            409,
+            "stale_capture",
+          );
         });
       },
     );

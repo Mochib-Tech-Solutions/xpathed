@@ -58,4 +58,15 @@ public sealed class PagesController(BrowserSessions sessions) : ControllerBase
         [FromBody] InspectActionRequest request,
         CancellationToken cancellationToken
     ) => sessions.InspectActionAsync(id, request, cancellationToken);
+
+    [HttpPost("{id}/spotlight")]
+    public async Task<IActionResult> Spotlight(
+        string id,
+        [FromBody] SpotlightRequest request,
+        CancellationToken cancellationToken
+    )
+    {
+        await sessions.SpotlightAsync(id, request, cancellationToken);
+        return NoContent();
+    }
 }

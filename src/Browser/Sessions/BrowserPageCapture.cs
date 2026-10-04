@@ -282,6 +282,19 @@ internal sealed class BrowserPageCapture(BrowserPageRuntime page) : IAsyncDispos
                 "(capture, ids) => (" + BrowserHighlightScript.Create + ")(capture.highlightNodes(ids))",
                 ids
             );
+            frame.HighlightCandidateIds = ids;
+        }
+    }
+
+    public async Task SpotlightAsync(string? candidateId)
+    {
+        foreach (var frame in frames)
+        {
+            if (frame.Highlight is { } highlight)
+            {
+                var index = candidateId is null ? -1 : Array.IndexOf(frame.HighlightCandidateIds, candidateId);
+                await highlight.EvaluateAsync("(overlay, index) => overlay.spotlight(index)", index);
+            }
         }
     }
 
@@ -291,6 +304,7 @@ internal sealed class BrowserPageCapture(BrowserPageRuntime page) : IAsyncDispos
         {
             var highlight = frame.Highlight;
             frame.Highlight = null;
+            frame.HighlightCandidateIds = [];
             if (highlight is null)
             {
                 continue;

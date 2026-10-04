@@ -102,6 +102,133 @@ async function submitInstruction(user: ReturnType<typeof userEvent.setup>) {
 }
 
 describe("Workspace resolution", () => {
+  it("keeps a covered target in its numbered card beside the ready target", async () => {
+    mockApi(() =>
+      Promise.resolve(
+        Response.json({
+          ...found,
+          actions: [
+            {
+              ...found.actions[0],
+              target: {
+                ...target,
+                label: "Log in",
+                interactability: {
+                  action: "click",
+                  status: "blocked",
+                  reasons: ["obstructed_at_hit_point"],
+                  checks: {},
+                },
+              },
+            },
+            {
+              ...found.actions[0],
+              actionId: "a2",
+              order: 2,
+              target: { ...target, label: "Log in" },
+            },
+          ],
+        }),
+      ),
+    );
+    const user = await openWorkspace();
+    await submitInstruction(user);
+    const blocked = await screen.findByRole("region", { name: "Target 1" });
+    expect(within(blocked).getByText("Target 1")).toBeVisible();
+    expect(blocked).toHaveClass("rounded-xl", "border");
+    expect(blocked).toHaveTextContent(
+      "Cannot click “Log in”. Another element or clipping blocks the inspected pointer point.",
+    );
+    expect(blocked).not.toHaveTextContent(/XPath|Verification/);
+    expect(
+      within(screen.getByRole("region", { name: "Target 2" })).getByText("XPath"),
+    ).toBeVisible();
+  });
+
+  it("spotlights the current XPath on hover and focus, and clears it on exit", async () => {
+    mockApi();
+    const user = await openWorkspace();
+    await submitInstruction(user);
+    const xpath = await screen.findByText(target.xpaths[0]!);
+    let finishHover!: (response: Response) => void;
+    const hoverResponse = new Promise<Response>((resolve) => {
+      finishHover = resolve;
+    });
+    const upstream = vi.mocked(fetch).getMockImplementation()!;
+    let delayHover = true;
+    vi.mocked(fetch).mockImplementation((input, options) => {
+      if (input === "/api/pages/page-1/spotlight" && delayHover) {
+        delayHover = false;
+        return hoverResponse;
+      }
+      return upstream(input, options);
+    });
+    await user.hover(xpath);
+    await waitFor(() =>
+      expect(fetch).toHaveBeenCalledWith(
+        "/api/pages/page-1/spotlight",
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({
+            documentId: "document-1",
+            captureId: "capture-1",
+            actionId: "a1",
+          }),
+        }),
+      ),
+    );
+    await user.unhover(xpath);
+    expect(fetch).not.toHaveBeenCalledWith(
+      "/api/pages/page-1/spotlight",
+      expect.objectContaining({
+        body: JSON.stringify({ documentId: "document-1", captureId: "capture-1", actionId: null }),
+      }),
+    );
+    finishHover(new Response(null, { status: 204 }));
+    await waitFor(() =>
+      expect(fetch).toHaveBeenLastCalledWith(
+        "/api/pages/page-1/spotlight",
+        expect.objectContaining({
+          body: JSON.stringify({
+            documentId: "document-1",
+            captureId: "capture-1",
+            actionId: null,
+          }),
+        }),
+      ),
+    );
+    fireEvent.focus(xpath);
+    await waitFor(() =>
+      expect(fetch).toHaveBeenLastCalledWith(
+        "/api/pages/page-1/spotlight",
+        expect.objectContaining({
+          body: JSON.stringify({
+            documentId: "document-1",
+            captureId: "capture-1",
+            actionId: "a1",
+          }),
+        }),
+      ),
+    );
+    fireEvent.blur(xpath);
+    await waitFor(() =>
+      expect(fetch).toHaveBeenLastCalledWith(
+        "/api/pages/page-1/spotlight",
+        expect.objectContaining({
+          body: JSON.stringify({
+            documentId: "document-1",
+            captureId: "capture-1",
+            actionId: null,
+          }),
+        }),
+      ),
+    );
+    await submitInstruction(user);
+    const calls = vi.mocked(fetch).mock.calls.length;
+    await user.hover(xpath);
+    expect(vi.mocked(fetch).mock.calls).toHaveLength(calls);
+  });
+
   it.each([
     ["input", "button", "Search", "Button"],
     ["img", "img", "Product photo", "Image"],

@@ -390,6 +390,43 @@ public sealed class BrowserSessions(IConfiguration configuration, ILogger<Browse
             token
         );
 
+    public Task SpotlightAsync(string pageId, SpotlightRequest request, CancellationToken token) =>
+        OnPageAsync(
+            pageId,
+            async (session, page) =>
+            {
+                await RequireCaptureAsync(session, page, request.DocumentId, request.CaptureId);
+                string? candidateId = null;
+                if (request.ActionId is { } actionId)
+                {
+                    if (
+                        page.ActionSelections is null
+                        || !page.ActionSelections.TryGetValue(actionId, out var action)
+                        || action.CandidateId is null
+                    )
+                    {
+                        throw new ApiException(
+                            409,
+                            "unknown_action",
+                            "This action has no verified target in the current capture."
+                        );
+                    }
+                    var validation = await ValidateActionsAsync(
+                        session,
+                        page,
+                        request.DocumentId,
+                        request.CaptureId,
+                        [action]
+                    );
+                    candidateId = validation.Actions[0].Target!.CandidateId;
+                }
+                await page.Capture!.SpotlightAsync(candidateId);
+                await RequireCaptureAsync(session, page, request.DocumentId, request.CaptureId);
+                return true;
+            },
+            token
+        );
+
     private static void RequireAction(string action)
     {
         if (

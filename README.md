@@ -25,7 +25,7 @@ XPath: //*[@aria-label='Employee']//button[normalize-space(.)='OK']
 Verification: one match, same captured node, still in the current view
 ```
 
-The actual XPath comes from the DOM. Results include readiness, time and cost. A blocked action appears as one red explanation naming the target and why the action is unavailable, without an XPath card or repeated state labels. You browse manually; the resolver highlights targets without executing the instruction.
+The actual XPath comes from the DOM. Results include readiness, time and cost. A blocked action appears as one red explanation naming the target and why the action is unavailable, without an XPath card or repeated state labels. In plural replies it keeps its numbered target card. Hover or focus a current result’s XPath to keep a spotlight on that element until exit. Singular requests with indistinguishable matching targets ask for a name, section or position; explicit plural requests enumerate the matching targets. You browse manually; the resolver highlights targets without executing the instruction.
 
 XPath construction prefers explicit test attributes and meaningful semantics. It distinguishes sanitized names from DOM text so Unicode and nested labels can retain semantic locators across wrapper changes, while excluding hidden text and form values from new text predicates. The [selection policy](docs/resolution.md#preferred-xpath) describes the bounds and saved-locator limits.
 
@@ -206,3 +206,11 @@ See [security and contribution protection](SECURITY.md) for credential handling,
 - [Evaluation](docs/evaluation.md): run, compare and replay retained evidence.
 
 Imported-case review also binds the prepared model input after privacy sanitization. The host verifies this hash before provider inference; see the [prepared-input audit](docs/research/2026-10-03-prepared-input-audit.md).
+
+## References and acknowledgements
+
+- **PhraseNode** — Panupong Pasupat, Tian-Shun Jiang, Evan Liu, Kelvin Guu and Percy Liang. [*Mapping natural language commands to web elements*](https://aclanthology.org/D18-1540/), EMNLP 2018. This dataset supplies the saved-page target-selection cases. The [authors’ dataset page](https://nlp.stanford.edu/projects/phrasenode/) licenses crowdsourced commands under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) and processed pages under [ODC-By 1.0](https://opendatacommons.org/licenses/by/1-0/).
+- **Mind2Web** — Xiang Deng, Yu Gu, Boyuan Zheng, Shijie Chen, Samuel Stevens, Boshi Wang, Huan Sun and Yu Su. [*Mind2Web: Towards a Generalist Agent for the Web*](https://arxiv.org/abs/2306.06070), NeurIPS 2023. Its [dataset](https://github.com/OSU-NLP-Group/Mind2Web#licensing-information) is licensed under CC BY 4.0. We used it for an import/adaptation pilot; it contributes no cases to the current saved-page comparison. See the [adaptation and provenance notes](docs/research/mind2web-import-feasibility.md).
+- **Stagehand** — [Browserbase and the Stagehand contributors](https://github.com/browserbase/stagehand). Its observation API provides the independently graded browser comparison baseline described above.
+
+Our imported cases are reviewed derivatives: page evidence is sanitized, candidate inputs are prepared for xpathed, and unsuitable labels are explicitly excluded. Original source identities, splits, checksums and review decisions remain recorded in the [dataset provenance and review](docs/evaluation.md#private-dataset-collection). These adapted results are not the datasets’ original published benchmark scores, and attribution does not imply endorsement by their authors.
