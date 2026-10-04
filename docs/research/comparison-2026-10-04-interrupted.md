@@ -1,12 +1,10 @@
-# Refreshed comparison on the audited evaluation set
+# Interrupted saved-page refresh — 4 October 2026
 
 Measured on **4 October 2026** against runtime source `d444176cd2351d85336167cd3b9e7b60114bf77e`. Basic retains archived source `d533377945f67f99dbb2d23ab9b2ea04eef61569`; Stagehand is pinned to **4.1.0**. All three browser arms were remeasured on the expanded **190-case** set, including spatial-item and open-shadow cases. Both saved-page arms were refreshed on all **569 admitted cases**. The current source includes the retained-target revalidation changes. Later `main` commit `cd62ec0f7d27451b697f7ff7150b67e6f8ca1b39` changes CI/contribution policy only; runtime, cases and graders are unchanged.
 
-The saved-page results below come from a **fresh complete 2,276-request saved-page run** after the evaluation-key allowance was restored: 569 original attempts each for Basic, Improved, Luna and Gemini, with no spending-limit refusals. The earlier interrupted run remains [separate evidence](comparison-2026-10-04-interrupted.md); its run-success percentages are not substituted for selection accuracy. The pinned application images and runtime/evaluation file hashes are unchanged, while the fresh runner checkout is `dcaa1f5f98e16510ffd0d26cbcbf1e21999809dc`.
+**Provider-limit caveat:** the dedicated evaluation key reached its spending limit during Saved-page selection. Basic retains **115** provider refusals (5 HTTP 402, 110 HTTP 403); Improved retains **105** (5 HTTP 402, 100 HTTP 403). These count as failed original attempts. The saved-page scores measure first-attempt success including operational failures and cannot isolate model selection quality. No failed attempt was retried, replaced or removed. Unknown charges remain unknown.
 
-Luna and Gemini are separate model-comparison arms, described in the [model report](model-comparison-2026-10-04.md); Gemini uses its required low-reasoning research profile.
-
-The README table and figure use the [same verified aggregate](../assets/evaluation/clean-comparison.json). The [3 October report](comparison-2026-10-03.md) preserves its original 183 browser and 172 XPath cases. Supplementary [spatial pipeline results](spatial-item-selection.md) remain a separate measurement.
+The archived table and figure use the [same verified aggregate](../assets/evaluation/comparison-2026-10-04-interrupted.json). The [3 October report](comparison-2026-10-03.md) preserves its original 183 browser and 172 XPath cases. Supplementary [spatial pipeline results](spatial-item-selection.md) remain a separate measurement.
 
 ## Dataset and measurement boundaries
 
@@ -22,28 +20,39 @@ The browser catalog includes 221 source cases. Paid comparison excludes controll
 
 ## Results
 
-| System            | Saved-page exact-target selection | Browser action + targets |
-| ----------------- | --------------------------------- | ------------------------ |
-| Basic resolver    | 502/569 (88.2%)                   | 159/190 (83.7%)          |
-| Improved resolver | 481/569 (84.5%)                   | 176/190 (92.6%)          |
-| Stagehand         | Not applicable                    | 111/190 (58.4%)          |
+| System            | Browser action + targets — 4 October |
+| ----------------- | ------------------------------------ |
+| Basic resolver    | 159/190 (83.7%)                      |
+| Improved resolver | 176/190 (92.6%)                      |
+| Stagehand         | 111/190 (58.4%)                      |
 
-Saved-page failed outcomes (all retained):
+![Browser accuracy and interrupted saved-page run outcomes](../assets/evaluation/comparison-2026-10-04-interrupted.svg)
 
-| System            | Incorrect found target set | Not found | Error response | Unsupported response |
-| ----------------- | -------------------------- | --------- | -------------- | -------------------- |
-| Basic resolver    | 24                         | 13        | 22             | 8                    |
-| Improved resolver | 14                         | 11        | 21             | 42                   |
+**Full-set saved-page selection accuracy is unavailable for this refresh.** Preserve the complete 569-case run denominator for operational evidence, without labelling its provider-refusal percentages as selection accuracy.
 
-![Refreshed first-attempt results, on complete latest evaluation sets](../assets/evaluation/clean-comparison.svg)
+| System            | Passed | Provider-limit refusals | Other failures | Planned |
+| ----------------- | ------ | ----------------------- | -------------- | ------- |
+| Basic resolver    | 403    | 115                     | 51             | 569     |
+| Improved resolver | 376    | 105                     | 88             | 569     |
 
-Basic → Improved: **21 gains and 4 regressions** in browser action-and-target correctness; **32 gains and 53 regressions** in saved-page exact-target selection. These paired outcomes use complete new saved-page attempts; the interrupted run is kept separate.
+### Previous complete saved-page measurements
 
-| Browser comparison   | Gains | Lost passes |
-| -------------------- | ----- | ----------- |
-| Basic → Improved     | 21    | 4           |
-| Basic → Stagehand    | 8     | 56          |
-| Improved → Stagehand | 1     | 66          |
+| System            | Last complete saved-page measurement — 3 October |
+| ----------------- | ------------------------------------------------ |
+| Basic resolver    | 501/569 (88.0%)                                  |
+| Improved resolver | 498/569 (87.5%)                                  |
+
+These historical scores bind the 3 October source and original evidence. They are not current-runtime results.
+
+### Matched-response diagnostic
+
+On the 454 cases where both arms received HTTP 200 responses, Basic passed **403/454 (88.8%)**, Improved **368/454 (81.1%)**: 18 gains and 53 lost passes. This availability-selected subset includes malformed/invalid outputs and all other grading failures. It does not replace the complete planned denominator or establish full-set accuracy.
+
+The 53 lost Basic passes comprise 17 model ambiguity refusals, 10 unsupported-action refusals, three absent results, 10 found results with wrong targets, 11 malformed responses and two incomplete decompositions. The current prompt adds stricter singular ambiguity, cardinality and spatial instructions relative to the earlier measured prompt. This is a plausible contributor, not a causally isolated explanation. On these same 454 cases, the earlier Improved configuration passed 398 and the current one 368, with 18 gains and 48 lost passes; hosted-model sampling and serving conditions also differ.
+
+The public aggregate retains the exact response-subset case list, paired outcomes and limits. Nothing is retried, relabelled or removed.
+
+Basic → Improved: **21 gains and 4 regressions** in browser action-and-target correctness; **26 gains and 53 regressions** in saved-page first-attempt success. The latter includes unequal provider-limit refusals and is not a clean comparison of model quality.
 
 ### Browser scoring boundaries
 
@@ -77,22 +86,22 @@ Controlled XPath verification passed **180/180**, including **22/22 saved-locato
 | browser / Basic resolver      | 190               | $0.01872161        | 0                  | 0                  |
 | browser / Improved resolver   | 190               | $0.02724589        | 0                  | 0                  |
 | browser / Stagehand           | 190               | $0.03111618        | 0                  | 0                  |
-| savedPage / Basic resolver    | 569               | $0.36691909        | 0                  | 0                  |
-| savedPage / Improved resolver | 569               | $0.39201291        | 0                  | 0                  |
+| savedPage / Basic resolver    | 569               | $0.30128894        | 115                | 115                |
+| savedPage / Improved resolver | 569               | $0.32830161        | 105                | 105                |
 
-Total: **1,708 original provider requests**, **$0.83601567 known reported cost**, plus **0 unknown charges**. Refused requests remain requests; they do not establish completed inference or zero cost. The six provider-free Basic compatibility trials are excluded from paid totals.
+Total: **1,708 original provider requests**, **$0.70667422 known reported cost**, plus **220 unknown charges**. Refused requests remain requests; they do not establish completed inference or zero cost. The six provider-free Basic compatibility trials are excluded from paid totals.
 
 ### Timing by execution cohort
 
-| Category / system             | Cohort                  | Measured / attempts | Median | p95    |
-| ----------------------------- | ----------------------- | ------------------- | ------ | ------ |
-| browser / Basic resolver      | parallel                | 190/190             | 0.752s | 1.313s |
-| browser / Improved resolver   | parallel                | 190/190             | 0.822s | 1.565s |
-| browser / Stagehand           | parallel                | 190/190             | 0.692s | 1.717s |
-| savedPage / Basic resolver    | fresh-complete-parallel | 569/569             | 1.172s | 2.183s |
-| savedPage / Improved resolver | fresh-complete-parallel | 569/569             | 1.177s | 2.009s |
+| Category / system             | Cohort        | Measured / attempts | Median | p95    |
+| ----------------------------- | ------------- | ------------------- | ------ | ------ |
+| browser / Basic resolver      | parallel      | 190/190             | 0.752s | 1.313s |
+| browser / Improved resolver   | parallel      | 190/190             | 0.822s | 1.565s |
+| browser / Stagehand           | parallel      | 190/190             | 0.692s | 1.717s |
+| savedPage / Basic resolver    | parallel-arms | 569/569             | 1.273s | 2.429s |
+| savedPage / Improved resolver | parallel-arms | 569/569             | 1.290s | 2.391s |
 
-Browser streams run concurrently in isolated environments; each arm is serial. Saved-page arms run concurrently, serial within each arm. Browser timing measures the resolver/observer request; saved-page timing measures the CLI inference process, excluding preparation. The new saved-page run contains no spending-limit refusals. Timing remains specific to its execution cohort and is not a clean cross-model latency ranking.
+Browser streams run concurrently in isolated environments; each arm is serial. Saved-page arms run concurrently, serial within each arm. Browser timing measures the resolver/observer request; saved-page timing measures the CLI inference process, excluding preparation. Fast provider refusals are included in saved-page timings, so those timings cannot establish inference speed.
 
 ### Case examples
 
@@ -118,18 +127,18 @@ Basic uses its archived native Browser and Resolver images. An envelope adapter 
 | Evidence                     | Run ID                               | Manifest SHA-256                                                 |
 | ---------------------------- | ------------------------------------ | ---------------------------------------------------------------- |
 | Browser comparison           | 43cbd0cb-1373-4045-9d8b-5a90328fd1f3 | 3b9f75f8cefc2c33b08f4af1ef356f507ecc96201fda100414f324b4f8211ead |
-| Saved-page Basic resolver    | 5c9c59c5-bad3-4dbc-90f9-e6a883400345 | 47f5cad9e4a7e371a375a27ecbb0e3e48d35440a24c94cf19b1248b306d00c33 |
-| Saved-page Improved resolver | 99209703-579d-48cf-ac5d-f40d4219b00d | 68f941f6a8279e045f7f2951cc1187a94150654a338609343cd8547b10a4d5b9 |
+| Saved-page Basic resolver    | 7be04d22-28a1-49da-a32e-29bc4b0b19dd | 9c7b2b59c46428fc60acff7ceeb319ecf5a79d045eb042f8dac2ab2a619505d3 |
+| Saved-page Improved resolver | 1cecb52f-576f-4bde-941b-7ff72e035850 | 1a64a890bf25f821595f69b5dd71c800caed0bf2e0c2f2b238be561449435d66 |
 | XPath verification           | 9194a95c-e2ea-482c-ba0c-fb9a241a08bc | a296e5aa6c599bad18b25357e155fbbb7b0bbc6ffecc83d91a2e931283ec5248 |
 
-The active archive SHA-256 is `ca9c2dd8e5fbf5a6bc48b80fcc863113eff771f9a726858f3f9386f2a39080ae`; the full review SHA-256 is `f7233682af26dd85c34d1904504cf9542454a398a318ffc3d0738cd0c8fa5fbb`. The shared saved-page plan hash is `efd4440d689898fee54e9a9ecdbefe52a68b01b6b70a313c4d81a654954cbc18`. The aggregate binds complete source/image identities, preparation receipts, matched settings, independent expectations, grader identities and evidence hashes.
+The active archive SHA-256 is `ca9c2dd8e5fbf5a6bc48b80fcc863113eff771f9a726858f3f9386f2a39080ae`; the full review SHA-256 is `f7233682af26dd85c34d1904504cf9542454a398a318ffc3d0738cd0c8fa5fbb`. The shared saved-page plan hash is `ba6aae6c0661b9f4bba3003da7fd8fce65505180b48c2744e2856e245a2a520f`. The aggregate binds complete source/image identities, preparation receipts, matched settings, independent expectations, grader identities and evidence hashes.
 
 The Basic runtime receipt is explicitly marked **completed-run-image-restoration**: the original launcher omitted a contemporaneous container receipt. Pinned images were restored after completion without new inference, and every original manifest/trial/provider file was checked against a complete pre-restoration hash snapshot. This supports artifact identity but is not contemporaneous container evidence. Its receipt phase and snapshot hash remain public.
 
 The existing graders replayed all browser, saved-page and XPath outcomes; the export verified complete case membership, prepared-input review bindings, provider identity and cache protections, charges and summaries. Local fake-provider checks verified the actual CLI request binding and rejected changed input, prompt or schema with no external calls. Calculation-only reconciliation helpers remain private; the aggregate records their hashes. The [figure guide](../assets/evaluation/README.md) describes provider-free regeneration from retained evidence.
 
-The [model comparison](model-comparison-2026-10-04.md) uses this current Improved runtime and the same case definitions, prompt/schema and reviewed inputs. DeepSeek reference results are shared evidence, not additional requests or cached responses.
+The [model comparison](model-comparison-2026-10-04-interrupted.md) uses this current Improved runtime and the same case definitions, prompt/schema and reviewed inputs. DeepSeek reference results are shared evidence, not additional requests or cached responses.
 
 ## Limits
 
-These audited cases include previously observed failures; they are not a blinded held-out estimate. Authored browser pages cover defined behaviors, while historical saved pages do not establish live viewport, XPath or readiness correctness. One attempt leaves sampling variation unresolved, and hosted models can change independently of model names. System changes and provider conditions are not isolated causally. Complete fresh-run scores remain descriptive; differences cannot isolate the causal contribution of prompt changes or hosted-model sampling. Higher aggregate success does not override lost baseline passes or establish release approval, deployment or unseen-site accuracy.
+These audited cases include previously observed failures; they are not a blinded held-out estimate. Authored browser pages cover defined behaviors, while historical saved pages do not establish live viewport, XPath or readiness correctness. One attempt leaves sampling variation unresolved, and hosted models can change independently of model names. System changes and provider conditions are not isolated causally. Provider-limit refusals prevent a clean saved-page model-quality conclusion. Higher aggregate success does not override lost baseline passes or establish release approval, deployment or unseen-site accuracy.
