@@ -4,7 +4,64 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { fingerprint, secretFile } from "./deployment.mjs";
+import {
+  deploymentAddresses,
+  fingerprint,
+  resolvedDeploymentAddresses,
+  runDeployment,
+  secretFile,
+} from "./deployment.mjs";
+
+test("deployment output hides address fragments on both streams, including failure diagnostics", async () => {
+  const environment = {
+    DEPLOY_PUBLIC_URL: "https://workspace.example.invalid",
+    DEPLOY_HOST: "server.example.invalid",
+  };
+  const addresses = await resolvedDeploymentAddresses(environment, async () => [
+    { address: "192.0.2.8", family: 4 },
+    { address: "2001:db8::8", family: 6 },
+  ]);
+  const output = [];
+  const script = `
+    process.stdout.write('https://work');
+    setTimeout(() => {
+      process.stdout.write('space.example.invalid/health ready\\n');
+      process.stderr.write('SSH 192.0.2.8 WORKSPACE.EXAMPLE.INVALID failed\\n');
+      process.stderr.write('server.example.invalid [2001:db8::8] failed\\n');
+      process.exitCode = 1;
+    }, 20);
+  `;
+  await assert.rejects(
+    runDeployment(process.execPath, ["-e", script], Buffer.alloc(0), addresses, (line) =>
+      output.push(line),
+    ),
+    /Deployment command failed/,
+  );
+  const text = output.join("");
+  assert.match(text, /\[deployment address\]\/health ready/);
+  assert.match(text, /SSH \[deployment address\] \[deployment address\] failed/);
+  assert.doesNotMatch(text, /workspace|192\.0\.2|server\.example|2001:db8/i);
+  await assert.rejects(
+    resolvedDeploymentAddresses(environment, async () => {
+      throw new Error(environment.DEPLOY_HOST);
+    }),
+    (error) => error.message === "Cannot resolve deployment connection address",
+  );
+  assert.throws(
+    () => deploymentAddresses({ DEPLOY_PUBLIC_URL: "private-invalid-value" }),
+    (error) =>
+      error.message === "Invalid deployment public URL" &&
+      !String(error).includes("private-invalid-value"),
+  );
+  await assert.rejects(
+    runDeployment("/missing-deployment-command", [], Buffer.alloc(0), addresses),
+    /Deployment command failed/,
+  );
+});
+
+test("host receiver removes deployment addresses before relaying worker output", () => {
+  execFileSync("python3", ["-B", "scripts/deployment-receiver.test.py"], { stdio: "pipe" });
+});
 
 test("deployment key remains parseable when secret storage strips newline or uses CRLF", () => {
   const directory = mkdtempSync(join(tmpdir(), "deployment-key-test-"));
