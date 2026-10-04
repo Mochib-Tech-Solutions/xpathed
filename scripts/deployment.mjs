@@ -30,6 +30,10 @@ export const inputs = [
   ".npmrc",
 ];
 
+export function secretFile(value) {
+  return `${value.replace(/\r\n?/g, "\n").trim()}\n`;
+}
+
 export function fingerprint(revision, cwd = process.cwd()) {
   if (!/^[a-f\d]{40}$/.test(revision)) throw new Error("Invalid deployment revision");
   const tree = execFileSync("git", ["ls-tree", "-r", "-z", revision, "--", ...inputs], { cwd });
@@ -64,8 +68,8 @@ if (import.meta.main) {
         throw new Error("Invalid deployment connection settings");
       const key = join(directory, "key");
       const hosts = join(directory, "known_hosts");
-      writeFileSync(key, process.env.DEPLOY_SSH_KEY, { mode: 0o600 });
-      writeFileSync(hosts, process.env.DEPLOY_KNOWN_HOSTS, { mode: 0o600 });
+      writeFileSync(key, secretFile(process.env.DEPLOY_SSH_KEY), { mode: 0o600 });
+      writeFileSync(hosts, secretFile(process.env.DEPLOY_KNOWN_HOSTS), { mode: 0o600 });
       const archive = execFileSync("git", ["archive", "--format=tar", revision], {
         maxBuffer: 64 * 1024 * 1024,
       });

@@ -10,8 +10,8 @@ Read the PR diff, linked issue, relevant accepted ADRs, and domain terms in CONT
 ## Target resolution
 
 - The client and resolver must inspect the same managed session, page, and frame. Browser handles are live objects and expire after restart.
-- The model selects from captured elements. Validate its result against that capture. Each returned XPath must uniquely identify the selected node within the declared frame, and alternatives must identify that same node.
-- Locator validity and intended-target correctness are separate. Explicit target context takes precedence over viewport preference; off-screen elements remain eligible. Hidden elements are excluded, including hidden file inputs. Shadow-root targets are outside the initial XPath contract.
+- The model selects from captured current-view candidates. Validate its result against that capture. Each found target has one preferred XPath identifying the same captured node uniquely within its declared frame.
+- Locator validity and intended-target correctness are separate. Preserve current-view membership and revalidation under ADR-0018; entirely off-screen elements are outside this capture. Partially visible, disabled and covered targets retain their distinct observations. Hidden elements and unsupported shadow-root targets follow the resolution contract.
 - State checks depend on the requested action. Disabled does not mean absent; inspection does not prove successful action execution. Unknown checks must not be reported as passed.
 - Resolution must not click, type, navigate, scroll, or otherwise perform the requested action. Page changes during inference are outside initial scope; do not demand a recovery system absent a later accepted requirement.
 - Incomplete DOM processing must remain an operational result. Do not silently omit eligible candidates and turn a no-match response into page-wide not found.

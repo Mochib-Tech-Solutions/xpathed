@@ -78,6 +78,8 @@ Research notes record dated evidence and alternatives, not automatic requirement
 
 ## Code Review Rules
 
+Follow [security guidance](SECURITY.md) when changing credentials, workflow trust or repository visibility. Preserve the provider-free PR boundary, redacted history scan and independent-approval policy. Verify native GitHub protection after configuration; policy files are not enforcement. Retain the owner-selected evaluation archives.
+
 - Check the requested issue and latest accepted scope; flag accidental feature expansion or claims that future roadmap items already work.
 - Flag changes that let the viewer and resolver address different pages, preserve an invalidated session, bypass input/origin checks or weaken the browser sandbox.
 - Keep shared contracts serializable and service dependencies within their documented ownership.
