@@ -33,7 +33,7 @@ The chat header’s **Reset chat** asks for confirmation before clearing the act
 
 ## Clone and run locally
 
-Install **Node 24.16.0**, **pnpm 12.8.1**, and **Docker with Compose and Buildx**. Chromium needs the [documented Linux sandbox support](docs/runtime.md#sandbox-and-supported-environment).
+Install **Node 24.16.0**, **pnpm 12.8.1**, and **Docker with Compose and Buildx**. Chromium needs the [documented Linux sandbox support](docs/runtime.md#sandbox-and-supported-environment). Repository tooling checks additionally require Python 3.12 or later.
 
 ```sh
 git clone https://github.com/Mochib-Tech-Solutions/xpathed.git
