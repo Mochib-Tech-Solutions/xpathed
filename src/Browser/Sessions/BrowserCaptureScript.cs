@@ -352,7 +352,7 @@ internal static class BrowserCaptureScript
             appearance: appearance(element), isRepeatedItem: repeatedItem(element)
           });
           const nodes = [];
-          const nodeIds = new Map();
+          const nodeIds = new WeakMap();
           const parentIdFor = element => {
             for (let ancestor = parent(element); ancestor; ancestor = parent(ancestor)) {
               checkBudget();
@@ -410,6 +410,8 @@ internal static class BrowserCaptureScript
           }
           if (!complete) { nodes.length = 0; candidates.length = 0; }
           const capturedView = new Set([...nodes, ...frameElements]);
+          let replayingRule = false;
+          let nextNodeId = candidates.length;
           const literal = value => !value.includes("'") ? `'${value}'` : !value.includes('"') ? `"${value}"` : `concat(${value.split("'").map(part => `'${part}'`).join(`,"'",`)})`;
           const tag = element => element.namespaceURI === 'http://www.w3.org/1999/xhtml' ? element.localName : `*[local-name()=${literal(element.localName)}]`;
           const testAttributes = ['data-testid', 'data-test-id', 'data-test', 'data-cy', 'data-qa'];
@@ -572,8 +574,9 @@ internal static class BrowserCaptureScript
                 return node;
               });
             },
-            async updateEnvironment(value, budgetMs, scanBudget) {
+            async updateEnvironment(value, budgetMs, scanBudget, replayRule = false) {
               try {
+                replayingRule = replayRule;
                 environment = value ? JSON.parse(value) : { x:0, y:0, scaleX:1, scaleY:1, exposed:true, rendered:true, clip:{left:0,top:0,right:innerWidth,bottom:innerHeight} };
                 reset(budgetMs);
                 if (!viewUnchanged()) return { errorCode: 'stale_capture' };
@@ -587,6 +590,26 @@ internal static class BrowserCaptureScript
                 await observeIntersections(observed);
                 if (!viewUnchanged()) return { errorCode: 'stale_capture' };
                 const visible = observed.filter(inView);
+                if (replayRule) {
+                  const currentFrames = visible.filter(element => element.matches('iframe,frame'));
+                  if (currentFrames.length !== frameElements.length || currentFrames.some(element => !frameElements.includes(element))) return { errorCode: 'stale_capture' };
+                  const currentNodes = visible.filter(eligible);
+                  if (currentNodes.length > 2000) throw budgetExceeded;
+                  // Preserve captured node IDs; new nodes never inherit a departed candidate's ID.
+                  for (const node of currentNodes) if (!nodeIds.has(node)) nodeIds.set(node, `${frame.id}:c${++nextNodeId}`);
+                  const currentCandidates = [];
+                  let currentBytes = 2;
+                  for (const node of currentNodes) {
+                    checkBudget();
+                    const candidate = describe(node, 0);
+                    candidate.id = nodeIds.get(node);
+                    candidate.parentId = parentIdFor(node);
+                    currentBytes += new TextEncoder().encode(JSON.stringify(candidate)).length + 1;
+                    if (currentBytes > 512000) throw budgetExceeded;
+                    currentCandidates.push(candidate);
+                  }
+                  return { scannedCount: scanned, candidates: currentCandidates };
+                }
                 if (visible.length !== capturedView.size || visible.some(element => !capturedView.has(element))) return { errorCode: 'stale_capture' };
                 for (let index = 0; index < nodes.length; index++) {
                   checkBudget();
@@ -639,13 +662,13 @@ internal static class BrowserCaptureScript
               if (capturedDocument !== document) return { errorCode: 'stale_document' };
               if (!complete) return { errorCode: 'capture_budget_exceeded' };
               if (!viewUnchanged()) return { errorCode: 'stale_capture' };
-              if (document.documentElement !== capturedRoot || nodes.some(node => !node.isConnected || node.ownerDocument !== document)) return { errorCode: 'stale_capture' };
+              if (document.documentElement !== capturedRoot || !replayingRule && nodes.some(node => !node.isConnected || node.ownerDocument !== document)) return { errorCode: 'stale_capture' };
               if (candidateId === null) return { target: null };
               const index = candidates.findIndex(candidate => candidate.id === candidateId);
               if (index < 0) return { errorCode: 'unknown_candidate' };
               const element = nodes[index];
               if (!element.isConnected || !accessibilityExposed(element)) return { errorCode: 'stale_capture' };
-              if (!inView(element) || !validShadowChain(element, candidates[index].shadowChain)) return { errorCode: 'stale_capture' };
+              if (!inView(element) || !validShadowChain(element, candidates[index].shadowChain) || parentIdFor(element) !== candidates[index].parentId) return { errorCode: 'stale_capture' };
               const xpaths = xpathsFor(element);
               if (!xpaths.length) return { errorCode: 'xpath_validation_failed' };
               return { target: { candidateId, frame, shadowChain: candidates[index].shadowChain, tag: element.localName, role: role(element), accessibleName: label(element), label: candidates[index].label || candidates[index].text,

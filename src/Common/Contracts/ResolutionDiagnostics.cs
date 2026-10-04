@@ -11,6 +11,7 @@ public sealed record ResolutionDiagnostics
     public int ModelInputBytes { get; init; }
     public int ModelInputBudgetBytes { get; init; } = 512000;
     public int ModelCalls { get; init; }
+    public SelectionRule? SelectionRule { get; init; }
     public string Strategy { get; init; } = "candidate-selection";
     public string? Model { get; init; }
     public string? Provider { get; init; }

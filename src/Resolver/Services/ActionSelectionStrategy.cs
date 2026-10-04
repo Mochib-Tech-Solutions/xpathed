@@ -48,28 +48,46 @@ internal static class ActionSelectionStrategy
         Include explicitly named missing targets beside found targets. Deduplicate candidate IDs. Plural expansion shares step 1 in capture order unless visual order is explicitly requested.
         Explicitly ordered/named targets use consecutive steps in instruction order. Frame identity is part of target identity.
         Every entry includes a brief target instruction (1-300 characters).
+        rule is an optional replayable matching rule for the WHOLE found target set, not a locator for the chosen ID. Return null unless exact own label/text, kind and optional named scope fully express the original request.
+        A rule has name (copy the complete supplied sanitized value), field (label or text), kind (control, image or any), and scope (one exact supplied scope string or null). Matches use case-sensitive exact equality, never substrings, aliases, IDs, readiness or geometry. Use a supplied field; when text is omitted, use label.
+        control includes native and ARIA controls, including buttons AND links; do not narrow a generic named control to the chosen tag. image means img or role img; any includes context containers too. A scope string must be explicitly requested, not invented to remove a duplicate. If the instruction names no section, row, list or other container, scope MUST be null even when the candidate has supplied scope.
+        Example: for "Click the Login button" and an input with role button, label Login, omitted text and scope [Login], use {"name":"Login","field":"label","kind":"control","scope":null}; do not use text, any or scope Login. A form that repeats Login is not a control.
+        Return null for positional/spatial/appearance distinctions, inferred names or synonyms, differing named targets, missing/ambiguous/unsupported entries, or any distinction these operations cannot fully express. Never reduce the instruction to the selected target's current description.
+        A rule must match exactly every selected ID and no other supplied candidate, including disabled/covered competitors. It may represent an explicitly plural found set; target cardinality still follows the original instruction. Browser replays it on fresh current-view candidates and requires the same retained node set.
         complete describes target enumeration, not whether targets exist or are ready. A missing or unsupported target is fully represented by its own entry.
         Never set complete false merely because candidates is empty or an entry is not_found or unsupported; include the entry and return complete true.
         Maximum 16 entries; if enumeration cannot finish, return complete false and actions []. No form values or per-target usage/cost.
         """;
     public static readonly JsonElement Schema = JsonSerializer.Deserialize<JsonElement>(
         """
-        {"type":"object","properties":{"complete":{"type":"boolean"},"actions":{"type":"array","maxItems":16,"items":{
+        {"type":"object","properties":{"rule":{"type":["object","null"],"properties":{"name":{"type":"string","minLength":1,"maxLength":300},"field":{"type":"string","enum":["label","text"]},"kind":{"type":"string","enum":["control","image","any"]},"scope":{"type":["string","null"],"minLength":1,"maxLength":300}},"required":["name","field","kind","scope"],"additionalProperties":false},"complete":{"type":"boolean"},"actions":{"type":"array","maxItems":16,"items":{
           "type":"object","properties":{"step":{"type":"integer","minimum":1,"maximum":16},
           "instruction":{"type":"string","minLength":1,"maxLength":300},
           "outcome":{"type":"string","enum":["found","not_found","unsupported"]},
           "action":{"type":"string","enum":["click","double_click","right_click","hover","fill","type","clear","select","check","uncheck","press","focus","blur","upload","inspect","unsupported"]},
           "candidateId":{"type":["string","null"]},"limitation":{"type":"string","enum":["none","ambiguous","unsupported_action","current_state_dependency","appearance_unavailable"]}},
           "required":["step","instruction","outcome","action","candidateId","limitation"],"additionalProperties":false}}},
-          "required":["complete","actions"],"additionalProperties":false}
+          "required":["complete","actions","rule"],"additionalProperties":false}
         """
     );
 
-    public static ModelActionSelection[] Select(string content, CandidateCapture capture) =>
-        Select(content, capture.Candidates.Select(candidate => candidate.Id).ToArray());
-
-    public static ModelActionSelection[] Select(string content, string[] candidateIds)
+    public static ModelActionSelection[] Select(string content, CandidateCapture capture, out SelectionRule? rule)
     {
+        var selections = Select(content, capture.Candidates.Select(candidate => candidate.Id).ToArray(), out rule);
+        if (rule is not null)
+        {
+            ValidateRuleMatches(
+                rule,
+                selections,
+                capture.Candidates.Where(rule.Matches).Select(candidate => candidate.Id)
+            );
+        }
+        return selections;
+    }
+
+    public static ModelActionSelection[] Select(string content, string[] candidateIds, out SelectionRule? rule)
+    {
+        rule = null;
         if (Encoding.UTF8.GetByteCount(content) > 16000)
         {
             throw new ApiException(
@@ -84,7 +102,9 @@ internal static class ActionSelectionStrategy
             var root = document.RootElement;
             if (
                 root.ValueKind != JsonValueKind.Object
-                || root.EnumerateObject().Count() != 2
+                || root.EnumerateObject().Any(property => property.Name is not ("complete" or "actions" or "rule"))
+                || root.EnumerateObject().Select(property => property.Name).Distinct().Count()
+                    != root.EnumerateObject().Count()
                 || !root.TryGetProperty("complete", out var complete)
                 || complete.ValueKind is not (JsonValueKind.True or JsonValueKind.False)
                 || !root.TryGetProperty("actions", out var actions)
@@ -92,6 +112,25 @@ internal static class ActionSelectionStrategy
             )
             {
                 throw new JsonException();
+            }
+            if (root.TryGetProperty("rule", out var ruleValue) && ruleValue.ValueKind != JsonValueKind.Null)
+            {
+                if (
+                    ruleValue.ValueKind != JsonValueKind.Object
+                    || ruleValue.EnumerateObject().Count() != 4
+                    || !ruleValue.TryGetProperty("name", out var name)
+                    || !ruleValue.TryGetProperty("field", out var field)
+                    || !ruleValue.TryGetProperty("kind", out var kind)
+                    || !ruleValue.TryGetProperty("scope", out var scope)
+                )
+                {
+                    throw new JsonException();
+                }
+                rule = new SelectionRule(name.GetString()!, field.GetString()!, kind.GetString()!, scope.GetString());
+                if (!rule.IsValid)
+                {
+                    throw new JsonException();
+                }
             }
             if (actions.GetArrayLength() > MaximumActions)
             {
@@ -192,6 +231,10 @@ internal static class ActionSelectionStrategy
                     "The model returned an incomplete response for this instruction."
                 );
             }
+            if (rule is not null && selections.Any(selection => selection.Outcome != "found"))
+            {
+                throw new JsonException();
+            }
             if (
                 selections.Length == 0
                 || selections.Select(item => (item.Step, item.Action, item.CandidateId)).Distinct().Count()
@@ -240,6 +283,24 @@ internal static class ActionSelectionStrategy
         catch (Exception error) when (error is JsonException or InvalidOperationException)
         {
             throw new ApiException(502, "provider_malformed_response", "The model returned an invalid action list.");
+        }
+    }
+
+    internal static void ValidateRuleMatches(
+        SelectionRule rule,
+        ModelActionSelection[] selections,
+        IEnumerable<string> matches
+    )
+    {
+        if (
+            !matches.ToHashSet(StringComparer.Ordinal).SetEquals(selections.Select(selection => selection.CandidateId!))
+        )
+        {
+            throw new ApiException(
+                502,
+                "provider_invalid_selection_rule",
+                "The matching rule does not reproduce the complete selected target set."
+            );
         }
     }
 }

@@ -286,6 +286,7 @@ public sealed class BrowserSessions(IConfiguration configuration, ILogger<Browse
             async (session, page) =>
             {
                 page.ActionSelections = null;
+                page.ActionSelectionRule = null;
                 var result = await ValidateActionsAsync(
                     session,
                     page,
@@ -333,12 +334,14 @@ public sealed class BrowserSessions(IConfiguration configuration, ILogger<Browse
             async (session, page) =>
             {
                 page.ActionSelections = null;
+                page.ActionSelectionRule = null;
                 var validation = await ValidateActionsAsync(
                     session,
                     page,
                     request.DocumentId,
                     request.CaptureId,
-                    request.Actions
+                    request.Actions,
+                    request.Rule
                 );
                 await HighlightTargetAsync(
                     session,
@@ -348,6 +351,7 @@ public sealed class BrowserSessions(IConfiguration configuration, ILogger<Browse
                     validation.Actions.Select(action => action.Target).OfType<ResolvedTarget>().ToArray()
                 );
                 page.ActionSelections = request.Actions.ToDictionary(action => action.ActionId, StringComparer.Ordinal);
+                page.ActionSelectionRule = request.Rule;
                 return validation;
             },
             token
@@ -376,8 +380,17 @@ public sealed class BrowserSessions(IConfiguration configuration, ILogger<Browse
                         "This action has no verified target in the current capture."
                     );
                 }
-                var result = await ValidateActionsAsync(session, page, request.DocumentId, request.CaptureId, [action]);
-                var selection = new SelectionValidation(result.Actions[0].Target);
+                var result = await ValidateActionsAsync(
+                    session,
+                    page,
+                    request.DocumentId,
+                    request.CaptureId,
+                    page.ActionSelectionRule is null ? [action] : page.ActionSelections.Values.ToArray(),
+                    page.ActionSelectionRule
+                );
+                var selection = new SelectionValidation(
+                    result.Actions.Single(item => item.ActionId == action.ActionId).Target
+                );
                 await HighlightTargetAsync(
                     session,
                     page,
@@ -416,9 +429,12 @@ public sealed class BrowserSessions(IConfiguration configuration, ILogger<Browse
                         page,
                         request.DocumentId,
                         request.CaptureId,
-                        [action]
+                        page.ActionSelectionRule is null ? [action] : page.ActionSelections.Values.ToArray(),
+                        page.ActionSelectionRule
                     );
-                    candidateId = validation.Actions[0].Target!.CandidateId;
+                    candidateId = validation
+                        .Actions.Single(item => item.ActionId == action.ActionId)
+                        .Target!.CandidateId;
                 }
                 await page.Capture!.SpotlightAsync(candidateId);
                 await RequireCaptureAsync(session, page, request.DocumentId, request.CaptureId);
@@ -474,13 +490,14 @@ public sealed class BrowserSessions(IConfiguration configuration, ILogger<Browse
         BrowserPageRuntime page,
         string documentId,
         string captureId,
-        ActionSelection[] actions
+        ActionSelection[] actions,
+        SelectionRule? rule = null
     )
     {
         await RequireCaptureAsync(session, page, documentId, captureId);
         try
         {
-            var result = await page.Capture!.SelectAsync(actions);
+            var result = await page.Capture!.SelectAsync(actions, rule);
             await RequireCaptureAsync(session, page, documentId, captureId);
             return result;
         }

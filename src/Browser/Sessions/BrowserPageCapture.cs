@@ -84,6 +84,7 @@ internal sealed class BrowserPageCapture(BrowserPageRuntime page) : IAsyncDispos
             unsupported += result.UnsupportedBoundaryCount;
             candidates.AddRange(result.Candidates);
             captured.CandidateIds.UnionWith(result.Candidates.Select(candidate => candidate.Id));
+            captured.Candidates = result.Candidates;
             if (
                 !result.Coverage.Complete
                 || scanned > 20000
@@ -160,7 +161,7 @@ internal sealed class BrowserPageCapture(BrowserPageRuntime page) : IAsyncDispos
         }
     }
 
-    public async Task<ActionSelectionValidation> SelectAsync(ActionSelection[] actions)
+    public async Task<ActionSelectionValidation> SelectAsync(ActionSelection[] actions, SelectionRule? rule = null)
     {
         if (!complete)
         {
@@ -168,11 +169,59 @@ internal sealed class BrowserPageCapture(BrowserPageRuntime page) : IAsyncDispos
         }
         var timer = Stopwatch.StartNew();
         var scanBudget = 20000;
+        var expected = actions.Select(action => action.CandidateId).OfType<string>().ToHashSet(StringComparer.Ordinal);
+        if (
+            rule is not null
+            && (
+                !rule.IsValid
+                || actions.Any(action => action.CandidateId is null)
+                || expected.Count != actions.Length
+                || !frames
+                    .SelectMany(frame => frame.Candidates)
+                    .Where(rule.Matches)
+                    .Select(candidate => candidate.Id)
+                    .ToHashSet(StringComparer.Ordinal)
+                    .SetEquals(expected)
+            )
+        )
+        {
+            throw new ApiException(
+                400,
+                "invalid_selection_rule",
+                "The matching rule must reproduce the complete captured target set."
+            );
+        }
+        var fresh = new List<CandidateElement>();
         foreach (var frame in frames)
         {
             CheckBudget(timer);
-            scanBudget -= await frame.RefreshAsync((int)(2000 - timer.ElapsedMilliseconds), scanBudget);
+            var observation = await frame.RefreshAsync(
+                (int)(2000 - timer.ElapsedMilliseconds),
+                scanBudget,
+                rule is not null
+            );
+            scanBudget -= observation.ScannedCount;
+            fresh.AddRange(observation.Candidates);
+            if (fresh.Count > 2000 || JsonSerializer.SerializeToUtf8Bytes(fresh, JsonOptions).Length > 512000)
+            {
+                throw new ApiException(
+                    409,
+                    "validation_budget_exceeded",
+                    "The complete matching-rule comparison exceeds its observation budget."
+                );
+            }
             await SelectFrameAsync(frame, null, "unsupported", timer);
+        }
+        if (
+            rule is not null
+            && !fresh
+                .Where(rule.Matches)
+                .Select(candidate => candidate.Id)
+                .ToHashSet(StringComparer.Ordinal)
+                .SetEquals(expected)
+        )
+        {
+            throw new ApiException(409, "stale_capture", "The matching target set changed after capture.");
         }
         var validated = new List<ValidatedAction>();
         foreach (var action in actions)

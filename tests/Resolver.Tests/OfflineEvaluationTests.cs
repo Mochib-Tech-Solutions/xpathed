@@ -63,6 +63,8 @@ public sealed class OfflineEvaluationTests
     [InlineData("truncated", "provider_truncated_response")]
     [InlineData("rate_limited", "provider_rate_limited")]
     [InlineData("missing_usage", null)]
+    [InlineData("matching_rule", null)]
+    [InlineData("invalid_rule", "provider_invalid_selection_rule")]
     public async Task SavedPageInferenceReusesSelectionValidationAndReportsOneSharedChargeWithoutBrowserClaims(
         string scenario,
         string? expectedCode
@@ -86,6 +88,16 @@ public sealed class OfflineEvaluationTests
                     """{"complete":true,"actions":[{"step":1,"instruction":"Click Save","outcome":"found","action":"click","candidateId":"c1","limitation":"none"}]}""";
                 var content = scenario switch
                 {
+                    "matching_rule" => valid.Replace(
+                        "\"complete\":true",
+                        "\"complete\":true,\"rule\":{\"name\":\"Save\",\"field\":\"label\",\"kind\":\"control\",\"scope\":null}",
+                        StringComparison.Ordinal
+                    ),
+                    "invalid_rule" => valid.Replace(
+                        "\"complete\":true",
+                        "\"complete\":true,\"rule\":{\"name\":\"Other\",\"field\":\"label\",\"kind\":\"control\",\"scope\":null}",
+                        StringComparison.Ordinal
+                    ),
                     "plural" => valid.Replace(
                         "]}",
                         """,{"step":2,"instruction":"Click Cancel","outcome":"found","action":"click","candidateId":"c2","limitation":"none"}]}""",

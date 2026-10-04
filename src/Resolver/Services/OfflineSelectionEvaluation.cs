@@ -93,8 +93,27 @@ public static class OfflineSelectionEvaluation
             {
                 throw new ApiException(502, code, "The provider could not return a valid selection.");
             }
-            var selections = ActionSelectionStrategy.Select(completion.Content!, candidateIds);
-            diagnostics = diagnostics with { Stage = "complete" };
+            var selections = ActionSelectionStrategy.Select(completion.Content!, candidateIds, out var rule);
+            if (rule is not null)
+            {
+                var matches = inputDocument
+                    .RootElement.GetProperty("candidates")
+                    .EnumerateArray()
+                    .Where(candidate =>
+                        rule.Matches(
+                            Value(candidate, "tag"),
+                            Value(candidate, "role"),
+                            Value(candidate, "label"),
+                            Value(candidate, "text"),
+                            candidate.TryGetProperty("scope", out var scope)
+                                ? scope.EnumerateArray().Select(item => item.GetString()!).ToArray()
+                                : []
+                        )
+                    )
+                    .Select(candidate => candidate.GetProperty("id").GetString()!);
+                ActionSelectionStrategy.ValidateRuleMatches(rule, selections, matches);
+            }
+            diagnostics = diagnostics with { Stage = "complete", SelectionRule = rule };
             var outcomes = selections.Select(item => item.Outcome).Distinct(StringComparer.Ordinal).ToArray();
             await WriteResultAsync(outcomes.Length == 1 ? outcomes[0] : "partial", selections);
             return 0;
@@ -145,6 +164,9 @@ public static class OfflineSelectionEvaluation
             await Console.Out.WriteLineAsync(DiagnosticSanitizer.SanitizeJson(value));
         }
     }
+
+    private static string Value(JsonElement candidate, string name) =>
+        candidate.TryGetProperty(name, out var value) ? value.GetString() ?? "" : "";
 
     private static async Task<string> ReadInputAsync(string path)
     {

@@ -7,6 +7,10 @@ let targetText = "About us";
 let targetAction = "click";
 let plannedActions = [];
 let planComplete = true;
+let selectionRule = null;
+let providerDelayMs = 0;
+let inferenceMutation = null;
+let scenarioRun = null;
 const fixture = `<!doctype html><html lang="en"><meta charset="utf-8"><title>Resolution contract</title>
 <body><nav aria-label="Company"><button id="expected-target" data-testid="about-us" data-oracle="expected-target">About us</button></nav>
 <script>
@@ -14,8 +18,19 @@ let clicks = 0;
 const runQuery = '?run=' + encodeURIComponent(new URL(location.href).searchParams.get('run') ?? 'manual');
 document.querySelector('button').addEventListener('click', () => clicks++);
 const events = {};
+let mutationApplied = null;
 for (const name of ['click','input','change','focusin','mouseover','pointerover','scroll']) document.addEventListener(name, () => events[name] = (events[name] ?? 0) + 1, true);
 setInterval(async () => {
+ const mutation = await (await fetch('/mutation' + runQuery)).json();
+ if (mutation) {
+   const target = document.querySelector('#consent-host')?.shadowRoot?.querySelector('button') ?? document.querySelector('#expected-target');
+   if (mutation === 'carousel') document.querySelector('#carousel').style.transform='translateX(-400px)';
+   if (mutation === 'duplicate') document.body.insertAdjacentHTML('beforeend','<a href="#">Accept all</a>');
+   if (mutation === 'rename') target.textContent='Customize';
+   if (mutation === 'replace') target.outerHTML='<button data-oracle="replacement">Accept all</button>';
+   if (mutation === 'oversized') document.body.insertAdjacentHTML('beforeend','<button>Extra</button>'.repeat(20100));
+   mutationApplied = mutation;
+ }
  const response = await fetch('/oracle' + runQuery);
  const command = await response.json();
  if (!command) return;
@@ -31,7 +46,7 @@ setInterval(async () => {
    const result = doc.evaluate(xpath, scope === doc ? doc : scope.firstElementChild, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE);
    return Array.from({length:result.snapshotLength}, (_,i) => result.snapshotItem(i).getAttribute('data-oracle') ?? result.snapshotItem(i).id ?? 'wrong-target');
  });
- await fetch('/observation' + runQuery,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({matches,clicks,scrollY,events})});
+ await fetch('/observation' + runQuery,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({matches,clicks,scrollY,events,mutationApplied})});
 }, 50);
 </script></body></html>`;
 
@@ -85,6 +100,13 @@ const server = createServer(async (request, response) => {
             '<section aria-label="Consent" style="position:fixed;left:20px;bottom:20px"><button data-oracle="consent">Accept all</button><input type="password" value="PRIVATE_SHADOW_PASSWORD"><span aria-hidden="true">PRIVATE_SHADOW_HIDDEN</span></section>';
         </script>`,
         );
+      if (url.searchParams.has("motion"))
+        html = html.replace(
+          "</nav>",
+          `</nav><div style="position:absolute;top:200px;width:200px;overflow:hidden"><div id="carousel" style="display:flex;width:600px"><img alt="Partner A" width="200" height="40"><img alt="Partner B" width="200" height="40"><img alt="Partner C" width="200" height="40"></div></div>`,
+        );
+      if (url.searchParams.get("motion") === "auto")
+        html += `<style>#carousel { animation: cycle 800ms steps(2) infinite alternate; } @keyframes cycle { to { transform: translateX(-400px); } }</style>`;
       if (path === "/frames")
         html = html.replace(
           "</nav>",
@@ -163,12 +185,19 @@ const server = createServer(async (request, response) => {
       if (request.method === "POST") state.observation = body;
       output = state.observation;
     } else if (path === "/provider-request") output = providerRequest ?? null;
-    else if (path === "/scenario") {
+    else if (path === "/mutation") {
+      output = state.mutation ?? null;
+      state.mutation = null;
+    } else if (path === "/scenario") {
       scenario = body.name;
       targetText = body.targetText ?? "About us";
       targetAction = body.action ?? "click";
       plannedActions = body.actions ?? [];
       planComplete = body.complete ?? true;
+      selectionRule = body.rule ?? null;
+      providerDelayMs = body.delayMs ?? 0;
+      inferenceMutation = body.mutation ?? null;
+      scenarioRun = body.run ?? null;
       providerRequest = null;
       output = { ok: true };
     } else if (path === "/api/v1/models/deepseek/deepseek-v4.1-flash/endpoints") {
@@ -193,6 +222,8 @@ const server = createServer(async (request, response) => {
       );
       if (!target && scenario !== "absent" && scenario !== "batch")
         throw new Error("Independent fixture target absent from provider input");
+      if (scenarioRun && runs.has(scenarioRun)) runs.get(scenarioRun).mutation = inferenceMutation;
+      if (providerDelayMs) await new Promise((resolve) => setTimeout(resolve, providerDelayMs));
       output = {
         id: "deterministic-fixture",
         model: "deepseek/deepseek-v4.1-flash",
@@ -206,6 +237,7 @@ const server = createServer(async (request, response) => {
                 scenario === "batch"
                   ? {
                       complete: planComplete,
+                      rule: selectionRule,
                       actions: plannedActions.map((item) => ({
                         step: item.step,
                         instruction: item.instruction,
@@ -229,6 +261,7 @@ const server = createServer(async (request, response) => {
                     }
                   : {
                       complete: true,
+                      rule: selectionRule,
                       actions: [
                         {
                           step: 1,
