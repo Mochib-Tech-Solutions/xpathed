@@ -97,6 +97,10 @@ class DeploymentTests(unittest.TestCase):
         class Handler(BaseHTTPRequestHandler):
             def do_GET(self):
                 self.send_response(200 if self.path in routes else 404)
+                self.send_header("X-Frame-Options", "DENY")
+                self.send_header("X-Content-Type-Options", "nosniff")
+                self.send_header("Content-Security-Policy", "object-src 'none'")
+                self.send_header("Strict-Transport-Security", "max-age=15552000")
                 self.end_headers()
 
             def log_message(self, *args):
@@ -107,8 +111,11 @@ class DeploymentTests(unittest.TestCase):
         thread.start()
         try:
             (self.base / "deploy/public-url").write_text(f"http://127.0.0.1:{server.server_port}")
-            with patch.object(host, "compose", side_effect=self.run_compose):
+            with (patch.object(host, "compose", side_effect=self.run_compose),
+                  patch.object(host.subprocess, "run") as protection):
                 host.healthy(self.base, self.old)
+            protection.assert_called_once_with(["sudo", "-n", "python3",
+                "/usr/local/lib/xpathed/network-policy.py", "--verify"], check=True)
             self.assertEqual(self.calls, [(self.old["revision"],
                 ("exec", "-T", "web", "wget", "-q", "-O", "/dev/null", "http://resolver:8080/health"))])
         finally:

@@ -74,6 +74,8 @@ Keep CI jobs independent and selected by relevant changes. The deterministic bro
 
 ## Keep the guide current
 
+For the public hosted workspace, preserve [public browser isolation](docs/deployment.md#public-browser-isolation). The Browser startup gate must wait for host-installed IPv4/IPv6 packet filters on every container invocation; do not grant Browser network-administration capabilities or apply the hosted restrictions to trusted evaluation fixtures. Hosted health checks verify network-policy readiness and security headers before advancing the deployment receipt. Host-owned security helper and gateway changes require administrative installation; source edits alone do not update those files.
+
 When scope, commands, architecture or conventions change, update `README.md` and this file in the same change. Update `docs/runtime.md` for API/configuration/lifecycle changes, `CONTEXT.md` for domain terms, and an ADR for consequential accepted trade-offs. Remove stale instructions instead of accumulating contradictory history. Keep future work linked to its live issue; do not maintain a duplicate issue-status table or document test counts/inventories.
 
 Research notes record dated evidence and alternatives, not automatic requirements. Verify version-sensitive API/package/model claims from official sources before relying on them. Keep commit, branch and PR wording focused on the change and use the configured human Git identity.
