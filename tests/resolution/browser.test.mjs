@@ -1429,6 +1429,35 @@ test("highlights-mouse-movement-preserves-and-click-or-key-input-clears", async 
   });
 });
 
+for (const mutation of ["navigate", "detach"])
+  test(`highlights-selected-frame-${mutation}-invalidates-after-main-target-spotlight`, async () => {
+    await withFixture(
+      (path) =>
+        path === "/fixture"
+          ? `${highlightFixture}<iframe title="Approval frame" src="/highlight-frame" style="position:absolute;left:100px;top:300px;width:800px;height:300px;border:0"></iframe>
+            <script>window.mutateXpathFixture = () => ${mutation === "navigate" ? "document.querySelector('iframe').srcdoc='<p>Replacement document</p>'" : "document.querySelector('iframe').remove()"};</script>`
+          : `<style>body{margin:0;background:white}button{position:absolute;left:100px;top:20px;width:240px;height:100px;background:white;border:0}</style><button id="expected-target">Frame approval</button>`,
+      async (session, page) => {
+        await observe({}, "/highlight-frame");
+        const batch = await selectHighlights(page, true);
+        await request(`/pages/${page.pageId}/spotlight`, {
+          documentId: page.documentId,
+          captureId: batch.captureId,
+          actionId: "a1",
+        });
+        assert.equal(batch.actions.length, 3, "Selection includes both documents");
+        await observe({ mutateXpath: true });
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        await expectError(
+          `/pages/${page.pageId}/highlight`,
+          { documentId: page.documentId, captureId: batch.captureId, actionId: "a1" },
+          409,
+          "stale_capture",
+        );
+      },
+    );
+  });
+
 for (const crossOrigin of [false, true])
   test(`highlights-main-and-${crossOrigin ? "cross-origin" : "same-origin"}-frame-targets-clear-on-frame-input`, async () => {
     await withFixture(

@@ -170,8 +170,7 @@ internal sealed class BrowserPageCapture(BrowserPageRuntime page) : IAsyncDispos
             throw new ApiException(409, "capture_budget_exceeded", "The capture is incomplete.");
         }
         var timer = Stopwatch.StartNew();
-        selectedFrames.Clear();
-        selectedFrames.Add(frames[0]);
+        HashSet<BrowserFrameCapture> framesToRefresh = [frames[0]];
         foreach (var action in actions.Where(action => action.CandidateId is not null))
         {
             var frame =
@@ -179,10 +178,11 @@ internal sealed class BrowserPageCapture(BrowserPageRuntime page) : IAsyncDispos
                 ?? throw new ApiException(409, "unknown_candidate", "The target is outside this capture.");
             for (var current = frame; current is not null; current = current.Parent)
             {
-                selectedFrames.Add(current);
+                framesToRefresh.Add(current);
             }
         }
-        foreach (var frame in frames.Where(selectedFrames.Contains))
+        selectedFrames.UnionWith(framesToRefresh);
+        foreach (var frame in frames.Where(framesToRefresh.Contains))
         {
             CheckBudget(timer);
             var ids = actions
