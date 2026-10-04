@@ -1,6 +1,15 @@
 import { ArrowUp, Check, Copy, Eraser, LoaderCircle } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import type { Resolution, ResolutionResult } from "./api";
 import ResolutionCost from "./ResolutionCost";
 
@@ -106,6 +115,7 @@ export default function ChatPanel({
   const [copied, setCopied] = useState("");
   const [copyError, setCopyError] = useState<{ entryId: string; message: string } | null>(null);
   const composer = useRef<HTMLTextAreaElement>(null);
+  const resetConfirmed = useRef(false);
   const restoreFocus = useRef(false);
   const transcript = useRef<HTMLDivElement>(null);
   const followBottom = useRef(true);
@@ -143,24 +153,49 @@ export default function ChatPanel({
     >
       <div className="flex min-h-10 shrink-0 items-center gap-2 border-b border-border px-4">
         <h1 className="font-medium">Chat</h1>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          className="size-7 text-muted-foreground"
-          aria-label="Reset chat"
-          title="Reset chat"
-          disabled={resetDisabled || (!history.length && !instruction)}
-          onClick={() => {
-            onReset();
-            followBottom.current = true;
-            setCopied("");
-            setCopyError(null);
-            composer.current?.focus();
-          }}
-        >
-          <Eraser aria-hidden="true" />
-        </Button>
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="size-7 text-muted-foreground"
+              aria-label="Reset chat"
+              title="Reset chat"
+              disabled={resetDisabled || (!history.length && !instruction)}
+            >
+              <Eraser aria-hidden="true" />
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent
+            onCloseAutoFocus={(event) => {
+              if (!resetConfirmed.current) return;
+              event.preventDefault();
+              resetConfirmed.current = false;
+              composer.current?.focus();
+            }}
+          >
+            <AlertDialogTitle>Reset chat?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This tab’s draft and chat history will be cleared.
+            </AlertDialogDescription>
+            <div className="mt-3 flex justify-end gap-2">
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                disabled={resetDisabled}
+                onClick={() => {
+                  onReset();
+                  resetConfirmed.current = true;
+                  followBottom.current = true;
+                  setCopied("");
+                  setCopyError(null);
+                }}
+              >
+                Reset chat
+              </AlertDialogAction>
+            </div>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
       <div
         ref={transcript}
