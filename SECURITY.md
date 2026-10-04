@@ -1,0 +1,13 @@
+# Security
+
+Report suspected credential exposure privately to a maintainer through GitHub's **Report a vulnerability** option when enabled. Avoid posting credentials, customer page captures or authentication data in issues, PRs or public Actions artifacts. Revoke a compromised credential before editing or removing its public copy; deleting a file does not remove Git history.
+
+Keep application keys in ignored local environment files or private VPS configuration. Deployment SSH credentials and pinned host identity belong to Actions secrets. PR and merge-group checks receive no deployment or provider secrets; hosted deployment runs only after successful checks on a trusted `main` push. Paid qualification, publication and monitoring are restricted to private repositories.
+
+The **Security / Credential scan** check scans checked-out Git history using checksum-pinned Gitleaks with full redaction. Narrow allowlists cover reviewed source hashes, historical prose and one exact dummy privacy-test value. Negative controls require credential-shaped values to be detected inside each allowlisted file category. Run `node scripts/security-check.mjs` locally; the helper downloads and verifies the pinned scanner on Linux amd64 and macOS arm64, or accepts an explicitly supplied matching `GITLEAKS_BINARY`.
+
+The main-branch protection policy is recorded in [.github/branch-protection.json](.github/branch-protection.json): one independent approval, dismissal of stale approvals, approval after the latest push, resolved conversations and the Check, Conventional commits and Credential scan statuses. It also applies to administrators and blocks force pushes and branch deletion. GitHub must accept this policy remotely; the JSON file alone is not enforcement. An author cannot approve their own PR. Keep a second trusted reviewer available for maintainer-authored changes.
+
+After a visibility change, verify branch protection again, enable GitHub secret scanning and push protection if available, require workflow approval for all outside contributors, and retain read-only default workflow tokens. The public demo is a separately owner-selected access policy: it exposes session creation and paid resolution to visitors without exposing the provider key itself. Origin checks and private service ports do not provide user authentication or spending limits.
+
+The owner explicitly retains evaluation datasets and archived evidence. Sharing repository visibility also changes who can read published release assets and Actions evidence. A clean credential scan is not a certification that every archived page or dataset is public-domain, nonpersonal or licensed for redistribution.
