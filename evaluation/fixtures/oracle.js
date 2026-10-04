@@ -17,7 +17,11 @@
     const modal = doc.querySelector("dialog:modal");
     if (modal && !modal.contains(node)) return false;
     if (["hidden", "collapse"].includes(view.getComputedStyle(node).visibility)) return false;
-    for (let current = node; current; current = current.parentElement) {
+    for (
+      let current = node;
+      current;
+      current = current.assignedSlot ?? current.parentElement ?? current.getRootNode().host
+    ) {
       const css = view.getComputedStyle(current);
       if (
         current.matches("script,style,noscript,template,input[type=hidden]") ||
@@ -45,7 +49,7 @@
     return `fnv1a32-utf16:${(result >>> 0).toString(16).padStart(8, "0")}`;
   }
   function environment() {
-    const docs = documents();
+    const docs = roots();
     const identify = (node) => (node ? { tag: node.localName, id: node.id || null } : null);
     return {
       viewport: { width: innerWidth, height: innerHeight },
@@ -54,7 +58,10 @@
       languages: [...navigator.languages],
       timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
       initialState: docs.map((doc) => ({
-        scroll: [doc.defaultView.scrollX, doc.defaultView.scrollY],
+        scroll: [
+          (doc.defaultView ?? doc.ownerDocument.defaultView).scrollX,
+          (doc.defaultView ?? doc.ownerDocument.defaultView).scrollY,
+        ],
         active: identify(doc.activeElement),
         fields: [...doc.querySelectorAll("input,textarea,select,[contenteditable]")].map(
           (node) => ({
@@ -72,7 +79,11 @@
         ),
       })),
       documentChecksum: docs.map((doc) => {
-        const clone = doc.documentElement.cloneNode(true);
+        const clone = doc.documentElement
+          ? doc.documentElement.cloneNode(true)
+          : document.createElement("div");
+        if (!doc.documentElement)
+          for (const child of doc.childNodes) clone.append(child.cloneNode(true));
         for (const node of clone.querySelectorAll("input,textarea,select,[contenteditable]")) {
           node.removeAttribute("value");
           if (node.matches("textarea,[contenteditable]")) node.textContent = "";
@@ -82,16 +93,30 @@
       }),
     };
   }
-  function documents() {
-    const list = [document];
-    for (let i = 0; i < list.length; i++)
-      for (const frame of list[i].querySelectorAll("iframe"))
-        if (frame.contentDocument) list.push(frame.contentDocument);
+  function roots() {
+    const list = [document],
+      seen = new Set(list);
+    for (let index = 0; index < list.length; index++) {
+      for (const node of list[index].querySelectorAll("*")) {
+        for (const root of [
+          node.shadowRoot,
+          node.localName === "iframe" ? node.contentDocument : null,
+        ]) {
+          if (root && !seen.has(root)) {
+            seen.add(root);
+            list.push(root);
+          }
+        }
+      }
+    }
     return list;
   }
   function state() {
-    return documents().map((doc) => ({
-      scroll: [doc.defaultView.scrollX, doc.defaultView.scrollY],
+    return roots().map((doc) => ({
+      scroll: [
+        (doc.defaultView ?? doc.ownerDocument.defaultView).scrollX,
+        (doc.defaultView ?? doc.ownerDocument.defaultView).scrollY,
+      ],
       active: doc.activeElement,
       fields: [...doc.querySelectorAll("input,textarea,select,[contenteditable]")].map((node) => [
         node,
@@ -127,19 +152,43 @@
         throw new Error("Expected frame mapping is not unique");
       doc = nodes[0].contentDocument;
     }
+    for (const selector of target.shadows ?? []) {
+      const hosts = doc.querySelectorAll(selector);
+      if (hosts.length !== 1 || !hosts[0].shadowRoot)
+        throw new Error("Expected shadow mapping is not unique");
+      doc = hosts[0].shadowRoot;
+    }
     const nodes = doc.querySelectorAll(target.selector);
     if (nodes.length !== 1) throw new Error("Expected target mapping is not unique");
     return nodes[0];
   }
+  function scopedXPath(doc, root, xpath) {
+    const nodes = doc.evaluate(
+      xpath,
+      root === doc ? doc : root.firstElementChild,
+      null,
+      XPathResult.ORDERED_NODE_SNAPSHOT_TYPE,
+    );
+    return Array.from({ length: nodes.snapshotLength }, (_, index) => nodes.snapshotItem(index));
+  }
+  function shadowScope(doc, root, chain) {
+    for (const host of chain ?? []) {
+      const nodes = scopedXPath(doc, root, host.xpath);
+      if (nodes.length !== 1 || !nodes[0].shadowRoot)
+        throw new Error("Shadow host mapping is not unique");
+      root = nodes[0].shadowRoot;
+    }
+    return root;
+  }
   function matches(target, xpath) {
     let doc = document;
     for (const frame of target.frame?.chain ?? []) {
-      const nodes = doc.evaluate(frame.xpath, doc, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE);
-      if (nodes.snapshotLength !== 1 || !nodes.snapshotItem(0).contentDocument) return [];
-      doc = nodes.snapshotItem(0).contentDocument;
+      const root = shadowScope(doc, doc, frame.shadowChain);
+      const nodes = scopedXPath(doc, root, frame.xpath);
+      if (nodes.length !== 1 || !nodes[0].contentDocument) return [];
+      doc = nodes[0].contentDocument;
     }
-    const nodes = doc.evaluate(xpath, doc, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE);
-    return Array.from({ length: nodes.snapshotLength }, (_, i) => nodes.snapshotItem(i));
+    return scopedXPath(doc, shadowScope(doc, doc, target.shadowChain), xpath);
   }
   function observe(command) {
     const expected = command.expected.map(expectedNode);
@@ -241,10 +290,13 @@
           if (command.kind === "baseline") {
             const deadline = performance.now() + 10000;
             while (
-              documents().some(
-                (doc) =>
-                  doc.readyState !== "complete" || (doc !== document && doc.URL === "about:blank"),
-              )
+              roots()
+                .filter((root) => root.nodeType === 9)
+                .some(
+                  (doc) =>
+                    doc.readyState !== "complete" ||
+                    (doc !== document && doc.URL === "about:blank"),
+                )
             ) {
               if (performance.now() > deadline)
                 throw new Error("Fixture documents did not finish loading");

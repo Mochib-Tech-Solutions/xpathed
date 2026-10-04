@@ -15,7 +15,7 @@ const oracleScript = `<script>
       const endpoint = '?page=' + encodeURIComponent(location.pathname);
       const response = await fetch('/oracle' + endpoint);
       if (response.status === 204) return;
-      const { xpaths = [], replaceTarget, reload, click, open, focusPopup, close, cookie, scrollToY, scrollElement, slowFrame, mutateXpath, staleInput } = await response.json();
+      const { xpaths = [], locators = [], replaceTarget, reload, click, open, focusPopup, close, cookie, scrollToY, scrollElement, slowFrame, mutateXpath, staleInput } = await response.json();
       if (staleInput) {
         const binding = Object.keys(window).find(key => key.startsWith('xpathedInput') && typeof window[key] === 'function');
         if (!binding) throw new Error('Missing input notification binding');
@@ -34,11 +34,32 @@ const oracleScript = `<script>
       if (open) window.fixturePopup = window.open(open.url, open.name ?? '_blank', open.features ?? '');
       if (focusPopup) window.fixturePopup?.focus();
       if (replaceTarget) document.querySelector('#expected-target').outerHTML = '<button id="expected-target">Replacement</button>';
+      const shadowMatches = locators.map(({xpath, shadowChain = [], frame}) => {
+        let doc = document, root = doc;
+        const resolve = expression => doc.evaluate(expression, root === doc ? doc : root.firstElementChild,
+          null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
+        const enter = chain => {
+          for (const host of chain ?? []) {
+            const matches = resolve(host.xpath);
+            if (matches.snapshotLength !== 1) throw new Error('Shadow host must be unique');
+            root = matches.snapshotItem(0).shadowRoot;
+          }
+        };
+        for (const owner of frame?.chain ?? []) {
+          enter(owner.shadowChain);
+          const matches = resolve(owner.xpath);
+          if (matches.snapshotLength !== 1) throw new Error('Frame owner must be unique');
+          doc = root = matches.snapshotItem(0).contentDocument;
+        }
+        enter(shadowChain);
+        const matches = resolve(xpath);
+        return Array.from({length:matches.snapshotLength}, (_,index) => matches.snapshotItem(index).getAttribute('data-oracle'));
+      });
       const matches = xpaths.map(xpath => {
         const nodes = document.evaluate(xpath, document, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
         return Array.from({ length: nodes.snapshotLength }, (_, index) => nodes.snapshotItem(index).getAttribute('data-oracle') ?? nodes.snapshotItem(index).id);
       });
-      await fetch('/oracle-result' + endpoint, { method: 'POST', body: JSON.stringify({ matches, scrollY, clicks: document.querySelector('#expected-target')?.dataset.clicks ?? '0', nodeCount: document.querySelectorAll('*').length,
+      await fetch('/oracle-result' + endpoint, { method: 'POST', body: JSON.stringify({ matches, shadowMatches, scrollY, clicks: document.querySelector('#expected-target')?.dataset.clicks ?? '0', nodeCount: document.querySelectorAll('*').length,
         cookie: document.cookie, openerPath: window.opener?.location.pathname ?? null, focused: document.hasFocus(),
         activeElement: document.activeElement?.id, events: window.observedEvents ?? {},
         targetMarkup: document.querySelector("#expected-target")?.outerHTML, values: [...document.querySelectorAll('[data-observe-value]')].map(element => element.value),
@@ -2335,7 +2356,431 @@ test("frames-cross-origin-clipping-and-obstruction-are-passive-and-navigation-in
   );
 });
 
-test("frames-exposed-content-is-captured-and-hidden-or-shadow-content-is-excluded", async () => {
+test("shadow-dynamic-fixed-content-is-detected-without-a-host-box", async () => {
+  await withFixture(
+    `${targetMarkup}<button id="show">Show consent</button><div id="shadow"></div>
+    <script>
+      const host = document.querySelector('#shadow');
+      const root = host.attachShadow({mode:'open'});
+      document.querySelector('#show').onclick = () => {
+        root.innerHTML = '<div style="position:fixed;left:20px;bottom:20px"><button data-oracle="consent">Accept all</button></div>';
+        window.observedEvents = {hostHeight:host.getBoundingClientRect().height,
+          buttonVisible:root.querySelector('button').getBoundingClientRect().height > 0};
+      };
+    </script>`,
+    async (session, page) => {
+      const before = await request(`/pages/${session.pageId}/capture`, {
+        documentId: page.documentId,
+      });
+      assert.equal(before.unsupportedBoundaryCount, 0);
+      const observation = await observe({ click: "#show" });
+      assert.equal(observation.events.hostHeight, 0);
+      assert.equal(observation.events.buttonVisible, true);
+      await expectError(
+        `/pages/${session.pageId}/selection`,
+        {
+          documentId: page.documentId,
+          captureId: before.captureId,
+          candidateId: null,
+          action: "click",
+        },
+        409,
+        "stale_capture",
+      );
+      const capture = await request(`/pages/${session.pageId}/capture`, {
+        documentId: page.documentId,
+      });
+      assert.equal(capture.coverage.complete, true);
+      assert.equal(capture.unsupportedBoundaryCount, 0);
+      const candidate = capture.candidates.find((candidate) => candidate.label === "Accept all");
+      assert.ok(candidate);
+      const { target } = await request(`/pages/${session.pageId}/selection`, {
+        documentId: page.documentId,
+        captureId: capture.captureId,
+        candidateId: candidate.id,
+        action: "click",
+      });
+      assert.equal(target.interactability.status, "ready");
+      assert.equal(target.shadowChain.length, 1);
+      assert.deepEqual(
+        (
+          await observe({
+            locators: [{ xpath: target.xpaths[0], shadowChain: target.shadowChain }],
+          })
+        ).shadowMatches,
+        [["consent"]],
+      );
+      assert.equal((await observe()).clicks, "0");
+    },
+  );
+});
+
+for (const [name, markup, expected] of [
+  [
+    "display-contents",
+    '<div style="display:contents"><button data-oracle="consent">Accept all</button></div>',
+    1,
+  ],
+  ["nested", '<div id="nested"></div>', 1],
+  [
+    "hidden",
+    '<div hidden><button style="position:fixed;left:20px;bottom:20px">Accept all</button></div>',
+    0,
+  ],
+  ["offscreen", '<button style="position:absolute;top:2000px">Accept all</button>', 0],
+  [
+    "clipped",
+    '<div style="width:0;height:0;overflow:hidden"><button data-oracle="consent">Accept all</button></div>',
+    0,
+  ],
+]) {
+  test(`shadow-${name}-content-respects-current-view-boundaries`, async () => {
+    await withFixture(
+      `${targetMarkup}<div id="shadow" style="display:contents"></div>
+      <script>
+        const root = document.querySelector('#shadow').attachShadow({mode:'open'});
+        root.innerHTML = ${JSON.stringify(markup)};
+        const nested = root.querySelector('#nested')?.attachShadow({mode:'open'});
+        if (nested) nested.innerHTML = '<button data-oracle="consent">Accept all</button>';
+      </script>`,
+      async (session, page) => {
+        const capture = await request(`/pages/${session.pageId}/capture`, {
+          documentId: page.documentId,
+        });
+        assert.equal(capture.coverage.complete, true);
+        assert.equal(capture.unsupportedBoundaryCount, 0);
+        const candidate = capture.candidates.find((candidate) => candidate.label === "Accept all");
+        assert.equal(Boolean(candidate), Boolean(expected));
+        if (candidate) {
+          const { target } = await request(`/pages/${session.pageId}/selection`, {
+            documentId: page.documentId,
+            captureId: capture.captureId,
+            candidateId: candidate.id,
+            action: "click",
+          });
+          assert.equal(target.interactability.status, "ready");
+          assert.equal(target.shadowChain.length, name === "nested" ? 2 : 1);
+          assert.deepEqual(
+            (
+              await observe({
+                locators: [{ xpath: target.xpaths[0], shadowChain: target.shadowChain }],
+              })
+            ).shadowMatches,
+            [["consent"]],
+          );
+        }
+      },
+    );
+  });
+}
+
+test("shadow-labels-slots-and-private-values-preserve-native-semantics", async () => {
+  await withFixture(
+    `${targetMarkup}<div id="host" aria-label="Preferences"></div>
+    <div id="slot-host" role="button"><span slot="name">Slotted choice</span></div>
+    <script>
+      document.querySelector('#host').attachShadow({mode:'open'}).innerHTML =
+        '<span id="name" hidden>Accept all</span><button aria-labelledby="name" data-oracle="consent">Wrong name</button>' +
+        '<input type="password" value="PRIVATE_SHADOW_PASSWORD"><textarea>PRIVATE_SHADOW_VALUE</textarea>' +
+        '<span aria-hidden="true">PRIVATE_SHADOW_HIDDEN</span>';
+      document.querySelector('#slot-host').attachShadow({mode:'open'}).innerHTML = '<slot name="name"></slot>';
+    </script>`,
+    async (session, page) => {
+      const capture = await request(`/pages/${session.pageId}/capture`, {
+        documentId: page.documentId,
+      });
+      assert.doesNotMatch(JSON.stringify(capture), /PRIVATE_SHADOW_/);
+      const targetCandidate = capture.candidates.find(
+        (candidate) => candidate.tag === "button" && candidate.label === "Accept all",
+      );
+      assert.ok(targetCandidate);
+      assert.ok(targetCandidate.scope.includes("Preferences"));
+      const slotted = capture.candidates.find(
+        (candidate) => candidate.role === "button" && candidate.label === "Slotted choice",
+      );
+      assert.ok(slotted);
+      const { target } = await request(`/pages/${session.pageId}/selection`, {
+        documentId: page.documentId,
+        captureId: capture.captureId,
+        candidateId: slotted.id,
+        action: "click",
+      });
+      assert.equal(target.interactability.status, "ready");
+      assert.equal(target.shadowChain, undefined);
+    },
+  );
+});
+
+for (const [attribute, captured, status] of [
+  ['aria-hidden="true"', false, null],
+  ["inert", false, null],
+  ['aria-disabled="true"', true, "blocked"],
+]) {
+  test(`shadow-host-${attribute.split("=")[0]}-applies-to-descendants`, async () => {
+    await withFixture(
+      `<div id="host" ${attribute}></div><script>
+      document.querySelector('#host').attachShadow({mode:'open'}).innerHTML =
+        '<button style="position:fixed;left:20px;top:20px">Accept all</button>';
+      </script>`,
+      async (session, page) => {
+        const capture = await request(`/pages/${session.pageId}/capture`, {
+          documentId: page.documentId,
+        });
+        const candidate = capture.candidates.find((candidate) => candidate.label === "Accept all");
+        assert.equal(Boolean(candidate), captured);
+        if (candidate) {
+          const { target } = await request(`/pages/${session.pageId}/selection`, {
+            documentId: page.documentId,
+            captureId: capture.captureId,
+            candidateId: candidate.id,
+            action: "click",
+          });
+          assert.equal(target.interactability.status, status);
+          assert.ok(target.interactability.reasons.includes("disabled"));
+        }
+      },
+    );
+  });
+}
+
+test("shadow-duplicate-labels-have-distinct-verified-host-contexts", async () => {
+  await withFixture(
+    `<div id="first"></div><div id="second"></div>
+    <button id="replace">Replace first</button><script>
+      for (const id of ['first','second']) document.getElementById(id).attachShadow({mode:'open'}).innerHTML =
+        '<button data-oracle="' + id + '">Accept all</button>';
+      document.querySelector('#replace').onclick = () => document.querySelector('#first').outerHTML = '<div id="first"></div>';
+    </script>`,
+    async (session, page) => {
+      const capture = await request(`/pages/${session.pageId}/capture`, {
+        documentId: page.documentId,
+      });
+      const candidates = capture.candidates.filter((candidate) => candidate.label === "Accept all");
+      assert.equal(candidates.length, 2);
+      const targets = [];
+      for (const candidate of candidates) {
+        const { target } = await request(`/pages/${session.pageId}/selection`, {
+          documentId: page.documentId,
+          captureId: capture.captureId,
+          candidateId: candidate.id,
+          action: "click",
+        });
+        targets.push(target);
+      }
+      assert.equal(targets[0].xpaths[0], targets[1].xpaths[0]);
+      assert.notDeepEqual(targets[0].shadowChain, targets[1].shadowChain);
+      assert.deepEqual(
+        (
+          await observe({
+            locators: targets.map((target) => ({
+              xpath: target.xpaths[0],
+              shadowChain: target.shadowChain,
+            })),
+          })
+        ).shadowMatches,
+        [["first"], ["second"]],
+      );
+      await observe({ click: "#replace" });
+      await expectError(
+        `/pages/${session.pageId}/selection`,
+        {
+          documentId: page.documentId,
+          captureId: capture.captureId,
+          candidateId: candidates[0].id,
+          action: "click",
+        },
+        409,
+        "stale_capture",
+      );
+    },
+  );
+});
+
+test("shadow-overlay-blocks-the-inner-hit-point", async () => {
+  await withFixture(
+    `<div id="host"></div><div style="position:fixed;inset:0;background:white;z-index:99">Cover</div>
+    <script>document.querySelector('#host').attachShadow({mode:'open'}).innerHTML =
+      '<button style="position:fixed;left:20px;top:20px">Accept all</button>';</script>`,
+    async (session, page) => {
+      const capture = await request(`/pages/${session.pageId}/capture`, {
+        documentId: page.documentId,
+      });
+      const candidate = capture.candidates.find((candidate) => candidate.label === "Accept all");
+      assert.ok(candidate);
+      const { target } = await request(`/pages/${session.pageId}/selection`, {
+        documentId: page.documentId,
+        captureId: capture.captureId,
+        candidateId: candidate.id,
+        action: "click",
+      });
+      assert.equal(target.interactability.status, "blocked");
+      assert.ok(target.interactability.reasons.includes("obstructed_at_hit_point"));
+    },
+  );
+});
+
+test("shadow-native-modal-excludes-outside-candidates", async () => {
+  await withFixture(
+    `${targetMarkup}<div id="host"></div><script>
+    const root=document.querySelector('#host').attachShadow({mode:'open'});
+    root.innerHTML='<dialog><button>Accept all</button></dialog>';
+    root.querySelector('dialog').showModal();
+    </script>`,
+    async (session, page) => {
+      const capture = await request(`/pages/${session.pageId}/capture`, {
+        documentId: page.documentId,
+      });
+      assert.deepEqual(
+        capture.candidates
+          .filter((candidate) => candidate.tag === "button")
+          .map((candidate) => candidate.label),
+        ["Accept all"],
+      );
+    },
+  );
+});
+
+test("shadow-frame-owners-and-target-roots-retain-separate-context", async () => {
+  await withFixture(
+    (path) =>
+      path === "/fixture"
+        ? `<div id="outer-host"></div><script>document.querySelector('#outer-host').attachShadow({mode:'open'}).innerHTML =
+      '<iframe title="Preferences" src="/inner" style="width:600px;height:300px"></iframe>';</script>`
+        : `<div id="inner-host"></div><script>document.querySelector('#inner-host').attachShadow({mode:'open'}).innerHTML =
+      '<button data-oracle="framed-consent">Accept all</button>';</script>`,
+    async (session, page) => {
+      await observe({}, "/inner");
+      const capture = await request(`/pages/${session.pageId}/capture`, {
+        documentId: page.documentId,
+      });
+      const candidate = capture.candidates.find((candidate) => candidate.label === "Accept all");
+      assert.ok(candidate);
+      assert.equal(candidate.frame.chain.length, 1);
+      assert.equal(candidate.frame.chain[0].shadowChain.length, 1);
+      assert.equal(candidate.shadowChain.length, 1);
+      const { target } = await request(`/pages/${session.pageId}/selection`, {
+        documentId: page.documentId,
+        captureId: capture.captureId,
+        candidateId: candidate.id,
+        action: "click",
+      });
+      assert.equal(target.interactability.status, "ready");
+      assert.deepEqual(
+        (
+          await observe({
+            locators: [
+              { xpath: target.xpaths[0], shadowChain: target.shadowChain, frame: target.frame },
+            ],
+          })
+        ).shadowMatches,
+        [["framed-consent"]],
+      );
+    },
+  );
+});
+
+test("shadow-modal-exposure-survives-cleared-focus", async () => {
+  await withFixture(
+    `${targetMarkup}<div id="host"></div><script>
+    const root=document.querySelector('#host').attachShadow({mode:'open'});
+    root.innerHTML='<dialog><button>Accept all</button></dialog>';
+    root.querySelector('dialog').showModal();root.querySelector('button').blur();
+    </script>`,
+    async (session, page) => {
+      const capture = await request(`/pages/${session.pageId}/capture`, {
+        documentId: page.documentId,
+      });
+      assert.deepEqual(
+        capture.candidates
+          .filter((candidate) => candidate.tag === "button")
+          .map((candidate) => candidate.label),
+        ["Accept all"],
+      );
+    },
+  );
+});
+
+test("shadow-descendants-share-the-document-scan-budget", async () => {
+  await withFixture(
+    `<div id="host"></div><script>
+    document.querySelector('#host').attachShadow({mode:'open'}).innerHTML='<span>Entry</span>'.repeat(20100);
+    </script>`,
+    async (session, page) => {
+      const capture = await request(`/pages/${session.pageId}/capture`, {
+        documentId: page.documentId,
+      });
+      assert.equal(capture.coverage.complete, false);
+      assert.equal(capture.coverage.errorCode, "capture_budget_exceeded");
+      assert.deepEqual(capture.candidates, []);
+    },
+  );
+});
+
+test("targeting-dynamic-light-dom-button-resolves-after-insertion", async () => {
+  await withFixture(
+    `<button id="show">Show consent</button><script>
+    document.querySelector('#show').onclick=()=>{
+      const button=document.createElement('button');button.textContent='Accept all';button.dataset.oracle='consent';
+      document.body.append(button);
+    };</script>`,
+    async (session, page) => {
+      await observe({ click: "#show" });
+      const capture = await request(`/pages/${session.pageId}/capture`, {
+        documentId: page.documentId,
+      });
+      const candidate = capture.candidates.find((candidate) => candidate.label === "Accept all");
+      assert.ok(candidate);
+      const { target } = await request(`/pages/${session.pageId}/selection`, {
+        documentId: page.documentId,
+        captureId: capture.captureId,
+        candidateId: candidate.id,
+        action: "click",
+      });
+      assert.equal(target.shadowChain, undefined);
+      assert.deepEqual((await observe({ locators: [{ xpath: target.xpaths[0] }] })).shadowMatches, [
+        ["consent"],
+      ]);
+    },
+  );
+});
+
+test("shadow-highlights-preserve-target-pixels-and-passive-state", async () => {
+  await withFixture(
+    `<div id="host"></div><script>
+    document.querySelector('#host').attachShadow({mode:'open'}).innerHTML =
+      '<button style="position:fixed;left:60px;top:100px;width:160px;height:80px;border:0;background:rgb(21,80,200);color:white" data-oracle="consent">Accept all</button>';
+    </script>`,
+    async (session, page) => {
+      const before = await observe();
+      const capture = await request(`/pages/${session.pageId}/capture`, {
+        documentId: page.documentId,
+      });
+      const candidate = capture.candidates.find((candidate) => candidate.label === "Accept all");
+      assert.ok(candidate);
+      await request(`/pages/${session.pageId}/selection`, {
+        documentId: page.documentId,
+        captureId: capture.captureId,
+        candidateId: candidate.id,
+        action: "click",
+      });
+      await withFramebuffer(session, async (frame) => {
+        const image = await frame();
+        const pixel = (x, y) => [
+          ...image.pixels.subarray((y * image.width + x) * 4, (y * image.width + x) * 4 + 3),
+        ];
+        assert.deepEqual(pixel(70, 140), [200, 80, 21]);
+        assert.ok(pixel(140, 93).every((channel) => channel < 30));
+        assert.ok(pixel(140, 95).every((channel) => channel > 225));
+      });
+      const after = await observe();
+      assert.equal(after.scrollY, before.scrollY);
+      assert.equal(after.activeElement, before.activeElement);
+      assert.equal(after.clicks, before.clicks);
+    },
+  );
+});
+
+test("frames-exposed-frame-and-open-shadow-content-is-captured-and-hidden-content-is-excluded", async () => {
   await withFixture(
     `${targetMarkup}<iframe srcdoc="<button>FRAME_SECRET</button>"></iframe>
     <iframe hidden srcdoc="<button>HIDDEN_FRAME</button>"></iframe><div id="shadow"></div>
@@ -2344,11 +2789,12 @@ test("frames-exposed-content-is-captured-and-hidden-or-shadow-content-is-exclude
       const capture = await request(`/pages/${session.pageId}/capture`, {
         documentId: page.documentId,
       });
-      assert.equal(capture.unsupportedBoundaryCount, 1);
+      assert.equal(capture.unsupportedBoundaryCount, 0);
       assert.equal(capture.frameId, "main");
       assert.equal(capture.coverage.complete, true);
       assert.ok(capture.candidates.some((candidate) => candidate.text === "FRAME_SECRET"));
-      assert.doesNotMatch(JSON.stringify(capture.candidates), /HIDDEN_FRAME|SHADOW_SECRET/);
+      assert.doesNotMatch(JSON.stringify(capture.candidates), /HIDDEN_FRAME/);
+      assert.ok(capture.candidates.some((candidate) => candidate.label === "SHADOW_SECRET"));
       const absence = await request(`/pages/${session.pageId}/selection`, {
         documentId: page.documentId,
         captureId: capture.captureId,

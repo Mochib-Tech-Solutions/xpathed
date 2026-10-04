@@ -126,7 +126,7 @@
     "sourceIds": ["nested-frame-v4", "nested-frame", "nested-frame-contract-1"]
   },
   {
-    "id": "frames-shadow-root-target-is-unsupported",
+    "id": "frames-open-shadow-root-target-is-found",
     "family": "shadow",
     "split": "regression",
     "category": "integration",
@@ -139,38 +139,39 @@
     },
     "review": {
       "status": "reviewed",
-      "reviewer": "independent-contract-review",
-      "reviewedAt": "2026-09-30T20:59:55.247Z"
+      "reviewer": "controlled-fixture-source-review",
+      "reviewedAt": "2026-10-04T16:45:00Z"
     },
     "expected": {
-      "outcome": "unsupported",
+      "outcome": "found",
       "actions": [
         {
           "step": 1,
           "action": "click",
-          "outcome": "unsupported",
-          "code": "unsupported_scope"
+          "outcome": "found",
+          "target": {
+            "selector": "button",
+            "shadows": ["#preferences"]
+          },
+          "state": {
+            "rendered": true,
+            "inViewport": true,
+            "enabled": true
+          },
+          "interactability": {
+            "status": "ready"
+          }
         }
-      ],
-      "summary": {
-        "processingComplete": true,
-        "semanticCompleteness": "unverified",
-        "total": 1,
-        "found": 0,
-        "notFound": 0,
-        "unsupported": 1,
-        "errors": 0,
-        "blocked": 0,
-        "readinessUnknown": 0,
-        "assessmentUnsupported": 0
-      }
+      ]
     },
     "provider": {
       "actions": [
         {
           "step": 1,
           "action": "click",
-          "outcome": "not_found"
+          "outcome": "found",
+          "label": "Shadow save",
+          "tag": "button"
         }
       ]
     },
@@ -178,6 +179,15 @@
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
     "group": "frames",
-    "sourceIds": ["shadow-unsupported", "shadow-unsupported-contract-1"]
+    "sourceIds": [
+      "shadow-unsupported",
+      "shadow-unsupported-contract-1",
+      "frames-shadow-root-target-is-unsupported"
+    ],
+    "labelProvenance": {
+      "kind": "controlled-authored",
+      "sourceCaseId": "frames-shadow-root-target-is-unsupported",
+      "scopeReview": "Open-root button independently identified by CSS host and target selectors; current contract now supports shadow context."
+    }
   }
 ]

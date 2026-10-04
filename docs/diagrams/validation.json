@@ -210,17 +210,17 @@
     },
     {
       "name": "resolver-internals",
-      "date": "2026-10-03",
+      "date": "2026-10-04",
       "diagram_type": "architecture",
       "specification": {
-        "sha256": "86f60791b2e8e7cf9fd7c6c6f0b94b774495d372128961c45125ce36381b36f2",
-        "bytes": 3328
+        "sha256": "9ae0b2c0e6499038476f30d30daaca877ab4ea8dd23146d46af2a8c5ec8d00f8",
+        "bytes": 3982
       },
       "artifact": {
-        "sha256": "65585c551fecf5202dbd8229541456594f0e81238327050b7a14f7d1df24feca",
-        "bytes": 802423
+        "sha256": "259f0c44bd107344463eaafdda0cab9efbed630c9fb093843e8c39a2a9d691f9",
+        "bytes": 805405
       },
-      "svg_sha256": "ea8d22495df181eadb90b81e8d74d316c02280b9811022915e7eae0794cef1d8",
+      "svg_sha256": "79c0afc869daf7c4dfaf71faa9c403dfd87343e247a50ad2cbe967dc45eee5b3",
       "validation": {
         "checksPassed": 9,
         "checkCount": 9,
@@ -265,7 +265,7 @@
         "dark"
       ],
       "visual_review": "passed",
-      "correction_rounds": 2
+      "correction_rounds": 0
     }
   ]
 }

@@ -28,7 +28,7 @@ internal static class BrowserHighlightScript
             const boxes = [];
             for (const node of nodes) {
               let left = 0, top = 0, right = innerWidth, bottom = innerHeight, visible = true;
-              for (let current = node; current; current = current.parentElement) {
+              for (let current = node; current; current = current.assignedSlot ?? current.parentElement ?? current.getRootNode().host) {
                 const css = getComputedStyle(current);
                 if (css.display === 'none' || css.visibility !== 'visible') { visible = false; break; }
                 if (current !== node && current !== document.documentElement && current !== document.body) {

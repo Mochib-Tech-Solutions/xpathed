@@ -2,7 +2,7 @@
 
 Issues and specs for this repo live as GitHub issues. Use the `gh` CLI for all operations.
 
-Repository: `Mochib-Tech-Solutions/xpathed` (private).
+Repository: `Mochib-Tech-Solutions/xpathed`.
 
 ## Refresh an implementation task
 

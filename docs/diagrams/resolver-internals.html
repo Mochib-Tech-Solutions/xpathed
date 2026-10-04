@@ -5173,7 +5173,7 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
         <path data-edge-from="capture" data-edge-to="select" data-edge-label="sanitized candidates" data-edge-key="1" data-composition-points="760,158;900,158" d="M 760 158 L 900 158" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
         <path data-edge-from="select" data-edge-to="validate" data-edge-label="action + candidate IDs" data-edge-key="2" data-composition-points="1040,196;1040,380" d="M 1040 196 L 1040 380" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
         <path data-edge-from="validate" data-edge-to="verify" data-edge-label="capture ID + selections" data-edge-key="3" data-composition-points="900,418;760,418" d="M 900 418 L 760 418" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
-        <path data-edge-from="verify" data-edge-to="result" data-edge-label="XPath + state + frame" data-edge-key="4" data-composition-points="480,418;340,418" d="M 480 418 L 340 418" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+        <path data-edge-from="verify" data-edge-to="result" data-edge-label="XPath + state + context" data-edge-key="4" data-composition-points="480,418;340,418" d="M 480 418 L 340 418" class="a-default" stroke-width="1.5" marker-end="url(#arrowhead)"/>
 
         <!-- Components -->
         <g id="node-request" data-node-id="request" data-node-label="1. Accept request" tabindex="0" role="button" aria-label="Focus 1. Accept request, Resolver · active page + document, Request boundary" aria-pressed="false" data-node-kind="backend" data-node-sublabel="Resolver · active page + document" data-node-context="Request boundary">
@@ -5187,15 +5187,15 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
         <text data-detail="context" x="200" y="172" class="t-muted" font-size="9" text-anchor="middle">Resolver · active page + document</text>
         </g>
 
-        <g id="node-capture" data-node-id="capture" data-node-label="2. Capture current view" tabindex="0" role="button" aria-label="Focus 2. Capture current view, Browser · live DOM + frame documents, Capture boundary" aria-pressed="false" data-node-kind="backend" data-node-sublabel="Browser · live DOM + frame documents" data-node-context="Capture boundary">
-          <title>2. Capture current view · Browser · live DOM + frame documents · Capture boundary</title>
+        <g id="node-capture" data-node-id="capture" data-node-label="2. Capture current view" tabindex="0" role="button" aria-label="Focus 2. Capture current view, Browser · DOM + frames + open roots, Capture boundary" aria-pressed="false" data-node-kind="backend" data-node-sublabel="Browser · DOM + frames + open roots" data-node-context="Capture boundary">
+          <title>2. Capture current view · Browser · DOM + frames + open roots · Capture boundary</title>
           <rect x="480" y="120" width="280" height="76" rx="6" class="c-mask"/>
           <rect x="480" y="120" width="280" height="76" rx="6" class="c-backend" stroke-width="1.5"/>
           <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(486 126) scale(0.6875)">
             <path d="M6 3 3 8l3 5M10 3l3 5-3 5"/>
           </g>
           <text data-node-label="" data-detail-anchor="" x="620" y="156" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">2. Capture current view</text>
-        <text data-detail="context" x="620" y="172" class="t-muted" font-size="9" text-anchor="middle">Browser · live DOM + frame documents</text>
+        <text data-detail="context" x="620" y="172" class="t-muted" font-size="9" text-anchor="middle">Browser · DOM + frames + open roots</text>
         </g>
 
         <g id="node-select" data-node-id="select" data-node-label="3. Select targets" tabindex="0" role="button" aria-label="Focus 3. Select targets, Model · instruction + sanitized candidates, Inference boundary" aria-pressed="false" data-node-kind="external" data-node-sublabel="Model · instruction + sanitized candidates" data-node-context="Inference boundary">
@@ -5221,15 +5221,15 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
         <text data-detail="context" x="1040" y="432" class="t-muted" font-size="9" text-anchor="middle">Resolver · schema + captured ID set</text>
         </g>
 
-        <g id="node-verify" data-node-id="verify" data-node-label="5. Build and verify XPath" tabindex="0" role="button" aria-label="Focus 5. Build and verify XPath, Browser · retained nodes + live document, Browser verification boundary" aria-pressed="false" data-node-kind="backend" data-node-sublabel="Browser · retained nodes + live document" data-node-context="Browser verification boundary">
-          <title>5. Build and verify XPath · Browser · retained nodes + live document · Browser verification boundary</title>
+        <g id="node-verify" data-node-id="verify" data-node-label="5. Build and verify XPath" tabindex="0" role="button" aria-label="Focus 5. Build and verify XPath, Browser · retained nodes + scoped XPath, Browser verification boundary" aria-pressed="false" data-node-kind="backend" data-node-sublabel="Browser · retained nodes + scoped XPath" data-node-context="Browser verification boundary">
+          <title>5. Build and verify XPath · Browser · retained nodes + scoped XPath · Browser verification boundary</title>
           <rect x="480" y="380" width="280" height="76" rx="6" class="c-mask"/>
           <rect x="480" y="380" width="280" height="76" rx="6" class="c-backend" stroke-width="1.5"/>
           <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(486 386) scale(0.6875)">
             <path d="M6 3 3 8l3 5M10 3l3 5-3 5"/>
           </g>
           <text data-node-label="" data-detail-anchor="" x="620" y="416" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">5. Build and verify XPath</text>
-        <text data-detail="context" x="620" y="432" class="t-muted" font-size="9" text-anchor="middle">Browser · retained nodes + live document</text>
+        <text data-detail="context" x="620" y="432" class="t-muted" font-size="9" text-anchor="middle">Browser · retained nodes + scoped XPath</text>
         </g>
 
         <g id="node-result" data-node-id="result" data-node-label="6. Return resolution" tabindex="0" role="button" aria-label="Focus 6. Return resolution, Resolver · verified observations + usage, Response boundary" aria-pressed="false" data-node-kind="backend" data-node-sublabel="Resolver · verified observations + usage" data-node-context="Response boundary">
@@ -5260,9 +5260,9 @@ OTHER DEALINGS IN THE FONT SOFTWARE.
           <rect x="769.8" y="398" width="120.39999999999999" height="14" rx="3" class="c-mask"/>
           <text x="830" y="408" class="t-muted" font-size="8" text-anchor="middle">capture ID + selections</text>
         </g>
-        <g data-detail="context" data-edge-from="verify" data-edge-to="result" data-edge-label="XPath + state + frame" data-edge-key="4">
-          <rect x="354.6" y="398" width="110.8" height="14" rx="3" class="c-mask"/>
-          <text x="410" y="408" class="t-muted" font-size="8" text-anchor="middle">XPath + state + frame</text>
+        <g data-detail="context" data-edge-from="verify" data-edge-to="result" data-edge-label="XPath + state + context" data-edge-key="4">
+          <rect x="349.8" y="398" width="120.39999999999999" height="14" rx="3" class="c-mask"/>
+          <text x="410" y="408" class="t-muted" font-size="8" text-anchor="middle">XPath + state + context</text>
         </g>
 
         <!-- Boundary labels (foreground masks keep routes out of titles) -->

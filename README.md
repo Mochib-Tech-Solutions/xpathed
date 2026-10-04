@@ -27,6 +27,8 @@ Verification: one match, same captured node, still in the current view
 
 The actual XPath comes from the DOM. Results include readiness, time and cost. A blocked action appears as one red explanation naming the target and why the action is unavailable, without an XPath card or repeated state labels. In plural replies it keeps its numbered target card. Hover or focus a current result’s XPath to keep a spotlight on that element until exit. Singular requests with indistinguishable matching targets ask for a name, section or position; explicit plural requests enumerate the matching targets. You browse manually; the resolver highlights targets without executing the instruction.
 
+Open Shadow DOM is supported, including nested and dynamically inserted controls. A found shadow target includes its ordered `shadowChain` beside the XPath; enter each host's open root, then evaluate the XPath within the final tree. Frame owners can carry shadow context too. Closed roots remain unsupported. See [locator context](docs/resolution.md#open-shadow-dom-and-locator-context).
+
 XPath construction prefers explicit test attributes and meaningful semantics. It distinguishes sanitized names from DOM text so Unicode and nested labels can retain semantic locators across wrapper changes, while excluding hidden text and form values from new text predicates. The [selection policy](docs/resolution.md#preferred-xpath) describes the bounds and saved-locator limits.
 
 The chat header’s **Reset chat** asks for confirmation before clearing the active tab’s draft and results. Cancel or Escape preserves the chat; confirming keeps the browser page and other tabs.
@@ -121,7 +123,7 @@ Readiness: blocked — button disabled
 
 ## Scope
 
-Resolve one English action across one or more current-view targets, including nested iframe targets. Off-screen elements require manual scrolling and another request. Mixed actions, sequential workflows, shadow-root XPath targets and image-pixel interpretation are unsupported. Readiness describes observed state, not successful execution.
+Resolve one English action across one or more current-view targets, including nested iframe and open-shadow targets. Off-screen elements require manual scrolling and another request. Mixed actions, sequential workflows, closed shadow roots and image-pixel interpretation are unsupported. Readiness describes observed state, not successful execution.
 
 This is a local application. Hosted use needs authentication, network isolation and session capacity management.
 

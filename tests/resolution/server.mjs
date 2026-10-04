@@ -19,10 +19,16 @@ setInterval(async () => {
  const response = await fetch('/oracle' + runQuery);
  const command = await response.json();
  if (!command) return;
- const matches = (command.targets ?? command.xpaths.map(xpath => ({xpath,frameXpaths:[]}))).map(({xpath,frameXpaths}) => {
+ const matches = (command.targets ?? command.xpaths.map(xpath => ({xpath,frameXpaths:[]}))).map(({xpath,frameXpaths = [],shadowChain = []}) => {
    let scope = document;
    for (const frameXpath of frameXpaths) scope = scope.evaluate(frameXpath, scope, null, XPathResult.FIRST_ORDERED_NODE_TYPE).singleNodeValue.contentDocument;
-   const result = scope.evaluate(xpath, scope, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE);
+   const doc = scope;
+   for (const host of shadowChain) {
+     const matches = doc.evaluate(host.xpath, scope === doc ? doc : scope.firstElementChild, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE);
+     if (matches.snapshotLength !== 1) throw new Error('Expected unique shadow host');
+     scope = matches.snapshotItem(0).shadowRoot;
+   }
+   const result = doc.evaluate(xpath, scope === doc ? doc : scope.firstElementChild, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE);
    return Array.from({length:result.snapshotLength}, (_,i) => result.snapshotItem(i).getAttribute('data-oracle') ?? result.snapshotItem(i).id ?? 'wrong-target');
  });
  await fetch('/observation' + runQuery,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({matches,clicks,scrollY,events})});
@@ -52,6 +58,7 @@ const server = createServer(async (request, response) => {
         "/batch",
         "/confirmations",
         "/frames",
+        "/shadow",
       ].includes(path)
     ) {
       let html = fixture;
@@ -69,6 +76,14 @@ const server = createServer(async (request, response) => {
         html = html.replace(
           /<nav.*?<\/nav>/s,
           `<button>Confirm</button><ul aria-label="Pending requests"><li>Request one <button data-oracle="confirmation-first">Confirm</button></li><li>Request two <button data-oracle="confirmation-second" disabled>Confirm</button></li><li hidden><button>Confirm</button></li></ul>`,
+        );
+      if (path === "/shadow")
+        html = html.replace(
+          "</nav>",
+          `</nav><div id="consent-host"></div><script>
+          document.querySelector('#consent-host').attachShadow({mode:'open'}).innerHTML =
+            '<section aria-label="Consent" style="position:fixed;left:20px;bottom:20px"><button data-oracle="consent">Accept all</button><input type="password" value="PRIVATE_SHADOW_PASSWORD"><span aria-hidden="true">PRIVATE_SHADOW_HIDDEN</span></section>';
+        </script>`,
         );
       if (path === "/frames")
         html = html.replace(

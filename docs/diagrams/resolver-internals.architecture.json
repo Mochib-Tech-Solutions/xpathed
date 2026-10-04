@@ -31,7 +31,7 @@
       "id": "capture",
       "type": "backend",
       "label": "2. Capture current view",
-      "sublabel": "Browser \u00b7 live DOM + frame documents",
+      "sublabel": "Browser \u00b7 DOM + frames + open roots",
       "pos": [
         480,
         120
@@ -73,7 +73,7 @@
       "id": "verify",
       "type": "backend",
       "label": "5. Build and verify XPath",
-      "sublabel": "Browser \u00b7 retained nodes + live document",
+      "sublabel": "Browser \u00b7 retained nodes + scoped XPath",
       "pos": [
         480,
         380
@@ -176,7 +176,7 @@
     {
       "from": "verify",
       "to": "result",
-      "label": "XPath + state + frame"
+      "label": "XPath + state + context"
     }
   ],
   "cards": [

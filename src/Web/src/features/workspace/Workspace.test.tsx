@@ -495,7 +495,7 @@ describe("Workspace resolution", () => {
     expect(screen.getByText(target.xpaths[0]!)).toBeVisible();
   });
 
-  it("shows the frame chain separately from the document XPath and selected state", async () => {
+  it("shows frame and shadow context separately from the target XPath and selected state", async () => {
     mockApi(() =>
       Promise.resolve(
         Response.json({
@@ -510,12 +510,18 @@ describe("Workspace resolution", () => {
               outcome: "found",
               target: {
                 ...target,
+                shadowChain: [{ xpath: "//consent-panel", label: "Consent panel" }],
                 frame: {
                   id: "f2",
                   documentId: "child-document",
                   chain: [
                     { frameId: "f1", label: "Employee", xpath: "//iframe[@id='employee']" },
-                    { frameId: "f2", label: "Payroll", xpath: "//iframe[@id='payroll']" },
+                    {
+                      frameId: "f2",
+                      label: "Payroll",
+                      xpath: "//iframe[@id='payroll']",
+                      shadowChain: [{ xpath: "//payroll-panel", label: "Payroll panel" }],
+                    },
                   ],
                 },
                 state: { ...target.state, selected: true, selectedOptionCount: 2 },
@@ -528,6 +534,9 @@ describe("Workspace resolution", () => {
     const user = await openWorkspace();
     await submitInstruction(user);
     expect(await screen.findByText("Frame: Employee → Payroll")).toBeInTheDocument();
+    expect(screen.getByText("Shadow roots: Payroll panel")).toBeInTheDocument();
+    expect(screen.getByText("Shadow roots: Consent panel")).toBeInTheDocument();
+    expect(screen.getByText("//consent-panel")).toBeInTheDocument();
     expect(screen.getByText("//iframe[@id='employee']")).toBeInTheDocument();
     expect(screen.getByText("//iframe[@id='payroll']")).toBeInTheDocument();
     expect(screen.getByText("//*[@data-testid='pay']")).toBeInTheDocument();

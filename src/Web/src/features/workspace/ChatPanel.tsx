@@ -10,7 +10,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import type { Resolution, ResolutionResult } from "./api";
+import type { Resolution, ResolutionResult, ShadowHost } from "./api";
 import ResolutionCost from "./ResolutionCost";
 
 function MessageTime({ value, label }: { value: string; label: string }) {
@@ -24,6 +24,23 @@ function MessageTime({ value, label }: { value: string; label: string }) {
     >
       {date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
     </time>
+  );
+}
+
+function ShadowContext({ chain }: { chain?: ShadowHost[] | null }) {
+  if (!chain?.length) return null;
+  return (
+    <div className="space-y-1 text-xs text-muted-foreground">
+      <p>
+        Shadow roots: {chain.map((host, index) => host.label || `Root ${index + 1}`).join(" → ")}
+      </p>
+      {chain.map((host, index) => (
+        <code key={index} className="block break-all">
+          {host.xpath}
+        </code>
+      ))}
+      <p>Evaluate the next XPath inside the final shadow root.</p>
+    </div>
   );
 }
 
@@ -468,12 +485,14 @@ export default function ChatPanel({
                                     .join(" → ")}
                                 </p>
                                 {target.frame.chain.map((frame) => (
-                                  <code key={frame.frameId} className="block break-all">
-                                    {frame.xpath}
-                                  </code>
+                                  <div key={frame.frameId}>
+                                    <ShadowContext chain={frame.shadowChain} />
+                                    <code className="block break-all">{frame.xpath}</code>
+                                  </div>
                                 ))}
                               </div>
                             )}
+                            <ShadowContext chain={target.shadowChain} />
                             {target.xpaths[0] &&
                               xpathItem(target.xpaths[0], action.actionId, action.order)}
                             {copied.startsWith(`${resolution.id}:${action.actionId}:`) && (

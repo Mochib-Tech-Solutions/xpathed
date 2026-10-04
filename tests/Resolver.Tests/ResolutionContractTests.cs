@@ -1149,6 +1149,62 @@ public sealed class ResolutionContractTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
+    public async Task ShadowContextMustMatchTheCapturedCandidate(bool mismatch)
+    {
+        var capture = JsonNode.Parse(new DeterministicServicesHandler().CaptureBody)!;
+        var chain = JsonNode.Parse("""[{"xpath":"//consent-panel","label":"Preferences"}]""")!;
+        capture["candidates"]![0]!["shadowChain"] = chain.DeepClone();
+        var target = DeterministicServicesHandler.VerifiedTarget();
+        target["shadowChain"] = chain.DeepClone();
+        if (mismatch)
+        {
+            target["shadowChain"]![0]!["xpath"] = "//another-panel";
+        }
+
+        var handler = new DeterministicServicesHandler
+        {
+            CaptureBody = capture.ToJsonString(),
+            SelectionBody = new JsonObject
+            {
+                ["actions"] = new JsonArray(new JsonObject { ["actionId"] = "a1", ["target"] = target }),
+                ["inspectedActionId"] = "a1",
+            }.ToJsonString(),
+        };
+        await using var application = CreateApplication(handler);
+        using var client = application.CreateClient();
+        using var response = await client.PostAsJsonAsync(
+            "/pages/page-1/resolve",
+            new { instruction = "Click Save", documentId = "document-1" }
+        );
+        var result = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(mismatch ? "error" : "found", result.GetProperty("outcome").GetString());
+        if (mismatch)
+        {
+            Assert.Equal(
+                "invalid_browser_selection",
+                result.GetProperty("diagnostics").GetProperty("code").GetString()
+            );
+        }
+        else
+        {
+            Assert.Equal(
+                "//consent-panel",
+                result
+                    .GetProperty("actions")[0]
+                    .GetProperty("target")
+                    .GetProperty("shadowChain")[0]
+                    .GetProperty("xpath")
+                    .GetString()
+            );
+        }
+
+        var modelInput = handler.ModelRequest.GetProperty("messages")[1].GetProperty("content").GetString()!;
+        Assert.DoesNotContain("//consent-panel", modelInput, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     public async Task FrameIdentityMustMatchTheCapturedCandidate(bool mismatch)
     {
         var capture = JsonNode.Parse(new DeterministicServicesHandler().CaptureBody)!;

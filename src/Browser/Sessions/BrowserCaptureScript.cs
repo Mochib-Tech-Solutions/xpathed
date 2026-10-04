@@ -11,6 +11,32 @@ internal static class BrowserCaptureScript
           const scrollContainers = [];
           const viewUnchanged = () => viewport().every((value, index) => value === initialViewport[index]) &&
             scrollContainers.every(([element, x, y, width, height]) => element.isConnected && element.scrollLeft === x && element.scrollTop === y && element.clientWidth === width && element.clientHeight === height);
+          const parent = element => element.assignedSlot ?? element.parentElement ?? element.getRootNode().host ?? null;
+          const contains = (ancestor, element) => {
+            for (let current = element; current; current = parent(current)) if (current === ancestor) return true;
+            return false;
+          };
+          const closest = (element, selector) => {
+            for (let current = element; current; current = parent(current)) {
+              checkBudget(); if (current.matches(selector)) return current;
+            }
+          };
+          const activeElement = () => {
+            let element = document.activeElement;
+            while (element?.shadowRoot?.activeElement) element = element.shadowRoot.activeElement;
+            return element;
+          };
+          function* walkElements(root) {
+            const walkers = [document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT)];
+            while (walkers.length) {
+              checkBudget();
+              const walker = walkers.at(-1);
+              if (!walker.nextNode()) { walkers.pop(); continue; }
+              const element = walker.currentNode;
+              yield element;
+              if (element.shadowRoot) walkers.push(document.createTreeWalker(element.shadowRoot, NodeFilter.SHOW_ELEMENT));
+            }
+          }
           const capturedDocument = document;
           const capturedRoot = document.documentElement;
           const budgetExceeded = {};
@@ -22,12 +48,20 @@ internal static class BrowserCaptureScript
           let exposureCache = new WeakMap();
           let intersections = new WeakMap();
           let siblingShapes = new WeakMap();
-          let modalityUnknown = false;
+          let modalityUnknown = false, modalityBudgetExceeded = false;
           const currentModal = () => {
-            const modals = [...document.querySelectorAll('dialog:modal')];
-            const active = document.activeElement?.closest('dialog:modal') ?? document.elementFromPoint(0, 0)?.closest('dialog:modal');
-            modalityUnknown = modals.length > 1 && !active;
-            return active ?? modals[0];
+            const modals = [];
+            modalityBudgetExceeded = false;
+            try {
+              let scanned = 0;
+              for (const element of walkElements(document)) {
+                if (++scanned > 20000) throw budgetExceeded;
+                if (element.matches('dialog:modal')) modals.push(element);
+              }
+              const active = closest(activeElement(), 'dialog:modal') ?? document.elementFromPoint(0, 0)?.closest('dialog:modal');
+              modalityUnknown = modals.length > 1 && !active;
+              return active ?? modals[0];
+            } catch (error) { if (error !== budgetExceeded) throw error; modalityUnknown = false; modalityBudgetExceeded = true; }
           };
           let modal = currentModal();
           const normalize = value => (value ?? '').replace(/\s+/gu, ' ').trim().normalize('NFC');
@@ -43,26 +77,26 @@ internal static class BrowserCaptureScript
             const ancestors = [];
             let current = element;
             while (current && !exposureCache.has(current)) {
-              checkBudget(); ancestors.push(current); current = current.parentElement;
+              checkBudget(); ancestors.push(current); current = parent(current);
             }
             let allowed = current ? exposureCache.get(current) : true;
             while (ancestors.length) {
               current = ancestors.pop();
               const css = cssFor(current);
-              const hiddenAria = current.getAttribute('aria-hidden')?.toLowerCase() === 'true' && !current.contains(document.activeElement);
-              const inert = current.hasAttribute('inert') && !(modal && current !== modal && current.contains(modal));
+              const hiddenAria = current.getAttribute('aria-hidden')?.toLowerCase() === 'true' && !contains(current, activeElement());
+              const inert = current.hasAttribute('inert') && !(modal && current !== modal && contains(current, modal));
               allowed = allowed && !current.matches(`${ignored},input[type=hidden]`) && !inert && !hiddenAria && css.display !== 'none' && css.contentVisibility !== 'hidden';
-              const disclosure = current.parentElement;
+              const disclosure = parent(current);
               if (disclosure?.matches('details:not([open])') && current !== disclosure.querySelector(':scope > summary')) allowed = false;
               exposureCache.set(current, allowed);
             }
             return allowed;
           };
-          const accessibilityExposed = element => environment.exposed && (!modal || modal.contains(element)) && exposed(element) && !['hidden', 'collapse'].includes(cssFor(element).visibility);
+          const accessibilityExposed = element => environment.exposed && (!modal || contains(modal, element)) && exposed(element) && !['hidden', 'collapse'].includes(cssFor(element).visibility);
           const rendered = element => {
             const rect = element.getBoundingClientRect();
             if (!environment.rendered || rect.width <= 0 || rect.height <= 0 || !accessibilityExposed(element)) return false;
-            for (let current = element; current; current = current.parentElement) {
+            for (let current = element; current; current = parent(current)) {
               checkBudget();
               if (Number(cssFor(current).opacity) === 0) return false;
             }
@@ -71,7 +105,7 @@ internal static class BrowserCaptureScript
           const nameText = (reference, references) => reference ? normalize(reference.getAttribute('aria-label')) ||
             normalize(reference.getAttribute('alt')) || text(reference, !accessibilityExposed(reference), references) : '';
           const text = (element, includeHidden = false, references = new Set()) => {
-            if (!element || element.matches(valueContainer) || element.closest(ignored)) return '';
+            if (!element || element.matches(valueContainer) || closest(element, ignored)) return '';
             if (references.has(element)) return '';
             const cacheable = !includeHidden && references.size === 0;
             if (cacheable && textCache.has(element)) return textCache.get(element);
@@ -79,8 +113,9 @@ internal static class BrowserCaptureScript
             const parts = [];
             const pending = [];
             const children = node => {
-              for (let index = node.childNodes.length - 1; index >= 0; index--) {
-                checkBudget(); pending.push(node.childNodes[index]);
+              const children = node.shadowRoot?.childNodes ?? (node.localName === 'slot' && node.assignedNodes().length ? node.assignedNodes({flatten:true}) : node.childNodes);
+              for (let index = children.length - 1; index >= 0; index--) {
+                checkBudget(); pending.push(children[index]);
               }
             };
             children(element);
@@ -88,11 +123,11 @@ internal static class BrowserCaptureScript
               checkBudget();
               const node = pending.pop();
               const parent = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
-              if (!parent || parent.closest(`${valueContainer},${ignored}`) || !includeHidden && !accessibilityExposed(parent)) continue;
+              if (!parent || closest(parent, `${valueContainer},${ignored}`) || !includeHidden && !accessibilityExposed(parent)) continue;
               if (node.nodeType === Node.TEXT_NODE) parts.push(node.textContent);
               else if (node.nodeType === Node.ELEMENT_NODE) {
                 const referencedName = normalize((node.getAttribute('aria-labelledby') ?? '').split(/\s+/u)
-                  .map(id => nameText(document.getElementById(id), references)).join(' '));
+                  .map(id => nameText(parent.getRootNode().getElementById(id), references)).join(' '));
                 if (referencedName) parts.push(referencedName);
                 else if (normalize(node.getAttribute('aria-label'))) parts.push(node.getAttribute('aria-label'));
                 else if (node.localName === 'img') parts.push(node.getAttribute('alt'));
@@ -106,7 +141,7 @@ internal static class BrowserCaptureScript
           };
           const label = element => {
             if (labelCache.has(element)) return labelCache.get(element);
-            const result = normalize((element.getAttribute('aria-labelledby') ?? '').split(/\s+/u).map(id => nameText(document.getElementById(id))).join(' ')) ||
+            const result = normalize((element.getAttribute('aria-labelledby') ?? '').split(/\s+/u).map(id => nameText(element.getRootNode().getElementById(id))).join(' ')) ||
               normalize(element.getAttribute('aria-label')) || normalize(Array.from(element.labels ?? [], reference => nameText(reference)).join(' ')) ||
               normalize(element.getAttribute('alt')) || (element.matches(buttonInput) ? normalize(element.value) : '') ||
               (element.matches('button,a[href],summary,[role=button],[role=checkbox],[role=radio]') ? text(element) : '') || normalize(element.getAttribute('title'));
@@ -115,7 +150,7 @@ internal static class BrowserCaptureScript
           };
           const scope = element => {
             const scopes = [];
-            for (let ancestor = element.parentElement; ancestor && ancestor !== document.body; ancestor = ancestor.parentElement) {
+            for (let ancestor = parent(element); ancestor && ancestor !== document.body; ancestor = parent(ancestor)) {
               checkBudget();
               const context = label(ancestor) || (ancestor.matches('tr,[role=row]') ? text(ancestor) : '') || (ancestor.matches('header,footer,nav,main,aside') ? ancestor.localName : '') || text(ancestor.querySelector(':scope > legend,:scope > h1,:scope > h2,:scope > h3,:scope > h4,:scope > h5,:scope > h6'));
               if (context && !scopes.includes(context)) scopes.push(context);
@@ -175,8 +210,13 @@ internal static class BrowserCaptureScript
           const pointFor = element => { const clip = visibleRect(element); return { x: (clip.left + clip.right) / 2, y: (clip.top + clip.bottom) / 2 }; };
           const inView = element => { const rect = visibleRect(element); return rect.right > rect.left && rect.bottom > rect.top; };
           const receivesPoint = (element, point) => {
-            const hit = document.elementFromPoint((point.x - environment.x) / environment.scaleX, (point.y - environment.y) / environment.scaleY);
-            return !!hit && (hit === element || element.contains(hit));
+            let hit = document.elementFromPoint((point.x - environment.x) / environment.scaleX, (point.y - environment.y) / environment.scaleY);
+            while (hit?.shadowRoot) {
+              const inner = hit.shadowRoot.elementFromPoint((point.x - environment.x) / environment.scaleX, (point.y - environment.y) / environment.scaleY);
+              if (!inner || inner === hit) break;
+              hit = inner;
+            }
+            return !!hit && contains(element, hit);
           };
           const reset = budgetMs => {
             deadline = performance.now() + budgetMs;
@@ -191,7 +231,7 @@ internal static class BrowserCaptureScript
                 ['textbox','searchbox','spinbutton','combobox','listbox','checkbox','slider'].includes(role(element)) && element.getAttribute('aria-readonly') === 'true',
               rendered: rendered(element),
               inViewport: rect.right > rect.left && rect.bottom > rect.top,
-              enabled: environment.enabled !== false && !element.matches(':disabled') && !element.closest('[aria-disabled="true"]'),
+              enabled: environment.enabled !== false && !element.matches(':disabled') && !closest(element, '[aria-disabled="true"]'),
               editable: fillControl(element) && !element.readOnly && element.getAttribute('aria-readonly') !== 'true',
               selected: ({ true: true, false: false }[element.getAttribute('aria-selected')] ?? null),
               selectedOptionCount: element.localName === 'select' ? element.selectedOptions.length : null,
@@ -262,15 +302,15 @@ internal static class BrowserCaptureScript
           };
           const eligible = element => {
             if (!accessibilityExposed(element)) return false;
-            const container = element.closest(valueContainer);
+            const container = closest(element, valueContainer);
             if (container && container !== element) return false;
             return element.matches('a[href],button,input,select,textarea,summary,img[alt],[aria-label],[aria-labelledby],[role],[tabindex],[contenteditable]:not([contenteditable="false"])') ||
-              (!element.closest('button,a,textarea,select,[contenteditable]:not([contenteditable="false"])') &&
+              (!closest(element, 'button,a,textarea,select,[contenteditable]:not([contenteditable="false"])') &&
                 ([...element.childNodes].some(node => node.nodeType === Node.TEXT_NODE && normalize(node.textContent)) || repeatedItem(element)));
           };
           const complexEffects = element => {
             if (environment.complexEffects) return true;
-            for (let ancestor = element; ancestor; ancestor = ancestor.parentElement) {
+            for (let ancestor = element; ancestor; ancestor = parent(ancestor)) {
               checkBudget();
               const style = cssFor(ancestor);
               if (Number(style.opacity) !== 1 || style.filter !== 'none' || style.mixBlendMode !== 'normal' ||
@@ -314,27 +354,21 @@ internal static class BrowserCaptureScript
           const nodes = [];
           const nodeIds = new Map();
           const parentIdFor = element => {
-            for (let ancestor = element.parentElement; ancestor; ancestor = ancestor.parentElement) {
+            for (let ancestor = parent(element); ancestor; ancestor = parent(ancestor)) {
               checkBudget();
               if (nodeIds.has(ancestor) && !ancestor.matches('a[href],button,input,select,textarea,summary,[role=button],[role=link]')) return nodeIds.get(ancestor);
             }
           };
           const frameElements = [];
-          const shadowHosts = [];
           const candidates = [];
-          let scannedCount = 0, eligibleCount = 0, excludedOffscreenCount = 0, unsupportedBoundaryCount = 0, bytes = 2, complete = !modalityUnknown, viewChanged = false;
-          const walker = document.createTreeWalker(document, NodeFilter.SHOW_ELEMENT);
+          let scannedCount = 0, eligibleCount = 0, excludedOffscreenCount = 0, unsupportedBoundaryCount = 0, bytes = 2, complete = !modalityUnknown && !modalityBudgetExceeded, viewChanged = false;
           try {
-            while (walker.nextNode()) {
+            for (const element of walkElements(document)) {
               checkBudget();
               if (scannedCount === 20000) throw budgetExceeded;
               scannedCount++;
-              const element = walker.currentNode;
               if (element.scrollWidth > element.clientWidth || element.scrollHeight > element.clientHeight)
                 scrollContainers.push([element, element.scrollLeft, element.scrollTop, element.clientWidth, element.clientHeight]);
-              if (element.shadowRoot && accessibilityExposed(element)) {
-                shadowHosts.push(element);
-              }
               if (element.matches('iframe,frame') && accessibilityExposed(element)) frameElements.push(element);
               if (!eligible(element)) continue;
               eligibleCount++;
@@ -342,9 +376,8 @@ internal static class BrowserCaptureScript
               nodes.push(element);
             }
             if (complete) {
-              await observeIntersections([...nodes, ...frameElements, ...shadowHosts, ...scrollContainers.map(([element]) => element)]);
+              await observeIntersections([...nodes, ...frameElements, ...scrollContainers.map(([element]) => element)]);
               if (!viewUnchanged()) { viewChanged = true; throw budgetExceeded; }
-              unsupportedBoundaryCount = shadowHosts.filter(inView).length;
               const retained = nodes.filter(inView);
               excludedOffscreenCount = nodes.length - retained.length;
               nodes.length = 0; nodes.push(...retained);
@@ -352,7 +385,7 @@ internal static class BrowserCaptureScript
               frameElements.length = 0; frameElements.push(...retainedFrames);
               const relevantAncestors = new Set();
               for (const node of [...nodes, ...frameElements]) {
-                for (let ancestor = node.parentElement; ancestor && !relevantAncestors.has(ancestor); ancestor = ancestor.parentElement) {
+                for (let ancestor = parent(node); ancestor && !relevantAncestors.has(ancestor); ancestor = parent(ancestor)) {
                   checkBudget(); relevantAncestors.add(ancestor);
                 }
               }
@@ -376,7 +409,7 @@ internal static class BrowserCaptureScript
             complete = false;
           }
           if (!complete) { nodes.length = 0; candidates.length = 0; }
-          const capturedView = new Set([...nodes, ...frameElements, ...shadowHosts.filter(inView)]);
+          const capturedView = new Set([...nodes, ...frameElements]);
           const literal = value => !value.includes("'") ? `'${value}'` : !value.includes('"') ? `"${value}"` : `concat(${value.split("'").map(part => `'${part}'`).join(`,"'",`)})`;
           const tag = element => element.namespaceURI === 'http://www.w3.org/1999/xhtml' ? element.localName : `*[local-name()=${literal(element.localName)}]`;
           const testAttributes = ['data-testid', 'data-test-id', 'data-test', 'data-cy', 'data-qa'];
@@ -403,7 +436,7 @@ internal static class BrowserCaptureScript
               // Bound expression size as well as the shared validation deadline.
               if (count > 16) return predicates;
               const parent = node.parentElement;
-              if (parent.closest(`${valueContainer},${ignored}`) || !accessibilityExposed(parent)) {
+              if (closest(parent, `${valueContainer},${ignored}`) || !accessibilityExposed(parent)) {
                 excluded = true;
                 continue;
               }
@@ -434,11 +467,13 @@ internal static class BrowserCaptureScript
             }
             return predicates;
           };
+          const evaluate = (xpath, root) => document.evaluate(xpath, root === document ? document : root.firstElementChild,
+            null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
           const xpathsFor = element => {
             const xpaths = [];
             const add = xpath => {
               checkBudget();
-              const matches = document.evaluate(xpath, document, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
+              const matches = evaluate(xpath, element.getRootNode());
               if (matches.snapshotLength !== 1 || matches.snapshotItem(0) !== element) return false;
               xpaths.push(xpath);
               return true;
@@ -484,13 +519,50 @@ internal static class BrowserCaptureScript
             if (!xpaths.length) {
               const segments = [];
               for (let current = element; current; current = current.parentElement) {
-                const siblings = current.parentElement ? [...current.parentElement.children].filter(sibling => sibling.localName === current.localName && sibling.namespaceURI === current.namespaceURI) : [current];
+                const siblings = current.parentElement ? [...current.parentElement.children].filter(sibling => sibling.localName === current.localName && sibling.namespaceURI === current.namespaceURI) : [...element.getRootNode().children].filter(sibling => sibling.localName === current.localName && sibling.namespaceURI === current.namespaceURI);
                 segments.unshift(`${tag(current)}${siblings.length > 1 ? `[${siblings.indexOf(current) + 1}]` : ''}`);
               }
               add(`/${segments.join('/')}`);
             }
             return xpaths;
           };
+          const chains = new WeakMap();
+          const shadowChain = element => {
+            const hosts = [];
+            for (let root = element.getRootNode(); root.host; root = root.host.getRootNode()) {
+              checkBudget();
+              if (hosts.length >= 63) throw budgetExceeded;
+              hosts.unshift(root.host);
+            }
+            return hosts.length ? hosts.map(host => {
+              if (!chains.has(host)) {
+                const xpath = xpathsFor(host)[0];
+                if (!xpath) throw budgetExceeded;
+                chains.set(host, {xpath, label:label(host)});
+              }
+              return chains.get(host);
+            }) : undefined;
+          };
+          const validShadowChain = (element, chain) => {
+            let root = document;
+            for (const step of chain ?? []) {
+              checkBudget();
+              const matches = evaluate(step.xpath, root);
+              if (matches.snapshotLength !== 1 || !matches.snapshotItem(0).shadowRoot) return false;
+              root = matches.snapshotItem(0).shadowRoot;
+            }
+            return root === element.getRootNode();
+          };
+          try {
+            if (complete) for (let index = 0; index < nodes.length; index++) {
+              const chain = shadowChain(nodes[index]);
+              if (chain) candidates[index].shadowChain = chain;
+              if (chain) {
+                bytes += new TextEncoder().encode(JSON.stringify(chain)).length;
+                if (bytes > 512000) throw budgetExceeded;
+              }
+            }
+          } catch (error) { if (error !== budgetExceeded) throw error; complete = false; candidates.length = 0; }
           return {
             frameElements,
             highlightNodes(ids) {
@@ -507,12 +579,10 @@ internal static class BrowserCaptureScript
                 if (!viewUnchanged()) return { errorCode: 'stale_capture' };
                 const observed = [];
                 let scanned = 0;
-                const walker = document.createTreeWalker(document, NodeFilter.SHOW_ELEMENT);
-                while (walker.nextNode()) {
+                for (const element of walkElements(document)) {
                   checkBudget();
                   if (++scanned > scanBudget) throw budgetExceeded;
-                  const element = walker.currentNode;
-                  if (eligible(element) || (element.matches('iframe,frame') || element.shadowRoot) && accessibilityExposed(element)) observed.push(element);
+                  if (eligible(element) || element.matches('iframe,frame') && accessibilityExposed(element)) observed.push(element);
                 }
                 await observeIntersections(observed);
                 if (!viewUnchanged()) return { errorCode: 'stale_capture' };
@@ -521,7 +591,7 @@ internal static class BrowserCaptureScript
                 for (let index = 0; index < nodes.length; index++) {
                   checkBudget();
                   const candidate = candidates[index], node = nodes[index];
-                  if (parentIdFor(node) !== candidate.parentId) return { errorCode: 'stale_capture' };
+                  if (!validShadowChain(node, candidate.shadowChain) || parentIdFor(node) !== candidate.parentId) return { errorCode: 'stale_capture' };
                   if (candidate.isRepeatedItem) {
                     const current = geometry(node);
                     if (Object.keys(current).some(key => current[key] !== candidate.geometry[key])) return { errorCode: 'stale_capture' };
@@ -543,14 +613,14 @@ internal static class BrowserCaptureScript
               const scaleX = element.offsetWidth ? rect.width / element.offsetWidth : environment.scaleX;
               const scaleY = element.offsetHeight ? rect.height / element.offsetHeight : environment.scaleY;
               let geometrySupported = true;
-              for (let current = element; current; current = current.parentElement) {
+              for (let current = element; current; current = parent(current)) {
                 checkBudget();
                 const css = cssFor(current);
                 const individualScale = css.scale === 'none' ? [] : css.scale.split(/\s+/u).map(Number);
                 const matrix = css.transform === 'none' ? null : new DOMMatrixReadOnly(css.transform);
                 if (matrix && (!matrix.is2D || matrix.b !== 0 || matrix.c !== 0 || matrix.a <= 0 || matrix.d <= 0) || css.perspective !== 'none' || css.rotate !== 'none' || individualScale.some(value => !Number.isFinite(value) || value <= 0)) geometrySupported = false;
               }
-              return { xpath: xpathsFor(element)[0], label: label(element),
+              return { xpath: xpathsFor(element)[0], shadowChain: shadowChain(element), label: label(element),
                 environment: { scope: [...new Set([...scope(element), ...(environment.scope ?? [])])], x: rect.x + element.clientLeft * scaleX, y: rect.y + element.clientTop * scaleY, scaleX: scaleX || 1, scaleY: scaleY || 1,
                   clip: intersection(visibleRect(element), { left: rect.x + element.clientLeft * scaleX, top: rect.y + element.clientTop * scaleY,
                     right: rect.x + (element.clientLeft + element.clientWidth) * scaleX, bottom: rect.y + (element.clientTop + element.clientHeight) * scaleY }),
@@ -559,7 +629,7 @@ internal static class BrowserCaptureScript
               } catch (error) { if (error === budgetExceeded) return { errorCode: 'capture_budget_exceeded' }; throw error; }
             },
             data: { sessionId: identity.sessionId, pageId: identity.pageId, documentId: identity.documentId, captureId: identity.captureId, frameId: frame.id, capturedAt: new Date().toISOString(), candidates, scope: identity.scope,
-              coverage: { scannedCount, eligibleCount, excludedOffscreenCount, capturedCount: candidates.length, complete, errorCode: complete ? null : viewChanged ? 'capture_view_changed' : modalityUnknown ? 'capture_exposure_unknown' : 'capture_budget_exceeded' }, unsupportedBoundaryCount },
+              coverage: { scannedCount, eligibleCount, excludedOffscreenCount, capturedCount: candidates.length, complete, errorCode: complete ? null : viewChanged ? 'capture_view_changed' : modalityBudgetExceeded ? 'capture_budget_exceeded' : modalityUnknown ? 'capture_exposure_unknown' : 'capture_budget_exceeded' }, unsupportedBoundaryCount },
             select(candidateId, action, budgetMs = 2000) {
               try {
               deadline = performance.now() + budgetMs;
@@ -575,10 +645,10 @@ internal static class BrowserCaptureScript
               if (index < 0) return { errorCode: 'unknown_candidate' };
               const element = nodes[index];
               if (!element.isConnected || !accessibilityExposed(element)) return { errorCode: 'stale_capture' };
-              if (!inView(element)) return { errorCode: 'stale_capture' };
+              if (!inView(element) || !validShadowChain(element, candidates[index].shadowChain)) return { errorCode: 'stale_capture' };
               const xpaths = xpathsFor(element);
               if (!xpaths.length) return { errorCode: 'xpath_validation_failed' };
-              return { target: { candidateId, frame, tag: element.localName, role: role(element), accessibleName: label(element), label: candidates[index].label || candidates[index].text,
+              return { target: { candidateId, frame, shadowChain: candidates[index].shadowChain, tag: element.localName, role: role(element), accessibleName: label(element), label: candidates[index].label || candidates[index].text,
                 xpaths, state: state(element), geometry: geometry(element), interactability: interactability(element, action) } };
               } catch (error) {
                 if (error === budgetExceeded) return { errorCode: 'validation_budget_exceeded' };

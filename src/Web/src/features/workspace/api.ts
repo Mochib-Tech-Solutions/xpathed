@@ -1,3 +1,5 @@
+export type ShadowHost = { xpath: string; label: string };
+
 export type Session = { sessionId: string; pageId: string; viewPath: string };
 
 export type PageState = {
@@ -49,10 +51,11 @@ export type ResolutionResult = {
     accessibleName?: string | null;
     label: string;
     xpaths: string[];
+    shadowChain?: ShadowHost[] | null;
     frame?: {
       id: string;
       documentId: string;
-      chain: { frameId: string; xpath: string; label: string }[];
+      chain: { frameId: string; xpath: string; label: string; shadowChain?: ShadowHost[] | null }[];
     } | null;
     state: {
       rendered: boolean;
