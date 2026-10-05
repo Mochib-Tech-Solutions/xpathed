@@ -1124,13 +1124,19 @@ async function selectHighlights(page, plural = false, scope = "current_view") {
   return batch;
 }
 
-async function expectSpotlightPixels(frame, samples) {
+async function expectSpotlightPixels(frame, samples, outlines = []) {
   let observed;
   for (let attempt = 0; attempt < 20; attempt++) {
     const image = await frame();
     observed = samples.map(([x, y]) => image.pixels[(y * image.width + x) * 4]);
     if (
-      samples.every(([, , clear], index) => (clear ? observed[index] > 240 : observed[index] < 210))
+      samples.every(([, , clear], index) =>
+        clear ? observed[index] > 240 : observed[index] < 210,
+      ) &&
+      outlines.every(([left, top, visible]) => {
+        const count = outlineColumns(image, left, top);
+        return visible ? count >= 90 : count === 0;
+      })
     )
       return;
     await new Promise((resolve) => setTimeout(resolve, 50));
@@ -1141,7 +1147,7 @@ async function expectSpotlightPixels(frame, samples) {
 }
 
 for (const reducedMotion of [false, true])
-  test(`highlights-hover-spotlight-persists-and-preserves-all-outlines-motion-${reducedMotion}`, async () => {
+  test(`highlights-hover-spotlight-isolates-target-and-restores-outlines-motion-${reducedMotion}`, async () => {
     await withFixture(
       `${highlightFixture}${reducedMotion ? `<script>const nativeMatchMedia = matchMedia; window.matchMedia = query => query === '(prefers-reduced-motion: reduce)' ? {matches:true} : nativeMatchMedia(query);</script>` : ""}`,
       async (session, page) => {
@@ -1163,24 +1169,39 @@ for (const reducedMotion of [false, true])
             "Hover keeps surroundings dimmed beyond the brief spotlight",
           );
           assert.ok(red(150, 150) > 240, "Hovered target interior stays clear");
-          assert.ok(
-            red(495, 150) > 225 && red(492, 150) < 30,
-            "Other selected target keeps both outline edges",
+          assert.equal(
+            outlineColumns(image, 500, 100),
+            0,
+            "Other target has no outline during hover",
           );
+          assert.ok(red(550, 150) < 210, "Other target is dimmed during hover");
         });
         await spotlight("a1");
         await withFramebuffer(session, async (frame) => {
-          await expectSpotlightPixels(frame, [
-            [90, 150, false],
-            [490, 150, true],
-          ]);
+          await expectSpotlightPixels(
+            frame,
+            [
+              [90, 150, false],
+              [490, 150, true],
+              [150, 150, false],
+              [550, 150, true],
+            ],
+            [
+              [500, 100, true],
+              [100, 100, false],
+            ],
+          );
         });
         await spotlight(null);
         await withFramebuffer(session, async (frame) => {
-          await expectSpotlightPixels(frame, [[40, 40, true]]);
-          const image = await frame();
-          assert.ok(image.pixels[(40 * image.width + 40) * 4] > 240, "Exit removes dimming");
-          assert.ok(image.pixels[(150 * image.width + 95) * 4] > 225, "Exit preserves outlines");
+          await expectSpotlightPixels(
+            frame,
+            [[40, 40, true]],
+            [
+              [100, 100, true],
+              [500, 100, true],
+            ],
+          );
         });
         await expectError(
           `/pages/${page.pageId}/spotlight`,
@@ -1483,11 +1504,36 @@ for (const crossOrigin of [false, true])
             captureId: batch.captureId,
             actionId: "a2",
           });
-          await expectSpotlightPixels(frame, [
-            [120, 570, false],
-            [190, 350, true],
-            [40, 40, true],
-          ]);
+          await expectSpotlightPixels(
+            frame,
+            [
+              [120, 570, false],
+              [190, 350, true],
+              [40, 40, true],
+            ],
+            [
+              [200, 320, true],
+              [100, 100, false],
+              [500, 100, false],
+            ],
+          );
+          await request(`/pages/${page.pageId}/spotlight`, {
+            documentId: page.documentId,
+            captureId: batch.captureId,
+            actionId: "a0",
+          });
+          await expectSpotlightPixels(
+            frame,
+            [
+              [40, 40, false],
+              [150, 150, true],
+            ],
+            [
+              [100, 100, true],
+              [500, 100, false],
+              [200, 320, false],
+            ],
+          );
           await request(`/pages/${page.pageId}/spotlight`, {
             documentId: page.documentId,
             captureId: batch.captureId,
