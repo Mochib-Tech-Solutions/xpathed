@@ -145,6 +145,68 @@ describe("Workspace resolution", () => {
     ).toBeVisible();
   });
 
+  it("spotlights each target's own XPath on hover and focus in a plural result", async () => {
+    const secondTarget = {
+      ...target,
+      candidateId: "candidate-2",
+      label: "Cancel",
+      xpaths: ["//*[@data-testid='cancel']"],
+    };
+    mockApi(() =>
+      Promise.resolve(
+        Response.json({
+          ...found,
+          actions: [
+            found.actions[0],
+            { ...found.actions[0], actionId: "a2", order: 2, target: secondTarget },
+          ],
+        }),
+      ),
+    );
+    const user = await openWorkspace();
+    await submitInstruction(user);
+    const firstXpath = await screen.findByText(target.xpaths[0]!);
+    const secondXpath = screen.getByText(secondTarget.xpaths[0]!);
+    for (const [xpath, actionId] of [
+      [firstXpath, "a1"],
+      [secondXpath, "a2"],
+      [firstXpath, "a1"],
+    ] as const) {
+      await user.hover(xpath);
+      await waitFor(() =>
+        expect(fetch).toHaveBeenLastCalledWith(
+          "/api/pages/page-1/spotlight",
+          expect.objectContaining({
+            body: JSON.stringify({ documentId: "document-1", captureId: "capture-1", actionId }),
+          }),
+        ),
+      );
+      await user.unhover(xpath);
+      fireEvent.focus(xpath);
+      await waitFor(() =>
+        expect(fetch).toHaveBeenLastCalledWith(
+          "/api/pages/page-1/spotlight",
+          expect.objectContaining({
+            body: JSON.stringify({ documentId: "document-1", captureId: "capture-1", actionId }),
+          }),
+        ),
+      );
+      fireEvent.blur(xpath);
+      await waitFor(() =>
+        expect(fetch).toHaveBeenLastCalledWith(
+          "/api/pages/page-1/spotlight",
+          expect.objectContaining({
+            body: JSON.stringify({
+              documentId: "document-1",
+              captureId: "capture-1",
+              actionId: null,
+            }),
+          }),
+        ),
+      );
+    }
+  });
+
   it("spotlights the current XPath on hover and focus, and clears it on exit", async () => {
     mockApi();
     const user = await openWorkspace();

@@ -7,6 +7,7 @@ internal static class BrowserHighlightScript
           let host, canvas, animation, spotlightStarted;
           const nodes = [...new Set(selectedNodes)];
           let spotlightNodes = [];
+          let spotlightActive = false;
           const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
           const clear = () => {
             cancelAnimationFrame(animation);
@@ -48,15 +49,16 @@ internal static class BrowserHighlightScript
             if (spotlightStarted === undefined && boxes.some(box => box.width <= 24 || box.height <= 24)) {
               spotlightStarted = performance.now();
             }
-            const hovering = spotlightNodes.length > 0;
-            const opacity = hovering ? 0.35 : reducedMotion.matches || spotlightStarted === undefined
+            const hovering = spotlightActive;
+            const highlightedBoxes = hovering ? boxes.filter(box => spotlightNodes.includes(box.node)) : boxes;
+            const opacity = hovering ? (spotlightNodes.length ? 0.35 : 0) : reducedMotion.matches || spotlightStarted === undefined
               ? 0 : 0.35 * Math.min(1, Math.max(0, (1200 - (performance.now() - spotlightStarted)) / 600));
             if (opacity > 0 && boxes.length) {
               context.fillStyle = `rgba(0,0,0,${opacity})`;
               context.fillRect(0, 0, innerWidth, innerHeight);
               context.globalCompositeOperation = 'destination-out';
               context.fillStyle = 'black';
-              for (const box of boxes.filter(box => !hovering || spotlightNodes.includes(box.node))) {
+              for (const box of highlightedBoxes) {
                 const width = Math.max(48, box.width + 24), height = Math.max(48, box.height + 24);
                 context.beginPath();
                 context.roundRect(box.x + (box.width-width)/2, box.y + (box.height-height)/2, width, height, 12);
@@ -64,7 +66,7 @@ internal static class BrowserHighlightScript
               }
               context.globalCompositeOperation = 'source-over';
             }
-            for (const {x, y, width, height} of boxes) {
+            for (const {x, y, width, height} of highlightedBoxes) {
               // Offset by half the outer stroke so every painted pixel stays outside the target.
               context.strokeStyle = 'black'; context.lineWidth = 8;
               context.strokeRect(x - 4, y - 4, width + 8, height + 8);
@@ -72,7 +74,7 @@ internal static class BrowserHighlightScript
               context.strokeRect(x - 4, y - 4, width + 8, height + 8);
             }
             // Neighboring or overlapping outlines must not cover another selected target's content.
-            for (const {x, y, width, height} of boxes) context.clearRect(x, y, width, height);
+            for (const {x, y, width, height} of highlightedBoxes) context.clearRect(x, y, width, height);
             animation = requestAnimationFrame(draw);
           };
           host = document.createElement('div');
@@ -87,8 +89,9 @@ internal static class BrowserHighlightScript
           document.documentElement.append(host);
           host.showPopover();
           draw();
-          return {clear, spotlight(index) {
+          return {clear, spotlight(index, active) {
             spotlightNodes = nodes[index] ? [nodes[index]] : [];
+            spotlightActive = active;
             if (index < 0) spotlightStarted = -Infinity;
           }};
         }

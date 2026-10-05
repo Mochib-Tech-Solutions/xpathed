@@ -315,7 +315,10 @@ internal sealed class BrowserPageCapture(BrowserPageRuntime page) : IAsyncDispos
             if (frame.Highlight is { } highlight)
             {
                 var index = candidateId is null ? -1 : Array.IndexOf(frame.HighlightCandidateIds, candidateId);
-                await highlight.EvaluateAsync("(overlay, index) => overlay.spotlight(index)", index);
+                await highlight.EvaluateAsync(
+                    "(overlay, selection) => overlay.spotlight(selection.index, selection.active)",
+                    new { index, active = candidateId is not null }
+                );
             }
         }
     }
