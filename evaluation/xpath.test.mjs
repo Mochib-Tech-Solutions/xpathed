@@ -9,7 +9,8 @@ import { loadCases } from "./cases/load.mjs";
 test("xpath-selection-retains-mutations-and-excludes-cases-without-verifiable-targets", () => {
   const { cases, exclusions } = selectXPathCases(loadCases().cases);
   assert.ok(cases.some((item) => item.mutation));
-  assert.ok(exclusions.some((item) => item.caseId === "scope-capture-budget-exhaustion-is-error"));
+  assert.ok(cases.some((item) => item.id === "scope-large-dom-first-visible-entry-is-found"));
+  assert.ok(exclusions.length > 0);
   assert.ok(cases.every((item) => !item.provider.fault && !item.expected.summary));
   assert.ok(
     cases.every((item) => item.expected.actions.some((action) => action.outcome === "found")),

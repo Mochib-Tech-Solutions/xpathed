@@ -124,7 +124,7 @@ async function runWithServices(
     if (path === "/browser/pages/page/capture") {
       assert.equal(body.scope, "current_view");
       return captureFailure
-        ? send({ code: "capture_budget_exceeded" }, 502)
+        ? send({ code: "capture_incomplete" }, 502)
         : send({
             pageId: "page",
             documentId: "document",
@@ -236,10 +236,14 @@ test("evidence-authored-dom-fixtures-retain-complete-identity", async (t) => {
   assert.equal(manifest.cases[0].fixture.sha256, undefined);
 });
 
-test("capture-coverage-failure-retains-resolver-budget-error", async (t) => {
-  const { trial, attempts } = await runWithServices(t, "scope-capture-budget-exhaustion-is-error", {
-    captureFailure: true,
-  });
+test("capture-coverage-failure-retains-resolver-incomplete-error", async (t) => {
+  const { trial, attempts } = await runWithServices(
+    t,
+    "scope-large-dom-first-visible-entry-is-found",
+    {
+      captureFailure: true,
+    },
+  );
   assert.equal(attempts.length, 1);
   assert.equal(trial.captureObservation.error.code, "http_502");
   assert.equal(trial.result.diagnostics.code, "capture_incomplete");
@@ -299,7 +303,7 @@ test("scope-viewport-drift-beyond-tolerance-fails-trial", async (t) => {
 test("replay-missing-planned-trial-remains-failure", async (t) => {
   const { output, trialPath } = await runWithServices(
     t,
-    "scope-capture-budget-exhaustion-is-error",
+    "scope-large-dom-first-visible-entry-is-found",
     {
       captureFailure: true,
     },
