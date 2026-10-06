@@ -67,7 +67,7 @@ export function createFixtureServer({
           return send(504, { error: { message: "Controlled provider timeout" } });
         const input = JSON.parse(body.messages.find((message) => message.role === "user").content);
         const candidates = input.candidates ?? [];
-        const actions = controlledActions(current.entry.provider, candidates);
+        const actions = controlledActions(current.entry.provider, candidates, input.context);
         return send(200, {
           id: `deterministic-${trialId}`,
           model: body.model ?? "deepseek/deepseek-v4.1-flash",
