@@ -15,6 +15,8 @@ Each browser session owns a Chromium process, an isolated browser context, up to
 
 The resolver receives the same `pageId` as the client. It asks the browser service for an inspection without opening or navigating a page. The initial workspace shows a selected **New tab** and creates no session; tab creation and close-all controls stay disabled until a managed page exists. The tab strip and address bar retain their positions when navigation starts. Submitting the address bar creates a session at `about:blank` and immediately navigates to the supplied website. Later submissions reuse that session; a failed navigation keeps it available for retry.
 
+Each sent prompt offers **Retry instruction**. It starts a separate resolution attempt using the active page’s current document identity and the original prompt text, preserving earlier attempts and any composer draft. Busy workspace operations disable retries.
+
 The workspace defaults to dark before first paint and uses one header button to switch between light and dark. Explicit choices persist in `xpathed.theme`; an absent, legacy `system`, invalid or unreadable preference uses dark. OS theme changes do not alter the workspace. The chat reset uses an eraser beside its heading, separate from browser reload.
 
 ## Client API

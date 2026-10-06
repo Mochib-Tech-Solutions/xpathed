@@ -1,4 +1,4 @@
-import { ArrowUp, Check, Copy, Eraser, LoaderCircle } from "lucide-react";
+import { ArrowUp, Check, Copy, Eraser, LoaderCircle, RotateCcw } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -114,7 +114,7 @@ type Props = {
   resolving: boolean;
   resetDisabled: boolean;
   onInstructionChange: (instruction: string) => void;
-  onResolve: () => void;
+  onResolve: (instruction?: string) => void;
   onReset: () => void;
   onSpotlight: (resolution: Resolution, actionId: string | null) => void;
 };
@@ -289,9 +289,28 @@ export default function ChatPanel({
           return (
             <article key={resolution.id} className="mb-6 space-y-4 text-sm leading-relaxed">
               <div className="ml-6 flex flex-col items-end gap-1.5" aria-label="Sent message">
-                <p className="max-w-full rounded-2xl rounded-br-sm bg-accent px-3.5 py-2.5 break-words whitespace-pre-wrap">
-                  {resolution.instruction}
-                </p>
+                <div className="flex max-w-full items-start gap-1.5">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="size-7 shrink-0 text-muted-foreground"
+                    aria-label="Retry instruction"
+                    title="Retry instruction"
+                    disabled={disabled || resolving}
+                    onClick={() => {
+                      followBottom.current = true;
+                      setCopied("");
+                      setCopyError(null);
+                      onResolve(resolution.instruction);
+                    }}
+                  >
+                    <RotateCcw aria-hidden="true" />
+                  </Button>
+                  <p className="min-w-0 rounded-2xl rounded-br-sm bg-accent px-3.5 py-2.5 break-words whitespace-pre-wrap">
+                    {resolution.instruction}
+                  </p>
+                </div>
                 <div className="flex items-center gap-2 px-1 text-xs text-muted-foreground">
                   <span>You</span>
                   <MessageTime value={resolution.createdAt} label="Sent" />

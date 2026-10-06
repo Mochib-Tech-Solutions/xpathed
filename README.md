@@ -33,6 +33,8 @@ Browser verifies each returned target’s retained node, name/text, current-view
 
 XPath construction prefers explicit test attributes and meaningful semantics. It distinguishes sanitized names from DOM text so Unicode and nested labels can retain semantic locators across wrapper changes, while excluding hidden text and form values from new text predicates. The [selection policy](docs/resolution.md#preferred-xpath) describes the bounds and saved-locator limits.
 
+Each sent prompt has a **Retry instruction** button that resends it against the active tab’s current view as a new attempt, preserving earlier results and the composer draft. Retry is disabled while the workspace is busy.
+
 The chat header’s **Reset chat** asks for confirmation before clearing the active tab’s draft and results. Cancel or Escape preserves the chat; confirming keeps the browser page and other tabs.
 
 ## Clone and run locally

@@ -206,8 +206,8 @@ export default function useWorkspace() {
       if (isCurrent()) applySnapshot(next);
     });
   }
-  function resolve() {
-    const text = chat.instruction.trim();
+  function resolve(instruction?: string) {
+    const text = (instruction ?? chat.instruction).trim();
     if (!session || !page || !text || text.length > 4000) return;
     const entry: Resolution = {
       id: crypto.randomUUID(),
@@ -228,7 +228,7 @@ export default function useWorkspace() {
           ...previous.tabs,
           [page.pageId]: {
             ...previous.tabs[page.pageId]!,
-            instruction: "",
+            instruction: instruction === undefined ? "" : previous.tabs[page.pageId]!.instruction,
             history: [...historical(previous.tabs[page.pageId]!.history), entry],
           },
         },
