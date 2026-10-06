@@ -60,6 +60,13 @@ export function renderFixture(key, trial, frame) {
       '<section aria-label="Approvals"><button id="approve-visible">Approve</button><div style="margin-top:1500px"><button id="approve-below">Approve</button></div></section>',
     "qualification-color":
       '<main><button id="choose-cool" style="background:#1649cc;color:white">Choose</button><button id="choose-warm" style="background:#bb1818;color:white">Choose</button></main>',
+    "test-contract":
+      '<button id="direct-target" data-testid="save">Save</button><div data-test-id="login"><h2>Account</h2><button id="scoped-target">Log in</button></div>',
+    "test-contract-duplicates":
+      '<button data-testid="save">Save</button><section data-test-id="employee"><h2>Employee</h2><button id="employee-save" data-testid="save">Save</button><button data-testid="cancel">Cancel</button></section>',
+    "test-contract-offscreen-duplicate":
+      '<section aria-label="Employee"><div data-testid="shared"><button id="employee-save" data-testid="save">Save</button></div></section><section aria-label="Other" style="position:absolute;top:2000px"><div data-testid="shared"><button data-testid="save">Save</button></div></section>',
+    "namespace-collision": `<svg width="120" height="80"><g role="button" aria-label="Diagram node"><rect width="100" height="60"/></g></svg><script>const foreign = document.createElementNS('urn:fixture:other', 'g'); foreign.setAttribute('role', 'button'); foreign.setAttribute('aria-label', 'Diagram node'); document.querySelector('svg').append(foreign);</script>`,
     form: '<main><section aria-label="Profile"><h1>Profile</h1><button id="save-profile">Save changes</button><button id="cancel-profile">Cancel</button></section></main>',
     unicode:
       '<main><button id="publish-draft" aria-label="L&#39;été &quot;ready&quot;">Publish</button><button>Other</button></main>',

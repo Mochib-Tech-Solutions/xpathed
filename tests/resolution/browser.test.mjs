@@ -534,7 +534,7 @@ test("targeting-independent-target-is-captured-and-highlighted-without-execution
       candidateId: candidate.id,
       action: "click",
     });
-    assert.deepEqual(selection.target.xpaths, ["//button[@data-testid='about-us']"]);
+    assert.deepEqual(selection.target.xpaths, ["//*[@data-testid='about-us']"]);
     const after = await verify(selection.target.xpaths);
     assert.deepEqual(
       after.matches,
@@ -1904,6 +1904,161 @@ test("robustness-capture-preserves-unicode-labels-and-state-without-form-values"
       );
       assert.equal(capture.coverage.complete, true);
       assert.equal(capture.coverage.capturedCount, capture.candidates.length);
+    },
+  );
+});
+
+test("locators-target-test-contracts-survive-language-tag-and-id-changes", async () => {
+  const attributes = ["data-testid", "data-test-id", "data-test", "data-cy", "data-qa"];
+  await withFixture(
+    attributes
+      .map(
+        (attribute, index) =>
+          `<button ${attribute}="identity-${index}" id=":r${index}:" data-oracle="target-${index}">Save ${index}</button>`,
+      )
+      .join("") +
+      `<script>window.mutateXpathFixture = () => {
+      for (const button of document.querySelectorAll('button[data-oracle]')) {
+        const link = document.createElement('a');
+        for (const attribute of button.attributes) link.setAttribute(attribute.name, attribute.value);
+        link.id = 'changed-generated-' + button.getAttribute('data-oracle'); link.href = '#saved'; link.textContent = 'حفظ';
+        const wrapper = document.createElement('span'); button.replaceWith(wrapper); wrapper.append(link);
+      }
+    };</script>`,
+    async (session, page) => {
+      const capture = await request(`/pages/${page.pageId}/capture`, {
+        documentId: page.documentId,
+      });
+      const paths = [];
+      for (const [index, attribute] of attributes.entries()) {
+        const candidate = capture.candidates.find(
+          (candidate) => candidate.label === `Save ${index}`,
+        );
+        assert.ok(candidate);
+        const { target } = await request(`/pages/${page.pageId}/selection`, {
+          documentId: page.documentId,
+          captureId: capture.captureId,
+          candidateId: candidate.id,
+          action: "inspect",
+        });
+        assert.deepEqual(target.xpaths, [`//*[@${attribute}='identity-${index}']`]);
+        paths.push(target.xpaths[0]);
+      }
+      const expected = attributes.map((_, index) => [`target-${index}`]);
+      assert.deepEqual((await verify(paths)).matches, expected);
+      assert.deepEqual((await observe({ xpaths: paths, mutateXpath: true })).matches, expected);
+    },
+  );
+});
+
+test("locators-test-scopes-survive-translation-wrappers-and-generated-ids", async () => {
+  const attributes = ["data-testid", "data-test-id", "data-test", "data-cy", "data-qa"];
+  await withFixture(
+    attributes
+      .map(
+        (attribute, index) =>
+          `<div ${attribute}="scope-${index}"><h2>Account ${index}</h2><button id=":r${index}:" data-oracle="target-${index}">Log in ${index}</button></div>`,
+      )
+      .join("") +
+      `<script>window.mutateXpathFixture = () => {
+      const labels = ['Se connecter', 'تسجيل الدخول', '登录', 'Anmelden', 'Iniciar sesión'];
+      for (const [index, button] of [...document.querySelectorAll('button[data-oracle]')].entries()) {
+        const container = button.parentElement, section = document.createElement('section');
+        for (const attribute of container.attributes) section.setAttribute(attribute.name, attribute.value);
+        container.replaceWith(section); section.append(...container.childNodes);
+        section.querySelector('h2').textContent = labels[index]; button.textContent = labels[index];
+        button.id = 'changed-generated-' + index;
+        const wrapper = document.createElement('span'); button.before(wrapper); wrapper.append(button);
+      }
+      const distractor = document.createElement('button'); distractor.textContent = 'Log in 0'; document.body.prepend(distractor);
+    };</script>`,
+    async (session, page) => {
+      const capture = await request(`/pages/${page.pageId}/capture`, {
+        documentId: page.documentId,
+      });
+      const paths = [];
+      for (const [index, attribute] of attributes.entries()) {
+        const candidate = capture.candidates.find(
+          (candidate) => candidate.label === `Log in ${index}`,
+        );
+        assert.ok(candidate);
+        const { target } = await request(`/pages/${page.pageId}/selection`, {
+          documentId: page.documentId,
+          captureId: capture.captureId,
+          candidateId: candidate.id,
+          action: "inspect",
+        });
+        assert.deepEqual(target.xpaths, [`//*[@${attribute}='scope-${index}']//button`]);
+        paths.push(target.xpaths[0]);
+      }
+      const expected = attributes.map((_, index) => [`target-${index}`]);
+      assert.deepEqual((await verify(paths)).matches, expected);
+      assert.deepEqual((await observe({ xpaths: paths, mutateXpath: true })).matches, expected);
+    },
+  );
+});
+
+test("locators-test-scopes-retain-semantics-for-multiple-and-offscreen-children", async () => {
+  await withFixture(
+    `<div data-testid="account"><button data-oracle="save">Save</button><button>Cancel</button></div>
+    <section aria-label="Employee"><div data-testid="repeated"><button data-oracle="employee">Approve</button></div></section>
+    <section aria-label="Other" style="position:absolute;top:2000px"><div data-testid="repeated"><button>Approve</button></div></section>
+    <script>window.mutateXpathFixture = () => {
+      document.querySelector('[data-oracle="save"]').textContent = 'Delete';
+    };</script>`,
+    async (session, page) => {
+      const capture = await request(`/pages/${page.pageId}/capture`, {
+        documentId: page.documentId,
+      });
+      const paths = [];
+      for (const name of ["Save", "Approve"]) {
+        const candidate = capture.candidates.find((candidate) => candidate.label === name);
+        assert.ok(candidate);
+        const { target } = await request(`/pages/${page.pageId}/selection`, {
+          documentId: page.documentId,
+          captureId: capture.captureId,
+          candidateId: candidate.id,
+          action: "inspect",
+        });
+        assert.match(target.xpaths[0], /normalize-space/);
+        if (name === "Approve") assert.match(target.xpaths[0], /Employee/);
+        paths.push(target.xpaths[0]);
+      }
+      assert.deepEqual((await verify(paths)).matches, [["save"], ["employee"]]);
+      assert.deepEqual((await observe({ xpaths: paths, mutateXpath: true })).matches, [
+        [],
+        ["employee"],
+      ]);
+    },
+  );
+});
+
+test("locators-namespace-collisions-preserve-same-node-and-reject-replacement", async () => {
+  await withFixture(
+    `<svg width="120" height="80"><g role="button" aria-label="Diagram node" data-oracle="svg-target"><rect width="100" height="60"/></g></svg>
+    <script>
+      const foreign = document.createElementNS('urn:fixture:other', 'g');
+      foreign.setAttribute('role', 'button'); foreign.setAttribute('aria-label', 'Diagram node');
+      foreign.setAttribute('data-oracle', 'foreign-target'); document.querySelector('svg').append(foreign);
+      window.mutateXpathFixture = () => document.querySelector('[data-oracle="svg-target"]').remove();
+    </script>`,
+    async (session, page) => {
+      const capture = await request(`/pages/${page.pageId}/capture`, {
+        documentId: page.documentId,
+      });
+      const candidate = capture.candidates.find(
+        (candidate) => candidate.tag === "g" && candidate.label === "Diagram node",
+      );
+      assert.ok(candidate);
+      const { target } = await request(`/pages/${page.pageId}/selection`, {
+        documentId: page.documentId,
+        captureId: capture.captureId,
+        candidateId: candidate.id,
+        action: "inspect",
+      });
+      assert.match(target.xpaths[0], /namespace-uri\(\)/);
+      assert.deepEqual((await verify(target.xpaths)).matches, [["svg-target"]]);
+      assert.deepEqual((await observe({ xpaths: target.xpaths, mutateXpath: true })).matches, [[]]);
     },
   );
 });

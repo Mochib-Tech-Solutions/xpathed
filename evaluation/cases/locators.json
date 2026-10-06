@@ -2330,5 +2330,338 @@
     "group": "locators",
     "sourceIds": [],
     "privacySentinels": ["PRIVATE_REPLACEMENT"]
+  },
+  {
+    "id": "locators-target-test-contract-survives-translated-rerender",
+    "family": "test-contract",
+    "split": "regression",
+    "category": "locator",
+    "fixture": "test-contract",
+    "instruction": "Click Save.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-fixture-source-review",
+      "reviewedAt": "2026-10-06",
+      "notes": "The independently labelled control retains its explicit target or ancestor test contract after replacement and translation; reuse the original XPath and separately check fresh construction."
+    },
+    "expected": {
+      "outcome": "found",
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "target": {
+            "selector": "#direct-target",
+            "frames": []
+          }
+        }
+      ]
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "tag": "button",
+          "index": 0
+        }
+      ]
+    },
+    "mutation": {
+      "kind": "rerender",
+      "text": "حفظ",
+      "target": {
+        "selector": "#direct-target",
+        "frames": []
+      },
+      "afterExpected": {
+        "outcome": "found",
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "target": {
+              "selector": "#direct-target",
+              "frames": []
+            }
+          }
+        ]
+      }
+    },
+    "deterministicOnly": true,
+    "sourceSplit": "development",
+    "sourceCatalogs": ["locators.json"],
+    "group": "locators",
+    "sourceIds": []
+  },
+  {
+    "id": "locators-test-scope-survives-translated-rerender",
+    "family": "test-contract",
+    "split": "regression",
+    "category": "locator",
+    "fixture": "test-contract",
+    "instruction": "Click Log in.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-fixture-source-review",
+      "reviewedAt": "2026-10-06",
+      "notes": "The independently labelled control retains its explicit target or ancestor test contract after replacement and translation; reuse the original XPath and separately check fresh construction."
+    },
+    "expected": {
+      "outcome": "found",
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "target": {
+            "selector": "#scoped-target",
+            "frames": []
+          }
+        }
+      ]
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "tag": "button",
+          "index": 1
+        }
+      ]
+    },
+    "mutation": {
+      "kind": "rerender",
+      "text": "Se connecter",
+      "target": {
+        "selector": "#scoped-target",
+        "frames": []
+      },
+      "afterExpected": {
+        "outcome": "found",
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "target": {
+              "selector": "#scoped-target",
+              "frames": []
+            }
+          }
+        ]
+      }
+    },
+    "deterministicOnly": true,
+    "sourceSplit": "development",
+    "sourceCatalogs": ["locators.json"],
+    "group": "locators",
+    "sourceIds": []
+  },
+  {
+    "id": "locators-namespace-collision-retains-svg-target",
+    "family": "namespaces",
+    "split": "regression",
+    "category": "locator",
+    "fixture": "namespace-collision",
+    "instruction": "Click Diagram node.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-fixture-source-review",
+      "reviewedAt": "2026-10-06",
+      "notes": "The visible SVG g is independently labelled; a foreign-namespace g with the same local name and accessible label must not defeat tree-wide XPath identity."
+    },
+    "expected": {
+      "outcome": "found",
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "target": {
+            "selector": "svg > g:first-child",
+            "frames": []
+          }
+        }
+      ]
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "tag": "g",
+          "label": "Diagram node"
+        }
+      ]
+    },
+    "deterministicOnly": true,
+    "sourceSplit": "development",
+    "sourceCatalogs": ["locators.json"],
+    "group": "locators",
+    "sourceIds": []
+  },
+  {
+    "id": "locators-test-scope-disambiguates-repeated-target-contracts",
+    "family": "test-contract",
+    "split": "regression",
+    "category": "locator",
+    "fixture": "test-contract-duplicates",
+    "instruction": "Click Save in Employee.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-fixture-source-review",
+      "reviewedAt": "2026-10-06",
+      "notes": "Repeated target test IDs and multiple child buttons require a unique explicit scope plus target contract; the saved XPath must survive translated replacement."
+    },
+    "expected": {
+      "outcome": "found",
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "target": {
+            "selector": "#employee-save",
+            "frames": []
+          }
+        }
+      ]
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "tag": "button",
+          "index": 1
+        }
+      ]
+    },
+    "mutation": {
+      "kind": "rerender",
+      "text": "Enregistrer",
+      "target": {
+        "selector": "#employee-save",
+        "frames": []
+      },
+      "afterExpected": {
+        "outcome": "found",
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "target": {
+              "selector": "#employee-save",
+              "frames": []
+            }
+          }
+        ]
+      }
+    },
+    "deterministicOnly": true,
+    "sourceSplit": "development",
+    "sourceCatalogs": ["locators.json"],
+    "group": "locators",
+    "sourceIds": []
+  },
+  {
+    "id": "locators-offscreen-test-contract-duplicates-retain-semantic-scope",
+    "family": "test-contract",
+    "split": "regression",
+    "category": "locator",
+    "fixture": "test-contract-offscreen-duplicate",
+    "instruction": "Click Save in Employee.",
+    "viewport": {
+      "width": 1280,
+      "height": 800,
+      "tolerance": 1
+    },
+    "review": {
+      "status": "reviewed",
+      "reviewer": "independent-fixture-source-review",
+      "reviewedAt": "2026-10-06",
+      "notes": "Both target and ancestor test contracts repeat, including an offscreen duplicate; independently labelled Employee context must remain in the saved XPath after wrapper insertion."
+    },
+    "expected": {
+      "outcome": "found",
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "target": {
+            "selector": "#employee-save",
+            "frames": []
+          }
+        }
+      ]
+    },
+    "provider": {
+      "actions": [
+        {
+          "step": 1,
+          "action": "click",
+          "outcome": "found",
+          "tag": "button",
+          "label": "Save",
+          "scope": "Employee"
+        }
+      ]
+    },
+    "mutation": {
+      "kind": "wrapper",
+      "target": {
+        "selector": "#employee-save",
+        "frames": []
+      },
+      "afterExpected": {
+        "outcome": "found",
+        "actions": [
+          {
+            "step": 1,
+            "action": "click",
+            "outcome": "found",
+            "target": {
+              "selector": "#employee-save",
+              "frames": []
+            }
+          }
+        ]
+      }
+    },
+    "deterministicOnly": true,
+    "sourceSplit": "development",
+    "sourceCatalogs": ["locators.json"],
+    "group": "locators",
+    "sourceIds": []
   }
 ]
