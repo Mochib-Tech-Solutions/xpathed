@@ -8,7 +8,6 @@ namespace Xpathed.Resolver.Services;
 internal static class ActionSelectionStrategy
 {
     public const string Strategy = "candidate-selection";
-    public const int InputBudgetBytes = 512000;
     public const int MaximumActions = 16;
     public const int OutputTokens = 4096;
 

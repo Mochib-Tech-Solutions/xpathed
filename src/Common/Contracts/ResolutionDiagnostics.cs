@@ -9,7 +9,7 @@ public sealed record ResolutionDiagnostics
     public int ModelInputCount { get; init; }
     public bool ModelInputComplete { get; init; }
     public int ModelInputBytes { get; init; }
-    public int ModelInputBudgetBytes { get; init; } = 512000;
+    public int? ModelInputBudgetBytes { get; init; }
     public int ModelCalls { get; init; }
     public string Strategy { get; init; } = "candidate-selection";
     public string? Model { get; init; }

@@ -1903,7 +1903,7 @@ public sealed class ResolutionContractTests
     }
 
     [Fact]
-    public async Task OversizedRepresentationFailsWithoutTruncationOrInference()
+    public async Task LargeCurrentViewRepresentationReachesInferenceWithoutTruncation()
     {
         var capture = JsonNode.Parse(new DeterministicServicesHandler().CaptureBody)!;
         capture["candidates"]![0]!["text"] = new string('x', 512000);
@@ -1916,13 +1916,75 @@ public sealed class ResolutionContractTests
         );
 
         var result = await response.Content.ReadFromJsonAsync<JsonElement>();
-        Assert.Equal("error", result.GetProperty("outcome").GetString());
+        Assert.Equal("found", result.GetProperty("outcome").GetString());
         var diagnostics = result.GetProperty("diagnostics");
-        Assert.Equal("model_input_budget_exceeded", diagnostics.GetProperty("code").GetString());
         Assert.True(diagnostics.GetProperty("capture").GetProperty("complete").GetBoolean());
         Assert.True(diagnostics.GetProperty("modelInputBytes").GetInt32() > 512000);
-        Assert.Equal(0, diagnostics.GetProperty("modelCalls").GetInt32());
-        Assert.Equal(0, handler.ProviderRequestCount);
+        Assert.Equal(JsonValueKind.Null, diagnostics.GetProperty("modelInputBudgetBytes").ValueKind);
+        Assert.Equal(1, diagnostics.GetProperty("modelCalls").GetInt32());
+        Assert.Equal(1, handler.ProviderRequestCount);
+        Assert.Contains(
+            new string('x', 512000),
+            handler.ModelRequest.GetProperty("messages")[1].GetProperty("content").GetString()!,
+            StringComparison.Ordinal
+        );
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task DeepFrameAndShadowContextsHaveNoCaptureDepthCeiling(bool shadow)
+    {
+        var capture = JsonNode.Parse(new DeterministicServicesHandler().CaptureBody)!;
+        var target = DeterministicServicesHandler.VerifiedTarget();
+        var property = shadow ? "shadowChain" : "frame";
+        var chain = new JsonArray(
+            Enumerable
+                .Range(1, 65)
+                .Select(index =>
+                    (JsonNode)(
+                        shadow
+                            ? new JsonObject { ["xpath"] = $"//*[@id='host-{index}']", ["label"] = $"Host {index}" }
+                            : new JsonObject
+                            {
+                                ["frameId"] = $"f{index}",
+                                ["xpath"] = $"//iframe[{index}]",
+                                ["label"] = "Frame",
+                            }
+                    )
+                )
+                .ToArray()
+        );
+        JsonNode context = shadow
+            ? chain
+            : new JsonObject
+            {
+                ["id"] = "f65",
+                ["documentId"] = "child",
+                ["chain"] = chain,
+            };
+        capture["candidates"]![0]![property] = context.DeepClone();
+        target[property] = context;
+        var handler = new DeterministicServicesHandler
+        {
+            CaptureBody = capture.ToJsonString(),
+            SelectionBody = new JsonObject
+            {
+                ["actions"] = new JsonArray(new JsonObject { ["actionId"] = "a1", ["target"] = target }),
+                ["inspectedActionId"] = "a1",
+            }.ToJsonString(),
+        };
+        await using var application = CreateApplication(handler);
+        using var client = application.CreateClient();
+        using var response = await client.PostAsJsonAsync(
+            "/pages/page-1/resolve",
+            new { instruction = "Click Save", documentId = "document-1" }
+        );
+        var result = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("found", result.GetProperty("outcome").GetString());
+        Assert.Equal(1, handler.ProviderRequestCount);
+        var returned = result.GetProperty("actions")[0].GetProperty("target").GetProperty(property);
+        Assert.Equal(65, (shadow ? returned : returned.GetProperty("chain")).GetArrayLength());
     }
 
     [Theory]

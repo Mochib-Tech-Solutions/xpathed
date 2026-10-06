@@ -79,7 +79,7 @@ public sealed class OpenRouterGateway(
             pricingCacheSeconds = 300,
             endpoint = Uri.TryCreate(endpoint, UriKind.Absolute, out var address) ? address.AbsoluteUri : endpoint,
             timeoutSeconds = timeoutSeconds.ToString("R", CultureInfo.InvariantCulture),
-            modelInputBudgetBytes = ActionSelectionStrategy.InputBudgetBytes,
+            modelInputBudgetBytes = scope == "offline" ? OfflineSelectionEvaluation.InputBudgetBytes : (int?)null,
             responseCache = false,
             maximumActions = ActionSelectionStrategy.MaximumActions,
             usageLimits = new

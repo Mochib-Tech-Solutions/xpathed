@@ -1,6 +1,6 @@
 # Keep open-shadow context separate from tree-local XPath
 
-Dynamically inserted controls can be visible inside open shadow roots even when their host has zero area. Capture and verification now traverse those roots, preserving composed accessibility, naming, clipping, privacy and passive behavior under the existing aggregate budgets.
+Dynamically inserted controls can be visible inside open shadow roots even when their host has zero area. Capture and verification now traverse those roots, preserving composed accessibility, naming, clipping, privacy and passive behavior under the complete current-view capture policy in [ADR-0030](0030-capture-the-complete-current-view.md) and the separate target-validation budget.
 
 Each candidate and found target carries an optional ordered `shadowChain` of host XPaths and labels. A frame owner inside a root carries that context on its frame-chain entry. Enter each actual host root before evaluating the next XPath. Chromium evaluates standard XPath natively within a shadow tree using its first element as context; the `ShadowRoot` node itself is not a supported XPath context. Each expression must uniquely identify the original live node in its own tree. Slotted light-DOM targets keep their document XPath.
 

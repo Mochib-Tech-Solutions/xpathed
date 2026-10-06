@@ -40,7 +40,7 @@ internal static class BrowserCaptureScript
           const capturedDocument = document;
           const capturedRoot = document.documentElement;
           const budgetExceeded = {};
-          let deadline = performance.now() + (identity.budgetMs ?? 2000);
+          let deadline = Infinity;
           const checkBudget = () => { if (performance.now() > deadline) throw budgetExceeded; };
           let styleCache = new WeakMap();
           let textCache = new WeakMap();
@@ -53,9 +53,7 @@ internal static class BrowserCaptureScript
             const modals = [];
             modalityBudgetExceeded = false;
             try {
-              let scanned = 0;
               for (const element of walkElements(document)) {
-                if (++scanned > 20000) throw budgetExceeded;
                 if (element.matches('dialog:modal')) modals.push(element);
               }
               const active = closest(activeElement(), 'dialog:modal') ?? document.elementFromPoint(0, 0)?.closest('dialog:modal');
@@ -135,7 +133,6 @@ internal static class BrowserCaptureScript
               }
             }
             const result = normalize(parts.join(' '));
-            if (result.length > 64000) throw budgetExceeded;
             if (cacheable) textCache.set(element, result);
             return result;
           };
@@ -150,9 +147,10 @@ internal static class BrowserCaptureScript
           };
           const scope = element => {
             const scopes = [];
+            const row = closest(element, 'tr,[role=row]');
             for (let ancestor = parent(element); ancestor && ancestor !== document.body; ancestor = parent(ancestor)) {
               checkBudget();
-              const context = label(ancestor) || (ancestor.matches('tr,[role=row]') ? text(ancestor) : '') || (ancestor.matches('header,footer,nav,main,aside') ? ancestor.localName : '') || text(ancestor.querySelector(':scope > legend,:scope > h1,:scope > h2,:scope > h3,:scope > h4,:scope > h5,:scope > h6'));
+              const context = label(ancestor) || (ancestor === row ? text(ancestor) : '') || (ancestor.matches('header,footer,nav,main,aside') ? ancestor.localName : '') || text(ancestor.querySelector(':scope > legend,:scope > h1,:scope > h2,:scope > h3,:scope > h4,:scope > h5,:scope > h6'));
               if (context && !scopes.includes(context)) scopes.push(context);
             }
             return scopes;
@@ -187,7 +185,7 @@ internal static class BrowserCaptureScript
             let observer, timeout;
             try {
               await new Promise((resolve, reject) => {
-                timeout = setTimeout(() => reject(budgetExceeded), Math.max(0, deadline - performance.now()));
+                if (Number.isFinite(deadline)) timeout = setTimeout(() => reject(budgetExceeded), Math.max(0, deadline - performance.now()));
                 observer = new IntersectionObserver(entries => {
                   for (const entry of entries) {
                     const { x, y, width, height } = entry.intersectionRect;
@@ -218,7 +216,7 @@ internal static class BrowserCaptureScript
             }
             return !!hit && contains(element, hit);
           };
-          const reset = budgetMs => {
+          const reset = (budgetMs = Infinity) => {
             deadline = performance.now() + budgetMs;
             styleCache = new WeakMap(); textCache = new WeakMap(); labelCache = new WeakMap(); exposureCache = new WeakMap(); siblingShapes = new WeakMap();
             modal = currentModal();
@@ -361,11 +359,10 @@ internal static class BrowserCaptureScript
           };
           const frameElements = [];
           const candidates = [];
-          let scannedCount = 0, eligibleCount = 0, excludedOffscreenCount = 0, unsupportedBoundaryCount = 0, bytes = 2, complete = !modalityUnknown && !modalityBudgetExceeded, viewChanged = false;
+          let scannedCount = 0, eligibleCount = 0, excludedOffscreenCount = 0, unsupportedBoundaryCount = 0, complete = !modalityUnknown && !modalityBudgetExceeded, viewChanged = false;
           try {
             for (const element of walkElements(document)) {
               checkBudget();
-              if (scannedCount === 20000) throw budgetExceeded;
               scannedCount++;
               if (element.scrollWidth > element.clientWidth || element.scrollHeight > element.clientHeight)
                 scrollContainers.push([element, element.scrollLeft, element.scrollTop, element.clientWidth, element.clientHeight]);
@@ -393,14 +390,11 @@ internal static class BrowserCaptureScript
                 const [element] = scrollContainers[index];
                 if (!inView(element) && !relevantAncestors.has(element)) scrollContainers.splice(index, 1);
               }
-              if (nodes.length > 2000) throw budgetExceeded;
               nodes.forEach((element, index) => nodeIds.set(element, `${frame.id}:c${index + 1}`));
               for (const element of nodes) {
                 checkBudget();
                 const candidate = describe(element, candidates.length);
                 candidate.parentId = parentIdFor(element);
-                bytes += new TextEncoder().encode(JSON.stringify(candidate)).length + 1;
-                if (bytes > 512000) { complete = false; break; }
                 candidates.push(candidate);
               }
             }
@@ -545,7 +539,6 @@ internal static class BrowserCaptureScript
             const hosts = [];
             for (let root = element.getRootNode(); root.host; root = root.host.getRootNode()) {
               checkBudget();
-              if (hosts.length >= 63) throw budgetExceeded;
               hosts.unshift(root.host);
             }
             return hosts.length ? hosts.map(host => {
@@ -571,10 +564,6 @@ internal static class BrowserCaptureScript
             if (complete) for (let index = 0; index < nodes.length; index++) {
               const chain = shadowChain(nodes[index]);
               if (chain) candidates[index].shadowChain = chain;
-              if (chain) {
-                bytes += new TextEncoder().encode(JSON.stringify(chain)).length;
-                if (bytes > 512000) throw budgetExceeded;
-              }
             }
           } catch (error) { if (error !== budgetExceeded) throw error; complete = false; candidates.length = 0; }
           return {
@@ -621,10 +610,10 @@ internal static class BrowserCaptureScript
                     right: rect.x + (element.clientLeft + element.clientWidth) * scaleX, bottom: rect.y + (element.clientTop + element.clientHeight) * scaleY }),
                   exposed: accessibilityExposed(element), rendered: rendered(element), enabled: state(element).enabled, geometrySupported,
                   complexEffects: complexEffects(element) } };
-              } catch (error) { if (error === budgetExceeded) return { errorCode: 'capture_budget_exceeded' }; throw error; }
+              } catch (error) { if (error === budgetExceeded) return { errorCode: 'validation_budget_exceeded' }; throw error; }
             },
             data: { sessionId: identity.sessionId, pageId: identity.pageId, documentId: identity.documentId, captureId: identity.captureId, frameId: frame.id, capturedAt: new Date().toISOString(), candidates, scope: identity.scope,
-              coverage: { scannedCount, eligibleCount, excludedOffscreenCount, capturedCount: candidates.length, complete, errorCode: complete ? null : viewChanged ? 'capture_view_changed' : modalityBudgetExceeded ? 'capture_budget_exceeded' : modalityUnknown ? 'capture_exposure_unknown' : 'capture_budget_exceeded' }, unsupportedBoundaryCount },
+              coverage: { scannedCount, eligibleCount, excludedOffscreenCount, capturedCount: candidates.length, complete, errorCode: complete ? null : viewChanged ? 'capture_view_changed' : modalityUnknown ? 'capture_exposure_unknown' : 'capture_incomplete' }, unsupportedBoundaryCount },
             select(candidateId, action, budgetMs = 2000) {
               try {
               deadline = performance.now() + budgetMs;
@@ -632,7 +621,7 @@ internal static class BrowserCaptureScript
               modal = currentModal();
               if (modalityUnknown) return { errorCode: 'capture_exposure_unknown' };
               if (capturedDocument !== document) return { errorCode: 'stale_document' };
-              if (!complete) return { errorCode: 'capture_budget_exceeded' };
+              if (!complete) return { errorCode: 'capture_incomplete' };
               if (document.documentElement !== capturedRoot) return { errorCode: 'stale_capture' };
               if (candidateId === null) return { target: null };
               const index = candidates.findIndex(candidate => candidate.id === candidateId);

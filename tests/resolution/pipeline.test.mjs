@@ -590,7 +590,7 @@ test("xpath-duplicate-attributes-and-quotes-retain-unique-same-node-match", asyn
   }
 });
 
-test("scope-oversized-capture-fails-before-provider-call", async () => {
+test("scope-large-current-view-reaches-inference-and-verification-without-truncation", async () => {
   await json(`${fixture}/scenario`, "POST", { name: "found" });
   const session = await json(`${client}/api/sessions`, "POST");
   const run = randomUUID();
@@ -602,10 +602,32 @@ test("scope-oversized-capture-fails-before-provider-call", async () => {
       instruction: "Click About us.",
       documentId: page.documentId,
     });
-    assert.equal(result.outcome, "error");
-    assert.equal(result.diagnostics.capture.complete, false);
-    assert.equal(result.diagnostics.modelCalls, 0);
-    assert.equal(await json(`${fixture}/provider-request`), null);
+    assert.equal(result.outcome, "found", JSON.stringify(result.diagnostics));
+    assert.equal(result.diagnostics.capture.complete, true);
+    assert.ok(result.diagnostics.capture.scannedCount > 20000);
+    assert.equal(result.diagnostics.capture.capturedCount, 2003);
+    assert.equal(result.diagnostics.modelInputCount, 2003);
+    assert.ok(result.diagnostics.modelInputBytes > 512000);
+    assert.equal(result.diagnostics.modelInputBudgetBytes, null);
+    assert.equal(result.diagnostics.modelCalls, 1);
+    const input = JSON.parse((await json(`${fixture}/provider-request`)).messages[1].content);
+    assert.equal(input.candidates.length, 2003);
+    assert.equal(
+      input.candidates.filter((candidate) => candidate.label === "Extra ".repeat(40).trim()).length,
+      2001,
+    );
+    const target = result.actions[0].target;
+    assert.equal(target.accessibleName, "About us");
+    assert.equal(target.interactability.status, "ready");
+    await json(`${fixture}/oracle?run=${run}`, "POST", { xpaths: target.xpaths });
+    let observation;
+    for (let attempt = 0; attempt < 100 && !observation; attempt++) {
+      observation = await json(`${fixture}/observation?run=${run}`);
+      if (!observation) await delay(50);
+    }
+    assert.deepEqual(observation?.matches, [["expected-target"]]);
+    assert.equal(observation.clicks, 0);
+    assert.equal(observation.scrollY, 0);
   } finally {
     await fetch(`${client}/api/sessions/${session.sessionId}`, { method: "DELETE" });
   }

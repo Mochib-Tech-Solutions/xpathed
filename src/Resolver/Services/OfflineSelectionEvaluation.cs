@@ -11,7 +11,7 @@ namespace Xpathed.Resolver.Services;
 
 public static class OfflineSelectionEvaluation
 {
-    private const int InputBudgetBytes = ActionSelectionStrategy.InputBudgetBytes;
+    internal const int InputBudgetBytes = 512000;
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
         Encoder = JavaScriptEncoder.Create(UnicodeRanges.All),
@@ -23,7 +23,12 @@ public static class OfflineSelectionEvaluation
         var timer = Stopwatch.StartNew();
         string? configurationId = null;
         var prompt = ActionSelectionStrategy.Prompt;
-        var diagnostics = new ResolutionDiagnostics { Stage = "input", Strategy = "candidate-selection-offline" };
+        var diagnostics = new ResolutionDiagnostics
+        {
+            Stage = "input",
+            Strategy = "candidate-selection-offline",
+            ModelInputBudgetBytes = InputBudgetBytes,
+        };
         try
         {
             if (args.Length is < 2 or > 3 || args.Length == 3 && args[2] != "--prepare-only")
@@ -86,6 +91,7 @@ public static class OfflineSelectionEvaluation
                 Strategy = diagnostics.Strategy,
                 ModelCalls = 1,
                 ModelInputBytes = diagnostics.ModelInputBytes,
+                ModelInputBudgetBytes = InputBudgetBytes,
                 ModelInputCount = candidateIds.Length,
                 ModelInputComplete = true,
             };

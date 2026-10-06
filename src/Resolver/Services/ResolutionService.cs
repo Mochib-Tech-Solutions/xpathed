@@ -109,14 +109,6 @@ public sealed partial class ResolutionService(
                 ModelInputComplete = capture.Coverage.Complete,
                 ModelInputBytes = System.Text.Encoding.UTF8.GetByteCount(input),
             };
-            if (diagnostics.ModelInputBytes > diagnostics.ModelInputBudgetBytes)
-            {
-                throw new ApiException(
-                    422,
-                    "model_input_budget_exceeded",
-                    "The complete page representation exceeds the model input budget."
-                );
-            }
             observeInput?.Invoke(input);
             cancellationToken.ThrowIfCancellationRequested();
             ProviderCompletion completion;

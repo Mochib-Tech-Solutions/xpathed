@@ -177,7 +177,7 @@ internal static partial class BrowserEvidence
         frame is null
         || !string.IsNullOrWhiteSpace(frame.Id)
             && !string.IsNullOrWhiteSpace(frame.DocumentId)
-            && frame.Chain is { Length: <= 63 }
+            && frame.Chain is not null
             && (
                 frame.Id == "main"
                     ? frame.Chain.Length == 0 && frame.DocumentId == documentId
@@ -214,7 +214,7 @@ internal static partial class BrowserEvidence
 
     private static bool ValidShadowChain(ShadowHost[]? chain) =>
         chain is null
-        || chain is { Length: > 0 and <= 63 }
+        || chain is { Length: > 0 }
             && chain.All(host => host is not null && !string.IsNullOrWhiteSpace(host.Xpath) && host.Label is not null);
 
     private static bool SameShadowChain(ShadowHost[]? actual, ShadowHost[]? expected) =>

@@ -1,0 +1,7 @@
+# Capture the complete current view
+
+Status: Accepted, 2026-10-06. Supersedes the capture resource ceilings in [ADR-0018](0018-scope-resolution-to-the-current-view.md) and their retention in [ADR-0020](0020-treat-latency-targets-as-evaluation-metrics.md).
+
+Current-view capture has no application ceiling on visited elements, supported documents, retained candidates, frame/shadow depth, text length, candidate bytes or capture time. Fixed ceilings rejected ordinary dense pages before selection, including nested layout tables that repeated page-sized row text for every link. Capture preserves every eligible in-view identity, names, structural context and privacy sanitization; row text comes from the nearest row, while explicit ancestor names, headings and landmarks remain available.
+
+Live Resolver forwards the complete sanitized representation without an application byte ceiling; its diagnostics report input size with `modelInputBudgetBytes: null`. Provider context capacity, transport timeouts and caller cancellation can still produce operational failures, never silently truncated candidates or inferred absence. Saved-page selection retains its separate bounded file-input contract. Target validation and highlight revalidation retain their two-second budgets and same-node checks. View changes and unsupported/unknown boundaries remain explicit; completeness does not certify target-set semantics.

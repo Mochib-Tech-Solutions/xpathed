@@ -29,6 +29,8 @@ The actual XPath comes from the DOM. Results include readiness, time and cost. A
 
 Open Shadow DOM is supported, including nested and dynamically inserted controls. A found shadow target includes its ordered `shadowChain` beside the XPath; enter each host's open root, then evaluate the XPath within the final tree. Frame owners can carry shadow context too. Closed roots remain unsupported. See [locator context](docs/resolution.md#open-shadow-dom-and-locator-context).
 
+Current-view capture retains every eligible candidate without application ceilings on candidate count, DOM scans, frame/shadow depth, text, bytes or capture time. Live model input includes the complete sanitized view; provider context capacity and transport failures remain explicit. See [the capture policy](docs/adr/0030-capture-the-complete-current-view.md).
+
 Browser verifies each returned target’s retained node, name/text, current-view membership, unique XPath and fresh readiness. Unrelated carousel or widget changes do not invalidate it; selection and absence describe the captured view, with target-set completeness unverified. See [target revalidation](docs/resolution.md#target-revalidation). Explicit target counts are preserved: two found buttons out of three requested produce a partial result with one missing target.
 
 XPath construction prefers explicit test attributes and meaningful semantics. It distinguishes sanitized names from DOM text so Unicode and nested labels can retain semantic locators across wrapper changes, while excluding hidden text and form values from new text predicates. The [selection policy](docs/resolution.md#preferred-xpath) describes the bounds and saved-locator limits.
