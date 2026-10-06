@@ -170,6 +170,81 @@ async function openFirst(user: ReturnType<typeof userEvent.setup>) {
 }
 
 describe("Browser tabs and chat", () => {
+  it("retries a historical prompt on its active tab's current document without clearing drafts", async () => {
+    const api = browserApi();
+    const user = renderWorkspace();
+    await openFirst(user);
+    const composer = () => screen.getByRole("textbox", { name: "Describe an element" });
+    await user.type(composer(), "Click First{Enter}");
+    await screen.findByText("First target", { selector: "bdi" });
+    await user.click(screen.getByRole("button", { name: "New tab" }));
+    await user.type(screen.getByRole("textbox", { name: "Page address" }), "second.test{Enter}");
+    await waitFor(() => expect(composer()).toBeEnabled());
+    await user.type(composer(), "Click Second{Enter}");
+    await screen.findByText("Second target", { selector: "bdi" });
+    await user.type(composer(), "Draft for Second");
+    await user.click(screen.getByRole("tab", { name: "First" }));
+    const address = screen.getByRole("textbox", { name: "Page address" });
+    await user.clear(address);
+    await user.type(address, "first.test/updated{Enter}");
+    await waitFor(() => expect(composer()).toBeEnabled());
+    await user.type(composer(), "Draft for First");
+    const resolve = vi.fn((page: PageState, instruction: string) =>
+      Promise.resolve(Response.json(api.result(page, instruction))),
+    );
+    api.setResolve(resolve);
+    screen.getByRole("button", { name: "Retry instruction" }).focus();
+    await user.keyboard("{Enter}");
+    await waitFor(() =>
+      expect(screen.getAllByText("First target", { selector: "bdi" })).toHaveLength(2),
+    );
+    expect(resolve).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ pageId: "page-1", documentId: "document-1-n-n" }),
+      "Click First",
+    );
+    expect(screen.getAllByText("Click First", { selector: "p" })).toHaveLength(2);
+    expect(composer()).toHaveValue("Draft for First");
+    await user.click(screen.getByRole("tab", { name: "Second" }));
+    expect(screen.getAllByText("Click Second", { selector: "p" })).toHaveLength(1);
+    expect(composer()).toHaveValue("Draft for Second");
+  });
+
+  it("retries a failed prompt as a new attempt and disables retries while it is pending", async () => {
+    const api = browserApi();
+    api.setResolve(() =>
+      Promise.resolve(Response.json({ message: "Provider unavailable." }, { status: 503 })),
+    );
+    const user = renderWorkspace();
+    await openFirst(user);
+    await user.type(
+      screen.getByRole("textbox", { name: "Describe an element" }),
+      "Click First{Enter}",
+    );
+    expect(await screen.findByRole("alert")).toHaveTextContent("Provider unavailable.");
+    let finish!: (response: Response) => void;
+    const resolve = vi.fn(
+      () =>
+        new Promise<Response>((done) => {
+          finish = done;
+        }),
+    );
+    api.setResolve(resolve);
+    await user.dblClick(screen.getByRole("button", { name: "Retry instruction" }));
+    expect(resolve).toHaveBeenCalledTimes(1);
+    expect(screen.getAllByRole("button", { name: "Retry instruction" })).toHaveLength(2);
+    for (const button of screen.getAllByRole("button", { name: "Retry instruction" })) {
+      expect(button).toBeDisabled();
+    }
+    await act(() =>
+      Promise.resolve(finish(Response.json(api.result(api.snapshot().pages[0]!, "Click First")))),
+    );
+    await screen.findByText("First target", { selector: "bdi" });
+    expect(screen.getByRole("alert")).toHaveTextContent("Provider unavailable.");
+    for (const button of screen.getAllByRole("button", { name: "Retry instruction" })) {
+      expect(button).toBeEnabled();
+    }
+  });
+
   it("keeps keyboard focus on the selected tab after switching and closing", async () => {
     browserApi();
     const user = renderWorkspace();
