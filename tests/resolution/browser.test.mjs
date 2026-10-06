@@ -975,6 +975,60 @@ test("frames-offscreen-content-is-excluded-and-ancestor-appearance-limits-are-re
   );
 });
 
+test("state-static-text-does-not-claim-enabled-control-readiness", async () => {
+  await withFixture(
+    `<h1><span id="expected-target">Where should we begin?</span></h1>
+    <h2 id="heading">Welcome</h2><p id="paragraph">Instructions</p><div id="container">Content</div>
+    <img id="image" alt="Logo" width="24" height="24"><input id="input" type="email" aria-label="Email address">
+    <button id="native">Continue</button><span id="custom" role="button">Custom action</span>
+    <a id="link" href="#">Help</a><span id="declared" aria-disabled="false">Declared state</span>
+    <div aria-disabled="true"><span id="disabled">Disabled text</span></div>
+    <script>window.observedEvents = { click: 0, focus: 0 };
+    document.addEventListener('click', () => window.observedEvents.click++);
+    document.addEventListener('focusin', () => window.observedEvents.focus++);</script>`,
+    async (session, page) => {
+      const before = await observe();
+      const capture = await request(`/pages/${page.pageId}/capture`, {
+        documentId: page.documentId,
+      });
+      for (const [text, id, enabled] of [
+        ["Where should we begin?", "expected-target", "not_applicable"],
+        ["Welcome", "heading", "not_applicable"],
+        ["Instructions", "paragraph", "not_applicable"],
+        ["Content", "container", "not_applicable"],
+        ["Logo", "image", "not_applicable"],
+        ["Email address", "input", "pass"],
+        ["Continue", "native", "pass"],
+        ["Custom action", "custom", "pass"],
+        ["Help", "link", "pass"],
+        ["Declared state", "declared", "pass"],
+        ["Disabled text", "disabled", "fail"],
+      ]) {
+        const candidate = capture.candidates.find((entry) => (entry.text || entry.label) === text);
+        assert.ok(candidate, text);
+        for (const action of ["click", "double_click", "right_click"]) {
+          const { target } = await request(`/pages/${page.pageId}/selection`, {
+            documentId: page.documentId,
+            captureId: capture.captureId,
+            candidateId: candidate.id,
+            action,
+          });
+          assert.equal(target.interactability.checks.enabled, enabled, `${id}/${action}`);
+          assert.equal(target.interactability.status, enabled === "fail" ? "blocked" : "ready");
+          assert.equal(target.interactability.checks.viewport, "pass");
+          assert.equal(target.interactability.checks.pointerReception, "pass");
+          assert.equal(target.interactability.checks.eventOutcome, "unknown");
+          assert.deepEqual((await verify(target.xpaths)).matches, [[id]]);
+        }
+      }
+      const after = await observe();
+      assert.deepEqual(after.events, before.events);
+      assert.equal(after.activeElement, before.activeElement);
+      assert.equal(after.scrollY, before.scrollY);
+    },
+  );
+});
+
 test("state-disabled-target-has-distinct-click-and-hover-readiness", async () => {
   await withFixture(
     '<button id="expected-target" disabled>Disabled action</button>',
@@ -1734,9 +1788,45 @@ test("scope-accessibility-exposure-preserves-visual-limits-and-safe-hidden-names
   );
 });
 
+for (const focused of [false, true])
+  test(`state-native-email-keyboard-readiness-is-passive-${focused ? "focused" : "unfocused"}`, async () => {
+    await withFixture(
+      `<label for="expected-target">Email address</label><input id="expected-target" type="email" data-observe-value value="PRIVATE_EMAIL">
+    <script>${focused ? "document.querySelector('#expected-target').focus();" : ""}window.observedEvents={};for(const name of ['input','change','focusin','focusout','keydown'])document.addEventListener(name,()=>window.observedEvents[name]=(window.observedEvents[name]??0)+1,true);</script>`,
+      async (session, page) => {
+        const before = await observe();
+        assert.equal(before.activeElement, focused ? "expected-target" : "");
+        const capture = await request(`/pages/${session.pageId}/capture`, {
+          documentId: page.documentId,
+        });
+        const candidate = capture.candidates.find((entry) => entry.label === "Email address");
+        assert.ok(candidate);
+        const { target } = await request(`/pages/${session.pageId}/selection`, {
+          documentId: page.documentId,
+          captureId: capture.captureId,
+          candidateId: candidate.id,
+          action: "type",
+        });
+        assert.equal(target.interactability.checks.keyboard, "pass");
+        assert.equal(target.interactability.status, "ready");
+        assert.equal(target.interactability.checks.eventOutcome, "unknown");
+        const after = await verify(target.xpaths);
+        assert.deepEqual(after.matches, [["expected-target"]]);
+        assert.equal(after.activeElement, before.activeElement);
+        assert.deepEqual(after.events, before.events);
+        assert.deepEqual(after.values, before.values);
+        assert.equal(after.scrollY, before.scrollY);
+        assert.doesNotMatch(JSON.stringify(capture), /PRIVATE_EMAIL/);
+      },
+    );
+  });
+
 test("state-readiness-reports-control-limitations-without-interaction", async () => {
   await withFixture(
     `<input aria-label="Readonly field" readonly value="PRIVATE_VALUE">
+    <input aria-label="Disabled field" disabled><textarea aria-label="Native notes"></textarea>
+    <div contenteditable aria-label="Native editor" style="height:30px"></div>
+    <div role="textbox" aria-label="Custom writable editor" tabindex="0" style="height:30px"></div>
     <input type="checkbox" aria-label="Check choice"><input type="radio" aria-label="Radio choice">
     <select aria-label="Select country"><option>PRIVATE_OPTION</option></select>
     <div role="combobox" aria-label="Custom select" tabindex="0">Custom</div>
@@ -1754,6 +1844,11 @@ test("state-readiness-reports-control-limitations-without-interaction", async ()
         ["Readonly field", "fill", "blocked", "readonly"],
         ["Readonly field", "type", "blocked", "readonly"],
         ["Readonly field", "click", "ready", null],
+        ["Disabled field", "type", "blocked", "disabled"],
+        ["Native notes", "fill", "ready", null],
+        ["Native editor", "type", "ready", null],
+        ["Native editor", "clear", "ready", null],
+        ["Custom writable editor", "type", "unsupported", "custom_control_unverified"],
         ["Plain button", "fill", "blocked", "incompatible_control"],
         ["Blocked pointer", "hover", "blocked", "pointer_events_none"],
         ["Covered", "click", "blocked", "obstructed_at_hit_point"],
@@ -1855,7 +1950,7 @@ test("targeting-native-semantics-preserve-normalized-inputs-and-descendant-names
         action: "fill",
       });
       assert.equal(target.interactability.checks.compatibleControl, "pass");
-      assert.equal(target.interactability.status, "unknown");
+      assert.equal(target.interactability.status, "ready");
     },
   );
 });
@@ -2507,12 +2602,15 @@ test("state-native-date-and-time-fill-and-clear-remain-passive", async () => {
             action === "type" ? "fail" : "pass",
             `${type}: ${action}`,
           );
-          assert.equal(target.interactability.checks.keyboard, "unknown");
+          assert.equal(
+            target.interactability.checks.keyboard,
+            action === "type" ? "unknown" : "pass",
+          );
           assert.equal(target.state.editable, !readonly);
           assert.equal(target.interactability.checks.writable, readonly ? "fail" : "pass");
           assert.equal(
             target.interactability.status,
-            action === "type" || readonly ? "blocked" : "unknown",
+            action === "type" || readonly ? "blocked" : "ready",
           );
         }
       }

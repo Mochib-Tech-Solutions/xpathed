@@ -939,10 +939,25 @@ describe("Workspace resolution", () => {
 
   it.each([
     {
+      action: "click",
+      status: "ready",
+      checks: { enabled: "not_applicable", viewport: "pass", pointerReception: "pass" },
+      message: "Verified: in view, unobstructed at the checked point.",
+      limit: null,
+      staticText: true,
+    },
+    {
       action: "hover",
       status: "ready",
       checks: { enabled: "not_applicable", viewport: "pass", pointerReception: "pass" },
       message: "Verified: in view, unobstructed at the checked point.",
+      limit: null,
+    },
+    {
+      action: "type",
+      status: "ready",
+      checks: { compatibleControl: "pass", enabled: "pass", writable: "pass", keyboard: "pass" },
+      message: "Verified: compatible control type, enabled, not read-only.",
       limit: null,
     },
     {
@@ -982,7 +997,7 @@ describe("Workspace resolution", () => {
     },
   ])(
     "explains $action/$status from the actual checks",
-    async ({ action, status, checks, message, limit }) => {
+    async ({ action, status, checks, message, limit, staticText }) => {
       mockApi(() =>
         Promise.resolve(
           Response.json({
@@ -998,6 +1013,11 @@ describe("Workspace resolution", () => {
                 outcome: "found",
                 target: {
                   ...target,
+                  ...(staticText && {
+                    tag: "span",
+                    label: "",
+                    state: { ...target.state, enabled: true, inViewport: true },
+                  }),
                   interactability: { action, status, reasons: [], checks },
                 },
               },
@@ -1013,6 +1033,12 @@ describe("Workspace resolution", () => {
         expect(await screen.findByText(message)).toBeVisible();
       }
       if (limit) expect(screen.getByText(limit)).toBeVisible();
+      if (staticText) {
+        expect(screen.getByRole("heading", { name: "Element <span>" })).toBeVisible();
+        expect(screen.queryByText(/enabled|active|interactive/i)).not.toBeInTheDocument();
+      }
+      if (checks.keyboard === "pass")
+        expect(screen.queryByText("Keyboard readiness unknown.")).not.toBeInTheDocument();
       expect(
         screen.queryByText(
           /No action was performed|no interaction requested|movement and page response/i,

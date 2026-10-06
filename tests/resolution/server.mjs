@@ -161,7 +161,7 @@ const server = createServer(async (request, response) => {
       if (path === "/privacy")
         html = html.replace(
           "<script>",
-          `<label>Prénom<input value="PRIVATE_INPUT_SENTINEL"></label><label>Notes<textarea>PRIVATE_TEXTAREA_SENTINEL</textarea></label><select aria-label="Country"><option selected>PRIVATE_SELECT_SENTINEL</option></select><div contenteditable aria-label="Editor"><span>PRIVATE_EDITABLE_SENTINEL</span></div><input type="password" aria-label="Password" value="PRIVATE_PASSWORD_SENTINEL"><a href="https://example.test/?secret=PRIVATE_URL_SENTINEL">Help</a><script>document.cookie='private=PRIVATE_COOKIE_SENTINEL';localStorage.setItem('secret','PRIVATE_STORAGE_SENTINEL');</script><script>`,
+          `<label>Prénom<input data-oracle="native-input" value="PRIVATE_INPUT_SENTINEL"></label><label>Notes<textarea>PRIVATE_TEXTAREA_SENTINEL</textarea></label><select aria-label="Country"><option selected>PRIVATE_SELECT_SENTINEL</option></select><div contenteditable aria-label="Editor"><span>PRIVATE_EDITABLE_SENTINEL</span></div><input type="password" aria-label="Password" value="PRIVATE_PASSWORD_SENTINEL"><a href="https://example.test/?secret=PRIVATE_URL_SENTINEL">Help</a><script>document.cookie='private=PRIVATE_COOKIE_SENTINEL';localStorage.setItem('secret','PRIVATE_STORAGE_SENTINEL');</script><script>`,
         );
       if (path === "/quotes")
         html = html

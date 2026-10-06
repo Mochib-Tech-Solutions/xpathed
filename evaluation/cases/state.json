@@ -1944,7 +1944,7 @@
             "reasons": ["readonly"],
             "checks": {
               "writable": "fail",
-              "keyboard": "unknown"
+              "keyboard": "pass"
             }
           }
         }
@@ -2140,7 +2140,7 @@
     "sourceIds": ["control-states-4", "state-native-country-select-is-ready"]
   },
   {
-    "id": "state-native-date-fill-readiness-is-unknown",
+    "id": "state-native-date-fill-is-ready",
     "family": "states",
     "split": "regression",
     "category": "state",
@@ -2168,12 +2168,12 @@
             "frames": []
           },
           "interactability": {
-            "status": "unknown",
+            "status": "ready",
             "reasons": [],
             "checks": {
               "compatibleControl": "pass",
               "writable": "pass",
-              "keyboard": "unknown"
+              "keyboard": "pass"
             }
           }
         }
@@ -2187,7 +2187,7 @@
         "unsupported": 0,
         "errors": 0,
         "blocked": 0,
-        "readinessUnknown": 1,
+        "readinessUnknown": 0,
         "assessmentUnsupported": 0
       }
     },
@@ -2207,7 +2207,11 @@
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
     "group": "state",
-    "sourceIds": ["control-states-5", "state-native-date-fill-is-ready"]
+    "sourceIds": [
+      "control-states-5",
+      "state-native-date-fill-is-ready",
+      "state-native-date-fill-readiness-is-unknown"
+    ]
   },
   {
     "id": "state-custom-checkbox-check-is-unverified",
@@ -3115,7 +3119,7 @@
             "reasons": ["readonly"],
             "checks": {
               "writable": "fail",
-              "keyboard": "unknown"
+              "keyboard": "pass"
             }
           }
         }
@@ -3160,7 +3164,7 @@
     "sourceIds": ["clinic-readonly-clear"]
   },
   {
-    "id": "state-followup-question-fill-readiness-is-unknown",
+    "id": "state-followup-question-fill-is-ready",
     "family": "clinic-consultation",
     "split": "regression",
     "category": "semantics",
@@ -3227,11 +3231,11 @@
             "readonly": false
           },
           "interactability": {
-            "status": "unknown",
+            "status": "ready",
             "reasons": [],
             "checks": {
               "compatibleControl": "pass",
-              "keyboard": "unknown",
+              "keyboard": "pass",
               "eventOutcome": "unknown"
             }
           }
@@ -3247,7 +3251,7 @@
         "unsupported": 0,
         "errors": 0,
         "blocked": 0,
-        "readinessUnknown": 1,
+        "readinessUnknown": 0,
         "assessmentUnsupported": 0
       }
     },
@@ -3274,7 +3278,11 @@
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
     "group": "state",
-    "sourceIds": ["clinic-fill-question", "state-followup-question-fill-is-ready"]
+    "sourceIds": [
+      "clinic-fill-question",
+      "state-followup-question-fill-is-ready",
+      "state-followup-question-fill-readiness-is-unknown"
+    ]
   },
   {
     "id": "state-accessibility-link-hover-is-ready",

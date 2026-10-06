@@ -33,6 +33,10 @@ Current-view capture retains every eligible candidate without application ceilin
 
 Browser verifies each returned target’s retained node, name/text, current-view membership, unique XPath and fresh readiness. Unrelated carousel or widget changes do not invalidate it; selection and absence describe the captured view, with target-set completeness unverified. See [target revalidation](docs/resolution.md#target-revalidation). Explicit target counts are preserved: two found buttons out of three requested produce a partial result with one missing target.
 
+Typing, filling and clearing supported native inputs, textareas and editing hosts use passive keyboard editing checks. Passing readiness does not require moving focus or sending keys; event outcomes remain untested.
+
+Plain text selected for a click reports viewport and pointer observations. It is not labelled enabled merely because it has no disabled flag; those observations do not establish a click handler.
+
 XPath construction prefers explicit test attributes and meaningful semantics. It distinguishes sanitized names from DOM text so Unicode and nested labels can retain semantic locators across wrapper changes, while excluding hidden text and form values from new text predicates. The [selection policy](docs/resolution.md#preferred-xpath) describes the bounds and saved-locator limits.
 
 Each sent prompt has a **Retry instruction** button that resends it against the active tab’s current view as a new attempt, preserving earlier results and the composer draft. Retry is disabled while the workspace is busy.

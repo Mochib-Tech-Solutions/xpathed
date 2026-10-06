@@ -244,6 +244,9 @@ internal static class BrowserCaptureScript
             const rect = geometry(element);
             const hit = pointer && observed.inViewport && receivesPoint(element, pointFor(element));
             const semanticRole = role(element);
+            const enabledApplies = !observed.enabled || element.matches(':enabled,a[href],summary') || element.isContentEditable ||
+              ['button','link','checkbox','radio','switch','textbox','searchbox','spinbutton','combobox','listbox','slider','scrollbar','menuitem','menuitemcheckbox','menuitemradio','option','tab','treeitem'].includes(semanticRole) ||
+              !!closest(element, '[aria-disabled]');
             const custom = editable ? !element.isContentEditable && !element.matches('input,textarea') && ['textbox','searchbox','spinbutton'].includes(semanticRole) :
               action === 'select' ? element.localName !== 'select' && ['combobox','listbox'].includes(semanticRole) :
               ['check','uncheck'].includes(action) ? !element.matches('input[type=checkbox],input[type=radio]') && ['checkbox','radio','switch'].includes(semanticRole) : false;
@@ -254,11 +257,12 @@ internal static class BrowserCaptureScript
               ['check', 'uncheck'].includes(action) ? element.matches('input[type=checkbox],input[type=radio]') && !(action === 'uncheck' && element.type === 'radio') : true);
             const checks = {
               compatibleControl: custom ? 'unknown' : compatible ? 'pass' : 'fail',
-              enabled: ['hover', 'inspect', 'blur'].includes(action) ? 'not_applicable' : observed.enabled ? 'pass' : 'fail',
+              enabled: ['hover', 'inspect', 'blur'].includes(action) || !enabledApplies ? 'not_applicable' : observed.enabled ? 'pass' : 'fail',
               writable: editable ? observed.readonly ? 'fail' : 'pass' : 'not_applicable',
               viewport: pointer ? observed.inViewport ? 'pass' : 'fail' : 'not_applicable',
               pointerReception: !pointer ? 'not_applicable' : !observed.inViewport ? 'unknown' : hit ? 'pass' : 'fail',
-              keyboard: keyboard ? 'unknown' : 'not_applicable',
+              keyboard: !keyboard ? 'not_applicable' : editable && compatible && !custom && observed.enabled &&
+                (element.matches('input,textarea') || element.isContentEditable && !parent(element)?.isContentEditable) ? 'pass' : 'unknown',
               stability: 'unknown', eventOutcome: 'unknown'
             };
             const reasons = [];
