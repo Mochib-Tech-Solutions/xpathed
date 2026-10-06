@@ -289,7 +289,7 @@ export default function ChatPanel({
           return (
             <article key={resolution.id} className="mb-6 space-y-4 text-sm leading-relaxed">
               <div className="ml-6 flex flex-col items-end gap-1.5" aria-label="Sent message">
-                <div className="flex max-w-full items-start gap-1.5">
+                <div className="flex max-w-full items-center gap-1.5">
                   <Button
                     type="button"
                     variant="ghost"
