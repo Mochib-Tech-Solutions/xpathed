@@ -4,6 +4,10 @@ The 2026-09-30 follow-up requests meaningful readiness, one best XPath, inline s
 
 Browser returns the first unique same-node XPath from its preference order, rather than alternative paths. The existing `xpaths` array contains exactly one entry, preserving the existing response shape. Resolver rejects contradictory readiness and multiple-path selections. Chat displays that XPath and state directly. The model still selects candidate IDs; Browser owns locator construction and observations.
 
+Native keyboard editing support for fill/type/clear is assessed from enabled compatible inputs, textareas and contenteditable editing hosts. These controls can pass passive keyboard readiness even when they are not currently focused. Readonly controls remain blocked by the independent writable check; custom controls and inherited editable descendants retain unknown keyboard evidence. No focus or key event is needed to observe native editing support, and event outcomes remain unknown.
+
+Ordinary text does not have an enabled-control check. Positive enabled evidence applies to native/ARIA controls, editing elements or an explicit disabled-state declaration; observed disabling still blocks applicable actions. Chat omits positive enabled state when the check is not applicable. Selecting plain text for a click can verify viewport membership and pointer reception without claiming a click handler or an interactive control.
+
 The user explicitly chose to keep the current scroll position. Highlighting follows the verified DOM node in Chromium’s overlay, including targets outside the viewport, and becomes visible when the user scrolls to the target. Resolution does not scroll, focus, reveal or execute page actions. A multi-action result automatically highlights its first found target; the internal revalidation endpoint remains available while the workspace has no Inspect control.
 
 The highlight implementation and first-target-only behavior are superseded by [ADR-0015](0015-keep-target-highlights-until-user-input.md).

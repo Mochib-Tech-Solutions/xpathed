@@ -554,9 +554,11 @@ export default function ChatPanel({
                                       {target.state.inViewport ? "In viewport" : "Off-screen"}
                                     </span>
                                   )}
-                                  {checks?.enabled !== "pass" && (
-                                    <span>{target.state.enabled ? "Enabled" : "Disabled"}</span>
-                                  )}
+                                  {checks?.enabled !== "pass" &&
+                                    (checks?.enabled !== "not_applicable" ||
+                                      !target.state.enabled) && (
+                                      <span>{target.state.enabled ? "Enabled" : "Disabled"}</span>
+                                    )}
                                   {(target.state.editable ||
                                     action.action === "fill" ||
                                     action.action === "type") && (

@@ -447,7 +447,7 @@
       "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
       "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt10-reviewed-holdout-check"
     },
-    "id": "state-spinbutton-fill-readiness-is-unknown",
+    "id": "state-spinbutton-fill-readiness-is-ready",
     "family": "release3-spin",
     "split": "regression",
     "category": "current-view",
@@ -469,7 +469,10 @@
             "enabled": true
           },
           "interactability": {
-            "status": "unknown"
+            "status": "ready",
+            "checks": {
+              "keyboard": "pass"
+            }
           }
         }
       ],
@@ -494,7 +497,7 @@
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
     "group": "state",
-    "sourceIds": ["release3-spin-1"]
+    "sourceIds": ["release3-spin-1", "state-spinbutton-fill-readiness-is-unknown"]
   },
   {
     "viewport": {
@@ -854,7 +857,7 @@
       "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
       "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt10-reviewed-holdout-check"
     },
-    "id": "state-richtext-fill-readiness-is-unknown",
+    "id": "state-richtext-fill-readiness-is-ready",
     "family": "release3-richtext",
     "split": "regression",
     "category": "current-view",
@@ -876,7 +879,10 @@
             "enabled": true
           },
           "interactability": {
-            "status": "unknown"
+            "status": "ready",
+            "checks": {
+              "keyboard": "pass"
+            }
           }
         }
       ],
@@ -901,7 +907,7 @@
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
     "group": "state",
-    "sourceIds": ["release3-richtext-1"]
+    "sourceIds": ["release3-richtext-1", "state-richtext-fill-readiness-is-unknown"]
   },
   {
     "viewport": {
@@ -920,7 +926,7 @@
       "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
       "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt10-reviewed-holdout-check"
     },
-    "id": "state-richtext-clear-readiness-is-unknown",
+    "id": "state-richtext-clear-readiness-is-ready",
     "family": "release3-richtext",
     "split": "regression",
     "category": "current-view",
@@ -942,7 +948,10 @@
             "enabled": true
           },
           "interactability": {
-            "status": "unknown"
+            "status": "ready",
+            "checks": {
+              "keyboard": "pass"
+            }
           }
         }
       ],
@@ -967,7 +976,7 @@
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json"],
     "group": "state",
-    "sourceIds": ["release3-richtext-2"]
+    "sourceIds": ["release3-richtext-2", "state-richtext-clear-readiness-is-unknown"]
   },
   {
     "viewport": {
@@ -1944,7 +1953,7 @@
             "reasons": ["readonly"],
             "checks": {
               "writable": "fail",
-              "keyboard": "unknown"
+              "keyboard": "pass"
             }
           }
         }
@@ -2140,7 +2149,7 @@
     "sourceIds": ["control-states-4", "state-native-country-select-is-ready"]
   },
   {
-    "id": "state-native-date-fill-readiness-is-unknown",
+    "id": "state-native-date-fill-is-ready",
     "family": "states",
     "split": "regression",
     "category": "state",
@@ -2168,12 +2177,12 @@
             "frames": []
           },
           "interactability": {
-            "status": "unknown",
+            "status": "ready",
             "reasons": [],
             "checks": {
               "compatibleControl": "pass",
               "writable": "pass",
-              "keyboard": "unknown"
+              "keyboard": "pass"
             }
           }
         }
@@ -2187,7 +2196,7 @@
         "unsupported": 0,
         "errors": 0,
         "blocked": 0,
-        "readinessUnknown": 1,
+        "readinessUnknown": 0,
         "assessmentUnsupported": 0
       }
     },
@@ -2207,7 +2216,11 @@
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
     "group": "state",
-    "sourceIds": ["control-states-5", "state-native-date-fill-is-ready"]
+    "sourceIds": [
+      "control-states-5",
+      "state-native-date-fill-is-ready",
+      "state-native-date-fill-readiness-is-unknown"
+    ]
   },
   {
     "id": "state-custom-checkbox-check-is-unverified",
@@ -2278,7 +2291,7 @@
     "sourceIds": ["control-states-6"]
   },
   {
-    "id": "state-textarea-type-readiness-is-unknown",
+    "id": "state-textarea-type-readiness-is-ready",
     "family": "semantics",
     "split": "regression",
     "category": "semantics",
@@ -2306,10 +2319,11 @@
             "frames": []
           },
           "interactability": {
-            "status": "unknown",
+            "status": "ready",
             "reasons": [],
             "checks": {
-              "eventOutcome": "unknown"
+              "eventOutcome": "unknown",
+              "keyboard": "pass"
             }
           }
         }
@@ -2323,7 +2337,7 @@
         "unsupported": 0,
         "errors": 0,
         "blocked": 0,
-        "readinessUnknown": 1,
+        "readinessUnknown": 0,
         "assessmentUnsupported": 0
       }
     },
@@ -2342,10 +2356,14 @@
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
     "group": "state",
-    "sourceIds": ["action-families-2", "state-textarea-type-is-ready"]
+    "sourceIds": [
+      "action-families-2",
+      "state-textarea-type-is-ready",
+      "state-textarea-type-readiness-is-unknown"
+    ]
   },
   {
-    "id": "state-textarea-clear-readiness-is-unknown",
+    "id": "state-textarea-clear-readiness-is-ready",
     "family": "semantics",
     "split": "regression",
     "category": "semantics",
@@ -2373,10 +2391,11 @@
             "frames": []
           },
           "interactability": {
-            "status": "unknown",
+            "status": "ready",
             "reasons": [],
             "checks": {
-              "eventOutcome": "unknown"
+              "eventOutcome": "unknown",
+              "keyboard": "pass"
             }
           }
         }
@@ -2390,7 +2409,7 @@
         "unsupported": 0,
         "errors": 0,
         "blocked": 0,
-        "readinessUnknown": 1,
+        "readinessUnknown": 0,
         "assessmentUnsupported": 0
       }
     },
@@ -2409,7 +2428,11 @@
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
     "group": "state",
-    "sourceIds": ["action-families-3", "state-textarea-clear-is-ready"]
+    "sourceIds": [
+      "action-families-3",
+      "state-textarea-clear-is-ready",
+      "state-textarea-clear-readiness-is-unknown"
+    ]
   },
   {
     "id": "state-textarea-focus-readiness-is-unknown",
@@ -3115,7 +3138,7 @@
             "reasons": ["readonly"],
             "checks": {
               "writable": "fail",
-              "keyboard": "unknown"
+              "keyboard": "pass"
             }
           }
         }
@@ -3160,7 +3183,7 @@
     "sourceIds": ["clinic-readonly-clear"]
   },
   {
-    "id": "state-followup-question-fill-readiness-is-unknown",
+    "id": "state-followup-question-fill-is-ready",
     "family": "clinic-consultation",
     "split": "regression",
     "category": "semantics",
@@ -3227,11 +3250,11 @@
             "readonly": false
           },
           "interactability": {
-            "status": "unknown",
+            "status": "ready",
             "reasons": [],
             "checks": {
               "compatibleControl": "pass",
-              "keyboard": "unknown",
+              "keyboard": "pass",
               "eventOutcome": "unknown"
             }
           }
@@ -3247,7 +3270,7 @@
         "unsupported": 0,
         "errors": 0,
         "blocked": 0,
-        "readinessUnknown": 1,
+        "readinessUnknown": 0,
         "assessmentUnsupported": 0
       }
     },
@@ -3274,7 +3297,11 @@
     "sourceSplit": "regression",
     "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
     "group": "state",
-    "sourceIds": ["clinic-fill-question", "state-followup-question-fill-is-ready"]
+    "sourceIds": [
+      "clinic-fill-question",
+      "state-followup-question-fill-is-ready",
+      "state-followup-question-fill-readiness-is-unknown"
+    ]
   },
   {
     "id": "state-accessibility-link-hover-is-ready",

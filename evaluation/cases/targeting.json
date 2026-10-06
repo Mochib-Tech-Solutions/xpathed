@@ -193,10 +193,11 @@
             "frames": []
           },
           "interactability": {
-            "status": "unknown",
+            "status": "ready",
             "reasons": [],
             "checks": {
-              "eventOutcome": "unknown"
+              "eventOutcome": "unknown",
+              "keyboard": "pass"
             }
           }
         }
@@ -210,7 +211,7 @@
         "unsupported": 0,
         "errors": 0,
         "blocked": 0,
-        "readinessUnknown": 1,
+        "readinessUnknown": 0,
         "assessmentUnsupported": 0
       }
     },
@@ -269,7 +270,10 @@
             "enabled": true
           },
           "interactability": {
-            "status": "unknown"
+            "status": "ready",
+            "checks": {
+              "keyboard": "pass"
+            }
           }
         }
       ],
@@ -1078,7 +1082,10 @@
             "enabled": true
           },
           "interactability": {
-            "status": "unknown"
+            "status": "ready",
+            "checks": {
+              "keyboard": "pass"
+            }
           }
         }
       ],

@@ -554,6 +554,48 @@ test("robustness-model-input-excludes-secrets-and-preserves-unicode-labels", asy
   }
 });
 
+test("state-client-response-preserves-native-typing-readiness", async () => {
+  await json(`${fixture}/scenario`, "POST", {
+    name: "batch",
+    actions: [
+      {
+        step: 1,
+        instruction: 'Type "hello" in Prénom.',
+        action: "type",
+        outcome: "found",
+        label: "Prénom",
+        tag: "input",
+      },
+    ],
+  });
+  const session = await json(`${client}/api/sessions`, "POST");
+  const run = randomUUID();
+  try {
+    const page = await json(`${client}/api/pages/${session.pageId}/navigate`, "POST", {
+      url: `${fixture}/privacy?run=${run}`,
+    });
+    const before = await observeXpaths(run, []);
+    const result = await json(`${client}/api/pages/${page.pageId}/resolve`, "POST", {
+      instruction: 'Type "hello" in Prénom.',
+      documentId: page.documentId,
+    });
+    assert.equal(result.outcome, "found", JSON.stringify(result));
+    const target = result.actions[0].target;
+    assert.equal(target.interactability.status, "ready");
+    assert.equal(target.interactability.checks.keyboard, "pass");
+    assert.equal(target.interactability.checks.eventOutcome, "unknown");
+    assert.equal(result.summary.readinessUnknown, 0);
+    assert.equal(result.diagnostics.modelCalls, 1);
+    const after = await observeXpaths(run, target.xpaths);
+    assert.deepEqual(after.matches, [["native-input"]]);
+    assert.deepEqual(after.events, before.events);
+    assert.equal(after.scrollY, before.scrollY);
+    assert.doesNotMatch(JSON.stringify(await json(`${fixture}/provider-request`)), /PRIVATE_/);
+  } finally {
+    await fetch(`${client}/api/sessions/${session.sessionId}`, { method: "DELETE" });
+  }
+});
+
 test("xpath-duplicate-attributes-and-quotes-retain-unique-same-node-match", async () => {
   await json(`${fixture}/scenario`, "POST", { name: "found" });
   const session = await json(`${client}/api/sessions`, "POST");
