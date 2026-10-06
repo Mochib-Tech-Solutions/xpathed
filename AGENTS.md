@@ -98,3 +98,5 @@ Follow [security guidance](SECURITY.md) when changing credentials, workflow trus
 - **Domain docs:** one root context and `docs/adr/`; see [docs/agents/domain.md](docs/agents/domain.md).
 
 Release publication is deferred; README documents cloned-source development with `pnpm dev`. Keep release tooling and historical evidence intact, and consult [the retained runbook](docs/releases.md) if publication resumes. Before updating comparison tables or charts, follow [matched inputs and scoring](docs/evaluation.md#matched-inputs-and-scoring): bind each score to its measured source, collection and grader; refresh every relevant arm when these change. Keep supplementary two-arm pipeline results separate from the recorded three-system common-score comparison.
+
+For codebase maps, use the repository [Graphify skill](.agents/plugins/graphify/skills/graphify/SKILL.md). Keep generated graphs in ignored `.artifacts/graphify/`; confirm inferred relationships against source before changing behavior.
