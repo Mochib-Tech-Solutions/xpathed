@@ -255,7 +255,10 @@
             "enabled": true
           },
           "interactability": {
-            "status": "unknown"
+            "status": "ready",
+            "checks": {
+              "keyboard": "pass"
+            }
           }
         }
       ],
