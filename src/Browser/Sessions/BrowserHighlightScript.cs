@@ -9,8 +9,13 @@ internal static class BrowserHighlightScript
           let spotlightNodes = [];
           let spotlightActive = false;
           const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+          const intersections = new Map();
+          const observer = new IntersectionObserver(entries => {
+            for (const entry of entries) intersections.set(entry.target, entry.intersectionRect);
+          }, {root: document});
           const clear = () => {
             cancelAnimationFrame(animation);
+            observer.disconnect();
             host?.remove(); host = canvas = null;
           };
           const draw = () => {
@@ -28,18 +33,12 @@ internal static class BrowserHighlightScript
             context.clearRect(0, 0, innerWidth, innerHeight);
             const boxes = [];
             for (const node of nodes) {
-              let left = 0, top = 0, right = innerWidth, bottom = innerHeight, visible = true;
-              for (let current = node; current; current = current.assignedSlot ?? current.parentElement ?? current.getRootNode().host) {
-                const css = getComputedStyle(current);
-                if (css.display === 'none' || css.visibility !== 'visible') { visible = false; break; }
-                if (current !== node && current !== document.documentElement && current !== document.body) {
-                  const box = current.getBoundingClientRect();
-                  if (css.overflowX !== 'visible') { left = Math.max(left, box.left); right = Math.min(right, box.right); }
-                  if (css.overflowY !== 'visible') { top = Math.max(top, box.top); bottom = Math.min(bottom, box.bottom); }
-                }
-                if (current.matches('dialog:modal, :popover-open')) break;
-              }
-              if (!visible || right <= left || bottom <= top) continue;
+              // Reobserve each frame: movement can change clipping without changing the intersection ratio.
+              observer.unobserve(node); observer.observe(node);
+              if (getComputedStyle(node).visibility !== 'visible') continue;
+              const intersection = intersections.get(node);
+              if (!intersection || intersection.width <= 0 || intersection.height <= 0) continue;
+              const {left, top, right, bottom} = intersection;
               for (const rect of node.getClientRects()) {
                 const x = Math.max(left, rect.left), y = Math.max(top, rect.top);
                 const width = Math.min(right, rect.right) - x, height = Math.min(bottom, rect.bottom) - y;

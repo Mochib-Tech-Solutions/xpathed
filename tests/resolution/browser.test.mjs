@@ -59,10 +59,11 @@ const oracleScript = `<script>
         const nodes = document.evaluate(xpath, document, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
         return Array.from({ length: nodes.snapshotLength }, (_, index) => nodes.snapshotItem(index).getAttribute('data-oracle') ?? nodes.snapshotItem(index).id);
       });
-      await fetch('/oracle-result' + endpoint, { method: 'POST', body: JSON.stringify({ matches, shadowMatches, scrollY, clicks: document.querySelector('#expected-target')?.dataset.clicks ?? '0', nodeCount: document.querySelectorAll('*').length,
+      const observedTarget = document.querySelector('#expected-target') ?? document.querySelector('#consent-host')?.shadowRoot?.querySelector('#expected-target');
+      await fetch('/oracle-result' + endpoint, { method: 'POST', body: JSON.stringify({ matches, shadowMatches, scrollY, clicks: observedTarget?.dataset.clicks ?? '0', nodeCount: document.querySelectorAll('*').length,
         cookie: document.cookie, openerPath: window.opener?.location.pathname ?? null, focused: document.hasFocus(),
         activeElement: document.activeElement?.id, events: window.observedEvents ?? {},
-        targetMarkup: document.querySelector("#expected-target")?.outerHTML, values: [...document.querySelectorAll('[data-observe-value]')].map(element => element.value),
+        targetMarkup: observedTarget?.outerHTML, values: [...document.querySelectorAll('[data-observe-value]')].map(element => element.value),
         innerWidth, innerHeight, outerWidth, outerHeight, screenWidth: screen.width, screenHeight: screen.height }) });
       if (close) window.close();
       if (reload === 'hash') location.hash = 'changed';
@@ -1220,6 +1221,50 @@ for (const reducedMotion of [false, true])
           409,
           "stale_capture",
         );
+      },
+    );
+  });
+
+for (const shadow of [false, true])
+  test(`highlights-fixed-cookie-banner-escapes-ancestor-overflow-shadow-${shadow}`, async () => {
+    const banner = `<style>section{position:fixed;left:80px;top:80px;width:400px;height:160px;background:white}button{position:absolute;left:20px;top:20px;width:120px;height:48px;border:0;background:white}</style><section aria-label="We use cookies"><button id="expected-target" data-oracle="cookie-close" aria-label="Close" onclick="this.dataset.clicks='1'">×</button></section>`;
+    await withFixture(
+      `<style>body{margin:0;background:white}main{height:40px;overflow:hidden}</style><main id="consent-host">${shadow ? "" : banner}</main>${shadow ? `<script>document.querySelector('#consent-host').attachShadow({mode:'open'}).innerHTML = ${JSON.stringify(banner)};</script>` : ""}`,
+      async (session, page) => {
+        const before = await observe();
+        const batch = await selectHighlights(page);
+        const { actions } = await request(`/pages/${page.pageId}/selections`, batch);
+        const target = actions[0].target;
+        assert.equal(target.interactability.status, "ready");
+        assert.equal(target.shadowChain?.length ?? 0, shadow ? 1 : 0);
+        assert.deepEqual(
+          (
+            await observe({
+              locators: [{ xpath: target.xpaths[0], shadowChain: target.shadowChain }],
+            })
+          ).shadowMatches,
+          [["cookie-close"]],
+        );
+        await withFramebuffer(session, async (frame) => {
+          assert.ok(
+            outlineColumns(await frame(), 100, 100) >= 90,
+            "Visible cookie Close button has both outline edges",
+          );
+          await request(`/pages/${page.pageId}/spotlight`, {
+            documentId: page.documentId,
+            captureId: batch.captureId,
+            actionId: "a0",
+          });
+          await expectSpotlightPixels(frame, [
+            [40, 40, false],
+            [150, 120, true],
+          ]);
+        });
+        const after = await observe();
+        assert.equal(after.targetMarkup, before.targetMarkup);
+        assert.equal(after.clicks, "0");
+        assert.equal(after.activeElement, before.activeElement);
+        assert.equal(after.scrollY, before.scrollY);
       },
     );
   });
