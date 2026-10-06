@@ -213,6 +213,16 @@ Category commands accept `--case CASE_ID` and `--output DIRECTORY`. `pnpm evalua
 
 Ordinary CI stays provider-free. A source merge validates the selected implementation; recorded evaluation results retain their own source, cases and grading identities.
 
+## Codebase graph
+
+The repository includes a Graphify plugin in the **xpathed tools** local marketplace.
+Install it with `codex plugin marketplace add .` followed by
+`codex plugin add graphify@xpathed-tools`, then invoke `$graphify` in the app.
+Its [skill](.agents/plugins/graphify/skills/graphify/SKILL.md) uses the official
+Graphify CLI for a local code-only map and keeps generated views under ignored
+`.artifacts/graphify/`. Structural connections need source confirmation; docs and
+images are outside this view.
+
 ## Read more
 
 See [security and contribution protection](SECURITY.md) for credential handling, the history scan and required PR-review policy.
