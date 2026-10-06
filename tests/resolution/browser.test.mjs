@@ -689,7 +689,7 @@ test("scope-capture-retains-partial-and-blocked-targets-with-safe-layout-evidenc
   );
 });
 
-test("scope-capture-budgets-exclude-offscreen-lists-and-reject-incomplete-visible-sets", async () => {
+test("scope-large-lists-retain-every-visible-candidate-and-exclude-offscreen-targets", async () => {
   await withFixture(
     `<button id="expected-target">Visible approval</button><div style="position:absolute;top:2000px">${"<button>Outside approval</button>".repeat(2200)}</div>`,
     async (session, page) => {
@@ -711,10 +711,10 @@ test("scope-capture-budgets-exclude-offscreen-lists-and-reject-incomplete-visibl
         documentId: page.documentId,
         scope: "current_view",
       });
-      assert.equal(capture.coverage.complete, false);
-      assert.equal(capture.coverage.errorCode, "capture_budget_exceeded");
-      assert.equal(capture.coverage.capturedCount, 0);
-      assert.deepEqual(capture.candidates, []);
+      assert.equal(capture.coverage.complete, true);
+      assert.equal(capture.coverage.errorCode, null);
+      assert.equal(capture.coverage.capturedCount, 2001);
+      assert.equal(capture.candidates.length, 2001);
     },
   );
 });
@@ -2367,24 +2367,36 @@ test("targeting-large-multilingual-capture-retains-complete-set-and-verified-tar
   );
 });
 
-test("scope-incomplete-capture-reports-budget-error", async () => {
-  for (const markup of [
-    "<style>button{position:fixed;left:0;top:0}</style>" + "<button>Target</button>".repeat(2001),
-    "<div></div>".repeat(20001),
-    `<button>${"長".repeat(65000)}</button>`,
-    `<button style="position:fixed;left:0;top:0;width:100px;height:40px;overflow:hidden">${"長".repeat(15000)}</button>`.repeat(
+test("scope-large-captures-have-no-candidate-scan-text-or-byte-ceiling", async () => {
+  for (const [markup, count, label] of [
+    [
+      "<style>button{position:fixed;left:0;top:0}</style>" + "<button>Target</button>".repeat(2001),
+      2001,
+      "Target",
+    ],
+    ["<div></div>".repeat(20001) + "<button>Last target</button>", 1, "Last target"],
+    [
+      `<button style="position:fixed;left:0;top:0;width:100px;height:40px;overflow:hidden">${"長".repeat(65000)}</button>`,
+      1,
+      "長".repeat(65000),
+    ],
+    [
+      `<button style="position:fixed;left:0;top:0;width:100px;height:40px;overflow:hidden">${"長".repeat(15000)}</button>`.repeat(
+        6,
+      ),
       6,
-    ),
+      "長".repeat(15000),
+    ],
   ]) {
     await withFixture(markup, async (session, page) => {
       const capture = await request(`/pages/${session.pageId}/capture`, {
         documentId: page.documentId,
       });
-      assert.equal(capture.coverage.complete, false);
-      assert.equal(capture.coverage.errorCode, "capture_budget_exceeded");
-      assert.equal(capture.coverage.capturedCount, 0);
-      assert.deepEqual(capture.candidates, []);
-      assert.ok(capture.coverage.scannedCount > 0);
+      assert.equal(capture.coverage.complete, true);
+      assert.equal(capture.coverage.errorCode, null);
+      assert.equal(capture.coverage.capturedCount, count);
+      assert.equal(capture.candidates.length, count);
+      assert.ok(capture.candidates.every((candidate) => candidate.label === label));
     });
   }
 });
@@ -3043,7 +3055,7 @@ test("shadow-modal-exposure-survives-cleared-focus", async () => {
   );
 });
 
-test("shadow-descendants-share-the-document-scan-budget", async () => {
+test("shadow-large-dom-retains-visible-targets-after-a-complete-scan", async () => {
   await withFixture(
     `<div id="host"></div><script>
     document.querySelector('#host').attachShadow({mode:'open'}).innerHTML='<span>Entry</span>'.repeat(20100);
@@ -3052,9 +3064,11 @@ test("shadow-descendants-share-the-document-scan-budget", async () => {
       const capture = await request(`/pages/${session.pageId}/capture`, {
         documentId: page.documentId,
       });
-      assert.equal(capture.coverage.complete, false);
-      assert.equal(capture.coverage.errorCode, "capture_budget_exceeded");
-      assert.deepEqual(capture.candidates, []);
+      assert.equal(capture.coverage.complete, true);
+      assert.equal(capture.coverage.errorCode, null);
+      assert.ok(capture.coverage.scannedCount > 20100);
+      assert.ok(capture.candidates.length > 0);
+      assert.ok(capture.candidates.every((candidate) => candidate.text === "Entry"));
     },
   );
 });
@@ -3251,7 +3265,7 @@ for (const [name, ancestorStyle, position, modal, visible] of [
   });
 }
 
-test("frames-slow-geometry-reports-capture-and-validation-budget-errors", async () => {
+test("frames-slow-capture-completes-while-target-validation-keeps-its-budget", async () => {
   await withFixture(
     '<button>Save</button><iframe srcdoc="<button>Child</button>"></iframe>',
     async (session, page) => {
@@ -3271,17 +3285,17 @@ test("frames-slow-geometry-reports-capture-and-validation-budget-errors", async 
         409,
         "validation_budget_exceeded",
       );
-      const incomplete = await request(`/pages/${page.pageId}/capture`, {
+      const complete = await request(`/pages/${page.pageId}/capture`, {
         documentId: page.documentId,
       });
-      assert.equal(incomplete.coverage.complete, false);
-      assert.equal(incomplete.coverage.errorCode, "capture_budget_exceeded");
-      assert.deepEqual(incomplete.candidates, []);
+      assert.equal(complete.coverage.complete, true);
+      assert.equal(complete.coverage.errorCode, null);
+      assert.ok(complete.candidates.some((candidate) => candidate.label === "Child"));
     },
   );
 });
 
-test("frames-exposure-transforms-and-budgets-preserve-coverage-limits", async () => {
+test("frames-exposure-and-transforms-preserve-complete-large-captures", async () => {
   await withFixture(
     (path) =>
       path === "/fixture"
@@ -3313,10 +3327,125 @@ test("frames-exposure-transforms-and-budgets-preserve-coverage-limits", async ()
       const capture = await request(`/pages/${page.pageId}/capture`, {
         documentId: page.documentId,
       });
-      assert.equal(capture.coverage.complete, false);
-      assert.equal(capture.coverage.errorCode, "capture_budget_exceeded");
-      assert.equal(capture.candidates.length, 0);
-      assert.equal(capture.coverage.capturedCount, 0);
+      assert.equal(capture.coverage.complete, true);
+      assert.equal(capture.coverage.errorCode, null);
+      assert.equal(capture.candidates.length, 2250);
+      assert.equal(capture.coverage.capturedCount, 2250);
+    },
+  );
+});
+
+test("frames-capture-retains-visible-targets-beyond-64-documents", async () => {
+  await withFixture(
+    (path) =>
+      path === "/fixture"
+        ? Array.from(
+            { length: 65 },
+            (_, index) =>
+              `<iframe style="position:fixed;left:0;top:0;width:100px;height:50px" src="/frame-${index + 1}"></iframe>`,
+          ).join("")
+        : `<style>body{margin:0}</style><button data-oracle="frame-target">${path.slice(1)}</button>`,
+    async (session, page) => {
+      await observe({}, "/frame-65");
+      const capture = await request(`/pages/${page.pageId}/capture`, {
+        documentId: page.documentId,
+      });
+      assert.equal(capture.coverage.complete, true);
+      assert.equal(capture.candidates.filter((candidate) => candidate.tag === "button").length, 65);
+      const candidate = capture.candidates.find((candidate) => candidate.label === "frame-65");
+      const selected = await request(`/pages/${page.pageId}/selection`, {
+        documentId: page.documentId,
+        captureId: capture.captureId,
+        candidateId: candidate.id,
+        action: "click",
+      });
+      const target = selected.target;
+      const observed = await observe({
+        locators: [{ xpath: target.xpaths[0], frame: target.frame }],
+      });
+      assert.deepEqual(observed.shadowMatches, [["frame-target"]]);
+      assert.equal(target.interactability.status, "ready");
+      assert.equal(observed.scrollY, 0);
+    },
+  );
+});
+
+test("shadow-capture-retains-targets-beyond-63-hosts", async () => {
+  await withFixture(
+    `<div id="host"></div><script>
+    let host=document.querySelector('#host');
+    for(let index=0;index<65;index++) {
+      const root=host.attachShadow({mode:'open'});
+      if(index===64) root.innerHTML='<button data-oracle="deep-target">Deep target</button>';
+      else { root.innerHTML='<div></div>';host=root.firstElementChild; }
+    }
+    </script>`,
+    async (session, page) => {
+      const capture = await request(`/pages/${page.pageId}/capture`, {
+        documentId: page.documentId,
+      });
+      assert.equal(capture.coverage.complete, true);
+      const candidate = capture.candidates.find((candidate) => candidate.label === "Deep target");
+      assert.equal(candidate.shadowChain.length, 65);
+      const selected = await request(`/pages/${page.pageId}/selection`, {
+        documentId: page.documentId,
+        captureId: capture.captureId,
+        candidateId: candidate.id,
+        action: "click",
+      });
+      const target = selected.target;
+      const observed = await observe({
+        locators: [{ xpath: target.xpaths[0], shadowChain: target.shadowChain }],
+      });
+      assert.deepEqual(observed.shadowMatches, [["deep-target"]]);
+      assert.equal(target.interactability.status, "ready");
+      assert.equal(observed.scrollY, 0);
+    },
+  );
+});
+
+test("context-nested-layout-tables-retain-own-row-without-repeating-the-page", async () => {
+  const rows = Array.from({ length: 24 }, (_, index) => {
+    const title = `Story ${index + 1} about browser testing`;
+    return `<tr><td>${title}</td><td>${Array.from({ length: 6 }, (_, link) => `<a href="#story-${index}-${link}">Discussion link number ${link + 1}</a>`).join(" ")}</td></tr>`;
+  }).join("");
+  await withFixture(
+    `<style>table{font:10px Arial;white-space:nowrap}</style>
+    <section aria-label="News"><table><tr><td><table><tr><td><a id="expected-target" href="#new">new</a></td></tr></table></td></tr>
+    <tr><td><table>${rows}</table></td></tr></table></section>`,
+    async (session, page) => {
+      const before = await observe();
+      const capture = await request(`/pages/${page.pageId}/capture`, {
+        documentId: page.documentId,
+      });
+      assert.equal(capture.coverage.complete, true, JSON.stringify(capture.coverage));
+      const links = capture.candidates.filter((candidate) => candidate.tag === "a");
+      assert.equal(links.length, 145);
+      for (const link of links) {
+        assert.ok(link.scope.includes("News"));
+        assert.ok(
+          !link.scope.some(
+            (context) => context.includes("Story 1 about") && context.includes("Story 2 about"),
+          ),
+        );
+      }
+      const discussion = links.find((candidate) => candidate.label === "Discussion link number 1");
+      assert.ok(
+        discussion.scope.some((context) => context.includes("Story 1 about browser testing")),
+      );
+      const target = links.find((candidate) => candidate.label === "new");
+      const selected = await request(`/pages/${page.pageId}/selection`, {
+        documentId: page.documentId,
+        captureId: capture.captureId,
+        candidateId: target.id,
+        action: "click",
+      });
+      const after = await verify(selected.target.xpaths);
+      assert.deepEqual(after.matches, [["expected-target"]]);
+      assert.equal(selected.target.interactability.status, "ready");
+      assert.equal(after.scrollY, before.scrollY);
+      assert.equal(after.activeElement, before.activeElement);
+      assert.equal(after.clicks, "0");
     },
   );
 });

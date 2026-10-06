@@ -90,7 +90,7 @@ internal static class CandidateInput
 
     private static Dictionary<string, string[]>? Neighbors(CandidateElement origin, CandidateElement[] peers)
     {
-        // Peer scans stay bounded by the capture quota; index intervals if preparation becomes a measured bottleneck.
+        // ponytail: quadratic peer scans; index intervals if preparation becomes a measured bottleneck.
         var nearest = new Dictionary<string, (double Gap, List<string> Ids)>(StringComparer.Ordinal);
         var a = origin.Geometry;
         foreach (var peer in peers)

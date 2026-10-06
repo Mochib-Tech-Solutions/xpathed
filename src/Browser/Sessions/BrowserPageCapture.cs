@@ -17,7 +17,6 @@ internal sealed class BrowserPageCapture(BrowserPageRuntime page) : IAsyncDispos
 
     public async Task<CandidateCapture> CaptureAsync(string sessionId, string documentId, string captureId)
     {
-        var timer = Stopwatch.StartNew();
         var candidates = new List<CandidateElement>();
         var scanned = 0;
         var eligible = 0;
@@ -28,10 +27,6 @@ internal sealed class BrowserPageCapture(BrowserPageRuntime page) : IAsyncDispos
             "() => ({x:0,y:0,scaleX:1,scaleY:1,exposed:true,rendered:true,clip:{left:0,top:0,right:innerWidth,bottom:innerHeight}})"
         );
         await VisitAsync(page.Page.MainFrame, new TargetFrame("main", documentId, []), null, null, environment);
-        if (timer.ElapsedMilliseconds >= 2000)
-        {
-            error = "capture_budget_exceeded";
-        }
         complete = error is null;
         return new CandidateCapture(
             sessionId,
@@ -58,11 +53,6 @@ internal sealed class BrowserPageCapture(BrowserPageRuntime page) : IAsyncDispos
             {
                 return;
             }
-            if (timer.ElapsedMilliseconds >= 2000 || frames.Count >= 64)
-            {
-                error = "capture_budget_exceeded";
-                return;
-            }
             var handle = await frame.EvaluateHandleAsync(
                 BrowserCaptureScript.Capture,
                 new
@@ -74,7 +64,6 @@ internal sealed class BrowserPageCapture(BrowserPageRuntime page) : IAsyncDispos
                     scope = "current_view",
                     frame = JsonSerializer.Serialize(identity, JsonOptions),
                     environment = environment.GetRawText(),
-                    budgetMs = 2000 - timer.ElapsedMilliseconds,
                 }
             );
             var captured = new BrowserFrameCapture(frame, handle, identity, parent, owner);
@@ -87,33 +76,22 @@ internal sealed class BrowserPageCapture(BrowserPageRuntime page) : IAsyncDispos
             unsupported += result.UnsupportedBoundaryCount;
             candidates.AddRange(result.Candidates);
             captured.CandidateIds.UnionWith(result.Candidates.Select(candidate => candidate.Id));
-            if (
-                !result.Coverage.Complete
-                || scanned > 20000
-                || candidates.Count > 2000
-                || JsonSerializer.SerializeToUtf8Bytes(candidates, JsonOptions).Length > 512000
-                || timer.ElapsedMilliseconds >= 2000
-            )
+            if (!result.Coverage.Complete)
             {
-                error = result.Coverage.ErrorCode ?? "capture_budget_exceeded";
+                error = result.Coverage.ErrorCode ?? "capture_incomplete";
                 return;
             }
             var childCount = await handle.EvaluateAsync<int>("capture => capture.frameElements.length");
             for (var index = 0; index < childCount && error is null; index++)
             {
-                if (timer.ElapsedMilliseconds >= 2000)
-                {
-                    error = "capture_budget_exceeded";
-                    break;
-                }
                 var childHandle = await handle.EvaluateHandleAsync(
                     "(capture, index) => capture.frameElements[index]",
                     index
                 );
                 var element = childHandle.AsElement()!;
                 var info = await handle.EvaluateAsync<JsonElement>(
-                    "(capture, args) => capture.frameInfo(args.element, args.budgetMs)",
-                    new { element, budgetMs = Math.Max(0, 2000 - timer.ElapsedMilliseconds) }
+                    "(capture, element) => capture.frameInfo(element)",
+                    element
                 );
                 if (info.TryGetProperty("errorCode", out var helperError))
                 {
@@ -167,7 +145,7 @@ internal sealed class BrowserPageCapture(BrowserPageRuntime page) : IAsyncDispos
     {
         if (!complete)
         {
-            throw new ApiException(409, "capture_budget_exceeded", "The capture is incomplete.");
+            throw new ApiException(409, "capture_incomplete", "The capture is incomplete.");
         }
         var timer = Stopwatch.StartNew();
         HashSet<BrowserFrameCapture> framesToRefresh = [frames[0]];

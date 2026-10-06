@@ -171,7 +171,14 @@ const server = createServer(async (request, response) => {
           )
           .replace("</nav>", '<button data-testid="shared">Other</button></nav>');
       if (path === "/oversized")
-        html = html.replace("</nav>", "</nav>" + "<button>Extra</button>".repeat(20100));
+        html = html.replace(
+          "</nav>",
+          "</nav>" +
+            "<div></div>".repeat(20100) +
+            `<button style="position:fixed;left:0;top:200px">${"Extra ".repeat(40)}</button>`.repeat(
+              2001,
+            ),
+        );
       response.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
       response.end(html);
       return;
@@ -311,7 +318,6 @@ async function readBody(request) {
   let text = "";
   for await (const chunk of request) {
     text += chunk;
-    if (text.length > 1024 * 1024) throw new Error("Request too large");
   }
   return text || "null";
 }
