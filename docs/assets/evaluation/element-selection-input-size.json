@@ -1,0 +1,286 @@
+{
+  "kind": "viewport-dom-versus-lossless-compact-selection-json",
+  "measuredOn": "2026-10-06",
+  "viewport": {
+    "width": 1280,
+    "height": 720
+  },
+  "locale": "en-US",
+  "browserVersion": "153.0.8010.12",
+  "browserImage": "sha256:6af5399922f8df27ae7c680b8a6015df1bb0e8002012f7f84be07245a6617581",
+  "sourceFiles": {
+    "src/Browser/Sessions/BrowserCaptureScript.cs": "aaa72e3dd540e3217b63621fc112a877d2ca4ed8393407ce95e3140632ae70c4",
+    "src/Resolver/Services/CandidateInput.cs": "fff88f8f4aa6857e9e174b88269e96f40b0ff08a1a29e239b5d690f9d0cccf71",
+    "src/Resolver/bin/Release/net10.0/Common.dll": "1f9eb82840e6892d3d5ff00fced994c79468d31514eaf8aad796704ef5581815"
+  },
+  "compactSerializerSha256": "673391ad99b0e1e6820d321fd07d56f9fba61253b1dfb5bdb3f6a987b6fd5c9b",
+  "measurementScripts": {
+    "capture.cjs": "1c252d781a6943a78e83de4b41302edf8bce2cb4c162d380abacca7d5cf6f26d",
+    "viewport-method.js": "7a8913e733f1e8d5ab2858c5a388cbff0b00d7f4942aa6c735eff901e3bd7ab7",
+    "count.py": "6e466fb708aa03e5fb43801a9ff0129ee7668f18c20ea66d004032dfe1eeb65a",
+    "helper/Program.cs": "141ec7a3beeb14e50c90482eeb3a0b58455c13eaea81f0aff27a74f4b053766e"
+  },
+  "tokenCountKind": "local proxy estimates; not Gemini token counts or billing",
+  "tiktokenVersion": "0.9.0",
+  "modelCalls": 0,
+  "rows": [
+    {
+      "id": "books",
+      "url": "https://books.toscrape.com/",
+      "capturedAt": "2026-10-06T13:20:31.424Z",
+      "candidateCount": 55,
+      "captureSha256": "992a578c18a57fb8eef143822605537082e915ddec743d68f4774804716874da",
+      "dom": {
+        "visibleElements": 147,
+        "retainedElements": 147,
+        "textNodes": 66,
+        "shadowRoots": 0,
+        "retainedCandidateCount": 55
+      },
+      "mutationCount": 0,
+      "viewportMarkup": {
+        "bytes": 9070,
+        "sha256": "06c8b42d4e3e8b5fbe7cc5f728b3c2fc98755eb417947299099725dd9d5abfe6",
+        "tokens": {
+          "o200k_base": 1921,
+          "cl100k_base": 1919
+        }
+      },
+      "originalJson": {
+        "bytes": 15100,
+        "sha256": "25e4f27cfb445ed8ed53bc0bae9ebf0adde92c7f22374677502fe15ad242314e",
+        "tokens": {
+          "o200k_base": 4568,
+          "cl100k_base": 4475
+        }
+      },
+      "compactJson": {
+        "bytes": 7747,
+        "sha256": "f12f717de281ad0c76d2b1003e46afc81f9249f46205a83031f46bbba59dd692",
+        "tokens": {
+          "o200k_base": 2544,
+          "cl100k_base": 2534
+        }
+      }
+    },
+    {
+      "id": "example",
+      "url": "https://example.com/",
+      "capturedAt": "2026-10-06T13:20:28.181Z",
+      "candidateCount": 7,
+      "captureSha256": "b5c8996f36780cd4e628c19abc5c07a00d0f4865112947a387e410027510cd2a",
+      "dom": {
+        "visibleElements": 9,
+        "retainedElements": 9,
+        "textNodes": 7,
+        "shadowRoots": 0,
+        "retainedCandidateCount": 7
+      },
+      "mutationCount": 0,
+      "viewportMarkup": {
+        "bytes": 1516,
+        "sha256": "25d81e91181c21b252f3f4d4223dbfdd4e64bd07c272fc8e2bfb1671183dd5d1",
+        "tokens": {
+          "o200k_base": 286,
+          "cl100k_base": 407
+        }
+      },
+      "originalJson": {
+        "bytes": 2840,
+        "sha256": "af1cbc1022f1b94dbfe54f0f4d7f55380129954df158fa35c010a76d21306b9e",
+        "tokens": {
+          "o200k_base": 675,
+          "cl100k_base": 788
+        }
+      },
+      "compactJson": {
+        "bytes": 2232,
+        "sha256": "e9cf072f92c16068aaa3bd9a9c6ec81a98bbe2d69fc416a533d046e1bbeedad6",
+        "tokens": {
+          "o200k_base": 512,
+          "cl100k_base": 626
+        }
+      }
+    },
+    {
+      "id": "github",
+      "url": "https://github.com/Mochib-Tech-Solutions/xpathed",
+      "capturedAt": "2026-10-06T13:20:39.055Z",
+      "candidateCount": 117,
+      "captureSha256": "5c0275367705e08bf08ed645a0a9fcc18753016bf7c7c3e9ffa4a079ad10aa1a",
+      "dom": {
+        "visibleElements": 399,
+        "retainedElements": 400,
+        "textNodes": 98,
+        "shadowRoots": 11,
+        "retainedCandidateCount": 117
+      },
+      "mutationCount": 0,
+      "viewportMarkup": {
+        "bytes": 49229,
+        "sha256": "2e3aedbbf36a5cb2899d162dfadff70a49c12bc3c0e36a5ede1c4853c2abd5fa",
+        "tokens": {
+          "o200k_base": 14039,
+          "cl100k_base": 14194
+        }
+      },
+      "originalJson": {
+        "bytes": 88400,
+        "sha256": "abf3366d3c75f2913304f5aa1916def141e992f2e6667ebecd4adb09c2b49f35",
+        "tokens": {
+          "o200k_base": 21262,
+          "cl100k_base": 20926
+        }
+      },
+      "compactJson": {
+        "bytes": 69592,
+        "sha256": "47852db5bf7c6d9a3d398f9c8891bbb113b1efbc38844f518c885e82607883ff",
+        "tokens": {
+          "o200k_base": 16316,
+          "cl100k_base": 16139
+        }
+      }
+    },
+    {
+      "id": "hacker-news",
+      "url": "https://news.ycombinator.com/",
+      "capturedAt": "2026-10-06T13:20:33.144Z",
+      "candidateCount": 231,
+      "captureSha256": "d36a4e84718fc48c414623a6653672bb347f07a55df55b7c67aa2c1a3d087ee7",
+      "dom": {
+        "visibleElements": 512,
+        "retainedElements": 512,
+        "textNodes": 315,
+        "shadowRoots": 0,
+        "retainedCandidateCount": 231
+      },
+      "mutationCount": 0,
+      "viewportMarkup": {
+        "bytes": 21872,
+        "sha256": "0e8920b177ad03099ea74e4c781b66b5a9a33446b9b733d8f55e0e2b3bec2744",
+        "tokens": {
+          "o200k_base": 7373,
+          "cl100k_base": 7358
+        }
+      },
+      "originalJson": {
+        "bytes": 78476,
+        "sha256": "6fb81a4355f7961a06fa45ada6db270b9df62e244d2117eb0f1f2400af36fc01",
+        "tokens": {
+          "o200k_base": 23721,
+          "cl100k_base": 23244
+        }
+      },
+      "compactJson": {
+        "bytes": 34643,
+        "sha256": "0848fd7c316949aeaef37709f509997eae9245351600b311bcc8f1ebae7ee9ed",
+        "tokens": {
+          "o200k_base": 11476,
+          "cl100k_base": 11410
+        }
+      }
+    },
+    {
+      "id": "mdn",
+      "url": "https://developer.mozilla.org/en-US/docs/Web/HTML",
+      "capturedAt": "2026-10-06T13:20:34.664Z",
+      "candidateCount": 73,
+      "captureSha256": "f85d008e4f0bdc217762abb44038e0a603930628c9c6fee54cdf46293604e06b",
+      "dom": {
+        "visibleElements": 181,
+        "retainedElements": 203,
+        "textNodes": 96,
+        "shadowRoots": 17,
+        "retainedCandidateCount": 73
+      },
+      "mutationCount": 0,
+      "viewportMarkup": {
+        "bytes": 15426,
+        "sha256": "02b01a033028e109c664430c152b12ddb649da7f0a8a43bc9b7e6787226c44d7",
+        "tokens": {
+          "o200k_base": 5118,
+          "cl100k_base": 5123
+        }
+      },
+      "originalJson": {
+        "bytes": 22404,
+        "sha256": "60e6bf9eb3e24600382c0be3400959876d85c2726a9347c9332653cddf1533a0",
+        "tokens": {
+          "o200k_base": 6735,
+          "cl100k_base": 6565
+        }
+      },
+      "compactJson": {
+        "bytes": 11329,
+        "sha256": "174f5f1dea57fd9dab5f861b3f33a4345d68918e4cd4b27aad0357067cbe0fb3",
+        "tokens": {
+          "o200k_base": 3686,
+          "cl100k_base": 3673
+        }
+      }
+    },
+    {
+      "id": "saucedemo",
+      "url": "https://www.saucedemo.com/",
+      "capturedAt": "2026-10-06T13:20:29.856Z",
+      "candidateCount": 10,
+      "captureSha256": "5fdf16e96b033b74c6f1e5089dd1806358ae8315c7aaa73e44d41fa7ab691bdd",
+      "dom": {
+        "visibleElements": 22,
+        "retainedElements": 22,
+        "textNodes": 10,
+        "shadowRoots": 0,
+        "retainedCandidateCount": 10
+      },
+      "mutationCount": 0,
+      "viewportMarkup": {
+        "bytes": 1429,
+        "sha256": "86351c979d8ccd41dd38e3e7aa8823db052db6d83764193ec4bc14fb945568b1",
+        "tokens": {
+          "o200k_base": 349,
+          "cl100k_base": 350
+        }
+      },
+      "originalJson": {
+        "bytes": 3106,
+        "sha256": "305797096184cfe6dcb5f207940791bdbbecaf7e85a77565df03405216c8ebb5",
+        "tokens": {
+          "o200k_base": 910,
+          "cl100k_base": 887
+        }
+      },
+      "compactJson": {
+        "bytes": 1970,
+        "sha256": "26666949c035fda4eeea661e68ee9bd527ff82fafeb4f566fd93d66a09e476e3",
+        "tokens": {
+          "o200k_base": 580,
+          "cl100k_base": 569
+        }
+      }
+    }
+  ],
+  "totals": {
+    "viewportMarkup": {
+      "bytes": 98542,
+      "tokens": {
+        "o200k_base": 29086,
+        "cl100k_base": 29351
+      }
+    },
+    "originalJson": {
+      "bytes": 210326,
+      "tokens": {
+        "o200k_base": 57871,
+        "cl100k_base": 56885
+      }
+    },
+    "compactJson": {
+      "bytes": 127513,
+      "tokens": {
+        "o200k_base": 35114,
+        "cl100k_base": 34951
+      }
+    }
+  },
+  "method": "Same capture exposure, clipping and viewport predicates for all DOM nodes; prune offscreen descendants; retain ancestors, attributes and open-shadow structure; same instruction; no mutation during paired capture; all candidates survive markup serialization; preserve entire partly visible text nodes; editable values excluded"
+}

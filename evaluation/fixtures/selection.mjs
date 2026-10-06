@@ -1,5 +1,10 @@
 // Controlled model output for fixture tests. Expected DOM labels stay in the oracle.
-export function controlledActions(provider, candidates) {
+export function controlledActions(provider, candidates, context = []) {
+  candidates = candidates.map((candidate) => ({
+    ...candidate,
+    scope: typeof candidate.scope === "number" ? context[candidate.scope] : candidate.scope,
+    frame: typeof candidate.frame === "number" ? context[candidate.frame] : candidate.frame,
+  }));
   return provider.actions.map((plan) => {
     const candidate = candidates.filter(
       (item) =>

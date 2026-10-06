@@ -234,7 +234,13 @@ const server = createServer(async (request, response) => {
     } else if (path === "/api/v1/chat/completions") {
       providerRequest = body;
       const input = JSON.parse(body.messages.find((message) => message.role === "user").content);
-      const candidates = input.capture?.candidates ?? input.candidates;
+      const candidates = (input.capture?.candidates ?? input.candidates).map((candidate) => ({
+        ...candidate,
+        scope:
+          typeof candidate.scope === "number" ? input.context[candidate.scope] : candidate.scope,
+        frame:
+          typeof candidate.frame === "number" ? input.context[candidate.frame] : candidate.frame,
+      }));
       const target = candidates.find(
         (candidate) =>
           candidate.tag === "button" &&

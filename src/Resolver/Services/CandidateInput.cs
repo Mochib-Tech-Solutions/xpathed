@@ -21,6 +21,65 @@ internal static class CandidateInput
             .ToDictionary(group => group.Key, group => group.ToArray());
         var byId = capture.Candidates.ToDictionary(candidate => candidate.Id, StringComparer.Ordinal);
         var items = capture.Candidates.Where(candidate => candidate.IsRepeatedItem).ToArray();
+        var context = new List<object>();
+        var contextIds = new Dictionary<string, int>(StringComparer.Ordinal);
+        var candidates = capture
+            .Candidates.Select(candidate => new
+            {
+                candidate.Id,
+                parentId = items.Length == 0 ? null : candidate.ParentId,
+                candidate.Tag,
+                role = string.IsNullOrEmpty(candidate.Role) ? null : candidate.Role,
+                text = string.IsNullOrEmpty(candidate.Text) || candidate.Text == candidate.Label
+                    ? null
+                    : candidate.Text,
+                label = string.IsNullOrEmpty(candidate.Label) ? null : candidate.Label,
+                placeholder = string.IsNullOrEmpty(candidate.Placeholder) ? null : candidate.Placeholder,
+                scope = candidate.Scope.Length == 0 ? null : (int?)Share(candidate.Scope),
+                state = candidate.State.Rendered
+                && candidate.State.Enabled
+                && !candidate.State.Editable
+                && candidate.State.Readonly != true
+                    ? null
+                    : new
+                    {
+                        rendered = candidate.State.Rendered ? (bool?)null : candidate.State.Rendered,
+                        enabled = candidate.State.Enabled ? (bool?)null : candidate.State.Enabled,
+                        editable = !candidate.State.Editable ? (bool?)null : candidate.State.Editable,
+                        @readonly = candidate.State.Readonly != true ? null : candidate.State.Readonly,
+                    },
+                geometry = new[]
+                {
+                    candidate.Geometry.X,
+                    candidate.Geometry.Y,
+                    candidate.Geometry.Width,
+                    candidate.Geometry.Height,
+                },
+                appearance = candidate.Appearance is { } appearance
+                && (
+                    appearance.BackgroundColor is not null
+                    || appearance.TextColor is not null
+                    || appearance.BorderColor is not null
+                    || appearance.Limitations.Length != 0
+                )
+                    ? (int?)Share(
+                        new
+                        {
+                            appearance.BackgroundColor,
+                            appearance.TextColor,
+                            appearance.BorderColor,
+                            limitations = appearance.Limitations.Length == 0 ? null : appearance.Limitations,
+                        }
+                    )
+                    : null,
+                frame = candidate.Frame is null
+                || (candidate.Frame.Id == capture.FrameId && candidate.Frame.Chain.Length == 0)
+                    ? null
+                    : (int?)Share(
+                        new { candidate.Frame.Id, labels = candidate.Frame.Chain.Select(ancestor => ancestor.Label) }
+                    ),
+            })
+            .ToArray();
         return JsonSerializer.Serialize(
             new
             {
@@ -42,42 +101,23 @@ internal static class CandidateInput
                                 pair => pair.Value.Select(id => new { id, description = Description(byId[id]) })
                             ),
                     }),
-                candidates = capture.Candidates.Select(candidate => new
-                {
-                    candidate.Id,
-                    parentId = items.Length == 0 ? null : candidate.ParentId,
-                    candidate.Tag,
-                    role = string.IsNullOrEmpty(candidate.Role) ? null : candidate.Role,
-                    text = string.IsNullOrEmpty(candidate.Text) || candidate.Text == candidate.Label
-                        ? null
-                        : candidate.Text,
-                    label = string.IsNullOrEmpty(candidate.Label) ? null : candidate.Label,
-                    placeholder = string.IsNullOrEmpty(candidate.Placeholder) ? null : candidate.Placeholder,
-                    scope = candidate.Scope.Length == 0 ? null : candidate.Scope,
-                    state = new
-                    {
-                        rendered = candidate.State.Rendered ? (bool?)null : candidate.State.Rendered,
-                        enabled = candidate.State.Enabled ? (bool?)null : candidate.State.Enabled,
-                        editable = !candidate.State.Editable ? (bool?)null : candidate.State.Editable,
-                        @readonly = candidate.State.Readonly != true ? null : candidate.State.Readonly,
-                    },
-                    geometry = candidate.Geometry,
-                    appearance = candidate.Appearance is { } appearance
-                        ? new
-                        {
-                            appearance.BackgroundColor,
-                            appearance.TextColor,
-                            appearance.BorderColor,
-                            limitations = appearance.Limitations.Length == 0 ? null : appearance.Limitations,
-                        }
-                        : null,
-                    frame = candidate.Frame is null
-                        ? null
-                        : new { candidate.Frame.Id, labels = candidate.Frame.Chain.Select(ancestor => ancestor.Label) },
-                }),
+                context = context.Count == 0 ? null : context,
+                candidates,
             },
             JsonOptions
         );
+
+        int Share(object value)
+        {
+            var key = JsonSerializer.Serialize(value, JsonOptions);
+            if (!contextIds.TryGetValue(key, out var id))
+            {
+                id = context.Count;
+                contextIds.Add(key, id);
+                context.Add(value);
+            }
+            return id;
+        }
 
         string Description(CandidateElement item) =>
             peers.TryGetValue((item.Frame?.Id, item.Id), out var children)

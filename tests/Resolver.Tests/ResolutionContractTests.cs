@@ -332,16 +332,19 @@ public sealed class ResolutionContractTests
     }
 
     [Theory]
-    [InlineData(false)]
-    [InlineData(true)]
-    public async Task CurrentViewCompactStatePreservesMeaningfulFlags(bool constrained)
+    [InlineData(null, false)]
+    [InlineData("rendered", false)]
+    [InlineData("enabled", false)]
+    [InlineData("editable", true)]
+    [InlineData("readonly", true)]
+    public async Task CurrentViewCompactStatePreservesMeaningfulFlags(string? flag, bool value)
     {
         var capture = JsonNode.Parse(CurrentViewCapture())!;
         var state = capture["candidates"]![0]!["state"]!;
-        state["rendered"] = !constrained;
-        state["enabled"] = !constrained;
-        state["editable"] = constrained;
-        state["readonly"] = constrained;
+        if (flag is not null)
+        {
+            state[flag] = value;
+        }
         var handler = new DeterministicServicesHandler
         {
             CaptureBody = capture.ToJsonString(),
@@ -357,22 +360,26 @@ public sealed class ResolutionContractTests
             handler.ModelRequest.GetProperty("messages")[1].GetProperty("content").GetString()!
         );
         var candidate = input.RootElement.GetProperty("candidates")[0];
-        var actual = candidate.GetProperty("state");
-        Assert.False(actual.TryGetProperty("inViewport", out _));
-        if (constrained)
+        Assert.Equal(flag is not null, candidate.TryGetProperty("state", out var actual));
+        if (flag is not null)
         {
-            Assert.False(actual.GetProperty("rendered").GetBoolean());
-            Assert.False(actual.GetProperty("enabled").GetBoolean());
-            Assert.True(actual.GetProperty("editable").GetBoolean());
-            Assert.True(actual.GetProperty("readonly").GetBoolean());
+            Assert.False(actual.TryGetProperty("inViewport", out _));
+            Assert.Single(actual.EnumerateObject());
+            Assert.Equal(value, actual.GetProperty(flag).GetBoolean());
         }
-        else
-        {
-            Assert.Empty(actual.EnumerateObject());
-        }
-        Assert.False(candidate.GetProperty("appearance").TryGetProperty("limitations", out _));
-        Assert.Equal("rgb(255, 0, 0)", candidate.GetProperty("appearance").GetProperty("backgroundColor").GetString());
-        Assert.Equal(20, candidate.GetProperty("geometry").GetProperty("x").GetInt32());
+        Assert.False(
+            input
+                .RootElement.GetProperty("context")[candidate.GetProperty("appearance").GetInt32()]
+                .TryGetProperty("limitations", out _)
+        );
+        Assert.Equal(
+            "rgb(255, 0, 0)",
+            input
+                .RootElement.GetProperty("context")[candidate.GetProperty("appearance").GetInt32()]
+                .GetProperty("backgroundColor")
+                .GetString()
+        );
+        Assert.Equal(20, candidate.GetProperty("geometry")[0].GetInt32());
     }
 
     [Theory]
@@ -406,13 +413,25 @@ public sealed class ResolutionContractTests
         Assert.Equal(instruction, input.RootElement.GetProperty("instruction").GetString());
         var candidate = input.RootElement.GetProperty("candidates")[0];
         Assert.Equal("button-save", candidate.GetProperty("id").GetString());
-        Assert.Equal("Profile", candidate.GetProperty("scope")[0].GetString());
-        Assert.Equal(20, candidate.GetProperty("geometry").GetProperty("x").GetInt32());
+        Assert.Equal(
+            "Profile",
+            input.RootElement.GetProperty("context")[candidate.GetProperty("scope").GetInt32()][0].GetString()
+        );
+        Assert.Equal(20, candidate.GetProperty("geometry")[0].GetInt32());
         Assert.Equal("current_view", input.RootElement.GetProperty("scope").GetString());
-        Assert.Equal("rgb(255, 0, 0)", candidate.GetProperty("appearance").GetProperty("backgroundColor").GetString());
+        Assert.Equal(
+            "rgb(255, 0, 0)",
+            input
+                .RootElement.GetProperty("context")[candidate.GetProperty("appearance").GetInt32()]
+                .GetProperty("backgroundColor")
+                .GetString()
+        );
         Assert.Equal(
             "background_transparent",
-            candidate.GetProperty("appearance").GetProperty("limitations")[0].GetString()
+            input
+                .RootElement.GetProperty("context")[candidate.GetProperty("appearance").GetInt32()]
+                .GetProperty("limitations")[0]
+                .GetString()
         );
         Assert.Equal(1, handler.ProviderRequestCount);
         Assert.Equal(1, handler.SelectionRequestCount);
@@ -864,6 +883,7 @@ public sealed class ResolutionContractTests
         Assert.Equal("button-save", candidates[1].GetProperty("id").GetString());
         Assert.False(candidates[0].TryGetProperty("neighbors", out _));
         Assert.False(candidates[1].TryGetProperty("neighbors", out _));
+        Assert.False(candidates[1].TryGetProperty("appearance", out _));
         Assert.Equal(1, handler.ProviderRequestCount);
         var layout = input.RootElement.GetProperty("layout");
         Assert.Equal(4, layout.GetArrayLength());
@@ -1109,9 +1129,13 @@ public sealed class ResolutionContractTests
     public async Task CompactModelInputPreservesCandidatesAndMeaningWithoutDuplicateOrPrivateState()
     {
         var capture = JsonNode.Parse(new DeterministicServicesHandler().CaptureBody)!;
+        capture["candidates"]![0]!["appearance"] = JsonNode.Parse(
+            """{"backgroundColor":"rgb(255, 0, 0)","textColor":null,"borderColor":null,"limitations":[]}"""
+        );
         var candidates = capture["candidates"]!.AsArray();
         var second = candidates[0]!.DeepClone();
         second["id"] = "other-save";
+        second["frame"] = JsonNode.Parse("""{"id":"main","documentId":"document-1","chain":[]}""");
         second["text"] = "Save changes";
         second["state"]!["enabled"] = false;
         second["state"]!["readonly"] = true;
@@ -1134,13 +1158,24 @@ public sealed class ResolutionContractTests
         Assert.Equal(2, sent.GetArrayLength());
         Assert.Equal("button-save", sent[0].GetProperty("id").GetString());
         Assert.Equal("Save", sent[0].GetProperty("label").GetString());
-        Assert.Equal("Profile", sent[0].GetProperty("scope")[0].GetString());
-        Assert.Equal(20, sent[0].GetProperty("geometry").GetProperty("x").GetDouble());
+        Assert.Equal(
+            "Profile",
+            input.RootElement.GetProperty("context")[sent[0].GetProperty("scope").GetInt32()][0].GetString()
+        );
+        Assert.Equal(20, sent[0].GetProperty("geometry")[0].GetDouble());
         Assert.False(sent[0].TryGetProperty("text", out _));
         Assert.False(sent[0].TryGetProperty("placeholder", out _));
-        Assert.False(sent[0].GetProperty("state").TryGetProperty("checked", out _));
-        Assert.False(sent[0].GetProperty("state").TryGetProperty("version", out _));
-        Assert.False(sent[0].GetProperty("state").TryGetProperty("editable", out _));
+        Assert.False(sent[0].TryGetProperty("state", out _));
+        Assert.False(sent[0].TryGetProperty("frame", out _));
+        Assert.False(sent[1].TryGetProperty("frame", out _));
+        Assert.Equal("main", input.RootElement.GetProperty("frameId").GetString());
+        Assert.Equal(sent[0].GetProperty("scope").GetInt32(), sent[1].GetProperty("scope").GetInt32());
+        Assert.Equal(sent[0].GetProperty("appearance").GetInt32(), sent[1].GetProperty("appearance").GetInt32());
+        Assert.Equal(2, input.RootElement.GetProperty("context").GetArrayLength());
+        Assert.Equal(4, sent[0].GetProperty("geometry").GetArrayLength());
+        Assert.Equal(40, sent[0].GetProperty("geometry")[1].GetDouble());
+        Assert.Equal(90, sent[0].GetProperty("geometry")[2].GetDouble());
+        Assert.Equal(30, sent[0].GetProperty("geometry")[3].GetDouble());
         Assert.Equal("Save changes", sent[1].GetProperty("text").GetString());
         Assert.False(sent[1].GetProperty("state").GetProperty("enabled").GetBoolean());
         Assert.True(sent[1].GetProperty("state").GetProperty("readonly").GetBoolean());
@@ -1256,6 +1291,13 @@ public sealed class ResolutionContractTests
             );
             var modelInput = handler.ModelRequest.GetProperty("messages")[1].GetProperty("content").GetString()!;
             Assert.Contains("Payroll", modelInput, StringComparison.Ordinal);
+            using var prepared = JsonDocument.Parse(modelInput);
+            var candidate = prepared.RootElement.GetProperty("candidates")[0];
+            var sentFrame = prepared.RootElement.GetProperty("context")[candidate.GetProperty("frame").GetInt32()];
+            Assert.Equal("f2", sentFrame.GetProperty("id").GetString());
+            Assert.Equal(2, sentFrame.GetProperty("labels").GetArrayLength());
+            Assert.Equal("Employee", sentFrame.GetProperty("labels")[0].GetString());
+            Assert.Equal("Payroll", sentFrame.GetProperty("labels")[1].GetString());
             Assert.DoesNotContain("frame-document", modelInput, StringComparison.Ordinal);
             Assert.DoesNotContain("//iframe", modelInput, StringComparison.Ordinal);
         }
