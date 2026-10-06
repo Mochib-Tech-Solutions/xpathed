@@ -410,7 +410,7 @@ internal static class BrowserCaptureScript
           }
           if (!complete) { nodes.length = 0; candidates.length = 0; }
           const literal = value => !value.includes("'") ? `'${value}'` : !value.includes('"') ? `"${value}"` : `concat(${value.split("'").map(part => `'${part}'`).join(`,"'",`)})`;
-          const tag = element => element.namespaceURI === 'http://www.w3.org/1999/xhtml' ? element.localName : `*[local-name()=${literal(element.localName)}]`;
+          const tag = element => element.namespaceURI === 'http://www.w3.org/1999/xhtml' ? element.localName : `*[local-name()=${literal(element.localName)} and namespace-uri()=${literal(element.namespaceURI ?? '')}]`;
           const testAttributes = ['data-testid', 'data-test-id', 'data-test', 'data-cy', 'data-qa'];
           const stableAttributes = ['id', 'name', 'aria-label', 'placeholder', 'alt', 'title'];
           const attributes = (element, names) => names.filter(name => {
@@ -468,21 +468,36 @@ internal static class BrowserCaptureScript
           };
           const evaluate = (xpath, root) => document.evaluate(xpath, root === document ? document : root.firstElementChild,
             null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
+          const uniqueMatch = (xpath, element) => {
+            checkBudget();
+            const matches = evaluate(xpath, element.getRootNode());
+            return matches.snapshotLength === 1 && matches.snapshotItem(0) === element;
+          };
           const xpathsFor = element => {
             const xpaths = [];
             const add = xpath => {
-              checkBudget();
-              const matches = evaluate(xpath, element.getRootNode());
-              if (matches.snapshotLength !== 1 || matches.snapshotItem(0) !== element) return false;
+              if (!uniqueMatch(xpath, element)) return false;
               xpaths.push(xpath);
               return true;
             };
             const testPredicates = attributes(element, testAttributes);
+            // Explicit test contracts retain identity through wording and element-tag changes.
+            for (const predicate of testPredicates) if (add(`//*[${predicate}]`)) return xpaths;
+            for (const predicate of testPredicates) if (add(`//${tag(element)}[${predicate}]`)) return xpaths;
+            for (let ancestor = element.parentElement; ancestor; ancestor = ancestor.parentElement) {
+              checkBudget();
+              for (const predicate of attributes(ancestor, testAttributes)) {
+                const prefix = `//*[${predicate}]`;
+                if (!uniqueMatch(prefix, ancestor)) continue;
+                for (const targetPredicate of testPredicates)
+                  if (add(`${prefix}//*[${targetPredicate}]`)) return xpaths;
+                if (add(`${prefix}//${tag(element)}`)) return xpaths;
+              }
+            }
             const stablePredicates = attributes(element, stableAttributes);
             const semanticPredicates = attributes(element, semanticAttributes);
             semanticPredicates.push(...textPredicates(element));
             if (element.matches(buttonInput) && element.getAttribute('value')) semanticPredicates.push(`@value=${literal(element.getAttribute('value'))}`);
-            for (const predicate of testPredicates) if (add(`//${tag(element)}[${predicate}]`)) return xpaths;
             for (let ancestor = element.parentElement; ancestor && ancestor !== document.body; ancestor = ancestor.parentElement) {
               checkBudget();
               const prefixes = contextPredicates(ancestor).map(context => `//${tag(ancestor)}[${context}]`);

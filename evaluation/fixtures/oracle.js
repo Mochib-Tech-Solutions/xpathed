@@ -265,9 +265,12 @@
         node.ownerDocument.body.prepend(clone);
         break;
       }
-      case "rerender":
-        node.replaceWith(node.cloneNode(true));
+      case "rerender": {
+        const clone = node.cloneNode(true);
+        if (mutation.text !== undefined) clone.textContent = mutation.text;
+        node.replaceWith(clone);
         break;
+      }
       case "remove":
         node.remove();
         break;
