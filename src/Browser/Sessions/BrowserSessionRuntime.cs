@@ -561,6 +561,7 @@ internal sealed partial class BrowserSessionRuntime(int slot, string browserType
             process.Dispose();
         }
         Vnc = null;
+        WindowManager = null;
         Display = null;
     }
 
