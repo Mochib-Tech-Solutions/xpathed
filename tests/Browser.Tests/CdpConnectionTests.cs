@@ -200,6 +200,93 @@ public sealed class CdpConnectionTests
         await next.WaitAsync(TimeSpan.FromSeconds(2));
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task NestedFrameKeepsItsContextWhenNavigationArrivesBeforeOrAfterContextCreation(bool contextFirst)
+    {
+        await using var pipe = new PipeFixture();
+        var page = await pipe.InitializePageAsync();
+        await pipe.EventAsync("Page.frameAttached", new { frameId = "nested", parentFrameId = "main" });
+        var created = new
+        {
+            context = new
+            {
+                id = 2,
+                uniqueId = "nested-document",
+                auxData = new { isDefault = true, frameId = "nested" },
+            },
+        };
+        if (contextFirst)
+        {
+            await pipe.EventAsync("Runtime.executionContextCreated", created);
+        }
+        await pipe.EventAsync(
+            "Page.frameNavigated",
+            new
+            {
+                frame = new
+                {
+                    id = "nested",
+                    parentId = "main",
+                    url = "about:blank",
+                },
+            }
+        );
+        if (!contextFirst)
+        {
+            await pipe.EventAsync("Runtime.executionContextCreated", created);
+        }
+        var frame = await page.FindFrameAsync("nested");
+        Assert.NotNull(frame);
+        Assert.Equal("nested-document", frame.Context?.UniqueId);
+        Assert.Equal("session", frame.Context?.SessionId);
+    }
+
+    [Fact]
+    public async Task RuntimeLifecycleInvalidatesOldHandlesWithoutErasingAReplacementContext()
+    {
+        await using var pipe = new PipeFixture();
+        var page = await pipe.InitializePageAsync();
+        await pipe.EventAsync("Page.frameAttached", new { frameId = "nested", parentFrameId = "main" });
+        await pipe.EventAsync(
+            "Runtime.executionContextCreated",
+            new
+            {
+                context = new
+                {
+                    id = 2,
+                    uniqueId = "old-document",
+                    auxData = new { isDefault = true, frameId = "nested" },
+                },
+            }
+        );
+        var frame = Assert.Single(page.Frames, frame => frame.Id == "nested");
+        var retained = new CdpRemoteObject(frame, "retained-object", frame.Context!);
+        await pipe.EventAsync(
+            "Runtime.executionContextCreated",
+            new
+            {
+                context = new
+                {
+                    id = 3,
+                    uniqueId = "new-document",
+                    auxData = new { isDefault = true, frameId = "nested" },
+                },
+            }
+        );
+        await Assert.ThrowsAsync<CdpException>(() => retained.EvaluateAsync<bool>("element => element.isConnected"));
+        await pipe.EventAsync("Runtime.executionContextDestroyed", new { executionContextId = 2 });
+        Assert.Equal("new-document", frame.Context?.UniqueId);
+        var replacement = new CdpRemoteObject(frame, "replacement-object", frame.Context!);
+        await pipe.EventAsync("Runtime.executionContextDestroyed", new { executionContextId = 3 });
+        Assert.Null(frame.Context);
+        await Assert.ThrowsAsync<CdpException>(() => replacement.EvaluateAsync<bool>("element => element.isConnected"));
+        await pipe.EventAsync("Runtime.executionContextsCleared", new { });
+        Assert.Null(frame.Context);
+        Assert.Null(page.MainFrame.Context);
+    }
+
     private sealed class DelayedCancellationStream : Stream
     {
         public TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -257,6 +344,66 @@ public sealed class CdpConnectionTests
             browserInput = outgoing.Reader.AsStream();
             BrowserOutput = incoming.Writer.AsStream();
             Connection.Connect(incoming.Reader.AsStream(), outgoing.Writer.AsStream());
+        }
+
+        public async Task<CdpPage> InitializePageAsync()
+        {
+            var page = new CdpPage(Connection, "target", "session", new("1024x768", 1024, 768));
+            var initialization = page.InitializeAsync();
+            while (true)
+            {
+                var request = await ReceiveAsync();
+                var method = request.GetProperty("method").GetString();
+                object result = method switch
+                {
+                    "Page.getFrameTree" => new { frameTree = new { frame = new { id = "main", url = "about:blank" } } },
+                    "Runtime.evaluate" => new { result = new { value = new { } } },
+                    "Browser.getWindowForTarget" => new { windowId = 1 },
+                    "Target.getTargetInfo" => new { targetInfo = new { title = "" } },
+                    _ => new { },
+                };
+                if (method == "Runtime.enable")
+                {
+                    await SendAsync(
+                        new
+                        {
+                            sessionId = "session",
+                            method = "Runtime.executionContextCreated",
+                            @params = new
+                            {
+                                context = new
+                                {
+                                    id = 1,
+                                    uniqueId = "main-document",
+                                    auxData = new { isDefault = true, frameId = "main" },
+                                },
+                            },
+                        }
+                    );
+                }
+                await SendAsync(new { id = request.GetProperty("id").GetInt64(), result });
+                if (method == "Target.getTargetInfo")
+                {
+                    await initialization;
+                    return page;
+                }
+            }
+        }
+
+        public async Task EventAsync(string method, object parameters)
+        {
+            await SendAsync(
+                new
+                {
+                    sessionId = "session",
+                    method,
+                    @params = parameters,
+                }
+            );
+            var barrier = Connection.SendAsync("Runtime.getIsolateId", sessionId: "session");
+            var request = await ReceiveAsync();
+            await SendAsync(new { id = request.GetProperty("id").GetInt64(), result = new { } });
+            await barrier;
         }
 
         public async Task<JsonElement> ReceiveAsync()
