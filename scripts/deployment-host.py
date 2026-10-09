@@ -15,10 +15,9 @@ SERVICES = ("browser", "resolver", "client-api", "web")
 
 
 def obsolete_images(references, current):
-    keep = {current["revision"], current.get("previousRevision")}
     pattern = r"xpathed/(browser|resolver|client-api|web):([a-f0-9]{40})"
     return {reference for reference in references
-            if (match := re.fullmatch(pattern, reference)) and match.group(2) not in keep}
+            if (match := re.fullmatch(pattern, reference)) and match.group(2) != current["revision"]}
 
 
 def cleanup(current):
@@ -105,7 +104,7 @@ def deploy(base, source, revision, fingerprint, run=compose, check=wait_healthy,
                "labels": {"org.opencontainers.image.revision": revision}}
         for name in SERVICES}}))
     candidate = {"revision": revision, "fingerprint": fingerprint,
-                 "source": str(release), "override": str(override), "previousRevision": previous["revision"]}
+                 "source": str(release), "override": str(override)}
     # A failed build leaves the running stack and successful receipt untouched.
     run(base, candidate, "build", *SERVICES)
     try:
