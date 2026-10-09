@@ -10,6 +10,10 @@ public sealed class SessionsController(IHttpClientFactory clients) : ControllerB
     [HttpPost]
     public Task Create() => HttpForwarder.ForwardAsync(HttpContext, clients.CreateClient("browser"), "/sessions");
 
+    [HttpGet("options")]
+    public Task Options() =>
+        HttpForwarder.ForwardAsync(HttpContext, clients.CreateClient("browser"), "/sessions/options");
+
     [HttpGet("{id}")]
     public Task Get(string id) =>
         HttpForwarder.ForwardAsync(

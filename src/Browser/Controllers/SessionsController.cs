@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Xpathed.Browser.Sessions;
 using Xpathed.Common.Contracts;
 
@@ -9,7 +10,13 @@ namespace Xpathed.Browser.Controllers;
 public sealed class SessionsController(BrowserSessions sessions) : ControllerBase
 {
     [HttpPost]
-    public Task<BrowserSession> Create(CancellationToken cancellationToken) => sessions.CreateAsync(cancellationToken);
+    public Task<BrowserSession> Create(
+        [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] CreateBrowserSessionRequest? request,
+        CancellationToken cancellationToken
+    ) => sessions.CreateAsync(request?.BrowserType, cancellationToken);
+
+    [HttpGet("options")]
+    public BrowserSessionOptions Options() => sessions.Options;
 
     [HttpGet("{id}")]
     public Task<BrowserSessionState> Get(string id, CancellationToken cancellationToken) =>

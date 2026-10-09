@@ -14,7 +14,12 @@ vi.mock("@novnc/novnc", () => ({
 }));
 
 function browserApi() {
-  const session = { sessionId: "session-1", pageId: "page-1", viewPath: "/view/session-1" };
+  const session = {
+    sessionId: "session-1",
+    pageId: "page-1",
+    viewPath: "/view/session-1",
+    browserType: "chromium" as const,
+  };
   let pages: PageState[] = [
     {
       sessionId: session.sessionId,
@@ -34,6 +39,7 @@ function browserApi() {
     activePageId,
     activationVersion,
     viewPath: session.viewPath,
+    browserType: "chromium" as const,
     pages,
   });
   const addPage = (url = "about:blank", title = "") => {
@@ -92,6 +98,10 @@ function browserApi() {
     Promise.resolve(Response.json(result(page, instruction)));
   const fetch = vi.fn<typeof globalThis.fetch>(async (input, options) => {
     const path = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+    if (path === "/api/sessions/options")
+      return Promise.resolve(
+        Response.json({ defaultBrowserType: "chromium", browserTypes: ["chromium", "firefox"] }),
+      );
     if (path === "/api/sessions") return Response.json(session);
     if (path === "/api/sessions/session-1" && snapshotFailure)
       return Response.json({ message: "Cannot verify current tabs." }, { status: 503 });
@@ -175,20 +185,30 @@ describe("Browser tabs and chat", () => {
     const user = renderWorkspace();
     await openFirst(user);
     const composer = () => screen.getByRole("textbox", { name: "Describe an element" });
-    await user.type(composer(), "Click First{Enter}");
+    await user.click(composer());
+    await user.paste("Click First");
+    await user.keyboard("{Enter}");
     await screen.findByText("First target", { selector: "bdi" });
     await user.click(screen.getByRole("button", { name: "New tab" }));
-    await user.type(screen.getByRole("textbox", { name: "Page address" }), "second.test{Enter}");
+    await user.click(screen.getByRole("textbox", { name: "Page address" }));
+    await user.paste("second.test");
+    await user.keyboard("{Enter}");
     await waitFor(() => expect(composer()).toBeEnabled());
-    await user.type(composer(), "Click Second{Enter}");
+    await user.click(composer());
+    await user.paste("Click Second");
+    await user.keyboard("{Enter}");
     await screen.findByText("Second target", { selector: "bdi" });
-    await user.type(composer(), "Draft for Second");
+    await user.click(composer());
+    await user.paste("Draft for Second");
     await user.click(screen.getByRole("tab", { name: "First" }));
     const address = screen.getByRole("textbox", { name: "Page address" });
     await user.clear(address);
-    await user.type(address, "first.test/updated{Enter}");
+    await user.click(address);
+    await user.paste("first.test/updated");
+    await user.keyboard("{Enter}");
     await waitFor(() => expect(composer()).toBeEnabled());
-    await user.type(composer(), "Draft for First");
+    await user.click(composer());
+    await user.paste("Draft for First");
     const resolve = vi.fn((page: PageState, instruction: string) =>
       Promise.resolve(Response.json(api.result(page, instruction))),
     );

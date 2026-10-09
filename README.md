@@ -41,6 +41,8 @@ XPath construction prefers explicit test attributes and meaningful semantics. It
 
 Each sent prompt has a **Retry instruction** button that resends it against the active tab’s current view as a new attempt, preserving earlier results and the composer draft. Retry is disabled while the workspace is busy.
 
+Choose **Chromium** or **Firefox** beside the address field before opening a website. The choice applies to the whole session; **Close all tabs** unlocks it again. Chromium is the default, configurable through `BROWSER_TYPE`.
+
 The chat header’s **Reset chat** asks for confirmation before clearing the active tab’s draft and results. Cancel or Escape preserves the chat; confirming keeps the browser page and other tabs.
 
 ## Clone and run locally
@@ -75,7 +77,7 @@ All four services run in Docker. Ctrl+C or `pnpm docker:down` removes developmen
 
 Main's classic branch protection requires independent review and CI checks for nonadministrators; administrators are exempt by owner choice. The recorded policy and live-setting verification are described in [security guidance](SECURITY.md).
 
-The hosted workspace can follow successful `main` pushes through the change-aware deployment job. App changes build on the VPS, pass health checks and restore the previous images on failure; unchanged inputs skip rebuilding and restarting but still verify health. After health checks pass, cleanup keeps only the current application images and removes older revisions, including rollback images. CI fails if deployment is unexpectedly skipped after successful checks. SSH settings and the deployment URL use Actions secrets; deployment output redacts addresses, while runtime provider credentials remain on the host. Keep real deployment addresses out of repository content. The production Browser image uses the ASP.NET runtime with only Playwright’s matching Chromium build and the display dependencies; the SDK and other browsers stay out of production. See [hosted deployment](docs/deployment.md) for setup, access and rollback behavior. This source deployment is separate from published-image releases.
+The hosted workspace can follow successful `main` pushes through the change-aware deployment job. App changes build on the VPS, pass health checks and restore the previous images on failure; unchanged inputs skip rebuilding and restarting but still verify health. After health checks pass, cleanup keeps only the current application images and removes older revisions, including rollback images. CI fails if deployment is unexpectedly skipped after successful checks. SSH settings and the deployment URL use Actions secrets; deployment output redacts addresses, while runtime provider credentials remain on the host. Keep real deployment addresses out of repository content. The production Browser image uses the ASP.NET runtime with Playwright’s matching Chromium and Firefox builds and the display dependencies; the SDK, WebKit and duplicate Chromium headless shell stay out of production. See [hosted deployment](docs/deployment.md) for setup, access and rollback behavior. This source deployment is separate from published-image releases.
 
 ClientApi and Resolver limit shared API traffic to 120 requests per minute and eight concurrent requests per process. Resolver separately allows 20 model calls per minute, 1,000 per 24-hour window and two concurrent calls, without queuing or automatic retries. Configure these positive limits in `.env`; [runtime limits](docs/runtime.md#backend-and-model-usage-limits) describe rejection and accounting. Counters reset on restart. Use a dedicated OpenRouter application key with a provider-side credit limit for a dollar spending cap.
 
@@ -83,18 +85,18 @@ For an anonymous public workspace, also install the [hosted security profile](do
 
 ## Architecture
 
-The Resolver accepts instructions from a client or evaluation runner, coordinates capture and model selection, and returns targets verified by the browser service. Browser implementations connect through the [browser API contract](docs/runtime.md#browser-integration). The bundled implementation uses Playwright/Chromium.
+The Resolver accepts instructions from a client or evaluation runner, coordinates capture and model selection, and returns targets verified by the browser service. Browser implementations connect through the [browser API contract](docs/runtime.md#browser-integration). The bundled implementation uses Playwright with Chromium or Firefox.
 
 [![Service ownership and request paths](docs/diagrams/system-design.svg)](docs/diagrams/system-design.svg)
 
 The diagram includes the bundled test client.
 
-| Service                       | Responsibility                                                                |
-| ----------------------------- | ----------------------------------------------------------------------------- |
-| Resolver — ASP.NET Core       | Core resolution API, model selection and orchestration                        |
-| Browser — Playwright/Chromium | Browser API implementation: pages, capture, XPath verification and highlights |
-| Web — React/TypeScript        | Manual test client: chat, tabs and noVNC viewer                               |
-| ClientApi — ASP.NET Core      | Test-client requests                                                          |
+| Service                  | Responsibility                                                                |
+| ------------------------ | ----------------------------------------------------------------------------- |
+| Resolver — ASP.NET Core  | Core resolution API, model selection and orchestration                        |
+| Browser — Playwright     | Browser API implementation: pages, capture, XPath verification and highlights |
+| Web — React/TypeScript   | Manual test client: chat, tabs and noVNC viewer                               |
+| ClientApi — ASP.NET Core | Test-client requests                                                          |
 
 Resolver runs independently of Web and ClientApi. It addresses Browser through `BrowserUrl`, exchanging serializable records defined in `src/Common`. A replacement browser service must preserve the capture, identity, verification and lifecycle contracts; only the bundled implementation has been verified. The test client's viewer and Resolver address the same managed page.
 

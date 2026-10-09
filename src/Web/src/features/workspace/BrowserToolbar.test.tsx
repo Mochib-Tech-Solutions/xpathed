@@ -4,6 +4,10 @@ import { describe, expect, it, vi } from "vitest";
 import BrowserToolbar from "./BrowserToolbar";
 
 const defaults = {
+  browserType: "chromium" as const,
+  browserTypes: ["chromium" as const, "firefox" as const],
+  canStart: true,
+  onBrowserTypeChange: () => undefined,
   sessionId: "session",
   pageUrl: "https://current.example/page",
   address: "https://draft.example",

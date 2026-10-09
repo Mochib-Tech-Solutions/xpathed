@@ -1,6 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { ApiError, request } from "./api";
-import type { PageState, Resolution, ResolutionResult, Session, SessionState } from "./api";
+import type {
+  BrowserType,
+  BrowserSessionOptions,
+  PageState,
+  Resolution,
+  ResolutionResult,
+  Session,
+  SessionState,
+} from "./api";
 
 type TabChat = { address: string; instruction: string; history: Resolution[] };
 type WorkspaceState = {
@@ -48,6 +56,8 @@ function updateSession(previous: WorkspaceState, snapshot: SessionState): Worksp
 }
 
 export default function useWorkspace() {
+  const [browserOptions, setBrowserOptions] = useState<BrowserSessionOptions | null>(null);
+  const [browserType, setBrowserType] = useState<BrowserType>("chromium");
   const [workspace, setWorkspace] = useState(emptyWorkspace);
   const { session, snapshot, tabs } = workspace;
   const page = snapshot?.pages.find((entry) => entry.pageId === snapshot.activePageId) ?? null;
@@ -61,6 +71,23 @@ export default function useWorkspace() {
   const revision = useRef(0);
   const snapshotRevision = useRef(0);
   const spotlightQueue = useRef(Promise.resolve());
+
+  useEffect(() => {
+    let active = true;
+    void request<BrowserSessionOptions>("/sessions/options")
+      .then((options) => {
+        if (active) {
+          setBrowserOptions(options);
+          setBrowserType(options.defaultBrowserType);
+        }
+      })
+      .catch(() => {
+        if (active) setError("Unable to load browser choices. Reload the app to try again.");
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(
     () => () => {
@@ -160,8 +187,10 @@ export default function useWorkspace() {
     });
   }
   function navigate(url: string) {
+    if (!session && !browserOptions) return;
     void perform("Opening website…", async (isCurrent) => {
-      const currentSession = session ?? (await request<Session>("/sessions", "POST"));
+      const currentSession =
+        session ?? (await request<Session>("/sessions", "POST", { browserType }));
       if (!isCurrent()) return;
       const pageId = page?.pageId ?? currentSession.pageId;
       setWorkspace((previous) => ({
@@ -352,6 +381,12 @@ export default function useWorkspace() {
   }
   return {
     session,
+    browserType: session?.browserType ?? browserType,
+    browserOptions,
+    setBrowserType: (next: BrowserType) => {
+      if (!session && !pending.current && browserOptions?.browserTypes.includes(next))
+        setBrowserType(next);
+    },
     page,
     pages: snapshot?.pages ?? [],
     address: page ? chat.address : workspace.initialAddress,

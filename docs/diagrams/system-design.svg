@@ -502,15 +502,15 @@ rect.c-bg-rect { fill: var(--bg); }
         <text x="695" y="194" class="t-muted" font-size="9" text-anchor="middle">Stateless orchestration</text>
         </g>
 
-        <g id="node-browser" data-node-id="browser" data-node-label="Browser" tabindex="0" role="button" aria-label="Focus Browser, Playwright + Chromium, Architecture component" aria-pressed="false" data-node-kind="backend" data-node-sublabel="Playwright + Chromium" data-node-context="Architecture component">
-          <title>Browser · Playwright + Chromium · Architecture component</title>
+        <g id="node-browser" data-node-id="browser" data-node-label="Browser" tabindex="0" role="button" aria-label="Focus Browser, Playwright, Architecture component" aria-pressed="false" data-node-kind="backend" data-node-sublabel="Playwright" data-node-context="Architecture component">
+          <title>Browser · Playwright · Architecture component</title>
           <rect x="320" y="20" width="160" height="60" rx="6" class="c-mask"/>
           <rect x="320" y="20" width="160" height="60" rx="6" class="c-backend" stroke-width="1.5"/>
           <g aria-hidden="true" data-semantic-sigil="backend" class="semantic-sigil s-backend" transform="translate(326 26) scale(0.6875)">
             <path d="M6 3 3 8l3 5M10 3l3 5-3 5"/>
           </g>
           <text data-node-label="" x="400" y="48" class="t-primary" font-size="11" font-weight="600" text-anchor="middle">Browser</text>
-        <text x="400" y="64" class="t-muted" font-size="9" text-anchor="middle">Playwright + Chromium</text>
+        <text x="400" y="64" class="t-muted" font-size="9" text-anchor="middle">Playwright</text>
         </g>
 
         <g id="node-model" data-node-id="model" data-node-label="OpenRouter" tabindex="0" role="button" aria-label="Focus OpenRouter, Model selects candidate IDs, Architecture component, OpenRouter" aria-pressed="false" data-node-kind="external" data-node-sublabel="Model selects candidate IDs" data-node-context="Architecture component" data-node-brand="OpenRouter" data-node-brand-id="openrouter" data-node-brand-status="preset" data-node-brand-source="https://openrouter.ai">

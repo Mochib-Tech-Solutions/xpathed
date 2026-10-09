@@ -12,7 +12,12 @@ vi.mock("@novnc/novnc", () => ({
   },
 }));
 
-const session = { sessionId: "session-1", pageId: "page-1", viewPath: "/view/page-1" };
+const session = {
+  sessionId: "session-1",
+  pageId: "page-1",
+  viewPath: "/view/page-1",
+  browserType: "chromium" as const,
+};
 const page = {
   ...session,
   documentId: "document-1",
@@ -69,6 +74,10 @@ function mockApi(resolve = () => Promise.resolve(Response.json(found)), currentP
       const path =
         typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
       if (options?.method === "DELETE") return Promise.resolve(new Response(null, { status: 204 }));
+      if (path === "/api/sessions/options")
+        return Promise.resolve(
+          Response.json({ defaultBrowserType: "chromium", browserTypes: ["chromium", "firefox"] }),
+        );
       if (path === "/api/sessions") return Promise.resolve(Response.json(session));
       if (path === "/api/sessions/session-1")
         return Promise.resolve(
@@ -77,6 +86,7 @@ function mockApi(resolve = () => Promise.resolve(Response.json(found)), currentP
             activePageId: page.pageId,
             activationVersion: 1,
             viewPath: session.viewPath,
+            browserType: "chromium" as const,
             pages: [currentPage()],
           }),
         );
@@ -1499,7 +1509,12 @@ describe("Workspace resolution", () => {
     await submitInstruction(user);
     await screen.findByText("Pay now", { selector: "bdi" });
     const originalFetch = globalThis.fetch;
-    const freshSession = { sessionId: "session-2", pageId: "page-2", viewPath: "/view/session-2" };
+    const freshSession = {
+      sessionId: "session-2",
+      pageId: "page-2",
+      viewPath: "/view/session-2",
+      browserType: "chromium" as const,
+    };
     const freshPage = {
       ...page,
       ...freshSession,
@@ -1536,6 +1551,13 @@ describe("Workspace resolution", () => {
           return new Promise<Response>((resolve) => {
             finishOldSnapshot = resolve;
           });
+        if (input === "/api/sessions/options")
+          return Promise.resolve(
+            Response.json({
+              defaultBrowserType: "chromium",
+              browserTypes: ["chromium", "firefox"],
+            }),
+          );
         if (input === "/api/sessions") return Promise.resolve(Response.json(freshSession));
         if (input === "/api/sessions/session-2")
           return Promise.resolve(
@@ -2016,6 +2038,10 @@ describe("Workspace resolution", () => {
     const fetch = vi.fn<typeof globalThis.fetch>((input, options) => {
       const path =
         typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      if (path === "/api/sessions/options")
+        return Promise.resolve(
+          Response.json({ defaultBrowserType: "chromium", browserTypes: ["chromium", "firefox"] }),
+        );
       if (path === "/api/sessions") return Promise.resolve(Response.json(session));
       if (path === "/api/sessions/session-1")
         return Promise.resolve(
@@ -2024,6 +2050,7 @@ describe("Workspace resolution", () => {
             activePageId: page.pageId,
             activationVersion: 1,
             viewPath: session.viewPath,
+            browserType: "chromium" as const,
             pages: [page],
           }),
         );

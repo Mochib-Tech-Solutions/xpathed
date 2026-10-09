@@ -9,6 +9,7 @@ services:
     ports: ["127.0.0.1:${BROWSER_PORT:-8082}:8080"]
     environment:
       ViewerOrigins: ${VIEWER_ORIGINS:-http://localhost:8080,http://127.0.0.1:8080}
+      DefaultBrowserType: ${BROWSER_TYPE:-chromium}
       MaxSessions: ${BROWSER_MAX_SESSIONS:-4}
       Logging__LogLevel__Default: Warning
     stop_grace_period: 20s

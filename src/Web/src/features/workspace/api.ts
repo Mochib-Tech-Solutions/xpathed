@@ -1,6 +1,16 @@
 export type ShadowHost = { xpath: string; label: string };
 
-export type Session = { sessionId: string; pageId: string; viewPath: string };
+export type BrowserType = "chromium" | "firefox";
+export type BrowserSessionOptions = {
+  defaultBrowserType: BrowserType;
+  browserTypes: BrowserType[];
+};
+export type Session = {
+  sessionId: string;
+  pageId: string;
+  viewPath: string;
+  browserType: BrowserType;
+};
 
 export type PageState = {
   sessionId: string;
@@ -12,6 +22,7 @@ export type PageState = {
 };
 
 export type SessionState = {
+  browserType: BrowserType;
   sessionId: string;
   activePageId: string;
   activationVersion: number;

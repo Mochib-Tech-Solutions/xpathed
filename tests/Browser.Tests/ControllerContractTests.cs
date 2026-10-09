@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.Configuration;
 using Xpathed.Browser.Controllers;
 
 namespace Xpathed.Browser.Tests;
@@ -19,6 +20,42 @@ public sealed class ControllerContractTests(WebApplicationFactory<HealthControll
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal("browser", body.GetProperty("service").GetString());
+    }
+
+    [Theory]
+    [InlineData("webkit")]
+    [InlineData("")]
+    [InlineData("Firefox")]
+    [InlineData("/usr/bin/firefox")]
+    public async Task InvalidEngineIsRejectedBeforeStartingADisplay(string browserType)
+    {
+        using var client = application.CreateClient();
+        using var response = await client.PostAsJsonAsync("/sessions", new { browserType });
+        await AssertErrorAsync(response, HttpStatusCode.BadRequest, "invalid_browser_type");
+    }
+
+    [Theory]
+    [InlineData("chromium")]
+    [InlineData("firefox")]
+    public async Task SessionOptionsExposeConfiguredDefaultAndInstalledEngines(string defaultType)
+    {
+        using var configured = application.WithWebHostBuilder(builder =>
+            builder.ConfigureAppConfiguration(
+                (_, config) =>
+                    config.AddInMemoryCollection(
+                        new Dictionary<string, string?> { ["DefaultBrowserType"] = defaultType }
+                    )
+            )
+        );
+        using var client = configured.CreateClient();
+        using var response = await client.GetAsync("/sessions/options");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal(defaultType, body.GetProperty("defaultBrowserType").GetString());
+        Assert.Equal(
+            ["chromium", "firefox"],
+            body.GetProperty("browserTypes").EnumerateArray().Select(type => type.GetString())
+        );
     }
 
     [Theory]

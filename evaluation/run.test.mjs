@@ -117,7 +117,10 @@ async function runWithServices(
       else assert.equal(traceId, undefined);
       return send({});
     }
-    if (path === "/browser/sessions") return send({ sessionId: "session", pageId: "page" });
+    if (path === "/browser/sessions") {
+      assert.deepEqual(body, { browserType: "chromium" });
+      return send({ sessionId: "session", pageId: "page" });
+    }
     if (path === "/browser/sessions/session" && request.method === "DELETE") return send({});
     if (path === "/browser/pages/page/navigate")
       return send({ pageId: "page", documentId: "document" });

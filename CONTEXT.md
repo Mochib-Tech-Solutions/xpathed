@@ -60,6 +60,9 @@ An expression that locates nodes within one DOM tree: a document or an open shad
 **Browser session**:
 A managed browsing instance containing related tabs and their shared browsing state. The client and resolver refer to the same session.
 
+**Browser type**:
+The engine selected when a browser session starts: Chromium or Firefox. Every managed page in that session uses the same engine.
+
 **Managed page**:
 A live browser tab within a session. Its page identifier links resolution requests and chat history to that same tab.
 

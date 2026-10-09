@@ -1,4 +1,7 @@
 services:
+  browser:
+    environment:
+      DefaultBrowserType: chromium
   resolver:
     environment:
       OpenRouter__BaseUrl: http://evaluation-fixture:8090/api/v1/

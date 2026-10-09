@@ -1,10 +1,25 @@
 import { useEffect, useRef } from "react";
 import type { FormEvent } from "react";
-import { ArrowRight, LoaderCircle, RotateCw } from "lucide-react";
+import { ArrowRight, ChevronDown, LoaderCircle, RotateCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+} from "@/components/ui/dropdown-menu";
+import type { BrowserType } from "./api";
+
+const browserNames = { chromium: "Chromium", firefox: "Firefox" };
+
 type Props = {
+  browserType: BrowserType;
+  browserTypes: BrowserType[];
+  onBrowserTypeChange: (type: BrowserType) => void;
+  canStart: boolean;
   sessionId: string | undefined;
   pageUrl: string | undefined;
   address: string;
@@ -15,6 +30,10 @@ type Props = {
 };
 
 export default function BrowserToolbar({
+  browserType,
+  browserTypes,
+  onBrowserTypeChange,
+  canStart,
   sessionId,
   pageUrl,
   address,
@@ -31,7 +50,8 @@ export default function BrowserToolbar({
   function submit(event: FormEvent) {
     event.preventDefault();
     const url = address.trim();
-    if (url && !busy) onNavigate(/^[a-z][a-z\d+.-]*:/i.test(url) ? url : `https://${url}`);
+    if (url && !busy && canStart)
+      onNavigate(/^[a-z][a-z\d+.-]*:/i.test(url) ? url : `https://${url}`);
   }
   const hasPage = /^https?:\/\//i.test(pageUrl ?? "");
   return (
@@ -39,6 +59,35 @@ export default function BrowserToolbar({
       className="flex min-h-14 items-center gap-2 border-b border-border px-3 py-2"
       onSubmit={submit}
     >
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            className="gap-1 px-2"
+            aria-label={`Browser type: ${browserNames[browserType]}`}
+            title={sessionId ? "Close all tabs to change browser" : "Browser type"}
+            disabled={!!sessionId || busy || browserTypes.length === 0}
+          >
+            {browserNames[browserType]}
+            <ChevronDown className="size-3" aria-hidden="true" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start">
+          <DropdownMenuRadioGroup
+            value={browserType}
+            onValueChange={(value) => {
+              if (value === "chromium" || value === "firefox") onBrowserTypeChange(value);
+            }}
+          >
+            {browserTypes.map((type) => (
+              <DropdownMenuRadioItem key={type} value={type}>
+                {browserNames[type]}
+              </DropdownMenuRadioItem>
+            ))}
+          </DropdownMenuRadioGroup>
+        </DropdownMenuContent>
+      </DropdownMenu>
       <Button
         type="button"
         variant="ghost"
@@ -67,7 +116,7 @@ export default function BrowserToolbar({
         size="icon"
         title="Go to address"
         aria-label="Go to address"
-        disabled={!address.trim() || busy}
+        disabled={!address.trim() || busy || !canStart}
       >
         {busy ? (
           <LoaderCircle className="motion-safe:animate-spin" aria-hidden="true" />
