@@ -185,20 +185,30 @@ describe("Browser tabs and chat", () => {
     const user = renderWorkspace();
     await openFirst(user);
     const composer = () => screen.getByRole("textbox", { name: "Describe an element" });
-    await user.type(composer(), "Click First{Enter}");
+    await user.click(composer());
+    await user.paste("Click First");
+    await user.keyboard("{Enter}");
     await screen.findByText("First target", { selector: "bdi" });
     await user.click(screen.getByRole("button", { name: "New tab" }));
-    await user.type(screen.getByRole("textbox", { name: "Page address" }), "second.test{Enter}");
+    await user.click(screen.getByRole("textbox", { name: "Page address" }));
+    await user.paste("second.test");
+    await user.keyboard("{Enter}");
     await waitFor(() => expect(composer()).toBeEnabled());
-    await user.type(composer(), "Click Second{Enter}");
+    await user.click(composer());
+    await user.paste("Click Second");
+    await user.keyboard("{Enter}");
     await screen.findByText("Second target", { selector: "bdi" });
-    await user.type(composer(), "Draft for Second");
+    await user.click(composer());
+    await user.paste("Draft for Second");
     await user.click(screen.getByRole("tab", { name: "First" }));
     const address = screen.getByRole("textbox", { name: "Page address" });
     await user.clear(address);
-    await user.type(address, "first.test/updated{Enter}");
+    await user.click(address);
+    await user.paste("first.test/updated");
+    await user.keyboard("{Enter}");
     await waitFor(() => expect(composer()).toBeEnabled());
-    await user.type(composer(), "Draft for First");
+    await user.click(composer());
+    await user.paste("Draft for First");
     const resolve = vi.fn((page: PageState, instruction: string) =>
       Promise.resolve(Response.json(api.result(page, instruction))),
     );
