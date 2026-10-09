@@ -207,6 +207,7 @@ jobs:
         with:
           version: v5.5.1
       - name: Verify Chromium and Firefox browser contracts
+        shell: bash
         env:
           XPATHED_ENV_FILE: /dev/null
           OPENROUTER_API_KEY: ""

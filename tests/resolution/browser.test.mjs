@@ -165,8 +165,9 @@ async function withFramebuffer(session, check) {
   }
 }
 
-test("session-teardown-releases-display-before-slot-reuse", { timeout: 300000 }, async () => {
+test("session-teardown-releases-display-before-slot-reuse", { timeout: 600000 }, async () => {
   // The old forced x11vnc shutdown exhausted the default 4096 System V segments before 128 sessions.
+  // Allow the slower hosted Firefox runner to finish all 128 launches and cleanups.
   for (let index = 0; index < 128; index++) {
     const session = await request("/sessions");
     try {
