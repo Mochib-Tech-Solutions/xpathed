@@ -184,6 +184,16 @@ test("session-teardown-releases-display-before-slot-reuse", { timeout: 300000 },
   }
 });
 
+test("session-concurrent-close-keeps-service-healthy", async () => {
+  const session = await request("/sessions");
+  await Promise.all([
+    request(`/sessions/${session.sessionId}`, undefined, "DELETE"),
+    request(`/sessions/${session.sessionId}`, undefined, "DELETE"),
+  ]);
+  assert.equal((await fetch(`${browserUrl}/health`)).status, 200);
+  assert.equal((await fetch(`${browserUrl}/sessions/${session.sessionId}`)).status, 404);
+});
+
 test("viewer-disconnect-completes-close-handshake-and-allows-reconnect", async () => {
   await withFixture(targetMarkup, async (session) => {
     for (let attempt = 0; attempt < 2; attempt++) {
