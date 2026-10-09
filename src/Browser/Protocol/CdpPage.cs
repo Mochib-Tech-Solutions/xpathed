@@ -197,8 +197,8 @@ internal sealed class CdpPage(CdpConnection connection, string targetId, string 
                 attached.ParentId = data.GetProperty("parentFrameId").GetString();
                 break;
             case "Page.frameNavigated":
+                // Runtime lifecycle events own context invalidation; creation can precede this event.
                 var navigated = AddFrame(data.GetProperty("frame"), id);
-                navigated.Context = null;
                 if (navigated.Id == mainFrameId)
                 {
                     BeginFrameGeneration();
