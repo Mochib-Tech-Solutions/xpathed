@@ -52,9 +52,11 @@ class DeploymentTests(unittest.TestCase):
                     check=lambda *args: None, **kwargs)
 
     def test_unchanged_does_not_build_or_restart(self):
-        host.deploy(self.base, self.source, "c" * 40, "b" * 64, run=self.run_compose,
-                    check=lambda base, state: self.calls.append((state["revision"], ("health",))))
-        self.assertEqual(self.calls, [(self.old["revision"], ("health",))])
+        deploy(self.base, self.source, "c" * 40, "b" * 64, run=self.run_compose,
+               check=lambda base, state: self.calls.append((state["revision"], ("health",))),
+               clean=lambda state: self.calls.append((state["revision"], ("cleanup",))))
+        self.assertEqual(self.calls, [(self.old["revision"], ("health",)),
+                                     (self.old["revision"], ("cleanup",))])
         self.assertEqual(json.loads(self.state.read_text()), self.old)
 
     def test_unhealthy_unchanged_inputs_fail_without_build_or_cleanup(self):
@@ -70,8 +72,11 @@ class DeploymentTests(unittest.TestCase):
         def check(base, state):
             self.assertEqual(json.loads(self.state.read_text()), self.old)
             self.calls.append((state["revision"], ("health",)))
-        host.deploy(self.base, self.source, "c" * 40, "d" * 64, run=self.run_compose, check=check)
-        self.assertEqual([args[0] for _, args in self.calls], ["build", "up", "health"])
+        def clean(state):
+            self.assertEqual(json.loads(self.state.read_text()), state)
+            self.calls.append((state["revision"], ("cleanup",)))
+        deploy(self.base, self.source, "c" * 40, "d" * 64, run=self.run_compose, check=check, clean=clean)
+        self.assertEqual([args[0] for _, args in self.calls], ["build", "up", "health", "cleanup"])
         self.assertEqual(json.loads(self.state.read_text())["revision"], "c" * 40)
 
     def test_bad_health_restores_previous_images_and_keeps_receipt(self):
@@ -79,7 +84,8 @@ class DeploymentTests(unittest.TestCase):
             if state["revision"] != self.old["revision"]:
                 raise RuntimeError("unhealthy candidate")
         with self.assertRaisesRegex(RuntimeError, "unhealthy candidate"):
-            host.deploy(self.base, self.source, "c" * 40, "d" * 64, run=self.run_compose, check=check)
+            deploy(self.base, self.source, "c" * 40, "d" * 64, run=self.run_compose, check=check,
+                   clean=lambda state: self.fail("Failed deployments must preserve recovery images"))
         self.assertEqual(self.calls[-1], (self.old["revision"], ("up", "-d", "--no-build", "--remove-orphans")))
         self.assertEqual(json.loads(self.state.read_text()), self.old)
 
@@ -141,11 +147,14 @@ class DeploymentTests(unittest.TestCase):
         self.assertFalse((self.base / "escaped").exists())
         self.assertEqual(list((self.base / "incoming").iterdir()), [])
 
-    def test_cleanup_keeps_active_previous_and_unrelated_images(self):
+    def test_cleanup_removes_previous_images_and_keeps_current_and_unrelated_images(self):
         current = {"revision": "a" * 40, "previousRevision": "b" * 40}
-        references = [f"xpathed/web:{revision * 40}" for revision in ("a", "b", "c")]
+        references = [f"xpathed/{service}:{revision * 40}"
+                      for service in host.SERVICES for revision in ("a", "b", "c")]
         references += ["nginx:latest", "xpathed/browser:development", "other/web:" + "c" * 40]
-        self.assertEqual(host.obsolete_images(references, current), {"xpathed/web:" + "c" * 40})
+        self.assertEqual(host.obsolete_images(references, current),
+                         {f"xpathed/{service}:{revision * 40}"
+                          for service in host.SERVICES for revision in ("b", "c")})
 
 
 if __name__ == "__main__":
