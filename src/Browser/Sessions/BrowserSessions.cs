@@ -1,11 +1,13 @@
 using System.Collections.Concurrent;
-using Microsoft.Playwright;
+using System.Net.WebSockets;
+using Xpathed.Browser.Protocol;
+using Xpathed.Browser.Viewing;
 using Xpathed.Common.Contracts;
 using Xpathed.Common.Http;
 
 namespace Xpathed.Browser.Sessions;
 
-public sealed class BrowserSessions(IConfiguration configuration, ILogger<BrowserSessions> logger) : IAsyncDisposable
+public sealed class BrowserSessions(IConfiguration configuration) : IAsyncDisposable
 {
     private readonly ConcurrentDictionary<string, BrowserSessionRuntime> sessions = new();
     private readonly SemaphoreSlim creation = new(1);
@@ -13,16 +15,28 @@ public sealed class BrowserSessions(IConfiguration configuration, ILogger<Browse
 
     private readonly string defaultBrowserType = ValidateBrowserType(configuration["DefaultBrowserType"] ?? "chromium");
 
-    public BrowserSessionOptions Options => new(defaultBrowserType, ["chromium", "firefox"]);
+    private static readonly BrowserResolution[] Resolutions =
+    [
+        new("1024x768", 1024, 768),
+        new("1280x800", 1280, 800),
+        new("1366x768", 1366, 768),
+        new("1440x900", 1440, 900),
+        new("1920x1080", 1920, 1080),
+    ];
+
+    public BrowserSessionOptions Options => new(defaultBrowserType, ["chromium"], "1280x800", Resolutions);
 
     private static string ValidateBrowserType(string browserType) =>
-        browserType is "chromium" or "firefox"
+        browserType is "chromium"
             ? browserType
-            : throw new ApiException(400, "invalid_browser_type", "Choose Chromium or Firefox.");
+            : throw new ApiException(400, "invalid_browser_type", "Choose Chromium.");
 
-    public async Task<BrowserSession> CreateAsync(string? browserType, CancellationToken token)
+    public async Task<BrowserSession> CreateAsync(string? browserType, string? resolutionId, CancellationToken token)
     {
         browserType = ValidateBrowserType(browserType ?? defaultBrowserType);
+        var resolution =
+            Resolutions.FirstOrDefault(choice => choice.Id == (resolutionId ?? "1280x800"))
+            ?? throw new ApiException(400, "invalid_resolution", "Choose a supported browser resolution.");
         await creation.WaitAsync(token);
         BrowserSessionRuntime? session = null;
         try
@@ -37,13 +51,24 @@ public sealed class BrowserSessions(IConfiguration configuration, ILogger<Browse
                 );
             }
 
-            session = new BrowserSessionRuntime(slot, browserType, logger);
+            session = new BrowserSessionRuntime(
+                slot,
+                browserType,
+                resolution,
+                configuration["BrowserExecutablePath"] ?? ""
+            );
             sessions[session.Id] = session;
             await session.Gate.WaitAsync(token);
             try
             {
                 await session.StartAsync(token);
-                return new(session.Id, session.ActivePageId, session.ViewPath, session.BrowserType);
+                return new(
+                    session.Id,
+                    session.ActivePageId,
+                    session.ViewPath,
+                    session.BrowserType,
+                    session.Resolution.Id
+                );
             }
             finally
             {
@@ -147,7 +172,11 @@ public sealed class BrowserSessions(IConfiguration configuration, ILogger<Browse
             {
                 throw new ApiException(504, "navigation_timeout", "The page did not respond in time.");
             }
-            catch (PlaywrightException)
+            catch (CdpDialogPendingException)
+            {
+                throw new ApiException(409, "dialog_pending", "Answer the browser dialog first.");
+            }
+            catch (CdpException)
             {
                 throw new ApiException(
                     502,
@@ -232,7 +261,7 @@ public sealed class BrowserSessions(IConfiguration configuration, ILogger<Browse
             pageId,
             async (s, page) =>
             {
-                await page.Page.GotoAsync(url, new() { WaitUntil = WaitUntilState.DOMContentLoaded, Timeout = 20000 });
+                await page.Page.NavigateAsync(url);
                 return new PageState(
                     s.Id,
                     page.Id,
@@ -277,10 +306,22 @@ public sealed class BrowserSessions(IConfiguration configuration, ILogger<Browse
                 var captureId = page.CaptureId;
                 page.Capture = new BrowserPageCapture(page);
                 var result = await page.Capture.CaptureAsync(s.Id, request.DocumentId, captureId);
+                if (request.IncludeImage)
+                {
+                    result = result with { Image = await page.Capture.CaptureImageAsync() };
+                }
                 await RequireFocusedDocumentAsync(s, page, request.DocumentId);
                 if (page.CaptureId != captureId)
                 {
                     throw new ApiException(409, "stale_capture", "This capture is no longer current.");
+                }
+                if (!await page.Capture.PrivacyUnchangedAsync())
+                {
+                    throw new ApiException(
+                        409,
+                        "stale_capture",
+                        "Private content changed while the page was captured."
+                    );
                 }
 
                 return result;
@@ -288,34 +329,70 @@ public sealed class BrowserSessions(IConfiguration configuration, ILogger<Browse
             token
         );
 
-    public Task<SelectionValidation> SelectAsync(string pageId, SelectionRequest request, CancellationToken token)
-    {
-        RequireAction(request.Action);
-        return OnPageAsync(
+    public Task<CaptureImageResult> CaptureImageAsync(
+        string pageId,
+        CaptureImageRequest request,
+        CancellationToken token
+    ) =>
+        OnPageAsync(
             pageId,
             async (session, page) =>
             {
-                page.ActionSelections = null;
-                var result = await ValidateActionsAsync(
-                    session,
-                    page,
-                    request.DocumentId,
-                    request.CaptureId,
-                    [new ActionSelection("single", request.CandidateId, request.Action)]
-                );
-                var selection = new SelectionValidation(result.Actions[0].Target);
-                await HighlightTargetAsync(
-                    session,
-                    page,
-                    request.DocumentId,
-                    request.CaptureId,
-                    selection.Target is { } target ? [target] : []
-                );
-                return selection;
+                await RequireCaptureAsync(session, page, request.DocumentId, request.CaptureId);
+                var capture = page.Capture!;
+                await capture.RequireImageCurrentAsync();
+                CaptureImage image;
+                try
+                {
+                    image = await capture.CaptureImageAsync();
+                }
+                catch (ApiException error) when (error.Code == "capture_image_unavailable")
+                {
+                    await RequireCurrentAsync();
+                    throw;
+                }
+                await RequireCurrentAsync();
+                return new CaptureImageResult(session.Id, page.Id, request.DocumentId, request.CaptureId, image);
+
+                async Task RequireCurrentAsync()
+                {
+                    await RequireCaptureAsync(session, page, request.DocumentId, request.CaptureId);
+                    await capture.RequireImageCurrentAsync();
+                    RequireDocument(session, page, request.DocumentId);
+                    if (page.Capture != capture || page.CaptureId != request.CaptureId)
+                    {
+                        throw new ApiException(409, "stale_capture", "This capture is no longer current.");
+                    }
+                }
             },
             token
         );
-    }
+
+    public Task<XPathEvidenceBatch> XPathEvidenceAsync(
+        string pageId,
+        XPathEvidenceRequest request,
+        CancellationToken token
+    ) =>
+        OnPageAsync(
+            pageId,
+            async (session, page) =>
+            {
+                await RequireCaptureAsync(session, page, request.DocumentId, request.CaptureId);
+                page.ActionSelections = null;
+                var evidence = await page.Capture!.XPathEvidenceAsync(request.CandidateIds);
+                await RequireCaptureAsync(session, page, request.DocumentId, request.CaptureId);
+                if (!await page.Capture.XPathPrivacyUnchangedAsync())
+                {
+                    throw new ApiException(
+                        409,
+                        "stale_capture",
+                        "Private content changed while the page was observed."
+                    );
+                }
+                return evidence;
+            },
+            token
+        );
 
     public Task<ActionSelectionValidation> SelectActionsAsync(
         string pageId,
@@ -342,6 +419,14 @@ public sealed class BrowserSessions(IConfiguration configuration, ILogger<Browse
             pageId,
             async (session, page) =>
             {
+                await RequireCaptureAsync(session, page, request.DocumentId, request.CaptureId);
+                if (request.Actions.Any(action => action.CandidateId is not null))
+                {
+                    await page.Capture!.VerifyXPathProposalsAsync(
+                        request.XpathEvidenceId,
+                        request.XpathProposals ?? []
+                    );
+                }
                 page.ActionSelections = null;
                 var validation = await ValidateActionsAsync(
                     session,
@@ -437,6 +522,100 @@ public sealed class BrowserSessions(IConfiguration configuration, ILogger<Browse
             token
         );
 
+    public Task<ActionExecutionResult> ExecuteActionAsync(
+        string pageId,
+        ExecuteActionRequest request,
+        CancellationToken token
+    ) =>
+        OnPageAsync(
+            pageId,
+            async (session, page) =>
+            {
+                if (session.Id != request.SessionId)
+                {
+                    throw new ApiException(409, "stale_session", "This action belongs to a different browser session.");
+                }
+                await RequireCaptureAsync(session, page, request.DocumentId, request.CaptureId);
+                try
+                {
+                    if (
+                        page.ActionSelections is null
+                        || !page.ActionSelections.TryGetValue(request.ActionId, out var action)
+                        || action.CandidateId is null
+                    )
+                    {
+                        throw new ApiException(
+                            409,
+                            "unknown_action",
+                            "This action has no verified target in the current capture."
+                        );
+                    }
+                    BrowserActionExecution.Validate(action.Action, request.Value);
+                    await page.ClearHighlightAsync();
+                    var validation = await ValidateActionsAsync(
+                        session,
+                        page,
+                        request.DocumentId,
+                        request.CaptureId,
+                        [action]
+                    );
+                    var target = validation.Actions[0].Target;
+                    if (
+                        target is not { State.Rendered: true, State.InViewport: true, Interactability: { } readiness }
+                        || readiness.Status is "blocked" or "unsupported"
+                        || readiness.Checks.CompatibleControl != "pass"
+                        || (action.Action is "fill" or "type" or "clear" && readiness.Checks.Keyboard != "pass")
+                    )
+                    {
+                        throw new ApiException(
+                            409,
+                            "action_not_ready",
+                            "The target is no longer ready for this action. Resolve it again."
+                        );
+                    }
+                    await using var element = await page.Capture!.RetainedTargetAsync(action.CandidateId);
+                    await RequireCaptureAsync(session, page, request.DocumentId, request.CaptureId);
+                    var point = await page.Capture.TargetPointAsync(action.CandidateId);
+                    // Consume the capture before dispatch so an uncertain result cannot be replayed.
+                    page.InvalidateCapture();
+                    try
+                    {
+                        await CdpActions.ExecuteAsync(
+                            element,
+                            action.Action,
+                            request.Value,
+                            point.GetProperty("x").GetDouble(),
+                            point.GetProperty("y").GetDouble()
+                        );
+                        if (page.Page.CurrentDialog is not null)
+                        {
+                            throw new CdpDialogPendingException();
+                        }
+                        return new ActionExecutionResult(
+                            request.ActionId,
+                            action.Action,
+                            "completed",
+                            "Browser action completed. Check the page for the result."
+                        );
+                    }
+                    catch (Exception error) when (error is CdpException or TimeoutException)
+                    {
+                        return new ActionExecutionResult(
+                            request.ActionId,
+                            action.Action,
+                            "uncertain",
+                            "The browser could not confirm completion. Check the page before resolving again."
+                        );
+                    }
+                }
+                finally
+                {
+                    await page.ClearCaptureAsync();
+                }
+            },
+            token
+        );
+
     private static void RequireAction(string action)
     {
         if (
@@ -492,9 +671,16 @@ public sealed class BrowserSessions(IConfiguration configuration, ILogger<Browse
         {
             var result = await page.Capture!.SelectAsync(actions);
             await RequireCaptureAsync(session, page, documentId, captureId);
+            if (
+                actions.Any(action => action.CandidateId is not null)
+                && !await page.Capture.XPathPrivacyUnchangedAsync()
+            )
+            {
+                throw new ApiException(409, "stale_capture", "Private content changed while the target was verified.");
+            }
             return result;
         }
-        catch (PlaywrightException)
+        catch (CdpException)
         {
             await page.ClearHighlightAsync();
             throw new ApiException(409, "stale_capture", "The retained target document is no longer available.");
@@ -557,8 +743,11 @@ public sealed class BrowserSessions(IConfiguration configuration, ILogger<Browse
         string documentId
     )
     {
-        session.ObserveNativeFocus();
         RequireDocument(session, page, documentId);
+        if (page.Page.CurrentDialog is not null)
+        {
+            throw new ApiException(409, "dialog_pending", "Answer the browser dialog first.");
+        }
         if (!await page.HasNativeFocusAsync())
         {
             page.InvalidateCapture();
@@ -571,6 +760,65 @@ public sealed class BrowserSessions(IConfiguration configuration, ILogger<Browse
         RequireDocument(session, page, documentId);
     }
 
+    public async Task ConnectViewerAsync(string sessionId, WebSocket socket, CancellationToken token)
+    {
+        var session = FindSession(sessionId);
+        using var relay = new BrowserViewerRelay();
+        using var lifetime = CancellationTokenSource.CreateLinkedTokenSource(token, session.Stop.Token);
+        try
+        {
+            await session.Gate.WaitAsync(lifetime.Token);
+            try
+            {
+                if (session.Viewer is not null)
+                {
+                    throw new ApiException(409, "viewer_connected", "This session already has an active viewer.");
+                }
+                session.Viewer = relay;
+                session.Interaction ??= new BrowserViewerInteraction(session, relay);
+                session.Interaction.Attach(relay);
+                var page = session.Pages[session.ActivePageId];
+                await session.Interaction.ReplayAsync(page);
+                await page.Page.StartScreencastAsync();
+            }
+            finally
+            {
+                session.Gate.Release();
+            }
+            await relay.RunAsync(socket, session.Interaction.HandleAsync, lifetime.Token);
+        }
+        finally
+        {
+            await session.Gate.WaitAsync(CancellationToken.None);
+            try
+            {
+                if (session.Viewer == relay)
+                {
+                    session.Viewer = null;
+                    foreach (var page in session.Pages.Values)
+                    {
+                        if (session.Interaction is { } interaction)
+                        {
+                            await interaction.ReleaseAsync(page, closePicker: false);
+                        }
+                        if (!page.Page.IsClosed)
+                        {
+                            try
+                            {
+                                await page.Page.StopScreencastAsync();
+                            }
+                            catch (CdpException) { }
+                        }
+                    }
+                }
+            }
+            finally
+            {
+                session.Gate.Release();
+            }
+        }
+    }
+
     public async Task CloseAsync(string sessionId)
     {
         if (!sessions.TryGetValue(sessionId, out var session))
@@ -579,7 +827,7 @@ public sealed class BrowserSessions(IConfiguration configuration, ILogger<Browse
         }
 
         await session.Stop.CancelAsync();
-        await session.Gate.WaitAsync();
+        await session.Gate.WaitAsync(CancellationToken.None);
         try
         {
             await session.DisposeAsync();

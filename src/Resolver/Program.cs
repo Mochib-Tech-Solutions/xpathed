@@ -2,12 +2,6 @@ using Xpathed.Common.Http;
 using Xpathed.Resolver.Middleware;
 using Xpathed.Resolver.Services;
 
-if (args.FirstOrDefault() == "--evaluate-offline")
-{
-    Environment.ExitCode = await OfflineSelectionEvaluation.RunAsync(args);
-    return;
-}
-
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddApiControllers();
 builder.Services.AddApiRateLimits(builder.Configuration);
@@ -19,7 +13,9 @@ builder.Services.AddHttpClient("openrouter");
 builder.Services.AddMemoryCache();
 builder.Services.AddTransient<OpenRouterGateway>();
 builder.Services.AddTransient<ResolutionService>();
+builder.Services.AddTransient<XPathSelectionService>();
 builder.Services.AddSingleton<ProviderAccounting>();
+builder.Services.AddSingleton<ImageRoutingCache>();
 builder.Services.AddSingleton<ModelUsageLimits>();
 var app = builder.Build();
 _ = app.Services.GetRequiredService<ModelUsageLimits>();

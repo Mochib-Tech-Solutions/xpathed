@@ -24,8 +24,8 @@ services:
       OpenRouter__BaseUrl: ${OPENROUTER_BASE_URL:-https://openrouter.ai/api/v1/}
       OpenRouter__TimeoutSeconds: ${OPENROUTER_TIMEOUT_SECONDS:-30}
       OpenRouter__ApiKey: ${OPENROUTER_API_KEY:-}
-      OpenRouter__Model: ${OPENROUTER_MODEL:-google/gemini-3.8-flash}
-      OpenRouter__Provider: ${OPENROUTER_PROVIDER:-google-ai-studio}
+      OpenRouter__Model: ${OPENROUTER_MODEL:-deepseek/deepseek-v4.1-flash}
+      OpenRouter__Provider: ${OPENROUTER_PROVIDER:-wafer}
       RateLimits__RequestsPerMinute: ${API_REQUESTS_PER_MINUTE:-120}
       RateLimits__ConcurrentRequests: ${API_CONCURRENT_REQUESTS:-8}
       ModelUsage__CallsPerMinute: ${MODEL_CALLS_PER_MINUTE:-20}
@@ -40,7 +40,6 @@ services:
     security_opt: ["seccomp=./docker/browser/seccomp.json"]
     environment:
       ViewerOrigins: http://localhost:${XPATHED_PORT:-8080},http://127.0.0.1:${XPATHED_PORT:-8080}
-      DefaultBrowserType: ${BROWSER_TYPE:-chromium}
       MaxSessions: 4
       Logging__LogLevel__Default: Warning
     stop_grace_period: 20s

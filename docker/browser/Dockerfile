@@ -12,28 +12,20 @@ COPY src/Common/ src/Common/
 COPY src/Browser/ src/Browser/
 RUN dotnet publish src/Browser/Browser.csproj -c Release --no-restore -o /out && chmod -R a+rX /out
 
-FROM mcr.microsoft.com/playwright/dotnet:v1.63.0-noble@sha256:aa3eaf29a65df8c93fc32ab20cf9359f4d8ecc53e6e89f79378647ace87b46b3 AS browser-base
-RUN apt-get update && apt-get install -y --no-install-recommends x11vnc matchbox-window-manager && rm -rf /var/lib/apt/lists/*
+FROM mcr.microsoft.com/dotnet/aspnet:10.0.12-noble-chiseled-extra@sha256:00e0ad6a7ef8c0c1391b87f05c7ac757a15740455688f2bfcd146a3f4b987efd AS dotnet-runtime
 
-FROM browser-base AS development
-WORKDIR /source
-ENV NUGET_PACKAGES=/opt/nuget DOTNET_CLI_HOME=/tmp/dotnet ASPNETCORE_HTTP_PORTS=8080
-COPY --from=dependencies --chown=pwuser:pwuser /opt/nuget /opt/nuget
-COPY --from=dependencies --chown=pwuser:pwuser /source /source
-COPY --chown=pwuser:pwuser src/Common/ src/Common/
-COPY --chown=pwuser:pwuser src/Browser/ src/Browser/
-RUN chown pwuser:pwuser /source
-USER pwuser
-CMD ["dotnet", "watch", "--non-interactive", "--project", "src/Browser", "run", "--no-restore", "--no-launch-profile"]
+FROM debian:trixie-slim@sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f AS browser-base
+ARG CHROMIUM_VERSION=154.0.8037.92-1~deb13u1
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends chromium=${CHROMIUM_VERSION} ca-certificates libicu76 libssl3t64 libstdc++6 tzdata fonts-freefont-ttf fonts-ipafont-gothic fonts-liberation fonts-noto-color-emoji fonts-tlwg-loma-otf fonts-unifont fonts-wqy-zenhei \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd --gid 1654 app \
+    && useradd --uid 1654 --gid 1654 --create-home app
+COPY --from=dotnet-runtime /usr/share/dotnet /usr/share/dotnet
+ENV PATH="/usr/share/dotnet:${PATH}" DOTNET_RUNNING_IN_CONTAINER=true ASPNETCORE_HTTP_PORTS=8080 DOTNET_EnableDiagnostics=0 BrowserExecutablePath=/usr/lib/chromium/chromium
+USER app
 
-FROM mcr.microsoft.com/dotnet/aspnet:10.0.12-noble@sha256:2d584d8147faddb0d678c5748d47953e5b8e18621ed4fb7049a91381d9d7746f AS runtime
-ENV ASPNETCORE_HTTP_PORTS=8080 DOTNET_EnableDiagnostics=0 PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+FROM browser-base AS runtime
 WORKDIR /app
 COPY --from=build /out .
-RUN dotnet exec --runtimeconfig Browser.runtimeconfig.json --depsfile Browser.deps.json Microsoft.Playwright.dll install --with-deps --no-shell chromium firefox \
-    && apt-get install -y --no-install-recommends x11vnc matchbox-window-manager \
-    && rm -rf /var/lib/apt/lists/* \
-    && useradd --create-home pwuser \
-    && chmod -R a+rX /ms-playwright
-USER pwuser
 ENTRYPOINT ["dotnet", "Browser.dll"]

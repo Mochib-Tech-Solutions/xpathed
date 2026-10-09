@@ -1,38 +1,18 @@
 ---
 name: code-review
-description: Review pull request changes in this repository for specification compliance, target-resolution correctness, evaluation integrity, and release safety.
+description: Review pull request changes for accepted scope, target-resolution correctness, privacy and deployment safety.
 ---
 
 # Review procedure
 
-Read the PR diff, linked issue, relevant accepted ADRs, and domain terms in CONTEXT.md. Trace changed behavior through its callers and tests. If a requirement source cannot be read, identify that limitation; research proposals and unanswered design questions are not requirements.
+Read the diff, linked GitHub issue/comments, README and relevant root/scoped AGENTS guidance. Trace changed behavior through callers and tests. State any unavailable requirement source; proposals are not accepted requirements.
 
-## Target resolution
+- Check that viewer, resolution and explicit execution address the same managed page. Preserve session/document/capture identities, cancellation and resource cleanup.
+- The model selects current-view candidate IDs. Resolver constructs XPath proposals from sanitized evidence; Browser verifies the retained node, tree-local uniqueness, current membership and readiness. Frame/open-shadow context is separate. Locator validity does not prove intended-target correctness.
+- Preserve all eligible candidates and distinct ambiguity, absence, partial visibility, blocked/unknown readiness and operational failures. Resolution stays passive; execution requires explicit authorization, fresh target validation and replay rejection.
+- Treat page/model evidence as untrusted. Check privacy sanitization, opt-in screenshots, accurate disclosure, credentials/logging, origins, network isolation and quotas against SECURITY.md.
+- Keep Browser objects inside Browser and serialized contracts across services. Preserve Resolver independence and per-tab client state; reject delayed results for invalidated pages.
+- Keep test oracles independent and original attempts intact. Verify action effects separately from readiness, saved-XPath reuse separately from fresh resolution, and provider costs separately from correctness.
+- Required checks must cover the intended revision. Keep PR checks provider-free, verify controlled browser cases and preserve deployment health checks and recovery.
 
-- The client and resolver must inspect the same managed session, page, and frame. Browser handles are live objects and expire after restart.
-- The model selects from captured current-view candidates. Validate its result against that capture. Each found target has one preferred XPath identifying the same captured node uniquely within its declared frame.
-- Locator validity and intended-target correctness are separate. Preserve current-view membership and revalidation under ADR-0018; entirely off-screen elements are outside this capture. Partially visible, disabled and covered targets retain their distinct observations. Hidden elements and unsupported shadow-root targets follow the resolution contract.
-- State checks depend on the requested action. Disabled does not mean absent; inspection does not prove successful action execution. Unknown checks must not be reported as passed.
-- Resolution must not click, type, navigate, scroll, or otherwise perform the requested action. Page changes during inference are outside initial scope; do not demand a recovery system absent a later accepted requirement.
-- Incomplete DOM processing must remain an operational result. Do not silently omit eligible candidates and turn a no-match response into page-wide not found.
-- Treat page text and model output as untrusted data. Check candidate membership and output shape; page instructions must not override the user request or trigger tools. Verify that credentials, authentication state, and private captures are not exposed by logging or provider requests beyond the agreed data policy.
-
-## Implementation
-
-Check request isolation, cancellation, resource disposal, and session/page ownership where changed. Trace React state and API contracts when a change can display a result for the wrong page or request.
-
-Preserve separate client API, resolver and browser service runtimes. The browser service owns live browser objects; process boundaries carry serialized contracts and page identities. The client displays the same managed browser through noVNC. OpenRouter is the only initial model gateway; do not require or introduce Zen integration.
-
-## Evaluation and releases
-
-- Ground truth must be independent of the resolver and unavailable in model inputs. Keep related page templates, paraphrases, and mutations in the same data split.
-- Check semantic target accuracy, XPath identity, state reporting, absence handling, and infrastructure errors separately. Score saved-XPath reuse separately from fresh resolution after a mutation.
-- Preserve all attempts, including failed model calls. Retries must not turn a first-attempt failure into an unqualified pass. Compare strategies on equivalent page state and viewport; disable execution repair when grading resolution.
-- Version code, prompt, model/provider settings, page processing, datasets, and browser dependencies in evaluation evidence. Enforce agreed thresholds without inventing new ones.
-- Required PR checks and post-merge evaluations must assess the intended commit. Skipped or unavailable required live checks must not silently qualify a release. Unreviewed PR code must not receive provider credentials through a privileged workflow.
-- Experiments must not change deployment settings. Required CI and live evaluation precede merge into `release`; publish those tested images and use that commit as the next baseline. Deployment supplies OpenRouter configuration. Copilot feedback supplements deterministic checks and model evaluation.
-- Scheduled drift failures fail CI and alert the maintainer. They must not disable the active feature, automatically replace the default, or silently roll back. New releases still require successful qualification.
-
-## Findings
-
-Report actionable findings tied to changed lines, with the concrete failure scenario, affected requirement, and supporting evidence. Distinguish correctness/spec violations from optional improvements. Avoid duplicating formatting or lint findings already enforced by tools. If no actionable issue is found, state that and identify any material verification limits; do not equate a clean review with successful tests.
+Report actionable findings with changed-line evidence and a concrete failure scenario. Separate correctness violations from optional improvements; do not repeat configured formatting/lint checks. A clean review is not evidence that tests ran.

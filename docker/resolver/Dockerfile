@@ -7,20 +7,12 @@ COPY src/Common/Common.csproj src/Common/packages.lock.json src/Common/
 COPY src/Resolver/Resolver.csproj src/Resolver/packages.lock.json src/Resolver/
 RUN dotnet restore src/Resolver/Resolver.csproj --locked-mode
 
-FROM dependencies AS development
-COPY --chown=app:app src/Common/ src/Common/
-COPY --chown=app:app src/Resolver/ src/Resolver/
-RUN mkdir -p /opt/nuget && chown -R app:app /source /opt/nuget
-ENV DOTNET_CLI_HOME=/tmp/dotnet
-USER app
-CMD ["dotnet", "watch", "--non-interactive", "--project", "src/Resolver", "run", "--no-restore", "--no-launch-profile"]
-
 FROM dependencies AS build
 COPY src/Common/ src/Common/
 COPY src/Resolver/ src/Resolver/
 RUN dotnet publish src/Resolver/Resolver.csproj -c Release --no-restore -o /out && chmod -R a+rX /out
 
-FROM mcr.microsoft.com/dotnet/aspnet:10.0.12-noble@sha256:2d584d8147faddb0d678c5748d47953e5b8e18621ed4fb7049a91381d9d7746f AS runtime
+FROM mcr.microsoft.com/dotnet/aspnet:10.0.12-noble-chiseled-extra@sha256:00e0ad6a7ef8c0c1391b87f05c7ac757a15740455688f2bfcd146a3f4b987efd AS runtime
 WORKDIR /app
 COPY --from=build /out .
 USER app

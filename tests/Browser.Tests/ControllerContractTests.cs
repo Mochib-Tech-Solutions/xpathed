@@ -26,6 +26,7 @@ public sealed class ControllerContractTests(WebApplicationFactory<HealthControll
     [InlineData("webkit")]
     [InlineData("")]
     [InlineData("Firefox")]
+    [InlineData("firefox")]
     [InlineData("/usr/bin/firefox")]
     public async Task InvalidEngineIsRejectedBeforeStartingADisplay(string browserType)
     {
@@ -35,8 +36,18 @@ public sealed class ControllerContractTests(WebApplicationFactory<HealthControll
     }
 
     [Theory]
+    [InlineData("")]
+    [InlineData("1x1")]
+    [InlineData("999999x999999")]
+    public async Task InvalidResolutionIsRejectedBeforeStartingADisplay(string resolution)
+    {
+        using var client = application.CreateClient();
+        using var response = await client.PostAsJsonAsync("/sessions", new { resolution });
+        await AssertErrorAsync(response, HttpStatusCode.BadRequest, "invalid_resolution");
+    }
+
+    [Theory]
     [InlineData("chromium")]
-    [InlineData("firefox")]
     public async Task SessionOptionsExposeConfiguredDefaultAndInstalledEngines(string defaultType)
     {
         using var configured = application.WithWebHostBuilder(builder =>
@@ -52,10 +63,15 @@ public sealed class ControllerContractTests(WebApplicationFactory<HealthControll
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal(defaultType, body.GetProperty("defaultBrowserType").GetString());
-        Assert.Equal(
-            ["chromium", "firefox"],
-            body.GetProperty("browserTypes").EnumerateArray().Select(type => type.GetString())
+        Assert.Equal("1280x800", body.GetProperty("defaultResolution").GetString());
+        Assert.Contains(
+            body.GetProperty("resolutions").EnumerateArray(),
+            choice =>
+                choice.GetProperty("id").GetString() == "1920x1080"
+                && choice.GetProperty("width").GetInt32() == 1920
+                && choice.GetProperty("height").GetInt32() == 1080
         );
+        Assert.Equal(["chromium"], body.GetProperty("browserTypes").EnumerateArray().Select(type => type.GetString()));
     }
 
     [Theory]
@@ -125,11 +141,20 @@ public sealed class ControllerContractTests(WebApplicationFactory<HealthControll
     [InlineData("capture", "{\"documentId\":null}")]
     [InlineData("capture", "{\"documentId\":\"document\",\"scope\":\"visible\"}")]
     [InlineData("capture", "{\"documentId\":\"document\",\"scope\":null}")]
-    [InlineData("selection", "{}")]
-    [InlineData("selection", "{\"documentId\":\"document\",\"captureId\":\"capture\"}")]
+    [InlineData("capture-image", "{}")]
+    [InlineData("capture-image", "{\"documentId\":\"document\"}")]
+    [InlineData("capture-image", "{\"documentId\":\"document\",\"captureId\":\"\"}")]
+    [InlineData("capture-image", "{\"documentId\":null,\"captureId\":\"capture\"}")]
+    [InlineData("selections", "{}")]
+    [InlineData("selections", "{\"documentId\":\"document\",\"captureId\":\"capture\"}")]
     [InlineData("selections", "{\"documentId\":\"document\",\"captureId\":\"capture\",\"actions\":[null]}")]
     [InlineData("selections", "{\"documentId\":\"document\",\"captureId\":\"capture\",\"actions\":[]}")]
     [InlineData("highlight", "{}")]
+    [InlineData("execute", "{}")]
+    [InlineData(
+        "execute",
+        "{\"sessionId\":\"session\",\"documentId\":\"doc\",\"captureId\":\"capture\",\"actionId\":\"\"}"
+    )]
     public async Task InvalidResolutionBodyReturnsBadRequest(string operation, string body)
     {
         using var client = application.CreateClient();
@@ -144,17 +169,59 @@ public sealed class ControllerContractTests(WebApplicationFactory<HealthControll
     {
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
-            "/pages/missing/selection",
+            "/pages/missing/selections",
             new
             {
                 documentId = "document",
                 captureId = "capture",
-                candidateId = "candidate",
-                action = "execute",
+                actions = new[]
+                {
+                    new
+                    {
+                        actionId = "action",
+                        candidateId = "candidate",
+                        action = "execute",
+                    },
+                },
             }
         );
 
         await AssertErrorAsync(response, HttpStatusCode.BadRequest, "invalid_action");
+    }
+
+    [Fact]
+    public async Task UnknownExecutionPageDoesNotStartAnOperation()
+    {
+        using var client = application.CreateClient();
+        using var response = await client.PostAsJsonAsync(
+            "/pages/missing/execute",
+            new
+            {
+                sessionId = "session",
+                documentId = "document",
+                captureId = "capture",
+                actionId = "a1",
+            }
+        );
+        await AssertErrorAsync(response, HttpStatusCode.NotFound, "page_not_found");
+    }
+
+    [Fact]
+    public async Task OversizedExecutionValueIsRejectedBeforePageLookup()
+    {
+        using var client = application.CreateClient();
+        using var response = await client.PostAsJsonAsync(
+            "/pages/missing/execute",
+            new
+            {
+                sessionId = "session",
+                documentId = "document",
+                captureId = "capture",
+                actionId = "a1",
+                value = new string('x', 10001),
+            }
+        );
+        await AssertErrorAsync(response, HttpStatusCode.BadRequest, "invalid_request");
     }
 
     [Theory]

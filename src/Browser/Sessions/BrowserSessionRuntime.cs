@@ -1,184 +1,148 @@
 using System.Collections.Concurrent;
-using System.Diagnostics;
-using System.Globalization;
-using System.Net.Sockets;
-using Microsoft.Playwright;
+using System.Text.Json;
+using Xpathed.Browser.Protocol;
+using Xpathed.Browser.Viewing;
 using Xpathed.Common.Contracts;
 using Xpathed.Common.Http;
 
 namespace Xpathed.Browser.Sessions;
 
-internal sealed partial class BrowserSessionRuntime(int slot, string browserType, ILogger logger) : IAsyncDisposable
+internal sealed class BrowserSessionRuntime(
+    int slot,
+    string browserType,
+    BrowserResolution resolution,
+    string executable
+) : IAsyncDisposable
 {
-    private int blockedPopups;
+    private ChromiumProcess? browser;
+    private readonly ConcurrentDictionary<string, byte> pendingPages = new();
     private long pageOrder;
-    private string activePageId = "";
     private long activationVersion;
-    private long focusRevision;
-    private long synchronizedFocusRevision;
-    private readonly ConcurrentDictionary<IPage, byte> pendingPages = new();
-
+    private string activePageId = "";
+    private string? pendingFocusId;
+    private int blockedPopups;
+    private int disposed;
     public string Id { get; } = Guid.NewGuid().ToString("N");
+    public int Slot { get; } = slot;
+    public string BrowserType { get; } = browserType;
+    public BrowserResolution Resolution { get; } = resolution;
     public ConcurrentDictionary<string, BrowserPageRuntime> Pages { get; } = new();
     public string ActivePageId => Volatile.Read(ref activePageId);
     public long ActivationVersion => Interlocked.Read(ref activationVersion);
     public string ViewPath => $"/view/{Id}";
-    public bool HasPendingPages =>
-        !pendingPages.IsEmpty || Interlocked.Read(ref focusRevision) != Interlocked.Read(ref synchronizedFocusRevision);
-    public int Slot { get; } = slot;
-    public string BrowserType { get; } = browserType;
-    private int DisplayNumber => 100 + Slot;
-    public int Port => 5900 + Slot;
+    public bool HasPendingPages => !pendingPages.IsEmpty || Volatile.Read(ref pendingFocusId) is not null;
     public bool Ready { get; private set; }
     public int BlockedPopups => Volatile.Read(ref blockedPopups);
     public DateTimeOffset LastSeen { get; set; } = DateTimeOffset.UtcNow;
     public SemaphoreSlim Gate { get; } = new(1);
     public CancellationTokenSource Stop { get; } = new();
-    private IPlaywright? Playwright { get; set; }
-    private IBrowser? Browser { get; set; }
-    private IBrowserContext? Context { get; set; }
-    private Process? Display { get; set; }
-    private Process? WindowManager { get; set; }
-    private Process? Vnc { get; set; }
-    private FirefoxDisplay? firefoxDisplay;
-    private string? firefoxProfile;
-    private Task? firefoxFocusMonitor;
+    public BrowserViewerRelay? Viewer { get; set; }
+    public BrowserViewerInteraction? Interaction { get; set; }
 
     public async Task StartAsync(CancellationToken token)
     {
-        Display = Start("Xvfb", $":{DisplayNumber}", "-screen", "0", "1280x800x24", "-nolisten", "tcp", "-ac");
-        await WaitUntilAsync(() => File.Exists($"/tmp/.X11-unix/X{DisplayNumber}"), token);
-        Playwright = await Microsoft.Playwright.Playwright.CreateAsync();
-        if (BrowserType == "firefox")
+        browser = new ChromiumProcess();
+        await browser.StartAsync(executable, Resolution, token);
+        browser.Connection.Disconnected += Disconnected;
+        await browser.Connection.SendAsync("Browser.setDownloadBehavior", new { behavior = "deny" });
+        var targets = await browser.Connection.SendAsync("Target.getTargets");
+        var initial = targets
+            .GetProperty("targetInfos")
+            .EnumerateArray()
+            .First(target => target.GetProperty("type").GetString() == "page");
+        await ActivateAsync(await RegisterAsync(initial.GetProperty("targetId").GetString()!));
+        browser.Connection.Event += OnEvent;
+        await browser.Connection.SendAsync("Target.setDiscoverTargets", new { discover = true });
+        Ready = true;
+    }
+
+    private void Disconnected() => Stop.Cancel();
+
+    private void OnEvent(string? sessionId, string method, JsonElement data)
+    {
+        if (sessionId is not null || Stop.IsCancellationRequested)
         {
-            WindowManager = Start("matchbox-window-manager", "-display", $":{DisplayNumber}", "-use_titlebar", "no");
-            firefoxDisplay = new FirefoxDisplay($":{DisplayNumber}");
-            firefoxProfile = Directory.CreateTempSubdirectory("xpathed-firefox-").FullName;
-            Directory.CreateDirectory(Path.Combine(firefoxProfile, "chrome"));
-            // This startup preference must precede Firefox's first window; launch preferences arrive later.
-            await File.WriteAllTextAsync(
-                Path.Combine(firefoxProfile, "user.js"),
-                "user_pref(\"toolkit.legacyUserProfileCustomizations.stylesheets\", true);",
-                token
-            );
-            await File.WriteAllTextAsync(
-                Path.Combine(firefoxProfile, "chrome", "userChrome.css"),
-                "#navigator-toolbox, #titlebar, #sidebar-main, #sidebar-box, #statuspanel { visibility: collapse !important; min-height: 0 !important; height: 0 !important; }",
-                token
-            );
-            Context = await Playwright.Firefox.LaunchPersistentContextAsync(
-                firefoxProfile,
-                new()
-                {
-                    Headless = false,
-                    ViewportSize = ViewportSize.NoViewport,
-                    AcceptDownloads = false,
-                    Env = new Dictionary<string, string> { ["DISPLAY"] = $":{DisplayNumber}" },
-                    FirefoxUserPrefs = new Dictionary<string, object>
-                    {
-                        ["dom.disable_window_move_resize"] = true,
-                        ["focusmanager.testmode"] = false,
-                        ["browser.link.open_newwindow"] = 2,
-                        ["browser.link.open_newwindow.restriction"] = 0,
-                    },
-                    Timeout = 20000,
-                }
-            );
-            Browser = Context.Browser!;
+            return;
         }
-        else
+        if (method == "Target.targetCreated")
         {
-            Browser = await Playwright.Chromium.LaunchAsync(
-                new()
-                {
-                    Headless = false,
-                    ChromiumSandbox = true,
-                    Env = new Dictionary<string, string> { ["DISPLAY"] = $":{DisplayNumber}" },
-                    Args = ["--kiosk", "--window-position=0,0", "--window-size=1280,800"],
-                    Timeout = 20000,
-                }
-            );
-            Context = await Browser.NewContextAsync(
-                new() { ViewportSize = ViewportSize.NoViewport, AcceptDownloads = false }
-            );
-        }
-        var initialPage = await Context.NewPageAsync();
-        foreach (var startupPage in Context.Pages.Where(page => page != initialPage).ToArray())
-        {
-            await startupPage.CloseAsync();
-        }
-        await ActivateAsync(await RegisterAsync(initialPage));
-        Context.Page += (_, page) =>
-        {
-            pendingPages.TryAdd(page, 0);
+            var info = data.GetProperty("targetInfo");
+            var targetId = info.GetProperty("targetId").GetString()!;
+            if (
+                info.GetProperty("type").GetString() != "page"
+                || Pages.Values.Any(page => page.Page.TargetId == targetId)
+            )
+            {
+                return;
+            }
+            pendingPages.TryAdd(targetId, 0);
             if (Pages.TryGetValue(ActivePageId, out var active))
             {
                 active.InvalidateCapture();
             }
-
-            _ = AcceptPageAsync(page);
-        };
-        Browser.Disconnected += (_, _) => Stop.Cancel();
-        Vnc = Start(
-            "x11vnc",
-            "-display",
-            $":{DisplayNumber}",
-            "-rfbport",
-            Port.ToString(CultureInfo.InvariantCulture),
-            "-localhost",
-            "-forever",
-            "-shared",
-            "-nopw",
-            "-quiet",
-            "-xkb"
-        );
-        await WaitUntilAsync(
-            async () =>
-            {
-                try
-                {
-                    using var tcp = new TcpClient();
-                    await tcp.ConnectAsync("127.0.0.1", Port, token);
-                    return true;
-                }
-                catch (SocketException)
-                {
-                    return false;
-                }
-            },
-            token
-        );
-        token.ThrowIfCancellationRequested();
-        firefoxDisplay?.ReadFocusChanges();
-        Ready = true;
-        if (firefoxDisplay is not null)
+            _ = UpdatePagesAsync();
+        }
+        else if (method == "Target.targetDestroyed")
         {
-            firefoxFocusMonitor = MonitorFirefoxFocusAsync();
+            var targetId = data.GetProperty("targetId").GetString()!;
+            pendingPages.TryRemove(targetId, out _);
+            var page = Pages.Values.FirstOrDefault(page => page.Page.TargetId == targetId);
+            if (page is not null)
+            {
+                page.Page.MarkClosed();
+                page.InvalidateCapture();
+                _ = UpdatePagesAsync();
+            }
         }
     }
 
-    private async Task<BrowserPageRuntime> RegisterAsync(IPage page)
+    private async Task<BrowserPageRuntime> RegisterAsync(string targetId)
     {
-        var existing = Pages.Values.FirstOrDefault(p => p.Page == page);
+        var existing = Pages.Values.FirstOrDefault(page => page.Page.TargetId == targetId);
         if (existing is not null)
         {
+            pendingPages.TryRemove(targetId, out _);
             return existing;
         }
-
-        var managed = new BrowserPageRuntime(
-            page,
-            ++pageOrder,
-            firefoxDisplay is null ? new ChromiumPageDisplay(page) : new FirefoxPageDisplay(page)
+        var attached = await browser!.Connection.SendAsync("Target.attachToTarget", new { targetId, flatten = true });
+        var page = new BrowserPageRuntime(
+            new CdpPage(browser.Connection, targetId, attached.GetProperty("sessionId").GetString()!, Resolution),
+            ++pageOrder
         );
-        await managed.InitializeAsync(Context!, NativeFocusChanged);
-        Pages[managed.Id] = managed;
-        pendingPages.TryRemove(page, out _);
-        page.Close += (_, _) =>
+        await page.InitializeAsync();
+        Pages[page.Id] = page;
+        page.Page.ScreencastFrame += frame =>
         {
-            managed.InvalidateCapture();
-            _ = RemoveClosedPageAsync(managed);
+            if (ActivePageId == page.Id)
+            {
+                Viewer?.Publish(
+                    new(
+                        page.Id,
+                        page.DocumentId,
+                        Resolution.Width,
+                        Resolution.Height,
+                        frame.GetProperty("data").GetString()!
+                    )
+                );
+            }
         };
-        return managed;
+        page.Page.DialogChanged += dialog => Interaction?.DialogChanged(page, dialog);
+        page.Page.Focused += () =>
+        {
+            if (!Ready || Stop.IsCancellationRequested || ActivePageId == page.Id)
+            {
+                return;
+            }
+            Volatile.Write(ref pendingFocusId, page.Id);
+            if (Pages.TryGetValue(ActivePageId, out var previous))
+            {
+                previous.InvalidateCapture();
+            }
+            _ = UpdatePagesAsync();
+        };
+        page.Invalidated += () => Interaction?.Invalidated(page);
+        pendingPages.TryRemove(targetId, out _);
+        return page;
     }
 
     public async Task<BrowserPageRuntime> NewPageAsync()
@@ -187,7 +151,8 @@ internal sealed partial class BrowserSessionRuntime(int slot, string browserType
         {
             throw new ApiException(409, "tab_limit", "Close a tab before opening another (limit 8).");
         }
-        var page = await RegisterAsync(await Context!.NewPageAsync());
+        var created = await browser!.Connection.SendAsync("Target.createTarget", new { url = "about:blank" });
+        var page = await RegisterAsync(created.GetProperty("targetId").GetString()!);
         await ActivateAsync(page);
         return page;
     }
@@ -196,122 +161,47 @@ internal sealed partial class BrowserSessionRuntime(int slot, string browserType
     {
         if (ActivePageId != page.Id && Pages.TryGetValue(ActivePageId, out var previous))
         {
+            if (Interaction is not null)
+            {
+                await Interaction.ReleaseAsync(previous);
+            }
             await previous.ClearCaptureAsync();
+            if (!previous.Page.IsClosed)
+            {
+                await previous.Page.StopScreencastAsync();
+                await previous.Page.SendAsync("Emulation.setFocusEmulationEnabled", new { enabled = false });
+                if (previous.Page.WindowId != page.Page.WindowId)
+                {
+                    await previous.Page.MinimizeAsync();
+                }
+            }
         }
         await page.ShowAsync();
-        SetActive(page);
-    }
-
-    private void SetActive(BrowserPageRuntime page)
-    {
-        var previous = Interlocked.Exchange(ref activePageId, page.Id);
-        if (previous != page.Id)
+        if (Interlocked.Exchange(ref activePageId, page.Id) != page.Id)
         {
             Interlocked.Increment(ref activationVersion);
-            if (Pages.TryGetValue(previous, out var oldPage))
+        }
+        await page.Page.SendAsync("Emulation.setFocusEmulationEnabled", new { enabled = true });
+        if (Viewer is not null)
+        {
+            await page.Page.StartScreencastAsync();
+            if (Interaction is not null)
             {
-                oldPage.InvalidateCapture();
+                await Interaction.ReplayAsync(page);
             }
         }
-    }
-
-    private void NativeFocusChanged(BrowserPageRuntime page)
-    {
-        if (!Ready || Stop.IsCancellationRequested || !Pages.ContainsKey(page.Id) || ActivePageId == page.Id)
-        {
-            return;
-        }
-
-        SetActive(page);
-        Interlocked.Increment(ref focusRevision);
-        _ = SynchronizeNativeFocusAsync();
-    }
-
-    public void ObserveNativeFocus()
-    {
-        if (firefoxDisplay is null || !firefoxDisplay.ReadFocusChanges())
-        {
-            return;
-        }
-        foreach (var page in Pages.Values)
-        {
-            page.InvalidateCapture();
-        }
-        Interlocked.Increment(ref focusRevision);
-        _ = SynchronizeNativeFocusAsync();
-    }
-
-    private async Task MonitorFirefoxFocusAsync()
-    {
-        using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(10));
-        try
-        {
-            while (await timer.WaitForNextTickAsync(Stop.Token))
-            {
-                ObserveNativeFocus();
-            }
-        }
-        catch (OperationCanceledException) when (Stop.IsCancellationRequested) { }
-        catch (PlaywrightException)
-        {
-            await Stop.CancelAsync();
-        }
-    }
-
-    private async Task SynchronizeNativeFocusAsync()
-    {
-        try
-        {
-            await Gate.WaitAsync(Stop.Token);
-            try
-            {
-                await RefreshFocusAsync();
-            }
-            finally
-            {
-                Gate.Release();
-            }
-        }
-        catch (OperationCanceledException) when (Stop.IsCancellationRequested) { }
-        catch (PlaywrightException)
-        {
-            await Stop.CancelAsync();
-        }
-    }
-
-    private async Task RefreshFocusAsync()
-    {
-        var revision = Interlocked.Read(ref focusRevision);
-        if (revision == Interlocked.Read(ref synchronizedFocusRevision))
-        {
-            return;
-        }
-
-        // Separate Chromium windows can both report focus; prefer the latest notification.
-        var focusedPageId = ActivePageId;
-        foreach (var page in Pages.Values.OrderByDescending(page => page.Id == focusedPageId))
-        {
-            if (!page.Page.IsClosed && await page.HasNativeFocusAsync())
-            {
-                foreach (var other in Pages.Values.Where(p => p.Id != page.Id))
-                {
-                    await other.ClearCaptureAsync();
-                }
-
-                if (revision != Interlocked.Read(ref focusRevision))
-                {
-                    return;
-                }
-                SetActive(page);
-                break;
-            }
-        }
-        Interlocked.Exchange(ref synchronizedFocusRevision, revision);
     }
 
     public async Task ClosePageAsync(BrowserPageRuntime page)
     {
-        var ordered = Pages.Values.Where(p => p.Id != page.Id && !p.Page.IsClosed).OrderBy(p => p.Order).ToArray();
+        var ordered = Pages
+            .Values.Where(other => other.Id != page.Id && !other.Page.IsClosed)
+            .OrderBy(other => other.Order)
+            .ToArray();
+        if (Interaction is not null)
+        {
+            await Interaction.ReleaseAsync(page);
+        }
         Pages.TryRemove(page.Id, out _);
         await page.ClearCaptureAsync();
         if (ordered.Length == 0)
@@ -320,7 +210,7 @@ internal sealed partial class BrowserSessionRuntime(int slot, string browserType
         }
         else if (ActivePageId == page.Id)
         {
-            await ActivateAsync(ordered.FirstOrDefault(p => p.Order > page.Order) ?? ordered[^1]);
+            await ActivateAsync(ordered.FirstOrDefault(other => other.Order > page.Order) ?? ordered[^1]);
         }
         if (!page.Page.IsClosed)
         {
@@ -328,125 +218,54 @@ internal sealed partial class BrowserSessionRuntime(int slot, string browserType
         }
     }
 
-    public async Task<BrowserSessionState> StateAsync()
+    private async Task RefreshPagesAsync()
     {
-        for (var attempt = 0; attempt < 8; attempt++)
+        var focused = Volatile.Read(ref pendingFocusId);
+        if (focused is not null)
         {
-            foreach (var page in pendingPages.Keys)
+            if (Pages.TryGetValue(focused, out var page) && !page.Page.IsClosed)
             {
-                await AdoptPageAsync(page);
+                await ActivateAsync(page);
             }
-            foreach (var page in Pages.Values.Where(p => p.Page.IsClosed).ToArray())
-            {
-                await ClosePageAsync(page);
-            }
-            ObserveNativeFocus();
-            await RefreshFocusAsync();
-            var pages = new List<PageState>();
-            foreach (var page in Pages.Values.OrderBy(p => p.Order))
-            {
-                if (!page.Page.IsClosed)
-                {
-                    pages.Add(
-                        new(Id, page.Id, page.Page.Url, await page.Page.TitleAsync(), BlockedPopups, page.DocumentId)
-                    );
-                }
-            }
-            if (!HasPendingPages && pages.Any(page => page.PageId == ActivePageId))
-            {
-                return new(Id, ActivePageId, ViewPath, pages.ToArray(), ActivationVersion, BrowserType);
-            }
+            Interlocked.CompareExchange(ref pendingFocusId, null, focused);
         }
-        throw new ApiException(409, "inactive_page", "The active browser tab is changing. Try again.");
-    }
-
-    private async Task AcceptPageAsync(IPage page)
-    {
-        try
-        {
-            await Gate.WaitAsync(Stop.Token);
-            try
-            {
-                await AdoptPageAsync(page);
-            }
-            finally
-            {
-                Gate.Release();
-            }
-        }
-        catch (OperationCanceledException) when (Stop.IsCancellationRequested) { }
-        finally
-        {
-            pendingPages.TryRemove(page, out _);
-        }
-    }
-
-    private async Task AdoptPageAsync(IPage page)
-    {
-        try
-        {
-            if (Stop.IsCancellationRequested || page.IsClosed || Pages.Values.Any(p => p.Page == page))
-            {
-                return;
-            }
-
-            if (Pages.Count >= 8)
-            {
-                Interlocked.Increment(ref blockedPopups);
-                await page.CloseAsync();
-                if (Pages.TryGetValue(ActivePageId, out var active))
-                {
-                    await active.ShowAsync();
-                }
-
-                return;
-            }
-            await ActivateAsync(await RegisterAsync(page));
-        }
-        catch (PlaywrightException)
+        foreach (var id in pendingPages.Keys)
         {
             try
             {
-                var failed = Pages.Values.FirstOrDefault(p => p.Page == page);
-                if (failed is not null)
+                if (Pages.Values.Any(page => page.Page.TargetId == id))
                 {
-                    await ClosePageAsync(failed);
+                    continue;
                 }
-                else if (!page.IsClosed)
+                if (Pages.Count >= 8)
                 {
-                    await page.CloseAsync();
-                }
-                if (Pages.TryGetValue(ActivePageId, out var active) && !active.Page.IsClosed)
-                {
-                    await active.ShowAsync();
+                    Interlocked.Increment(ref blockedPopups);
+                    await browser!.Connection.SendAsync("Target.closeTarget", new { targetId = id });
                 }
                 else
                 {
-                    await NewPageAsync();
+                    await ActivateAsync(await RegisterAsync(id));
                 }
             }
-            catch (PlaywrightException)
+            finally
             {
-                await Stop.CancelAsync();
+                pendingPages.TryRemove(id, out _);
             }
         }
-        finally
+        foreach (var page in Pages.Values.Where(page => page.Page.IsClosed).ToArray())
         {
-            pendingPages.TryRemove(page, out _);
+            await ClosePageAsync(page);
         }
     }
 
-    private async Task RemoveClosedPageAsync(BrowserPageRuntime page)
+    private async Task UpdatePagesAsync()
     {
         try
         {
             await Gate.WaitAsync(Stop.Token);
             try
             {
-                if (!Stop.IsCancellationRequested && Pages.ContainsKey(page.Id))
-                {
-                    await ClosePageAsync(page);
-                }
+                await RefreshPagesAsync();
             }
             finally
             {
@@ -454,117 +273,45 @@ internal sealed partial class BrowserSessionRuntime(int slot, string browserType
             }
         }
         catch (OperationCanceledException) when (Stop.IsCancellationRequested) { }
-        catch (PlaywrightException)
+        catch (CdpException)
         {
             await Stop.CancelAsync();
         }
     }
 
-    private Process Start(string name, params string[] args)
+    public async Task<BrowserSessionState> StateAsync()
     {
-        var info = new ProcessStartInfo(name) { RedirectStandardOutput = true, RedirectStandardError = true };
-        foreach (var arg in args)
+        await RefreshPagesAsync();
+        var pages = new List<PageState>();
+        foreach (var page in Pages.Values.OrderBy(page => page.Order))
         {
-            info.ArgumentList.Add(arg);
-        }
-
-        var process = Process.Start(info) ?? throw new InvalidOperationException($"Could not start {name}.");
-        // Drain display logs without collecting visited page data.
-        process.BeginOutputReadLine();
-        process.BeginErrorReadLine();
-        process.EnableRaisingEvents = true;
-        process.Exited += (_, _) => DisplayExited(logger, name);
-        return process;
-    }
-
-    private static Task WaitUntilAsync(Func<bool> ready, CancellationToken token) =>
-        WaitUntilAsync(() => Task.FromResult(ready()), token);
-
-    private static async Task WaitUntilAsync(Func<Task<bool>> ready, CancellationToken token)
-    {
-        for (var i = 0; i < 100; i++)
-        {
-            if (await ready())
+            if (!page.Page.IsClosed)
             {
-                return;
+                pages.Add(
+                    new(Id, page.Id, page.Page.Url, await page.Page.TitleAsync(), BlockedPopups, page.DocumentId)
+                );
             }
-
-            await Task.Delay(50, token);
         }
-        throw new ApiException(503, "display_unavailable", "The browser display could not start.");
+        return new(Id, ActivePageId, ViewPath, pages.ToArray(), ActivationVersion, BrowserType, Resolution.Id);
     }
 
     public async ValueTask DisposeAsync()
     {
+        if (Interlocked.Exchange(ref disposed, 1) != 0)
+        {
+            return;
+        }
         Ready = false;
         await Stop.CancelAsync();
-        if (firefoxFocusMonitor is not null)
+        if (browser is not null)
         {
-            await firefoxFocusMonitor;
-        }
-        firefoxDisplay?.Dispose();
-        firefoxDisplay = null;
-        if (Browser is not null)
-        {
-            try
+            browser.Connection.Event -= OnEvent;
+            browser.Connection.Disconnected -= Disconnected;
+            foreach (var page in Pages.Values)
             {
-                await Browser.CloseAsync();
+                page.Page.MarkClosed();
             }
-            catch (PlaywrightException) { }
-            Browser = null;
+            await browser.DisposeAsync();
         }
-        Playwright?.Dispose();
-        Playwright = null;
-        if (firefoxProfile is not null && Directory.Exists(firefoxProfile))
-        {
-            Directory.Delete(firefoxProfile, true);
-        }
-        firefoxProfile = null;
-        foreach (var process in new[] { Vnc, WindowManager, Display })
-        {
-            if (process is null)
-            {
-                continue;
-            }
-
-            if (!process.HasExited)
-            {
-                // x11vnc must detach and remove its System V shared-memory segments before Xvfb exits.
-                using var signal = Process.Start(
-                    new ProcessStartInfo("/bin/kill")
-                    {
-                        ArgumentList = { "-TERM", process.Id.ToString(CultureInfo.InvariantCulture) },
-                        RedirectStandardError = true,
-                    }
-                );
-                if (signal is not null)
-                {
-                    await signal.WaitForExitAsync();
-                }
-                try
-                {
-                    await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(2));
-                }
-                catch (TimeoutException)
-                {
-                    try
-                    {
-                        if (!process.HasExited)
-                        {
-                            process.Kill(true);
-                        }
-                    }
-                    catch (InvalidOperationException) when (process.HasExited) { }
-                    await process.WaitForExitAsync();
-                }
-            }
-            process.Dispose();
-        }
-        Vnc = null;
-        WindowManager = null;
-        Display = null;
     }
-
-    [LoggerMessage(Level = LogLevel.Information, Message = "Display process {Process} exited")]
-    private static partial void DisplayExited(ILogger logger, string process);
 }

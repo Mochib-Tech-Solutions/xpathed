@@ -61,7 +61,7 @@ function workspace(t) {
 test("browser contract logs preserve a failed test command", (t) => {
   const workflow = readFileSync(".github/workflows/check.yml", "utf8");
   const step = workflow.match(
-    /- name: Verify Chromium and Firefox browser contracts\n([\s\S]*?)(?=\n      - )/,
+    /- name: Verify Chromium browser contracts\n([\s\S]*?)(?=\n      - )/,
   )?.[1];
   assert.ok(step);
   assert.match(step, /^        shell: bash$/m);
@@ -210,14 +210,14 @@ function browserEvidence(work) {
         ),
       },
     },
+    fixture: "http://127.0.0.1:18090",
     sourceManifestHash: hash(JSON.stringify(suite)),
     configurations: {
       test: {
         configurationId: "test",
-        effective: { endpoint: "http://evaluation-fixture:8090/api/v1/", responseCache: false },
+        effective: { endpoint: "http://127.0.0.1:18090/api/v1/", responseCache: false },
       },
     },
-    policy: { qualification: "incomplete" },
   };
   const saveManifest = () => {
     delete manifest.contentHash;
@@ -344,9 +344,6 @@ test("Live-browser Resolver evidence rejects partial, altered, live-inference, r
     },
     (m) => {
       m.configurations = {};
-    },
-    (m) => {
-      m.policy.qualification = "qualified";
     },
     (m) => {
       m.code.files["evaluation/grader.mjs"] = "wrong";

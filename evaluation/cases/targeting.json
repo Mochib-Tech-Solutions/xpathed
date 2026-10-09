@@ -77,7 +77,6 @@
       "scopeReview": "independent source review; browser observation pending"
     },
     "sourceSplit": "development",
-    "sourceCatalogs": ["current-view-qualification-cases.json", "viewport-baseline-cases.json"],
     "group": "targeting",
     "sourceIds": ["basic-save-v4", "basic-save-v3", "basic-save", "basic-save-contract-1"]
   },
@@ -155,7 +154,6 @@
       "scopeReview": "independent source review; browser observation pending"
     },
     "sourceSplit": "regression",
-    "sourceCatalogs": ["current-view-qualification-cases.json", "viewport-baseline-cases.json"],
     "group": "targeting",
     "sourceIds": [
       "unicode-quotes-v4",
@@ -233,7 +231,6 @@
       "scopeReview": "independent source review; browser observation pending"
     },
     "sourceSplit": "regression",
-    "sourceCatalogs": ["current-view-qualification-cases.json", "viewport-baseline-cases.json"],
     "group": "targeting",
     "sourceIds": ["action-families-1-v4", "action-families-1-v3", "action-families-1"]
   },
@@ -294,7 +291,6 @@
     },
     "labelProvenance": {
       "kind": "controlled-authored",
-      "modelExposure": "Paired policy-6 confirmation run 36988432337; retained as regression",
       "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
       "browserReview": "Deterministic browser identity, scope and readiness checks passed"
     },
@@ -302,7 +298,6 @@
     "exposureRunId": "36988432337",
     "exposedAt": "2026-10-02T09:25:27Z",
     "sourceSplit": "regression",
-    "sourceCatalogs": ["current-view-qualification-cases.json"],
     "group": "targeting",
     "sourceIds": ["release-holdout-editor-19"]
   },
@@ -360,7 +355,6 @@
     },
     "labelProvenance": {
       "kind": "controlled-authored",
-      "modelExposure": "Paired policy-6 confirmation run 36988432337; retained as regression",
       "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
       "browserReview": "Deterministic browser identity, scope and readiness checks passed"
     },
@@ -368,7 +362,6 @@
     "exposureRunId": "36988432337",
     "exposedAt": "2026-10-02T09:25:27Z",
     "sourceSplit": "regression",
-    "sourceCatalogs": ["current-view-qualification-cases.json"],
     "group": "targeting",
     "sourceIds": ["release-holdout-editor-20"]
   },
@@ -426,7 +419,6 @@
     },
     "labelProvenance": {
       "kind": "controlled-authored",
-      "modelExposure": "Paired policy-6 confirmation run 36988432337; retained as regression",
       "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
       "browserReview": "Deterministic browser identity, scope and readiness checks passed"
     },
@@ -434,7 +426,6 @@
     "exposureRunId": "36988432337",
     "exposedAt": "2026-10-02T09:25:27Z",
     "sourceSplit": "regression",
-    "sourceCatalogs": ["current-view-qualification-cases.json"],
     "group": "targeting",
     "sourceIds": ["release-holdout-editor-21"]
   },
@@ -492,7 +483,6 @@
     },
     "labelProvenance": {
       "kind": "controlled-authored",
-      "modelExposure": "Reserved for interrupted live qualification 36994124655; retained as regression without relabeling",
       "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
       "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt9-holdout-check"
     },
@@ -500,7 +490,6 @@
     "exposureRunId": "36994124655",
     "exposedAt": "2026-10-02T10:26:06.108Z",
     "sourceSplit": "regression",
-    "sourceCatalogs": ["current-view-qualification-cases.json"],
     "group": "targeting",
     "sourceIds": ["release2-figures-1"]
   },
@@ -581,7 +570,6 @@
     },
     "labelProvenance": {
       "kind": "controlled-authored",
-      "modelExposure": "Reserved for interrupted live qualification 36994124655; retained as regression without relabeling",
       "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
       "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt9-holdout-check"
     },
@@ -589,7 +577,6 @@
     "exposureRunId": "36994124655",
     "exposedAt": "2026-10-02T10:26:06.108Z",
     "sourceSplit": "regression",
-    "sourceCatalogs": ["current-view-qualification-cases.json"],
     "group": "targeting",
     "cardinality": "all",
     "sourceIds": ["release2-figures-2"]
@@ -635,7 +622,6 @@
     },
     "labelProvenance": {
       "kind": "controlled-authored",
-      "modelExposure": "Reserved for interrupted live qualification 36994124655; retained as regression without relabeling",
       "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
       "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt9-holdout-check"
     },
@@ -643,7 +629,6 @@
     "exposureRunId": "36994124655",
     "exposedAt": "2026-10-02T10:26:06.108Z",
     "sourceSplit": "regression",
-    "sourceCatalogs": ["current-view-qualification-cases.json"],
     "group": "targeting",
     "sourceIds": ["release2-figures-3"]
   },
@@ -701,7 +686,6 @@
     },
     "labelProvenance": {
       "kind": "controlled-authored",
-      "modelExposure": "Reserved for interrupted live qualification 36994124655; retained as regression without relabeling",
       "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
       "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt9-holdout-check"
     },
@@ -709,7 +693,6 @@
     "exposureRunId": "36994124655",
     "exposedAt": "2026-10-02T10:26:06.108Z",
     "sourceSplit": "regression",
-    "sourceCatalogs": ["current-view-qualification-cases.json"],
     "group": "targeting",
     "sourceIds": ["release2-linked-form-1"]
   },
@@ -767,7 +750,6 @@
     },
     "labelProvenance": {
       "kind": "controlled-authored",
-      "modelExposure": "Reserved for interrupted live qualification 36994124655; retained as regression without relabeling",
       "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference. Follow-up review 2026-10-03: original instruction \"Hover over Member code.\" was underspecified because the visible label and its associated textbox are separate eligible hover targets. Added \"the\" and \"field\" to identify the intended textbox; expected identity and readiness are unchanged. Original wording and case evidence remain in the browser-label audit inventory and frozen selection-hints study.",
       "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt9-holdout-check"
     },
@@ -775,7 +757,6 @@
     "exposureRunId": "36994124655",
     "exposedAt": "2026-10-02T10:26:06.108Z",
     "sourceSplit": "regression",
-    "sourceCatalogs": ["current-view-qualification-cases.json"],
     "group": "targeting",
     "sourceIds": ["release2-linked-form-2"]
   },
@@ -833,7 +814,6 @@
     },
     "labelProvenance": {
       "kind": "controlled-authored",
-      "modelExposure": "Reserved for interrupted live qualification 36994124655; retained as regression without relabeling",
       "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
       "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt9-holdout-check"
     },
@@ -841,7 +821,6 @@
     "exposureRunId": "36994124655",
     "exposedAt": "2026-10-02T10:26:06.108Z",
     "sourceSplit": "regression",
-    "sourceCatalogs": ["current-view-qualification-cases.json"],
     "group": "targeting",
     "sourceIds": ["release2-linked-form-3"]
   },
@@ -858,7 +837,6 @@
     },
     "labelProvenance": {
       "kind": "controlled-authored",
-      "modelExposure": "Reserved for live qualification 37000295638; retained as regression without relabeling",
       "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
       "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt10-reviewed-holdout-check"
     },
@@ -907,7 +885,6 @@
     "exposureRunId": "37000295638",
     "exposedAt": "2026-10-02T11:36:32.165Z",
     "sourceSplit": "regression",
-    "sourceCatalogs": ["current-view-qualification-cases.json"],
     "group": "targeting",
     "sourceIds": ["release3-menu-1"]
   },
@@ -924,7 +901,6 @@
     },
     "labelProvenance": {
       "kind": "controlled-authored",
-      "modelExposure": "Reserved for live qualification 37000295638; retained as regression without relabeling",
       "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
       "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt10-reviewed-holdout-check"
     },
@@ -973,7 +949,6 @@
     "exposureRunId": "37000295638",
     "exposedAt": "2026-10-02T11:36:32.165Z",
     "sourceSplit": "regression",
-    "sourceCatalogs": ["current-view-qualification-cases.json"],
     "group": "targeting",
     "sourceIds": ["release3-menu-2"]
   },
@@ -990,7 +965,6 @@
     },
     "labelProvenance": {
       "kind": "controlled-authored",
-      "modelExposure": "Reserved for live qualification 37000295638; retained as regression without relabeling",
       "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
       "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt10-reviewed-holdout-check"
     },
@@ -1039,7 +1013,6 @@
     "exposureRunId": "37000295638",
     "exposedAt": "2026-10-02T11:36:32.165Z",
     "sourceSplit": "regression",
-    "sourceCatalogs": ["current-view-qualification-cases.json"],
     "group": "targeting",
     "sourceIds": ["release3-menu-3"]
   },
@@ -1056,7 +1029,6 @@
     },
     "labelProvenance": {
       "kind": "controlled-authored",
-      "modelExposure": "Reserved for live qualification 37000295638; retained as regression without relabeling",
       "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
       "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt10-reviewed-holdout-check"
     },
@@ -1108,7 +1080,6 @@
     "exposureRunId": "37000295638",
     "exposedAt": "2026-10-02T11:36:32.165Z",
     "sourceSplit": "regression",
-    "sourceCatalogs": ["current-view-qualification-cases.json"],
     "group": "targeting",
     "sourceIds": ["release3-search-1"]
   },
@@ -1125,7 +1096,6 @@
     },
     "labelProvenance": {
       "kind": "controlled-authored",
-      "modelExposure": "Reserved for live qualification 37000295638; retained as regression without relabeling",
       "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
       "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt10-reviewed-holdout-check"
     },
@@ -1174,7 +1144,6 @@
     "exposureRunId": "37000295638",
     "exposedAt": "2026-10-02T11:36:32.165Z",
     "sourceSplit": "regression",
-    "sourceCatalogs": ["current-view-qualification-cases.json"],
     "group": "targeting",
     "sourceIds": ["release3-search-2"]
   },
@@ -1191,7 +1160,6 @@
     },
     "labelProvenance": {
       "kind": "controlled-authored",
-      "modelExposure": "Reserved for live qualification 37000295638; retained as regression without relabeling",
       "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
       "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt10-reviewed-holdout-check"
     },
@@ -1227,7 +1195,6 @@
     "exposureRunId": "37000295638",
     "exposedAt": "2026-10-02T11:36:32.165Z",
     "sourceSplit": "regression",
-    "sourceCatalogs": ["current-view-qualification-cases.json"],
     "group": "targeting",
     "sourceIds": ["release3-search-3"]
   },
@@ -1244,7 +1211,6 @@
     },
     "labelProvenance": {
       "kind": "controlled-authored",
-      "modelExposure": "Reserved for live qualification 37000295638; retained as regression without relabeling",
       "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
       "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt10-reviewed-holdout-check"
     },
@@ -1293,7 +1259,6 @@
     "exposureRunId": "37000295638",
     "exposedAt": "2026-10-02T11:36:32.165Z",
     "sourceSplit": "regression",
-    "sourceCatalogs": ["current-view-qualification-cases.json"],
     "group": "targeting",
     "sourceIds": ["release3-status-1"]
   },
@@ -1310,7 +1275,6 @@
     },
     "labelProvenance": {
       "kind": "controlled-authored",
-      "modelExposure": "Reserved for live qualification 37000295638; retained as regression without relabeling",
       "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
       "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt10-reviewed-holdout-check"
     },
@@ -1359,7 +1323,6 @@
     "exposureRunId": "37000295638",
     "exposedAt": "2026-10-02T11:36:32.165Z",
     "sourceSplit": "regression",
-    "sourceCatalogs": ["current-view-qualification-cases.json"],
     "group": "targeting",
     "sourceIds": ["release3-status-2"]
   },
@@ -1376,7 +1339,6 @@
     },
     "labelProvenance": {
       "kind": "controlled-authored",
-      "modelExposure": "Reserved for live qualification 37000295638; retained as regression without relabeling",
       "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
       "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt10-reviewed-holdout-check"
     },
@@ -1425,7 +1387,6 @@
     "exposureRunId": "37000295638",
     "exposedAt": "2026-10-02T11:36:32.165Z",
     "sourceSplit": "regression",
-    "sourceCatalogs": ["current-view-qualification-cases.json"],
     "group": "targeting",
     "sourceIds": ["release3-status-3"]
   },
@@ -1483,12 +1444,10 @@
     },
     "labelProvenance": {
       "kind": "controlled-authored",
-      "modelExposure": "No model inference; authored before policy-7 qualification",
       "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
       "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/policy7-fresh-check"
     },
     "sourceSplit": "held-out",
-    "sourceCatalogs": ["current-view-qualification-cases.json"],
     "group": "targeting",
     "sourceIds": ["release4-image-links-1"]
   },
@@ -1569,12 +1528,10 @@
     },
     "labelProvenance": {
       "kind": "controlled-authored",
-      "modelExposure": "No model inference; authored before policy-7 qualification",
       "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
       "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/policy7-fresh-check"
     },
     "sourceSplit": "held-out",
-    "sourceCatalogs": ["current-view-qualification-cases.json"],
     "group": "targeting",
     "cardinality": "all",
     "sourceIds": ["release4-image-links-2"]
@@ -1620,12 +1577,10 @@
     },
     "labelProvenance": {
       "kind": "controlled-authored",
-      "modelExposure": "No model inference; authored before policy-7 qualification",
       "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
       "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/policy7-fresh-check"
     },
     "sourceSplit": "held-out",
-    "sourceCatalogs": ["current-view-qualification-cases.json"],
     "group": "targeting",
     "sourceIds": ["release4-image-links-3"]
   },
@@ -1683,12 +1638,10 @@
     },
     "labelProvenance": {
       "kind": "controlled-authored",
-      "modelExposure": "No model inference; authored before policy-7 qualification",
       "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
       "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/policy7-fresh-check"
     },
     "sourceSplit": "held-out",
-    "sourceCatalogs": ["current-view-qualification-cases.json"],
     "group": "targeting",
     "sourceIds": ["release4-bidi-1"]
   },
@@ -1769,12 +1722,10 @@
     },
     "labelProvenance": {
       "kind": "controlled-authored",
-      "modelExposure": "No model inference; authored before policy-7 qualification",
       "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
       "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/policy7-fresh-check"
     },
     "sourceSplit": "held-out",
-    "sourceCatalogs": ["current-view-qualification-cases.json"],
     "group": "targeting",
     "cardinality": "all",
     "sourceIds": ["release4-bidi-2"]
@@ -1820,12 +1771,10 @@
     },
     "labelProvenance": {
       "kind": "controlled-authored",
-      "modelExposure": "No model inference; authored before policy-7 qualification",
       "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
       "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/policy7-fresh-check"
     },
     "sourceSplit": "held-out",
-    "sourceCatalogs": ["current-view-qualification-cases.json"],
     "group": "targeting",
     "sourceIds": ["release4-bidi-3"]
   },
@@ -1899,7 +1848,6 @@
     },
     "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
     "sourceSplit": "development",
-    "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
     "group": "targeting",
     "sourceIds": ["paraphrase-save", "paraphrase-save-contract-1"]
   },
@@ -1974,7 +1922,6 @@
       "reviewedAt": "2026-09-30T20:59:55.247Z"
     },
     "sourceSplit": "development",
-    "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
     "group": "targeting",
     "sourceIds": ["typo-save"]
   },
@@ -2080,7 +2027,6 @@
       "reviewedAt": "2026-09-30T20:59:55.247Z"
     },
     "sourceSplit": "development",
-    "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
     "group": "targeting",
     "sourceIds": ["named-save-cancel"],
     "cardinality": "all"
@@ -2156,7 +2102,6 @@
       "reviewedAt": "2026-09-30T20:59:55.247Z"
     },
     "sourceSplit": "development",
-    "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
     "group": "targeting",
     "sourceIds": ["duplicate-mentioned-target"]
   },
@@ -2282,7 +2227,6 @@
     "exposedAt": "2026-09-30",
     "exposureRunId": "312713e2-f4ba-4e35-b28b-6df3e3e78fce",
     "sourceSplit": "regression",
-    "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
     "group": "targeting",
     "sourceIds": ["library-borrow"]
   },
@@ -2418,7 +2362,6 @@
     "exposedAt": "2026-09-30",
     "exposureRunId": "312713e2-f4ba-4e35-b28b-6df3e3e78fce",
     "sourceSplit": "regression",
-    "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
     "group": "targeting",
     "sourceIds": ["museum-about-link"]
   },
@@ -2540,7 +2483,6 @@
     "exposedAt": "2026-09-30",
     "exposureRunId": "312713e2-f4ba-4e35-b28b-6df3e3e78fce",
     "sourceSplit": "regression",
-    "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
     "group": "targeting",
     "sourceIds": ["recipe-typo"]
   }

@@ -3,8 +3,264 @@ import { randomUUID } from "node:crypto";
 import { test } from "node:test";
 import { setTimeout as delay } from "node:timers/promises";
 
-const client = "http://client-api:8080";
-const fixture = "http://resolution-fixture:8090";
+const client = process.env.XPATHED_CLIENT_API_URL ?? "http://client-api:8080";
+const fixture = process.env.XPATHED_FIXTURE_URL ?? "http://resolution-fixture:8090";
+
+test("provider-auto-image-sends-masked-pixels-and-keeps-result-image-free", async () => {
+  await json(`${fixture}/scenario`, "POST", { name: "found", routing: "pixels" });
+  const session = await json(`${client}/api/sessions`, "POST");
+  try {
+    const page = await json(`${client}/api/pages/${session.pageId}/navigate`, "POST", {
+      url: `${fixture}/fixture`,
+    });
+    const result = await json(`${client}/api/pages/${page.pageId}/resolve`, "POST", {
+      instruction: "Click About us",
+      documentId: page.documentId,
+      imageMode: "auto",
+    });
+    assert.equal(result.outcome, "found", JSON.stringify(result));
+    assert.equal(result.diagnostics.modelCalls, 2);
+    const provider = await json(`${fixture}/provider-request`);
+    const content = provider.messages[1].content;
+    assert.equal(content.length, 2);
+    assert.equal(content[0].type, "text");
+    assert.equal(content[1].type, "image_url");
+    assert.match(content[1].image_url.url, /^data:image\/png;base64,iVBOR/);
+    assert.doesNotMatch(JSON.stringify(result), /data:image|iVBOR/);
+  } finally {
+    await fetch(`${client}/api/sessions/${session.sessionId}`, { method: "DELETE" });
+  }
+});
+
+async function withRoutingFixture({ path = "/fixture", ...scenario }, check) {
+  const run = randomUUID();
+  await json(`${fixture}/scenario`, "POST", { name: "found", ...scenario, run });
+  const session = await json(`${client}/api/sessions`, "POST");
+  try {
+    const url = new URL(path, fixture);
+    url.searchParams.set("run", run);
+    const page = await json(`${client}/api/pages/${session.pageId}/navigate`, "POST", {
+      url: url.href,
+    });
+    await check({
+      run,
+      resolve: (instruction, imageMode = "auto") =>
+        json(`${client}/api/pages/${page.pageId}/resolve`, "POST", {
+          instruction,
+          documentId: page.documentId,
+          imageMode,
+        }),
+      observe: async (xpaths) => {
+        await json(`${fixture}/oracle?run=${run}`, "POST", { xpaths });
+        for (let attempt = 0; attempt < 100; attempt++) {
+          const observed = await json(`${fixture}/observation?run=${run}`);
+          if (observed) return observed;
+          await delay(25);
+        }
+        assert.fail("Independent page observation was not returned");
+      },
+    });
+  } finally {
+    await fetch(`${client}/api/sessions/${session.sessionId}`, { method: "DELETE" });
+  }
+}
+
+function assertImageRequest(provider) {
+  const content = provider.messages.find((message) => message.role === "user").content;
+  assert.deepEqual(
+    content.map((part) => part.type),
+    ["text", "image_url"],
+  );
+  const image = content[1].image_url.url;
+  assert.match(image, /^data:image\/png;base64,/);
+  const png = Buffer.from(image.split(",")[1], "base64");
+  assert.deepEqual([...png.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);
+  assert.equal(png.readUInt32BE(16), 1280);
+  assert.equal(png.readUInt32BE(20), 800);
+  return JSON.parse(content[0].text);
+}
+
+function assertPassive(observed, expected) {
+  assert.deepEqual(observed.matches, expected);
+  assert.equal(observed.clicks, 0);
+  assert.equal(observed.events.click ?? 0, 0);
+  assert.equal(observed.scrollY, 0);
+}
+
+test("smart-routing-named-control-uses-text-without-pixels", async () => {
+  await withRoutingFixture({ routing: "text" }, async ({ resolve, observe }) => {
+    const result = await resolve("Click the About us button in Company.");
+    assert.equal(result.outcome, "found", JSON.stringify(result));
+    assert.deepEqual(result.diagnostics.imageRouting, {
+      mode: "auto",
+      status: "text_only",
+      reason: "semantic_evidence",
+      score: 0.01,
+      cached: false,
+    });
+    assert.equal(result.diagnostics.modelCalls, 2);
+    const provider = await json(`${fixture}/provider-request`);
+    assert.equal(typeof provider.messages[1].content, "string");
+    const router = await json(`${fixture}/router-request`);
+    assert.equal(router.state.instruction, "Click the About us button in Company.");
+    assertPassive(await observe(result.actions[0].target.xpaths), [["expected-target"]]);
+  });
+});
+
+test("smart-routing-visual-triangle-uses-image-and-keeps-dom-identity", async () => {
+  await withRoutingFixture(
+    { path: "/visual", routing: "pixels", targetText: "Option B" },
+    async ({ resolve, observe }) => {
+      const result = await resolve("Click the control depicting a blue triangle.");
+      assert.equal(result.outcome, "found", JSON.stringify(result));
+      assert.equal(result.diagnostics.imageRouting.status, "included");
+      assert.equal(result.diagnostics.imageRouting.reason, "visual_evidence");
+      assert.equal(result.diagnostics.imageRouting.cached, false);
+      assert.equal(result.diagnostics.modelCalls, 2);
+      const input = assertImageRequest(await json(`${fixture}/provider-request`));
+      assert.doesNotMatch(
+        JSON.stringify(input.candidates),
+        /\b(?:triangle|circle|square|blue|red)\b|2563eb|dc2626/i,
+        "The shape must be unavailable in candidate names/text",
+      );
+      assert.equal(
+        result.actions[0].target.accessibleName,
+        "Option B",
+        "Pixels must not rename the DOM target",
+      );
+      assertPassive(await observe(result.actions[0].target.xpaths), [["visual-primary"]]);
+      assert.doesNotMatch(JSON.stringify(result), /data:image|iVBOR/);
+    },
+  );
+});
+
+test("smart-routing-image-does-not-disambiguate-identical-singular-matches", async () => {
+  const instruction = "Click one button depicting a blue triangle.";
+  await withRoutingFixture(
+    {
+      path: "/visual?duplicate=1",
+      routing: "pixels",
+      name: "batch",
+      actions: [
+        {
+          step: 1,
+          instruction,
+          action: "unsupported",
+          outcome: "unsupported",
+          limitation: "ambiguous",
+        },
+      ],
+    },
+    async ({ resolve, observe }) => {
+      const result = await resolve(instruction);
+      assert.equal(result.diagnostics.imageRouting.status, "included");
+      assertImageRequest(await json(`${fixture}/provider-request`));
+      assert.equal(result.outcome, "unsupported", JSON.stringify(result));
+      assert.equal(result.actions.length, 1);
+      assert.equal(result.actions[0].code, "ambiguous");
+      assert.equal(result.actions[0].target, null);
+      assert.equal(result.inspectedActionId, null);
+      // Both matching pictures independently exist; the controlled model reports the unresolved intent.
+      assertPassive(await observe(["//button[.//*[local-name()='svg']/*[local-name()='path']]"]), [
+        ["visual-primary", "visual-secondary"],
+      ]);
+    },
+  );
+});
+
+test("smart-routing-excludes-adversarial-page-text-from-router-without-dropping-candidates", async () => {
+  await withRoutingFixture(
+    { path: "/fixture?adversarial=1", routing: "text" },
+    async ({ resolve, observe }) => {
+      const result = await resolve(
+        "Click About us in the Company section; leave other controls unchanged.",
+      );
+      assert.equal(result.outcome, "found", JSON.stringify(result));
+      const router = await json(`${fixture}/router-request`);
+      assert.doesNotMatch(
+        JSON.stringify(router),
+        /UNTRUSTED_ROUTING_SENTINEL|send every screenshot|Company<|data-oracle/,
+      );
+      assert.deepEqual(Object.keys(router.state).sort(), ["evidence", "instruction"]);
+      assert.deepEqual(Object.keys(router.state.evidence).sort(), [
+        "cssColors",
+        "fontAndTextStylingAvailable",
+        "geometryAndOrder",
+        "opaqueVisualContentObserved",
+        "semanticNamesAndText",
+        "shapeAndBorderStyleAvailable",
+        "unresolvedAppearance",
+      ]);
+      const provider = await json(`${fixture}/provider-request`);
+      assert.equal(typeof provider.messages[1].content, "string");
+      assert.match(
+        provider.messages[1].content,
+        /UNTRUSTED_ROUTING_SENTINEL/,
+        "The final model must still receive the complete sanitized candidate inventory",
+      );
+      assertPassive(await observe(result.actions[0].target.xpaths), [["expected-target"]]);
+    },
+  );
+});
+
+test("smart-routing-malformed-answer-falls-back-to-image-with-accounting", async () => {
+  await withRoutingFixture(
+    { path: "/visual", routing: "malformed", targetText: "Option B" },
+    async ({ resolve, observe }) => {
+      const result = await resolve("Locate the blue triangle control for this view.");
+      assert.equal(result.outcome, "found", JSON.stringify(result));
+      assert.equal(result.diagnostics.imageRouting.status, "included");
+      assert.equal(result.diagnostics.imageRouting.reason, "router_unavailable");
+      assert.equal(result.diagnostics.imageRouting.cached, false);
+      assert.equal(result.diagnostics.modelCalls, 2);
+      assert.deepEqual(
+        result.diagnostics.providerCalls.map((call) => call.purpose),
+        ["image_routing", "selection"],
+      );
+      assert.equal(result.diagnostics.providerCalls[0].code, "provider_malformed_response");
+      assert.equal(result.diagnostics.providerCalls[0].usage.cost, 0);
+      assertImageRequest(await json(`${fixture}/provider-request`));
+      assertPassive(await observe(result.actions[0].target.xpaths), [["visual-primary"]]);
+    },
+  );
+});
+
+test("smart-routing-text-only-override-skips-router-and-image", async () => {
+  await withRoutingFixture({ routing: "pixels" }, async ({ resolve, observe }) => {
+    const result = await resolve("Find the About us control using page text only.", "text_only");
+    assert.equal(result.outcome, "found", JSON.stringify(result));
+    assert.equal(result.diagnostics.modelCalls, 1);
+    assert.equal(result.diagnostics.imageRouting.status, "text_only");
+    assert.equal(result.diagnostics.imageRouting.reason, "text_only_requested");
+    assert.equal(await json(`${fixture}/router-request`), null);
+    assert.equal(typeof (await json(`${fixture}/provider-request`)).messages[1].content, "string");
+    assert.deepEqual(
+      result.diagnostics.providerCalls.map((call) => call.purpose),
+      ["selection"],
+    );
+    assertPassive(await observe(result.actions[0].target.xpaths), [["expected-target"]]);
+  });
+});
+
+test("smart-routing-mutation-during-decision-rejects-image-before-selection", async () => {
+  await withRoutingFixture(
+    { routing: "pixels", routingMutation: "replace" },
+    async ({ run, resolve }) => {
+      const result = await resolve("Inspect the About us control's depicted appearance.");
+      assert.equal((await json(`${fixture}/observation?run=${run}`)).mutationApplied, "replace");
+      assert.equal(result.outcome, "error", JSON.stringify(result));
+      assert.equal(result.diagnostics.code, "stale_capture");
+      assert.equal(result.diagnostics.modelCalls, 1);
+      assert.deepEqual(
+        result.diagnostics.providerCalls.map((call) => call.purpose),
+        ["image_routing"],
+      );
+      assert.equal(result.diagnostics.providerCalls[0].usage.cost, 0);
+      assert.notEqual(result.diagnostics.imageRouting.status, "included");
+      assert.equal(await json(`${fixture}/provider-request`), null);
+    },
+  );
+});
 
 test("session-empty-json-request-through-client-uses-configured-default", async () => {
   const options = await json(`${client}/api/sessions/options`);
@@ -404,14 +660,7 @@ test("cardinality-independent-oracle-rejects-omitted-targets-despite-valid-xpath
   }
 });
 async function json(url, method = "GET", body) {
-  if (
-    url.endsWith("/api/sessions") &&
-    method === "POST" &&
-    body === undefined &&
-    process.env.XPATHED_TEST_BROWSER_TYPE
-  ) {
-    body = { browserType: process.env.XPATHED_TEST_BROWSER_TYPE };
-  }
+  if (url.endsWith("/resolve") && body) body = { imageMode: "text_only", ...body };
   const response = await fetch(url, {
     method,
     headers: body ? { "Content-Type": "application/json" } : undefined,

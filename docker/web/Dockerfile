@@ -7,12 +7,6 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY src/Web/package.json src/Web/
 RUN pnpm install --frozen-lockfile --ignore-scripts
 
-FROM dependencies AS development
-COPY --chown=node:node src/Web/ src/Web/
-RUN chown -R node:node /app
-USER node
-CMD ["pnpm", "--filter", "xpathed", "exec", "vite", "--host", "0.0.0.0", "--port", "8080"]
-
 FROM dependencies AS build
 COPY src/Web/ src/Web/
 RUN pnpm --filter xpathed build

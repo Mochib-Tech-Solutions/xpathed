@@ -10,8 +10,9 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import type { Resolution, ResolutionResult, ShadowHost } from "./api";
+import type { ImageMode, Resolution, ResolutionResult, ShadowHost } from "./api";
 import ResolutionCost from "./ResolutionCost";
+import ExecuteAction from "./ExecuteAction";
 
 function MessageTime({ value, label }: { value: string; label: string }) {
   const date = new Date(value);
@@ -106,8 +107,20 @@ const instructionTitles: Record<string, string> = {
   unsupported_scope: "Unsupported page content",
 };
 
+const imageReasons: Record<string, string> = {
+  text_only_requested: "You chose text only.",
+  no_candidates: "There were no captured elements to inspect.",
+  semantic_evidence: "Page text and structure appeared sufficient.",
+  visual_evidence: "An image was chosen to help with visual details.",
+  uncertain_route: "A screenshot could help clarify the available evidence.",
+  router_unavailable: "The automatic image decision was unavailable.",
+  image_unavailable: "A usable screenshot was unavailable.",
+};
+
 type Props = {
   instruction: string;
+  imageMode: ImageMode;
+  onImageModeChange: (imageMode: ImageMode) => void;
   history: Resolution[];
   ready: boolean;
   disabled: boolean;
@@ -117,10 +130,13 @@ type Props = {
   onResolve: (instruction?: string) => void;
   onReset: () => void;
   onSpotlight: (resolution: Resolution, actionId: string | null) => void;
+  onExecute: (resolution: Resolution, actionId: string, value?: string) => void;
 };
 
 export default function ChatPanel({
   instruction,
+  imageMode,
+  onImageModeChange,
   history,
   ready,
   disabled,
@@ -130,6 +146,7 @@ export default function ChatPanel({
   onResolve,
   onReset,
   onSpotlight,
+  onExecute,
 }: Props) {
   const [copied, setCopied] = useState("");
   const [copyError, setCopyError] = useState<{ entryId: string; message: string } | null>(null);
@@ -241,6 +258,16 @@ export default function ChatPanel({
         {history.map((resolution) => {
           const result = resolution.result;
           const actions = result?.actions ?? [];
+          const imageRouting = result?.diagnostics.imageRouting;
+          const imageStatus =
+            imageRouting?.status === "included"
+              ? "Image used"
+              : imageRouting?.status === "unavailable"
+                ? "Image unavailable"
+                : "Text only";
+          const imageReason = imageRouting
+            ? (imageReasons[imageRouting.reason] ?? "Image use was decided for this request.")
+            : "";
           const totalMs = result?.diagnostics.timingsMs?.total;
           const duration =
             typeof totalMs === "number" && Number.isFinite(totalMs) && totalMs >= 0
@@ -524,6 +551,12 @@ export default function ChatPanel({
                                 {copyError.message}
                               </p>
                             )}
+                            <ExecuteAction
+                              entry={resolution}
+                              action={action}
+                              disabled={disabled}
+                              onExecute={onExecute}
+                            />
                             <div className="space-y-2 border-t border-border/70 pt-3">
                               <h3 className="text-xs font-medium">Verification</h3>
                               {target.interactability?.reasons.map((reason) => (
@@ -592,6 +625,11 @@ export default function ChatPanel({
                   )}
                   {result && (
                     <>
+                      {imageRouting && (
+                        <span title={imageReason} aria-label={`${imageStatus}: ${imageReason}`}>
+                          {imageStatus}
+                        </span>
+                      )}
                       {duration && (
                         <span title="Duration reported by the resolver">
                           Resolution time: {duration}
@@ -620,6 +658,27 @@ export default function ChatPanel({
       >
         <p id="instruction-scope" className="px-3 pt-2 text-xs text-muted-foreground">
           Current view only
+        </p>
+        <label className="mx-3 mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+          Screenshots
+          <select
+            value={imageMode}
+            onChange={(event) => {
+              const value = event.currentTarget.value;
+              if (value === "auto" || value === "text_only") onImageModeChange(value);
+            }}
+            disabled={disabled || resolving}
+            aria-describedby="screenshot-sharing"
+            className="rounded-md border border-input bg-background px-2 py-1 text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <option value="auto">Auto</option>
+            <option value="text_only">Text only</option>
+          </select>
+        </label>
+        <p id="screenshot-sharing" className="px-3 pt-1 text-xs text-muted-foreground">
+          {imageMode === "auto"
+            ? "Auto sends a masked screenshot to the model provider when visual details may help. Other visible content can be shared."
+            : "Text only sends page text and structure, without screenshots."}
         </p>
         <textarea
           ref={composer}

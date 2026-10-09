@@ -1,15 +1,19 @@
 export type ShadowHost = { xpath: string; label: string };
 
-export type BrowserType = "chromium" | "firefox";
+export type BrowserType = "chromium";
+export type BrowserResolution = { id: string; width: number; height: number };
 export type BrowserSessionOptions = {
   defaultBrowserType: BrowserType;
   browserTypes: BrowserType[];
+  defaultResolution: string;
+  resolutions: BrowserResolution[];
 };
 export type Session = {
   sessionId: string;
   pageId: string;
   viewPath: string;
   browserType: BrowserType;
+  resolution: string;
 };
 
 export type PageState = {
@@ -23,11 +27,45 @@ export type PageState = {
 
 export type SessionState = {
   browserType: BrowserType;
+  resolution: string;
   sessionId: string;
   activePageId: string;
   activationVersion: number;
   viewPath: string;
   pages: PageState[];
+};
+
+export type ImageMode = "auto" | "text_only";
+
+export type ModelUsage = {
+  inputTokens: number | null;
+  outputTokens: number | null;
+  totalTokens: number | null;
+  reasoningTokens: number | null;
+  cachedTokens: number | null;
+  cost: number | null;
+};
+
+export type ModelCostEstimate = {
+  currency: "USD";
+  inputPricePerMillion: number;
+  outputPricePerMillion: number;
+  inputCost: number;
+  outputCost: number;
+  requestCost: number;
+  totalCost: number;
+  pricingFetchedAt: string;
+};
+
+export type ProviderCall = {
+  purpose: "image_routing" | "selection";
+  model?: string | null;
+  provider?: string | null;
+  generationId?: string | null;
+  usage?: ModelUsage | null;
+  costEstimate?: ModelCostEstimate | null;
+  accounting?: "pending" | "completed" | "unavailable" | null;
+  code?: string | null;
 };
 
 export type ResolutionResult = {
@@ -90,28 +128,20 @@ export type ResolutionResult = {
   diagnostics: {
     code: string | null;
     message: string | null;
-    timingsMs?: { total?: number };
+    timingsMs?: { total?: number; [stage: string]: number | undefined };
     model?: string | null;
     provider?: string | null;
     providerAccounting?: "pending" | "completed" | "unavailable" | null;
-    usage?: {
-      inputTokens: number | null;
-      outputTokens: number | null;
-      totalTokens: number | null;
-      reasoningTokens: number | null;
-      cachedTokens: number | null;
-      cost: number | null;
+    usage?: ModelUsage | null;
+    costEstimate?: ModelCostEstimate | null;
+    imageRouting?: {
+      mode: ImageMode;
+      status: "not_requested" | "text_only" | "included" | "unavailable";
+      reason: string;
+      score: number | null;
+      cached: boolean;
     } | null;
-    costEstimate?: {
-      currency: "USD";
-      inputPricePerMillion: number;
-      outputPricePerMillion: number;
-      inputCost: number;
-      outputCost: number;
-      requestCost: number;
-      totalCost: number;
-      pricingFetchedAt: string;
-    } | null;
+    providerCalls?: ProviderCall[] | null;
   };
 };
 
@@ -140,6 +170,18 @@ export type Resolution = {
   historical: boolean;
   result: ResolutionResult | null;
   error: string | null;
+  execution?: {
+    actionId: string;
+    status: "pending" | "completed" | "uncertain" | "failed";
+    message: string;
+  };
+};
+
+export type ActionExecutionResult = {
+  actionId: string;
+  action: string;
+  status: "completed" | "uncertain";
+  message: string;
 };
 
 export class ApiError extends Error {

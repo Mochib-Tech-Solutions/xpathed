@@ -51,9 +51,21 @@ export function createFixtureServer({
             ],
           },
         });
+      if (url.pathname === "/api/alpha/decisions" && request.method === "POST") {
+        await readBody(request);
+        return send(200, {
+          model: "typesafe/jev-1.13",
+          provider: "TypeSafe",
+          answers: {
+            pixel_content: { type: "noul", noul: 0.01 },
+            rendered_appearance: { type: "noul", noul: 0.01 },
+          },
+          usage: { input_tokens: 100, output_tokens: 0, cost: 0 },
+        });
+      }
       if (url.pathname === "/api/v1/chat/completions" && request.method === "POST") {
         const traceId = request.headers.traceparent?.split("-")[1];
-        // Legacy research runners register serial trials without a trace binding.
+        // Serial checks register their active trial without a trace binding.
         const trialId =
           traceTrials.get(traceId) ?? (!trials.get(activeTrial)?.traceId ? activeTrial : undefined);
         const current = trials.get(trialId);
@@ -65,7 +77,10 @@ export function createFixtureServer({
           return send(429, { error: { message: "Controlled rate limit" } });
         if (fault === "timeout")
           return send(504, { error: { message: "Controlled provider timeout" } });
-        const input = JSON.parse(body.messages.find((message) => message.role === "user").content);
+        const content = body.messages.find((message) => message.role === "user").content;
+        const input = JSON.parse(
+          Array.isArray(content) ? content.find((part) => part.type === "text").text : content,
+        );
         const candidates = input.candidates ?? [];
         const actions = controlledActions(current.entry.provider, candidates, input.context);
         return send(200, {
@@ -137,4 +152,8 @@ async function readBody(request) {
   return Buffer.concat(chunks).toString("utf8");
 }
 
-if (import.meta.main) createFixtureServer().listen(8090, "0.0.0.0");
+if (import.meta.main)
+  createFixtureServer().listen(
+    Number(process.env.XPATHED_FIXTURE_PORT ?? "8090"),
+    process.env.XPATHED_FIXTURE_HOST ?? "0.0.0.0",
+  );

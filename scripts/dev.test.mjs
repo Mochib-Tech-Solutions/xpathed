@@ -1,105 +1,86 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { once } from "node:events";
 import { cp, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import test from "node:test";
+import { browserExecutable, developmentConfig, loadEnvironment } from "./native.mjs";
 
 const exited = (child) => child.exitCode !== null || child.signalCode !== null;
-
 async function fixture(t) {
   const root = await realpath(await mkdtemp(join(tmpdir(), "xpathed-dev-")));
   const children = [];
+  const digest = createHash("sha256").update(root).digest("hex");
+  const port = 30000 + (Number.parseInt(digest.slice(0, 8), 16) % 30000);
+  let base;
+  for (let candidate = 16000; candidate < 25000; candidate += 4) {
+    const reservations = [];
+    try {
+      for (let index = 0; index < 4; index++) {
+        const server = createServer();
+        await new Promise((resolve, reject) => {
+          server.once("error", reject);
+          server.listen(candidate + index, "127.0.0.1", resolve);
+        });
+        reservations.push(server);
+      }
+      base = candidate;
+    } catch (error) {
+      if (error.code !== "EADDRINUSE") throw error;
+    } finally {
+      await Promise.all(
+        reservations.map((server) => new Promise((resolve) => server.close(resolve))),
+      );
+    }
+    if (base) break;
+  }
+  assert.ok(base);
   t.after(async () => {
-    for (const child of children) child.kill("SIGTERM");
-    await delay(200);
+    for (const child of children) if (!exited(child)) child.kill("SIGTERM");
+    for (let attempt = 0; attempt < 100 && children.some((child) => !exited(child)); attempt++)
+      await delay(100);
     await rm(root, { recursive: true, force: true });
   });
   await mkdir(join(root, "scripts"));
-  await mkdir(join(root, "docker"));
   await mkdir(join(root, "bin"));
-  await cp(new URL("./dev.mjs", import.meta.url), join(root, "scripts/dev.mjs"));
-  await cp(new URL("../docker/compose.sh", import.meta.url), join(root, "docker/compose.sh"));
-  await writeFile(join(root, ".env"), "OPENROUTER_API_KEY=keep-this\n");
-  await writeFile(join(root, "scripts/setup.sh"), "#!/bin/sh\nprintf 'setup\\n' >> events\n", {
-    mode: 0o755,
-  });
-  await writeFile(
-    join(root, "bin/docker"),
-    `#!${process.execPath}
+  for (const name of ["dev.mjs", "native.mjs", "service-process.mjs"])
+    await cp(new URL(name, import.meta.url), join(root, "scripts", name));
+  const envFile = `OPENROUTER_API_KEY=keep-this\nOPENROUTER_EVAL_API_KEY=eval-private\nXPATHED_PORT=${base}\nBROWSER_EXECUTABLE_PATH=${process.execPath}\n`;
+  await writeFile(join(root, ".env"), envFile);
+  await writeFile(join(root, "scripts/setup.sh"), "#!/bin/sh\nprintf 'setup\\n' >> events\n");
+  const executable = String.raw`#!${process.execPath}
 const fs = require('node:fs');
+const http = require('node:http');
 const args = process.argv.slice(2);
-if (args[0] === 'ps') {
-  if (process.env.TEST_DELAY_PS) { fs.appendFileSync('events', 'project-query\\n'); setTimeout(() => process.exit(0), 1000); }
-  else { if (process.env.TEST_PROJECT_OWNER) console.log('fixture-container'); process.exit(0); }
-  return;
+const project = args.find(a => a.endsWith('.csproj'));
+const name = project ? project.split('/')[1].toLowerCase() : 'web';
+const port = project ? Number(new URL(process.env.ASPNETCORE_URLS).port) : Number(args[args.indexOf('--port') + 1]);
+fs.appendFileSync('events', 'start ' + name + ' ' + JSON.stringify(args) + '\n');
+if (process.env.TEST_FAIL_SERVICE === name) process.exit(7);
+const server = http.createServer((req, res) => res.end('healthy'));
+server.listen(port, '127.0.0.1', () => fs.appendFileSync('events', 'ready ' + name + '\n'));
+if (process.env.TEST_PLUGIN_CHILD) {
+  const child = require('node:child_process').spawn(process.execPath, ['-e', 'setInterval(()=>{},1000)'], { stdio:'ignore' });
+  fs.appendFileSync('child-pids', child.pid + '\n');
 }
-if (args[0] === 'inspect') { console.log(process.env.TEST_PROJECT_OWNER); process.exit(0); }
-const command = args.includes('up') ? 'up' : args.includes('down') ? 'down' : 'other';
-if (command === 'up' && process.env.TEST_PLUGIN_CHILD && !process.env.TEST_IN_PLUGIN) {
-  require('node:child_process').spawn(process.execPath, [__filename, ...args], { env: { ...process.env, TEST_IN_PLUGIN:'1' }, stdio:'inherit' });
-  process.on('SIGINT', () => {});
-  return;
-}
-fs.appendFileSync('events', command + ' ' + JSON.stringify(args) + '\\n');
-if (command === 'down') { fs.rmSync('running', { force:true }); process.exit(0); }
-if (command === 'up') {
-  if (fs.existsSync('running')) fs.appendFileSync('events', 'overlap\\n');
-  fs.writeFileSync('running', String(process.pid));
-  const timer = setInterval(() => {
-    if (!fs.existsSync('running') || fs.readFileSync('running', 'utf8') !== String(process.pid)) { fs.appendFileSync('events', 'exited ' + process.pid + '\\n'); clearInterval(timer); }
-  }, 20);
-  process.on('SIGINT', () => { fs.rmSync('running', { force:true }); process.exit(0); });
-}
-`,
-    { mode: 0o755 },
-  );
-  // Keep fixture ports below the common Linux ephemeral range without changing production hashing.
-  const reservation = createServer();
-  let project;
-  let digest;
-  let port;
-  for (let attempt = 0; attempt < 1000; attempt++) {
-    project = `dev-command-test-${attempt}`;
-    digest = createHash("sha256").update(`${root}\0${project}`).digest("hex");
-    port = 30000 + (Number.parseInt(digest.slice(0, 8), 16) % 30000);
-    if (port >= 32768) continue;
-    try {
-      const listening = once(reservation, "listening");
-      reservation.listen(port, "127.0.0.1");
-      await listening;
-      break;
-    } catch (error) {
-      if (error.code !== "EADDRINUSE") throw error;
-    }
-  }
-  assert.ok(reservation.listening, "No available fixture control port below 32768.");
-  t.after(() => {
-    if (reservation.listening) reservation.close();
-  });
-  const releasePort = () => {
-    if (reservation.listening) reservation.close();
-  };
-  const start = (extraEnv = {}, legacy = false) => {
-    releasePort();
-    const child = spawn(
-      legacy ? join(root, "docker/compose.sh") : process.execPath,
-      legacy ? ["--dev", "up", "--build", "--watch"] : [join(root, "scripts/dev.mjs")],
-      {
-        cwd: root,
-        env: {
-          ...process.env,
-          PATH: `${join(root, "bin")}:${process.env.PATH}`,
-          COMPOSE_PROJECT_NAME: project,
-          ...extraEnv,
-        },
-        stdio: "pipe",
-      },
-    );
+process.on('SIGTERM', () => server.close(() => { fs.appendFileSync('events', 'stop ' + name + '\n'); process.exit(0); }));
+`;
+  for (const name of ["dotnet", "pnpm"])
+    await writeFile(join(root, "bin", name), executable, { mode: 0o755 });
+  const start = (extraEnv = {}, args = []) => {
+    const env = { ...process.env, PATH: `${join(root, "bin")}:${process.env.PATH}`, ...extraEnv };
+    delete env.XPATHED_ENV_FILE;
+    delete env.XPATHED_PORT;
+    delete env.BROWSER_EXECUTABLE_PATH;
+    Object.assign(env, extraEnv);
+    const child = spawn(process.execPath, [join(root, "scripts/dev.mjs"), ...args], {
+      cwd: root,
+      env,
+      stdio: "pipe",
+    });
     children.push(child);
     let output = "";
     child.stdout.on("data", (chunk) => (output += chunk));
@@ -110,114 +91,100 @@ if (command === 'up') {
   async function waitFor(check) {
     for (let attempt = 0; attempt < 200; attempt++) {
       if (await check()) return;
-      await delay(20);
+      await delay(50);
     }
     assert.fail(children.map((child) => child.output()).join("\n"));
   }
   const events = () => readFile(join(root, "events"), "utf8").catch(() => "");
-  const waitForUps = (count) =>
-    waitFor(async () => (await events()).split("up ").length >= count + 1);
-  return { root, start, events, waitFor, waitForUps, port, digest, releasePort };
+  const ready = (child) => waitFor(() => child.output().includes("workspace ready"));
+  return { root, envFile, start, events, waitFor, ready, port, digest, base };
 }
 
-test("dev replaces its previous owner and retains configuration", async (t) => {
-  const { root, start, events, waitFor, waitForUps } = await fixture(t);
+test("native dev replaces only its previous owner and preserves configuration", async (t) => {
+  const { root, envFile, start, events, waitFor, ready } = await fixture(t);
   const first = start();
-  await waitForUps(1);
+  await ready(first);
   const second = start();
-  await waitForUps(2);
+  await ready(second);
   await waitFor(() => exited(first));
   assert.equal(second.exitCode, null);
-  second.kill("SIGTERM");
-  await waitFor(() => exited(second));
-  assert.doesNotMatch(await events(), /--volumes|--remove-orphans|overlap/);
-  assert.equal(await readFile(join(root, ".env"), "utf8"), "OPENROUTER_API_KEY=keep-this\n");
+  const stop = start({}, ["--stop"]);
+  await waitFor(() => exited(second) && exited(stop));
+  assert.equal(stop.exitCode, 0);
+  assert.equal(await readFile(join(root, ".env"), "utf8"), envFile);
+  assert.doesNotMatch(first.output() + second.output(), /keep-this|eval-private/);
+  const log = await events();
+  assert.ok(log.indexOf("ready browser") < log.indexOf("start resolver"));
+  assert.ok(log.indexOf("ready resolver") < log.indexOf("start clientapi"));
+  assert.ok(log.indexOf("ready clientapi") < log.indexOf("start web"));
+  assert.ok(log.indexOf("stop web") < log.lastIndexOf("start browser"));
+  assert.match(log, /--artifacts-path/);
+  assert.doesNotMatch(log, /docker|compose/);
 });
 
-test("concurrent dev invocations serialize setup and leave one owner", async (t) => {
-  const { start, events, waitFor, waitForUps } = await fixture(t);
+test("concurrent native dev invocations leave one complete owner", async (t) => {
+  const { start, waitFor, ready } = await fixture(t);
   const first = start();
-  await waitForUps(1);
+  await ready(first);
   const challengers = [start(), start()];
   await waitFor(() => exited(first) && challengers.filter((child) => !exited(child)).length === 1);
-  await waitForUps(2);
-  await delay(100);
-  assert.doesNotMatch(await events(), /overlap/);
-  const log = await events();
-  assert.doesNotMatch(log.slice(log.lastIndexOf("up ")), /down /);
-  challengers.find((child) => !exited(child)).kill("SIGTERM");
-  await waitFor(() => challengers.every(exited));
+  const winner = challengers.find((child) => !exited(child));
+  await ready(winner);
+  winner.kill("SIGTERM");
+  await waitFor(() => exited(winner));
+  assert.equal(winner.exitCode, 0);
 });
 
-test("a crashed owner is replaced and its orphaned Compose watcher retires", async (t) => {
-  const { root, start, events, waitFor, waitForUps } = await fixture(t);
-  const first = start();
-  await waitForUps(1);
-  const oldWatcher = await readFile(join(root, "running"), "utf8");
+test("a killed launcher releases owned service groups before its replacement starts", async (t) => {
+  const { root, start, waitFor, ready } = await fixture(t);
+  const first = start({ TEST_PLUGIN_CHILD: "1" });
+  await ready(first);
+  const pids = (await readFile(join(root, "child-pids"), "utf8")).trim().split("\n").map(Number);
   first.kill("SIGKILL");
   await waitFor(() => exited(first));
   const second = start();
-  await waitForUps(2);
-  await waitFor(async () => (await events()).includes(`exited ${oldWatcher}`));
-  assert.equal(second.exitCode, null);
-  second.kill("SIGTERM");
-  await waitFor(() => exited(second));
-  assert.doesNotMatch(await events(), /overlap/);
-});
-
-test("a legacy attached Compose watcher retires before the new dev run", async (t) => {
-  const { start, events, waitFor, waitForUps } = await fixture(t);
-  const legacy = start({}, true);
-  await waitForUps(1);
-  const current = start();
-  await waitForUps(2);
-  await waitFor(() => exited(legacy));
-  assert.equal(current.exitCode, null);
-  current.kill("SIGTERM");
-  await waitFor(() => exited(current));
-  assert.doesNotMatch(await events(), /overlap/);
-});
-
-test("replacement stops the owned Docker Compose plugin child", async (t) => {
-  const { start, events, waitFor, waitForUps } = await fixture(t);
-  const first = start({ TEST_PLUGIN_CHILD: "1" });
-  await waitForUps(1);
-  const second = start();
-  await waitForUps(2);
-  await waitFor(() => exited(first));
-  assert.equal(second.exitCode, null);
-  assert.doesNotMatch(await events(), /overlap/);
+  await ready(second);
+  await waitFor(() =>
+    pids.every((pid) => {
+      try {
+        process.kill(pid, 0);
+        return false;
+      } catch (error) {
+        return error.code === "ESRCH";
+      }
+    }),
+  );
   second.kill("SIGTERM");
   await waitFor(() => exited(second));
 });
 
-test("dev refuses a Compose project from another checkout before cleanup", async (t) => {
-  const { root, start, events, waitFor } = await fixture(t);
-  await mkdir(join(root, "other-checkout"));
-  const current = start({ TEST_PROJECT_OWNER: join(root, "other-checkout") });
+test("startup failure stops earlier services and never launches later services", async (t) => {
+  const { start, events, waitFor } = await fixture(t);
+  const current = start({ TEST_FAIL_SERVICE: "resolver" });
   await waitFor(() => exited(current));
   assert.equal(current.exitCode, 1);
-  assert.match(current.output(), /belongs to another checkout/);
-  assert.doesNotMatch(await events(), /down |up /);
+  assert.match(await events(), /stop browser/);
+  assert.doesNotMatch(await events(), /start clientapi|start web/);
 });
 
-test("interrupting project ownership checks cannot authorize cleanup", async (t) => {
-  const { start, events, waitFor } = await fixture(t);
-  const current = start({ TEST_DELAY_PS: "1" });
-  await waitFor(async () => (await events()).includes("project-query"));
-  current.kill("SIGTERM");
+test("an occupied application port is never stopped", async (t) => {
+  const { base, start, events, waitFor } = await fixture(t);
+  const foreign = createServer();
+  await new Promise((resolve) => foreign.listen(base + 1, "127.0.0.1", resolve));
+  t.after(() => new Promise((resolve) => foreign.close(resolve)));
+  const current = start();
   await waitFor(() => exited(current));
-  assert.doesNotMatch(await events(), /down |up /);
+  assert.equal(current.exitCode, 1);
+  assert.match(current.output(), /occupied/);
+  assert.doesNotMatch(await events(), /start /);
+  assert.equal(foreign.listening, true);
 });
 
 for (const method of ["end", "resetAndDestroy", "wrongIdentity"])
-  test(`dev fails safely when a foreign listener uses ${method} without identifying itself`, async (t) => {
-    const { start, events, waitFor, port, releasePort } = await fixture(t);
-    releasePort();
+  test(`foreign control listener ${method} never authorizes service startup or shutdown`, async (t) => {
+    const { start, events, waitFor, port } = await fixture(t);
     const foreign = createServer((socket) =>
-      method === "wrongIdentity"
-        ? socket.end("xpathed-dev-v1:another-checkout\n")
-        : socket[method](),
+      method === "wrongIdentity" ? socket.end("another-checkout\n") : socket[method](),
     );
     await new Promise((resolve) => foreign.listen(port, "127.0.0.1", resolve));
     t.after(() => new Promise((resolve) => foreign.close(resolve)));
@@ -228,39 +195,46 @@ for (const method of ["end", "resetAndDestroy", "wrongIdentity"])
     assert.equal(await events(), "");
   });
 
-for (const interrupted of [false, true])
-  test(`dev ${interrupted ? "can stop during" : "survives"} repeated control-port collisions without leaking listeners`, async (t) => {
-    const { start, events, waitFor, waitForUps, port, digest, releasePort } = await fixture(t);
-    const identity = `xpathed-dev-v1:${digest}\n`;
-    releasePort();
-    let replacements = 0;
-    const owner = createServer((socket) => {
-      socket.write(identity);
-      let input = "";
-      socket.on("data", (chunk) => {
-        input += chunk;
-        if (input === identity) {
-          replacements++;
-          socket.end();
-          if (!interrupted && replacements === 12) owner.close();
-        }
-      });
-    });
-    await new Promise((resolve) => owner.listen(port, "127.0.0.1", resolve));
-    t.after(async () => {
-      if (owner.listening) await new Promise((resolve) => owner.close(resolve));
-    });
-    const current = start();
-    if (interrupted) {
-      await waitFor(() => replacements >= 12);
-      assert.equal(await events(), "");
-    } else {
-      await waitForUps(1);
-      assert.equal(replacements, 12);
-      assert.doesNotMatch(await events(), /overlap/);
-    }
-    current.kill("SIGTERM");
-    await waitFor(() => exited(current));
-    assert.doesNotMatch(current.output(), /MaxListenersExceededWarning/);
-    assert.equal(current.exitCode, 0);
+test("configuration maps isolated loopback services and only Resolver receives the provider key", async () => {
+  const config = developmentConfig("/checkout", {
+    XPATHED_PORT: "12000",
+    OPENROUTER_API_KEY: "private",
+    OPENROUTER_EVAL_API_KEY: "evaluation-private",
   });
+  assert.deepEqual(config.ports, [12000, 12001, 12002, 12003]);
+  const [browser, resolver, client, web] = config.services;
+  assert.equal(
+    browser.env.ViewerOrigins,
+    "http://127.0.0.1:12000,http://localhost:12000,http://127.0.0.1:12001",
+  );
+  assert.equal(resolver.env.OpenRouter__ApiKey, "private");
+  assert.equal(client.env.ResolverUrl, "http://127.0.0.1:12002");
+  assert.equal(web.env.XPATHED_URL, "http://127.0.0.1:12003");
+  assert.equal(web.env.XPATHED_BROWSER_URL, "http://127.0.0.1:12001");
+  for (const service of [browser, client, web])
+    assert.doesNotMatch(JSON.stringify(service), /private/);
+  assert.doesNotMatch(JSON.stringify(resolver), /evaluation-private/);
+  assert.equal(new Set(config.services.slice(0, 3).map((service) => service.args[5])).size, 3);
+  for (const value of ["0", "-1", "65533", "x", "1234.5"])
+    assert.throws(
+      () => developmentConfig("/checkout", { XPATHED_PORT: value }),
+      /four consecutive ports/,
+    );
+});
+
+test("native environment overrides files without rewriting them and validates explicit browsers", async (t) => {
+  const { root, envFile } = await fixture(t);
+  const env = await loadEnvironment(root, { OPENROUTER_API_KEY: "override" });
+  assert.equal(env.OPENROUTER_API_KEY, "override");
+  assert.equal(env.OPENROUTER_EVAL_API_KEY, "eval-private");
+  assert.equal(await readFile(join(root, ".env"), "utf8"), envFile);
+  assert.equal(
+    await browserExecutable({ BROWSER_EXECUTABLE_PATH: process.execPath }),
+    process.execPath,
+  );
+  await assert.rejects(
+    browserExecutable({ BROWSER_EXECUTABLE_PATH: join(root, "missing") }),
+    /installed executable/,
+  );
+  await assert.rejects(browserExecutable({}, "win32"), /macOS and Linux/);
+});

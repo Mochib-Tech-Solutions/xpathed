@@ -93,27 +93,6 @@ test("unsupported results must match the independently labelled reason code", ()
   }
 });
 
-test("Saved-page selection identity grading rejects wrong targets and fabricated browser evidence", () => {
-  const spec = {
-    ...caseSpec,
-    track: "offline-selection",
-    expected: {
-      outcome: "found",
-      actions: [{ step: 1, action: "click", outcome: "found", target: { candidateId: "c2" } }],
-    },
-  };
-  const actual = trial();
-  actual.result.action = "click";
-  actual.result.actions[0].target = { candidateId: "c2" };
-  actual.observation = {};
-  assert.equal(gradeTrial(spec, actual).passed, true);
-  assert.equal(gradeTrial(spec, actual).metrics.readinessExpected, 0);
-  actual.result.actions[0].target.candidateId = "c1";
-  assert.equal(gradeTrial(spec, actual).metrics.wrongTargets, 1);
-  actual.result.actions[0].target = { candidateId: "c2", xpaths: ["//button"] };
-  assert.equal(gradeTrial(spec, actual).passed, false);
-});
-
 test("decomposition, ordered outcomes, partial state and request summary are independent assertions", () => {
   const expected = structuredClone(caseSpec);
   expected.expected.actions[0].state = { enabled: false };
@@ -277,6 +256,36 @@ test("unavailable accounting does not change a successful resolver grade", () =>
   assert.equal(gradeTrial(caseSpec, actual).passed, true);
 });
 
+test("response accounting includes image routing and preserves an unknown charge", () => {
+  const actual = trial();
+  actual.result.diagnostics = {
+    modelCalls: 2,
+    usage: { cost: 9, inputTokens: 999 },
+    providerCalls: [
+      { purpose: "image_routing", usage: { cost: 0.001, inputTokens: 30, outputTokens: 0 } },
+      { purpose: "selection", usage: { cost: 0.003, inputTokens: 100, outputTokens: 20 } },
+    ],
+  };
+  let metrics = gradeTrial(caseSpec, actual).metrics;
+  assert.equal(metrics.reportedCostUsd, 0.004);
+  assert.equal(metrics.usage.inputTokens, 130);
+  assert.equal(metrics.accountingSource, "response_provider_calls");
+  const report = summarize(
+    { cases: [caseSpec], plan: { caseOrder: [caseSpec.id], repetitions: 1 } },
+    [actual],
+  );
+  assert.equal(report.firstAttempt.accountingSources.response_provider_calls, 1);
+  assert.equal(
+    Object.values(report.firstAttempt.accountingSources).reduce((sum, count) => sum + count, 0),
+    report.firstAttempt.trials,
+  );
+  actual.result.diagnostics.providerCalls[0].usage.cost = null;
+  metrics = gradeTrial(caseSpec, actual).metrics;
+  assert.equal(metrics.reportedCostUsd, null);
+  assert.equal(metrics.usage.inputTokens, 130);
+  assert.equal(metrics.estimatedCostUsd, null);
+});
+
 test("provider accounting sums each forwarded call and preserves unknown charges and usage", () => {
   const actual = trial();
   actual.result.diagnostics = {
@@ -374,7 +383,6 @@ test("reports recompute first attempts, preserve missing repetitions and isolate
   second.grade = { passed: true };
   const rerun = { ...trial(), repetition: 2, attempt: 2, elapsedMs: 15 };
   const report = summarize(manifest, [first, second, rerun]);
-  assert.equal(report.qualification, "incomplete");
   assert.equal(report.mode, "unavailable");
   assert.equal(report.modelQualityMeasured, false);
   assert.equal(report.passed, false);
@@ -570,58 +578,6 @@ test("malformed results and capture leaks fail even when resolution also errors"
   assert.equal(gradeTrial(errorCase, leaked).metrics.privacyLeak, true);
 });
 
-test("Saved-page selection forecast preserves unmeasured usage and labels cross-split extrapolation", () => {
-  const spec = {
-    id: "sample",
-    dataset: "phrasenode",
-    split: "train",
-    family: "page",
-    track: "offline-selection",
-    expected: {
-      outcome: "found",
-      actions: [{ step: 1, outcome: "found", target: { candidateId: "n1" } }],
-    },
-  };
-  const manifest = {
-    track: "offline-selection",
-    mode: "live",
-    cases: [spec],
-    plan: { caseOrder: [spec.id], repetitions: 1 },
-    selection: { split: "train" },
-    inventory: {
-      splits: {
-        train: { statuses: { "offline-eligible": 100 } },
-        test: { statuses: { "offline-eligible": 20 } },
-      },
-    },
-    pricing: { prompt: "0.0000001", completion: "0.000001" },
-  };
-  assert.equal(summarize(manifest, []).forecast.splits.train.projectedUsd, null);
-  const report = summarize(manifest, [
-    {
-      caseId: spec.id,
-      result: {
-        outcome: "found",
-        action: "inspect",
-        actions: [
-          {
-            actionId: "a1",
-            order: 1,
-            step: 1,
-            action: "inspect",
-            outcome: "found",
-            target: { candidateId: "n1" },
-          },
-        ],
-        diagnostics: { usage: { inputTokens: 1000, outputTokens: 100, cost: 0.0002 } },
-      },
-    },
-  ]);
-  assert.equal(report.forecast.measuredTrials, 1);
-  assert.ok(Math.abs(report.forecast.splits.train.projectedUsd - 0.02) < 1e-12);
-  assert.match(report.forecast.splits.test.limitation, /another split/);
-});
-
 test("one interaction cannot duplicate a candidate to inflate target completeness", () => {
   const expected = {
     outcome: "found",
@@ -633,7 +589,7 @@ test("one interaction cannot duplicate a candidate to inflate target completenes
     })),
   };
   const grade = gradeTrial(
-    { track: "offline-selection", expected },
+    { expected },
     {
       result: {
         outcome: "found",
@@ -655,7 +611,6 @@ test("one interaction cannot duplicate a candidate to inflate target completenes
 
 test("plural reports distinguish missing, extra, duplicate and wrong targets", () => {
   const spec = {
-    track: "offline-selection",
     expected: {
       outcome: "found",
       actions: ["n1", "n2"].map((candidateId, i) => ({
@@ -682,10 +637,34 @@ test("plural reports distinguish missing, extra, duplicate and wrong targets", (
         order: i + 1,
         action: "click",
         outcome: "found",
-        target: { candidateId },
+        target: {
+          candidateId,
+          xpaths: [`//*[@id='${candidateId}']`],
+          state: {
+            rendered: true,
+            inViewport: true,
+            enabled: true,
+            editable: false,
+            accessibilityExposed: true,
+            readonly: false,
+          },
+          interactability: { action: "click" },
+        },
       })),
     };
-    const { metrics } = gradeTrial(spec, { result });
+    const { metrics } = gradeTrial(spec, {
+      result,
+      observation: {
+        actions: ids.map((candidateId, index) => ({
+          matches: [
+            {
+              count: 1,
+              intended: candidateId === spec.expected.actions[index]?.target.candidateId,
+            },
+          ],
+        })),
+      },
+    });
     assert.deepEqual(
       [
         metrics.missingTargets,

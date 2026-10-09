@@ -5,18 +5,14 @@ import { mockSystemTheme } from "@/test/systemTheme";
 import { ThemeProvider } from "../theme/ThemeProvider";
 import Workspace from "./Workspace";
 
-vi.mock("@novnc/novnc", () => ({
-  default: class extends EventTarget {
-    disconnect = vi.fn();
-    focus = vi.fn();
-  },
-}));
+vi.mock("./BrowserViewer", () => ({ default: () => <div aria-label="Managed browser" /> }));
 
 const session = {
   sessionId: "session-1",
   pageId: "page-1",
   viewPath: "/view/page-1",
   browserType: "chromium" as const,
+  resolution: "1280x800",
 };
 const page = {
   ...session,
@@ -42,7 +38,15 @@ describe("Workspace navigation", () => {
       Promise.resolve(
         Response.json(
           input === "/api/sessions/options"
-            ? { defaultBrowserType: "chromium", browserTypes: ["chromium", "firefox"] }
+            ? {
+                defaultBrowserType: "chromium",
+                browserTypes: ["chromium"],
+                defaultResolution: "1280x800",
+                resolutions: [
+                  { id: "1280x800", width: 1280, height: 800 },
+                  { id: "1920x1080", width: 1920, height: 1080 },
+                ],
+              }
             : input === "/api/sessions"
               ? session
               : input === "/api/sessions/session-1"
@@ -52,6 +56,7 @@ describe("Workspace navigation", () => {
                     activationVersion: 1,
                     viewPath: session.viewPath,
                     browserType: "chromium" as const,
+                    resolution: "1280x800",
                     pages: [page],
                   }
                 : page,
@@ -89,24 +94,39 @@ describe("Workspace navigation", () => {
     expect(screen.getAllByRole("tab")).toHaveLength(1);
     expect(screen.getByRole("tab", { name: "Example" })).toHaveAttribute("aria-selected", "true");
   });
-  it("uses the configured default, sends the chosen engine and unlocks it only after closing the session", async () => {
-    let selectedType = "firefox";
+  it("sends the chosen resolution and unlocks it only after closing the session", async () => {
+    let selectedType = "chromium";
+    let selectedResolution = "1280x800";
     const fetch = vi.fn<typeof globalThis.fetch>(async (input, options) => {
       if (input === "/api/sessions/options")
         return Response.json({
-          defaultBrowserType: "firefox",
-          browserTypes: ["chromium", "firefox"],
+          defaultBrowserType: "chromium",
+          browserTypes: ["chromium"],
+          defaultResolution: "1280x800",
+          resolutions: [
+            { id: "1280x800", width: 1280, height: 800 },
+            { id: "1920x1080", width: 1920, height: 1080 },
+          ],
         });
       if (options?.method === "DELETE") return new Response(null, { status: 204 });
       if (input === "/api/sessions") {
-        selectedType = ((await new Response(options?.body).json()) as { browserType: string })
-          .browserType;
-        return Response.json({ ...session, browserType: selectedType });
+        const selection = (await new Response(options?.body).json()) as {
+          browserType: string;
+          resolution: string;
+        };
+        selectedType = selection.browserType;
+        selectedResolution = selection.resolution;
+        return Response.json({
+          ...session,
+          browserType: selectedType,
+          resolution: selectedResolution,
+        });
       }
       if (input === "/api/sessions/session-1")
         return Response.json({
           ...session,
           browserType: selectedType,
+          resolution: selectedResolution,
           activePageId: page.pageId,
           activationVersion: 1,
           pages: [page],
@@ -116,10 +136,10 @@ describe("Workspace navigation", () => {
     vi.stubGlobal("fetch", fetch);
     const user = renderWorkspace();
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: "Browser type: Firefox" })).toBeEnabled(),
+      expect(screen.getByRole("button", { name: "Browser resolution: 1280x800" })).toBeEnabled(),
     );
-    await user.click(screen.getByRole("button", { name: "Browser type: Firefox" }));
-    await user.click(screen.getByRole("menuitemradio", { name: "Chromium" }));
+    await user.click(screen.getByRole("button", { name: "Browser resolution: 1280x800" }));
+    await user.click(screen.getByRole("menuitemradio", { name: "1920 × 1080" }));
     await user.type(screen.getByRole("textbox", { name: "Page address" }), "example.test{Enter}");
     await waitFor(() =>
       expect(screen.getByRole("textbox", { name: "Describe an element" })).toBeEnabled(),
@@ -128,27 +148,29 @@ describe("Workspace navigation", () => {
       "/api/sessions",
       expect.objectContaining({
         method: "POST",
-        body: JSON.stringify({ browserType: "chromium" }),
+        body: JSON.stringify({ browserType: "chromium", resolution: "1920x1080" }),
       }),
     );
-    expect(screen.getByRole("button", { name: "Browser type: Chromium" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Browser resolution: 1920x1080" })).toBeDisabled();
     await user.click(screen.getByRole("button", { name: "Close all tabs" }));
     await user.click(screen.getByRole("button", { name: "Cancel" }));
-    expect(screen.getByRole("button", { name: "Browser type: Chromium" })).toBeDisabled();
     await user.click(screen.getByRole("button", { name: "Close all tabs" }));
     await user.click(
       within(screen.getByRole("alertdialog")).getByRole("button", { name: "Close all tabs" }),
     );
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: "Browser type: Chromium" })).toBeEnabled(),
+      expect(screen.getByRole("button", { name: "Browser resolution: 1920x1080" })).toBeEnabled(),
     );
-    await user.click(screen.getByRole("button", { name: "Browser type: Chromium" }));
-    await user.click(screen.getByRole("menuitemradio", { name: "Firefox" }));
+    expect(screen.getByRole("button", { name: "Browser resolution: 1920x1080" })).toBeEnabled();
+    await user.click(screen.getByRole("button", { name: "Browser resolution: 1920x1080" }));
+    await user.click(screen.getByRole("menuitemradio", { name: "1280 × 800" }));
     await user.type(screen.getByRole("textbox", { name: "Page address" }), "example.test{Enter}");
     await waitFor(() =>
       expect(fetch).toHaveBeenCalledWith(
         "/api/sessions",
-        expect.objectContaining({ body: JSON.stringify({ browserType: "firefox" }) }),
+        expect.objectContaining({
+          body: JSON.stringify({ browserType: "chromium", resolution: "1280x800" }),
+        }),
       ),
     );
   });
@@ -158,7 +180,15 @@ describe("Workspace navigation", () => {
     const fetch = vi.fn<typeof globalThis.fetch>((input) => {
       if (input === "/api/sessions/options")
         return Promise.resolve(
-          Response.json({ defaultBrowserType: "chromium", browserTypes: ["chromium", "firefox"] }),
+          Response.json({
+            defaultBrowserType: "chromium",
+            browserTypes: ["chromium"],
+            defaultResolution: "1280x800",
+            resolutions: [
+              { id: "1280x800", width: 1280, height: 800 },
+              { id: "1920x1080", width: 1920, height: 1080 },
+            ],
+          }),
         );
       if (input === "/api/sessions") return Promise.resolve(Response.json(session));
       if (input === "/api/pages/page-1/navigate" && ++attempts === 1)
@@ -173,6 +203,7 @@ describe("Workspace navigation", () => {
             activationVersion: 1,
             viewPath: session.viewPath,
             browserType: "chromium" as const,
+            resolution: "1280x800",
             pages: [attempts < 2 ? { ...page, url: "about:blank" } : page],
           }),
         );

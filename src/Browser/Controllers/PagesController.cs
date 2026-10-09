@@ -38,12 +38,12 @@ public sealed class PagesController(BrowserSessions sessions) : ControllerBase
         CancellationToken cancellationToken
     ) => sessions.CaptureAsync(id, request, cancellationToken);
 
-    [HttpPost("{id}/selection")]
-    public Task<SelectionValidation> Select(
+    [HttpPost("{id}/capture-image")]
+    public Task<CaptureImageResult> CaptureImage(
         string id,
-        [FromBody] SelectionRequest request,
+        [FromBody] CaptureImageRequest request,
         CancellationToken cancellationToken
-    ) => sessions.SelectAsync(id, request, cancellationToken);
+    ) => sessions.CaptureImageAsync(id, request, cancellationToken);
 
     [HttpPost("{id}/selections")]
     public Task<ActionSelectionValidation> SelectActions(
@@ -52,12 +52,26 @@ public sealed class PagesController(BrowserSessions sessions) : ControllerBase
         CancellationToken cancellationToken
     ) => sessions.SelectActionsAsync(id, request, cancellationToken);
 
+    [HttpPost("{id}/xpath-evidence")]
+    public Task<XPathEvidenceBatch> XPathEvidence(
+        string id,
+        [FromBody] XPathEvidenceRequest request,
+        CancellationToken cancellationToken
+    ) => sessions.XPathEvidenceAsync(id, request, cancellationToken);
+
     [HttpPost("{id}/highlight")]
     public Task<ValidatedAction> InspectAction(
         string id,
         [FromBody] InspectActionRequest request,
         CancellationToken cancellationToken
     ) => sessions.InspectActionAsync(id, request, cancellationToken);
+
+    [HttpPost("{id}/execute")]
+    public Task<ActionExecutionResult> ExecuteAction(
+        string id,
+        [FromBody] ExecuteActionRequest request,
+        CancellationToken cancellationToken
+    ) => sessions.ExecuteActionAsync(id, request, cancellationToken);
 
     [HttpPost("{id}/spotlight")]
     public async Task<IActionResult> Spotlight(

@@ -1,15 +1,10 @@
 # Browser guidance
 
-This service is the bundled Playwright implementation with Chromium and Firefox of the Resolver's browser API. Keep implementation details behind the [browser integration contract](../../docs/runtime.md#browser-integration), with serializable Common records and opaque identities at the boundary.
+Browser owns browser processes, managed sessions/pages, retained capture objects, page streaming and input. Keep the boundary in Common records; use [README.md](../../README.md) and the source contracts for API behavior.
 
-For capture, XPath or readiness changes, read [resolution](../../docs/resolution.md) and use `$xpathed-resolution-checks`. For frame traversal, also read [ADR-0012](../../docs/adr/0012-keep-frame-context-separate-from-xpath.md).
-
-`Sessions/BrowserSessions.cs` serializes operations through the session gate and handles cancellation of live commands. Keep new page operations on that path; a cancelled in-flight browser command cannot safely leave its page available for a later operation. `Viewing/` owns display relay behavior. `IBrowserPageDisplay` contains engine-specific window/focus control; keep capture logic shared. Firefox uses a fresh temporary profile for chrome suppression and native X11 focus events; dispose the profile, focus observer and its Matchbox window manager with the session. See [ADR-0031](../../docs/adr/0031-select-browser-type-per-session.md).
-
-Resolve and highlight passively. Preserve scrolling, focus and form state; inspecting readiness must not click, type or trigger application handlers. Frame and open-shadow host context belong beside XPath, since each expression is evaluated within one DOM tree. Follow [ADR-0027](../../docs/adr/0027-keep-shadow-context-separate-from-xpath.md); preserve composed exposure, native clipped geometry, scoped names, private-value exclusion and retained node/root identity.
-
-## Code Review Rules
-
-- Flag captures or highlights accepted after page/document/capture identity changes, including tab activation and frame navigation.
-- Flag geometry-only tests presented as actual browser readiness evidence. Exercise clipping, overlays and nested frames through `tests/resolution/` when those semantics change.
-- Flag page evidence that bypasses capture sanitization merely because its destination is internal diagnostics.
+- Route page operations through `BrowserSessions` and its session gate. Cancelled in-flight commands invalidate their session; dispose browser connections, processes and temporary profiles together.
+- Capture, resolve, verify readiness and highlight passively. Explicit execution revalidates retained nodes, consumes the capture before dispatch, and rejects stale identities or repeated requests. Never resolve an execution target again by XPath.
+- Preserve complete current-view capture, native clipped geometry, scoped names and private-value exclusion. Frame/open-shadow context stays separate from XPath; each expression must uniquely identify the retained node in its own tree.
+- Return sanitized XPath evidence and verify Resolver's ordered proposals against retained nodes. Construction and ranking belong in Resolver; Browser must not invent fallback expressions.
+- Send screenshots only when Resolver or an API caller requests them. Lazy image requests reuse retained captures and recheck identity, viewport, geometry, names and state before and after masking. Mask detected editable/private controls without claiming inaccessible content is masked. Apply privacy rules to diagnostics too.
+- Use `$xpathed-resolution-checks` for changed capture, XPath, readiness and execution behavior. Prove clipping, overlays, frames, shadow roots and action effects in a real browser when affected; geometry-only assertions are insufficient.

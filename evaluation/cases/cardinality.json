@@ -99,11 +99,6 @@
       "scopeReview": "independent source review; browser observation pending"
     },
     "sourceSplit": "regression",
-    "sourceCatalogs": [
-      "current-view-qualification-cases.json",
-      "viewport-baseline-cases.json",
-      "cases.json"
-    ],
     "sourceIds": [
       "single-action-plural-confirmations-v4",
       "current-view-single-action-plural-confirmations-v4",
@@ -201,7 +196,6 @@
       "browserReview": "Deterministic browser identity, scope and readiness checks passed"
     },
     "sourceSplit": "development",
-    "sourceCatalogs": ["current-view-qualification-cases.json"],
     "group": "cardinality",
     "sourceIds": ["named-found-missing-v4", "named-found-missing"],
     "cardinality": "all"
@@ -265,7 +259,6 @@
       "browserReview": "Deterministic browser identity, scope and readiness checks passed"
     },
     "sourceSplit": "development",
-    "sourceCatalogs": ["current-view-qualification-cases.json"],
     "group": "cardinality",
     "sourceIds": ["mixed-interactions-v4", "mixed-interactions"]
   },
@@ -328,7 +321,6 @@
       "browserReview": "Deterministic browser identity, scope and readiness checks passed"
     },
     "sourceSplit": "development",
-    "sourceCatalogs": ["current-view-qualification-cases.json"],
     "group": "cardinality",
     "sourceIds": ["sequential-workflow-v4", "sequential-workflow"]
   }

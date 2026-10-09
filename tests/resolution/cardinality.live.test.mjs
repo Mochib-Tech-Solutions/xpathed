@@ -2,9 +2,9 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import test from "node:test";
 
-const browser = "http://browser:8080";
-const resolver = "http://resolver:8080";
-const fixture = "http://resolution-fixture:8090";
+const browser = process.env.XPATHED_BROWSER_URL ?? "http://browser:8080";
+const resolver = process.env.XPATHED_RESOLVER_URL ?? "http://resolver:8080";
+const fixture = process.env.XPATHED_FIXTURE_URL ?? "http://resolution-fixture:8090";
 async function json(url, body) {
   const response = await fetch(url, {
     method: body === undefined ? "GET" : "POST",
@@ -39,6 +39,7 @@ test("cardinality-live-singular-login-is-ambiguous-and-plural-login-enumerates",
       });
       const result = await json(`${resolver}/pages/${session.pageId}/resolve`, {
         instruction,
+        imageMode: "text_only",
         documentId: page.documentId,
       });
       knownReportedCostUsd += result.diagnostics.usage?.cost ?? 0;
@@ -55,6 +56,8 @@ test("cardinality-live-singular-login-is-ambiguous-and-plural-login-enumerates",
           generationId: result.diagnostics.generationId,
           usage: result.diagnostics.usage,
           costEstimate: result.diagnostics.costEstimate,
+          timingsMs: result.diagnostics.timingsMs,
+          modelInputBytes: result.diagnostics.modelInputBytes,
         }),
       );
       try {

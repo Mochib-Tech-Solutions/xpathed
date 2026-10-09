@@ -1,5 +1,5 @@
 # Pull request reviews
 
-Use `.github/skills/code-review/SKILL.md` for this repository's review procedure.
-Accepted requirements live in the linked GitHub issue and `docs/adr/`; `CONTEXT.md` defines domain terms. Proposed questions and research recommendations are not accepted requirements.
-The project and evaluation evidence are private. Keep credentials, raw private page content, and held-out labels out of review comments and public artifacts.
+Use `.github/skills/code-review/SKILL.md`. Read `README.md`, root/scoped `AGENTS.md`, and `SECURITY.md` when relevant. Current user instructions and accepted GitHub issue scope define requirements; research proposals do not.
+
+Keep credentials, private page content and deployment addresses out of comments and artifacts. Report concrete changed-line failures and verification limits; do not duplicate formatting checks.

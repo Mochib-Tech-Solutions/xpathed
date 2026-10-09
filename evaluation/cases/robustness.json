@@ -73,7 +73,6 @@
       "scopeReview": "independent source review; browser observation pending"
     },
     "sourceSplit": "regression",
-    "sourceCatalogs": ["current-view-qualification-cases.json", "viewport-baseline-cases.json"],
     "group": "robustness",
     "sourceIds": [
       "page-injection-v4",
@@ -130,11 +129,6 @@
       "scopeReview": "independent source review; browser observation pending"
     },
     "sourceSplit": "regression",
-    "sourceCatalogs": [
-      "current-view-qualification-cases.json",
-      "viewport-baseline-cases.json",
-      "cases.json"
-    ],
     "sourceIds": [
       "large-visible-prefix-v4",
       "current-view-large-visible-prefix-v4",
@@ -219,7 +213,6 @@
     ],
     "critical": true,
     "sourceSplit": "regression",
-    "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
     "group": "robustness",
     "sourceIds": ["private-values", "private-values-contract-1"]
   },
@@ -260,7 +253,6 @@
     "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
     "deterministicOnly": true,
     "sourceSplit": "development",
-    "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
     "group": "robustness",
     "sourceIds": ["provider-malformed", "provider-malformed-contract-1"]
   },
@@ -301,7 +293,6 @@
     "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
     "deterministicOnly": true,
     "sourceSplit": "development",
-    "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
     "group": "robustness",
     "sourceIds": ["provider-unknown", "provider-unknown-contract-1"]
   },
@@ -342,7 +333,6 @@
     "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
     "deterministicOnly": true,
     "sourceSplit": "development",
-    "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
     "group": "robustness",
     "sourceIds": ["provider-rate_limit", "provider-rate_limit-contract-1"]
   },
@@ -383,7 +373,6 @@
     "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
     "deterministicOnly": true,
     "sourceSplit": "development",
-    "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
     "group": "robustness",
     "sourceIds": ["provider-timeout", "provider-timeout-contract-1"]
   },
@@ -424,7 +413,6 @@
     "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
     "deterministicOnly": true,
     "sourceSplit": "development",
-    "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
     "group": "robustness",
     "sourceIds": ["provider-refusal"]
   },
@@ -465,7 +453,6 @@
     "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
     "deterministicOnly": true,
     "sourceSplit": "development",
-    "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
     "group": "robustness",
     "sourceIds": ["provider-empty"]
   },
@@ -506,7 +493,6 @@
     "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
     "deterministicOnly": true,
     "sourceSplit": "development",
-    "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
     "group": "robustness",
     "sourceIds": ["provider-truncated"]
   },
@@ -585,7 +571,6 @@
     "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
     "deterministicOnly": true,
     "sourceSplit": "development",
-    "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
     "group": "robustness",
     "sourceIds": ["provider-missing-usage"]
   }

@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using System.Text.RegularExpressions;
 using Xpathed.Common.Contracts;
 using Xpathed.Common.Http;
@@ -6,7 +7,30 @@ namespace Xpathed.Resolver.Services;
 
 internal static partial class BrowserEvidence
 {
-    internal static void ValidateCapture(CandidateCapture capture, string pageId, string documentId)
+    internal static void ValidateImage(CandidateCapture capture, CaptureImageResult? result)
+    {
+        if (result is null)
+        {
+            throw new ApiException(502, "invalid_browser_capture", "The browser returned an invalid screenshot.");
+        }
+        if (
+            result.SessionId != capture.SessionId
+            || result.PageId != capture.PageId
+            || result.DocumentId != capture.DocumentId
+            || result.CaptureId != capture.CaptureId
+        )
+        {
+            throw new ApiException(409, "stale_capture", "The screenshot belongs to another capture.");
+        }
+        ValidateCapture(capture with { Image = result.Image }, capture.PageId, capture.DocumentId, true);
+    }
+
+    internal static void ValidateCapture(
+        CandidateCapture capture,
+        string pageId,
+        string documentId,
+        bool includeImage = false
+    )
     {
         if (
             capture.Coverage is null
@@ -30,6 +54,23 @@ internal static partial class BrowserEvidence
                 502,
                 "capture_incomplete",
                 "The browser could not capture every eligible candidate."
+            );
+        }
+        if (
+            !includeImage && capture.Image is not null
+            || includeImage
+                && (
+                    capture.Image is not { Png: { Length: >= 24 }, Width: > 0, Height: > 0 } image
+                    || !image.Png.AsSpan(0, 8).SequenceEqual(new byte[] { 137, 80, 78, 71, 13, 10, 26, 10 })
+                    || BinaryPrimitives.ReadInt32BigEndian(image.Png.AsSpan(16, 4)) != image.Width
+                    || BinaryPrimitives.ReadInt32BigEndian(image.Png.AsSpan(20, 4)) != image.Height
+                )
+        )
+        {
+            throw new ApiException(
+                502,
+                "invalid_browser_capture",
+                "The browser did not return a valid masked screenshot."
             );
         }
         if (
@@ -186,7 +227,8 @@ internal static partial class BrowserEvidence
             && frame.Chain.All(ancestor =>
                 ancestor is not null
                 && !string.IsNullOrWhiteSpace(ancestor.FrameId)
-                && !string.IsNullOrWhiteSpace(ancestor.Xpath)
+                && !string.IsNullOrWhiteSpace(ancestor.NodeId)
+                && ancestor.Xpath is not null
                 && ancestor.Label is not null
                 && ValidShadowChain(ancestor.ShadowChain)
             )
@@ -207,7 +249,7 @@ internal static partial class BrowserEvidence
                         pair.First is not null
                         && pair.Second is not null
                         && pair.First.FrameId == pair.Second.FrameId
-                        && pair.First.Xpath == pair.Second.Xpath
+                        && pair.First.NodeId == pair.Second.NodeId
                         && pair.First.Label == pair.Second.Label
                         && SameShadowChain(pair.First.ShadowChain, pair.Second.ShadowChain)
                     );
@@ -215,12 +257,21 @@ internal static partial class BrowserEvidence
     private static bool ValidShadowChain(ShadowHost[]? chain) =>
         chain is null
         || chain is { Length: > 0 }
-            && chain.All(host => host is not null && !string.IsNullOrWhiteSpace(host.Xpath) && host.Label is not null);
+            && chain.All(host =>
+                host is not null
+                && host.Xpath is not null
+                && !string.IsNullOrWhiteSpace(host.NodeId)
+                && host.Label is not null
+            );
 
     private static bool SameShadowChain(ShadowHost[]? actual, ShadowHost[]? expected) =>
-        ValidShadowChain(actual) && (actual ?? []).SequenceEqual(expected ?? []);
+        ValidShadowChain(actual)
+        && (actual ?? []).Length == (expected ?? []).Length
+        && (actual ?? [])
+            .Zip(expected ?? [])
+            .All(pair => pair.First.NodeId == pair.Second.NodeId && pair.First.Label == pair.Second.Label);
 
-    private static bool ValidInteractability(ResolvedTarget target, string action)
+    internal static bool ValidInteractability(ResolvedTarget target, string action)
     {
         var assessment = target.Interactability;
         if (assessment?.Checks is not { } checks)

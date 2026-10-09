@@ -13,7 +13,7 @@ public sealed class SessionsController(BrowserSessions sessions) : ControllerBas
     public Task<BrowserSession> Create(
         [FromBody(EmptyBodyBehavior = EmptyBodyBehavior.Allow)] CreateBrowserSessionRequest? request,
         CancellationToken cancellationToken
-    ) => sessions.CreateAsync(request?.BrowserType, cancellationToken);
+    ) => sessions.CreateAsync(request?.BrowserType, request?.Resolution, cancellationToken);
 
     [HttpGet("options")]
     public BrowserSessionOptions Options() => sessions.Options;

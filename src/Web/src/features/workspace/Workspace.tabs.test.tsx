@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { mockSystemTheme } from "@/test/systemTheme";
@@ -6,12 +6,7 @@ import { ThemeProvider } from "../theme/ThemeProvider";
 import Workspace from "./Workspace";
 import type { PageState } from "./api";
 
-vi.mock("@novnc/novnc", () => ({
-  default: class extends EventTarget {
-    disconnect = vi.fn();
-    focus = vi.fn();
-  },
-}));
+vi.mock("./BrowserViewer", () => ({ default: () => <div aria-label="Managed browser" /> }));
 
 function browserApi() {
   const session = {
@@ -19,6 +14,7 @@ function browserApi() {
     pageId: "page-1",
     viewPath: "/view/session-1",
     browserType: "chromium" as const,
+    resolution: "1280x800",
   };
   let pages: PageState[] = [
     {
@@ -40,6 +36,7 @@ function browserApi() {
     activationVersion,
     viewPath: session.viewPath,
     browserType: "chromium" as const,
+    resolution: "1280x800",
     pages,
   });
   const addPage = (url = "about:blank", title = "") => {
@@ -100,7 +97,15 @@ function browserApi() {
     const path = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
     if (path === "/api/sessions/options")
       return Promise.resolve(
-        Response.json({ defaultBrowserType: "chromium", browserTypes: ["chromium", "firefox"] }),
+        Response.json({
+          defaultBrowserType: "chromium",
+          browserTypes: ["chromium"],
+          defaultResolution: "1280x800",
+          resolutions: [
+            { id: "1280x800", width: 1280, height: 800 },
+            { id: "1920x1080", width: 1920, height: 1080 },
+          ],
+        }),
       );
     if (path === "/api/sessions") return Response.json(session);
     if (path === "/api/sessions/session-1" && snapshotFailure)
@@ -180,6 +185,27 @@ async function openFirst(user: ReturnType<typeof userEvent.setup>) {
 }
 
 describe("Browser tabs and chat", () => {
+  it("preserves text only across tab revisits and navigation without changing another tab", async () => {
+    browserApi();
+    const user = renderWorkspace();
+    await openFirst(user);
+    const mode = () => screen.getByRole("combobox", { name: "Screenshots" });
+    await user.selectOptions(mode(), "text_only");
+    await user.click(screen.getByRole("button", { name: "New tab" }));
+    expect(mode()).toHaveValue("auto");
+    await user.type(screen.getByRole("textbox", { name: "Page address" }), "second.test{Enter}");
+    await waitFor(() => expect(mode()).toBeEnabled());
+    await user.click(screen.getByRole("tab", { name: "First" }));
+    await waitFor(() => expect(mode()).toHaveValue("text_only"));
+    const address = screen.getByRole("textbox", { name: "Page address" });
+    await user.clear(address);
+    await user.type(address, "first.test/changed{Enter}");
+    await waitFor(() => expect(mode()).toBeEnabled());
+    expect(mode()).toHaveValue("text_only");
+    await user.click(screen.getByRole("tab", { name: "Second" }));
+    await waitFor(() => expect(mode()).toHaveValue("auto"));
+  });
+
   it("retries a historical prompt on its active tab's current document without clearing drafts", async () => {
     const api = browserApi();
     const user = renderWorkspace();
@@ -287,33 +313,6 @@ describe("Browser tabs and chat", () => {
     await user.tab();
     await user.keyboard("{Enter}");
     await waitFor(() => expect(screen.getByRole("tab", { name: "New tab" })).toHaveFocus());
-  });
-
-  it("blocks native tab shortcuts in the viewer while keeping normal page typing and copying", async () => {
-    browserApi();
-    const user = renderWorkspace();
-    await openFirst(user);
-    const viewer = await screen.findByRole("application");
-    for (const shortcut of [
-      { key: "t", ctrlKey: true },
-      { key: "n", metaKey: true },
-      { key: "l", ctrlKey: true },
-      { key: "Tab", ctrlKey: true },
-      { key: "F11" },
-      { key: "F12" },
-      { key: "i", ctrlKey: true, shiftKey: true },
-      { key: "j", ctrlKey: true, shiftKey: true },
-      { key: "c", ctrlKey: true, shiftKey: true },
-      { key: "d", altKey: true },
-    ]) {
-      expect(fireEvent.keyDown(viewer, { ...shortcut, bubbles: true, cancelable: true })).toBe(
-        false,
-      );
-    }
-    expect(
-      fireEvent.keyDown(viewer, { key: "c", ctrlKey: true, bubbles: true, cancelable: true }),
-    ).toBe(true);
-    expect(fireEvent.keyDown(viewer, { key: "a", bubbles: true, cancelable: true })).toBe(true);
   });
 
   it("keeps an unverified response as historical when the final session refresh fails", async () => {

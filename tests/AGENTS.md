@@ -1,13 +1,9 @@
 # Test guidance
 
-Keep the oracle independent of the implementation: assert the intended target/action and preserved page state, not only an emitted XPath string or returned `ready` flag. Use `$xpathed-resolution-checks` for browser and provider scenarios.
+Keep the oracle independent: assert intended target/action, page state and effects, not only the emitted XPath or readiness flag. Use `$xpathed-resolution-checks` for browser/provider changes.
 
-`resolution/` exercises real browser/service boundaries using a deterministic provider by default. C# projects exercise their service's HTTP/contract boundary. Use controlled HTTP services for forwarding and deterministic upstream failures.
-
-Add projects to `Xpathed.slnx` and account for selection in `scripts/ci-changes.mjs` and `scripts/ci-dotnet-tests.mjs`. A passing local test is not evidence that its CI path runs; validate selection too.
-
-## Code Review Rules
-
-- Flag retries or relaxed assertions that conceal the original failure, and tests whose expected values are computed by the code under test.
-- Flag fixture data containing real credentials or unrelated user page content. Use synthetic secrets to prove exclusion.
-- Keep paid live provider checks explicit and report their measured usage/cost separately from deterministic checks.
+- `resolution/` exercises real Browser/service boundaries with deterministic providers by default. C# tests cover service HTTP/contracts; Web tests cover client state and presentation.
+- Verify passive resolution leaves scroll/focus/forms unchanged. For explicit execution, verify the intended effect plus stale-target, replay, failure and cancellation behavior when affected.
+- Use synthetic secrets to prove privacy exclusion. Test Auto routing and Text only independently, including stale images and fail-closed masking; do not put real credentials or private pages in fixtures.
+- Paid checks require explicit scope; report request counts and measured costs separately. Preserve original failed attempts and independent labels; never relax assertions or retry to hide failures.
+- Add projects to `Xpathed.slnx` and update CI selection in `scripts/ci-changes.mjs` and `scripts/ci-dotnet-tests.mjs`. Run affected gates from `package.json` and report what actually ran.

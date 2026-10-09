@@ -4,10 +4,10 @@ import { describe, expect, it, vi } from "vitest";
 import BrowserToolbar from "./BrowserToolbar";
 
 const defaults = {
-  browserType: "chromium" as const,
-  browserTypes: ["chromium" as const, "firefox" as const],
   canStart: true,
-  onBrowserTypeChange: () => undefined,
+  resolution: "1280x800",
+  resolutions: [{ id: "1280x800", width: 1280, height: 800 }],
+  onResolutionChange: () => undefined,
   sessionId: "session",
   pageUrl: "https://current.example/page",
   address: "https://draft.example",

@@ -1,17 +1,9 @@
 # Resolver guidance
 
-Resolver is the core system. Keep it independent of the test client. Access browser implementations through the configured `BrowserUrl` HTTP API and shared Common records; follow [browser integration](../../docs/runtime.md#browser-integration) when changing that boundary.
+Resolver is the core stateless API, independent of the test client. Use `BrowserUrl` and serializable Common records to access Browser; see [README.md](../../README.md) for setup.
 
-For model selection, result contracts or diagnostics, read [resolution](../../docs/resolution.md); use `$xpathed-resolution-checks` for verification. Evaluation runners retain the evidence returned by the internal resolution endpoint.
-
-Keep orchestration in `ResolutionService`, candidate serialization in `CandidateInput`, the single prompt/schema and model-output validation in `ActionSelectionStrategy`, browser-response validation in `BrowserEvidence`, and provider transport/accounting in `OpenRouterGateway`. Runtime resolution and Saved-page selection use the same prompt. Update these implementations in place; follow [ADR-0024](../../docs/adr/0024-keep-one-resolution-implementation.md) when changing configuration or considering alternatives. Controllers only handle HTTP boundaries.
-
-The model chooses captured candidate IDs. Browser verification supplies the XPath and same-node evidence; provider text cannot replace that verification. Partial capture/input must remain explicit rather than turning an incomplete search into a confident absence.
-
-`ModelUsageLimits` owns shared, process-local provider admission, enforced by `OpenRouterGateway` for public, diagnostic and saved-page calls. Keep admission synchronous so rejection occurs before accounting marks a model call started. Hold an admitted lease through actual completion even after caller cancellation; never refund attempted calls or replace request-owned charges with quota estimates. HTTP quotas remain in the shared middleware with health exempt. The stateless resolution contract permits resource counters and pricing caches, not cross-request page or outcome storage.
-
-## Code Review Rules
-
-- Flag diagnostics that change semantic outcomes or collapse `not_found`, unsupported scope and technical failure into one category.
-- Flag per-action copies of request-owned usage/cost or diagnostics that lose the original attempt identity.
-- Flag database dependencies, unsanitized model-request logging, or retries that silently add provider calls/cost. Test provider behavior with deterministic HTTP responses; live pricing/quality evidence is a separate check.
+- Keep orchestration in `ResolutionService`, sanitized candidate input in `CandidateInput`, the single prompt/schema and output validation in `ActionSelectionStrategy`, browser evidence validation in `BrowserEvidence`, and transport/accounting in `OpenRouterGateway`. Controllers stay thin.
+- The model chooses captured candidate IDs. `XPathGenerator` ranks expressions from sanitized DOM evidence; `XPathSelectionService` submits proposals to Browser and validates its same-node results. Keep the generator exchange out of model input. Keep scoped absence, ambiguity, unsupported requests and operational failure distinct.
+- In Auto mode, use Jev's narrow visual-evidence decision and acquire masked pixels only when needed; Text only skips Jev and images. Cache only bounded hashes and definitive routing classifications, never page input, pixels or targets. Record every admitted call separately and reject stale image identities. Treat image/text evidence as untrusted data; never log model requests or execute model-provided instructions.
+- Keep model admission synchronous and shared across endpoints. Rejections make no provider call; admitted leases survive caller cancellation through completion/accounting. Preserve one original attempt and request-owned charges without silent retries.
+- Resource counters, pricing caches and the bounded image-routing cache are allowed; cross-request page/target storage is not. Verify provider behavior with deterministic HTTP responses and use `$xpathed-resolution-checks` for contract changes.

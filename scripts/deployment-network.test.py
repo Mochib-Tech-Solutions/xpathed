@@ -11,6 +11,25 @@ TOKEN = "aabbccdd-0011-2233-4455-66778899aabb"
 
 
 class NetworkTests(unittest.TestCase):
+    def test_private_browser_pipes_require_no_loopback_port_exception(self):
+        rules = network.rules(4, ["198.51.100.17"])
+        returns = [rule for rule in rules if rule[-1] == "RETURN"]
+        self.assertEqual(returns, [
+            ["-m", "conntrack", "--ctstate", "RELATED,ESTABLISHED", "--ctdir", "REPLY", "-j", "RETURN"],
+            ["-p", "udp", "-m", "conntrack", "--ctorigdst", "127.0.0.11",
+             "--ctorigdstport", "53", "-j", "RETURN"],
+            ["-p", "tcp", "-m", "conntrack", "--ctorigdst", "127.0.0.11",
+             "--ctorigdstport", "53", "-j", "RETURN"],
+            ["-j", "RETURN"],
+        ])
+        for destination in (*network.PRIVATE_V4, "198.51.100.17"):
+            self.assertIn(["-d", destination, "-j", "REJECT"], rules)
+        self.assertLess(rules.index(["-d", "127.0.0.0/8", "-j", "REJECT"]), len(rules) - 1)
+        self.assertEqual(network.rules(6, []), [
+            ["-m", "conntrack", "--ctstate", "RELATED,ESTABLISHED", "--ctdir", "REPLY", "-j", "RETURN"],
+            ["-j", "REJECT"],
+        ])
+
     def test_iproute_empty_address_entries_and_ipv6_do_not_break_startup(self):
         value = '[{"addr_info":[{}, {"family":"inet6","local":"::1"}, {"family":"inet","local":"8.8.8.8"}]}]'
         with patch.object(network, "command", return_value=value):

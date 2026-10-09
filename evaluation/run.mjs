@@ -72,42 +72,28 @@ export function validateCases(manifest) {
   const ids = new Set(),
     families = new Map();
   for (const item of manifest.cases) {
-    const offline = item.track === "offline-selection";
     if (!/^[a-z0-9_-]+$/.test(item.id) || ids.has(item.id))
       throw new Error("Invalid or duplicate case id");
     ids.add(item.id);
-    if (
-      !item.family ||
-      ![
-        "development",
-        "regression",
-        "held-out",
-        ...(item.dataset
-          ? ["train", "dev", "test", "test_task", "test_website", "test_domain"]
-          : []),
-      ].includes(item.split)
-    )
+    if (!item.family || !["development", "regression", "held-out"].includes(item.split))
       throw new Error("Invalid family or split");
     if (families.has(item.family) && families.get(item.family) !== item.split)
       throw new Error("A family cannot cross split boundaries");
     families.set(item.family, item.split);
     if (!Array.isArray(item.expected?.actions)) throw new Error("Expected actions are required");
-    if (!item.instruction || (!offline && !item.fixture) || !item.review || !item.category)
+    if (!item.instruction || !item.fixture || !item.review || !item.category)
       throw new Error("Case provenance is incomplete");
-    if (!offline && (item.viewport?.width !== 1280 || item.viewport?.height !== 800))
+    if (item.viewport?.width !== 1280 || item.viewport?.height !== 800)
       throw new Error("Only the managed 1280x800 viewport is currently supported");
     for (const action of item.expected.actions) {
       if (
         !Number.isInteger(action.step) ||
         action.step < 1 ||
-        (!offline && !action.action) ||
+        !action.action ||
         !["found", "not_found", "unsupported", "error"].includes(action.outcome)
       )
         throw new Error("Invalid expected action");
-      if (
-        action.outcome === "found" &&
-        !(offline ? action.target?.candidateId : action.target?.selector)
-      )
+      if (action.outcome === "found" && !action.target?.selector)
         throw new Error("Found actions require an independent target mapping");
     }
   }
@@ -132,40 +118,6 @@ export function buildPlan(cases, options) {
     trials: Array.from({ length: options.repetitions }, (_, i) =>
       caseOrder.map((caseId) => ({ caseId, repetition: i + 1, attempt: 1 })),
     ).flat(),
-  };
-}
-
-export function toArtifact(manifest, trial, grade) {
-  const { evidence, ...record } = trial;
-  // Mutation evidence has the same short lifetime as the first model input.
-  const freshEvidence = record.mutation?.fresh?.evidence;
-  if (record.mutation)
-    record.mutation = {
-      ...record.mutation,
-      fresh: { ...record.mutation.fresh, evidence: undefined },
-    };
-  return {
-    version: "1",
-    id: trial.id,
-    kind: "evaluation",
-    traceId: trial.result?.traceId ?? trial.id,
-    pageId: trial.result?.pageId ?? "unavailable",
-    outcome: grade.passed ? "passed" : "failed",
-    createdAt: trial.createdAt,
-    expiresAt: new Date(Date.parse(trial.createdAt) + 90 * 86400000).toISOString(),
-    evidenceExpiresAt: new Date(Date.parse(trial.createdAt) + 30 * 86400000).toISOString(),
-    evidenceAvailability: evidence?.availability ?? "unavailable",
-    result: { ...record, grade },
-    evidence: evidence
-      ? { ...evidence, ...(freshEvidence ? { freshResolution: freshEvidence } : {}) }
-      : null,
-    provenance: {
-      source: "evaluation",
-      commit: manifest.code.revision,
-      configurationId: trial.result?.configurationId ?? "unavailable",
-      caseId: trial.caseId,
-      runId: manifest.id,
-    },
   };
 }
 
@@ -266,13 +218,13 @@ export async function command(fixture, trialId, body, timeoutMs) {
   throw new Error("Fixture observation timeout");
 }
 
-async function mapCandidates(candidates, identity, browser, timeoutMs) {
+async function mapCandidates(candidates, identity, resolver, timeoutMs) {
   const coverageTargets = [];
-  // Map captured IDs through the Browser contract, then independently compare actual DOM nodes.
+  // Map captured IDs through Resolver construction and Browser verification, then independently compare actual DOM nodes.
   // Never use the generated XPath itself as the expected target label.
   for (let i = 0; i < candidates.length; i += 16) {
     const selection = await request(
-      `${browser}/pages/${identity.pageId}/selections`,
+      `${resolver}/pages/${identity.pageId}/selections`,
       {
         documentId: identity.documentId,
         captureId: identity.captureId,
@@ -289,10 +241,10 @@ async function mapCandidates(candidates, identity, browser, timeoutMs) {
   return coverageTargets;
 }
 
-async function observe(spec, trial, session, fixture, browser, timeoutMs) {
+async function observe(spec, trial, session, fixture, resolver, timeoutMs) {
   const input = trial.evidence?.modelInput ? JSON.parse(trial.evidence.modelInput) : null;
   const candidates = input?.candidates ?? [];
-  const coverageTargets = await mapCandidates(candidates, trial.result, browser, timeoutMs);
+  const coverageTargets = await mapCandidates(candidates, trial.result, resolver, timeoutMs);
   const observation = await command(
     fixture,
     trial.id,
@@ -356,7 +308,7 @@ async function resolveTrial(spec, trial, session, page, options, services, chann
       { ...trial, id: channelId },
       session,
       services.fixture,
-      services.browser,
+      services.resolver,
       options.timeoutMs,
     );
   } catch (error) {
@@ -427,7 +379,7 @@ export async function execute(spec, trial, options, services) {
       const coverageTargets = await mapCandidates(
         capture.candidates,
         capture,
-        services.browser,
+        services.resolver,
         options.timeoutMs,
       );
       trial.captureObservation = await command(
@@ -518,13 +470,12 @@ export async function fingerprints(
     ".editorconfig",
     ".dockerignore",
     "docker/compose.yaml",
-    "docker/compose.evaluation.yaml",
-    "docker/compose.qualification.yaml",
     "docker/compose.sh",
     "scripts/evaluate.sh",
-    "scripts/evaluate-model.mjs",
+    "scripts/native-check.mjs",
+    "scripts/native.mjs",
+    "scripts/service-process.mjs",
     "scripts/evaluate-all.mjs",
-    "scripts/release/offline.mjs",
     "tests/resolution/ready.mjs",
   ];
   async function collect(path) {
@@ -556,15 +507,14 @@ export async function fingerprints(
       files[path] = "unavailable";
     }
   }
-  for (const path of [
-    "src/Resolver/bin/Release/net10.0/Resolver.dll",
-    "src/Resolver/bin/Release/net10.0/Common.dll",
-  ]) {
-    try {
-      files[path] = hash(await readFile(join(root, path)));
-    } catch {
-      files[path] = "unavailable";
-    }
+  if (process.env.XPATHED_RUNTIME_ARTIFACTS) {
+    for (const project of ["Browser", "Resolver"])
+      for (const name of [project, "Common"])
+        files[`runtime/${project}/${name}.dll`] = hash(
+          await readFile(
+            join(process.env.XPATHED_RUNTIME_ARTIFACTS, "bin", project, "release", `${name}.dll`),
+          ),
+        );
   }
   let revision = process.env.XPATHED_CODE_REVISION,
     tree = process.env.XPATHED_TREE_HASH;
@@ -634,11 +584,10 @@ export async function replay(path) {
 
 export async function prune(path, now = new Date()) {
   const manifest = await readJson(join(path, "manifest.json"));
-  const context = manifest.kind === "context-experiment" && manifest.version === 1;
   if (
-    (!context && manifest.version !== "1") ||
+    manifest.version !== "1" ||
     !manifest.id ||
-    !Array.isArray(context ? manifest.plan : manifest.plan?.trials) ||
+    !Array.isArray(manifest.plan?.trials) ||
     !manifest.code ||
     !Number.isFinite(Date.parse(manifest.createdAt))
   )
@@ -649,12 +598,10 @@ export async function prune(path, now = new Date()) {
     return "records_deleted";
   }
   if (age < 30 * 86400000) return "retained";
-  if (context) delete manifest.preparedRequests;
-  for (const spec of manifest.cases ?? []) delete spec.input;
   manifest.evidenceAvailability = "expired";
   // Keep the frozen hash: removed raw evidence intentionally cannot pass replay integrity.
   await writeFile(join(path, "manifest.json"), JSON.stringify(manifest, null, 2) + "\n");
-  for (const sub of ["trials", "imports", ...(context ? ["preflight"] : [])])
+  for (const sub of ["trials"])
     for (const file of await readdir(join(path, sub)).catch((error) => {
       if (error.code === "ENOENT") return [];
       throw error;
@@ -668,16 +615,9 @@ export async function prune(path, now = new Date()) {
         value = await readJson(name);
       value.evidence = null;
       value.evidenceAvailability = "expired";
-      if (value.baseline) {
-        value.baseline.evidence = null;
-        value.baseline.evidenceAvailability = "expired";
-      }
       if (value.mutation?.fresh) value.mutation.fresh.evidence = null;
       await writeFile(name, JSON.stringify(value, null, 2) + "\n");
     }
-  // Comparison provider snapshots contain the same expiring input/output evidence.
-  await rm(join(path, "provider"), { recursive: true, force: true });
-  await rm(join(path, "offline"), { recursive: true, force: true });
   return "evidence_deleted";
 }
 
@@ -721,9 +661,7 @@ export async function main(args = process.argv.slice(2), track = "resolver") {
     process.env.XPATHED_EVALUATION_SUITE || join(directory, "cases/index.json"),
   );
   if (process.env.XPATHED_EVALUATION_SUITE && options.mode !== "deterministic")
-    throw new Error(
-      "External reconstructed suites use controlled provider-free browser validation; use Saved-page selection for live provider inference",
-    );
+    throw new Error("Custom suites use controlled provider-free browser validation");
   let cases = validateCases(suite);
   let exclusions = [];
   if (track === "xpath") {
@@ -736,6 +674,11 @@ export async function main(args = process.argv.slice(2), track = "resolver") {
   if (!cases.length) throw new Error("No matching cases");
   const plan = buildPlan(cases, options);
   plan.trials = plan.trials.map((t) => ({ ...t, id: randomUUID().replaceAll("-", "") }));
+  const services = {
+    browser: process.env.XPATHED_BROWSER_URL ?? "http://browser:8080",
+    resolver: process.env.XPATHED_RESOLVER_URL ?? "http://resolver:8080",
+    fixture: process.env.XPATHED_FIXTURE_URL ?? "http://evaluation-fixture:8090",
+  };
   const manifest = {
     version: "1",
     id: randomUUID(),
@@ -752,22 +695,15 @@ export async function main(args = process.argv.slice(2), track = "resolver") {
     plan,
     code: await fingerprints(),
     policy: {
-      qualification: "incomplete",
-      qualityThresholds: null,
       retentionDays: 90,
       evidenceDays: 30,
     },
+    fixture: services.fixture,
     sourceManifestHash: hash(suite),
   };
   manifest.contentHash = hash(manifest);
   await mkdir(join(options.output, "trials"), { recursive: true });
-  await mkdir(join(options.output, "imports"), { recursive: true });
   await saveJson(join(options.output, "manifest.json"), manifest);
-  const services = {
-    browser: process.env.XPATHED_BROWSER_URL ?? "http://browser:8080",
-    resolver: process.env.XPATHED_RESOLVER_URL ?? "http://resolver:8080",
-    fixture: process.env.XPATHED_FIXTURE_URL ?? "http://evaluation-fixture:8090",
-  };
   let configurations = Promise.resolve();
   const trials = await runTrials(plan, async (planned) => {
     const spec = cases.find((c) => c.id === planned.caseId);
@@ -775,12 +711,7 @@ export async function main(args = process.argv.slice(2), track = "resolver") {
     await execute(spec, trial, options, services);
     const grade = gradeTrial(spec, trial);
     await saveJson(join(options.output, "trials", `${trial.id}.json`), trial);
-    if (track !== "xpath")
-      await saveJson(
-        join(options.output, "imports", `${trial.id}.json`),
-        toArtifact(manifest, trial, grade),
-      );
-    // Only manifest writes share a path; trial and import files have unique identities.
+    // Only manifest writes share a path; trial files have unique identities.
     configurations = configurations.then(() =>
       retainConfigurations(options.output, manifest, trial),
     );
@@ -795,7 +726,7 @@ export async function main(args = process.argv.slice(2), track = "resolver") {
   const first = summary.firstAttempt;
   const readable =
     [
-      `Evaluation: ${track === "xpath" ? "XPath construction and verification" : "Live-browser Resolver"}; inference mode: ${options.mode === "deterministic" ? "controlled provider-free" : "live provider inference"}; qualification: ${summary.qualification}`,
+      `Evaluation: ${track === "xpath" ? "XPath construction and verification" : "Live-browser Resolver"}; inference mode: ${options.mode === "deterministic" ? "controlled provider-free" : "live provider inference"}`,
       `Trials: ${summary.completedTrials}/${summary.plannedTrials}; checks passed: ${first.passed}; failed: ${first.failed}`,
       `Intended targets: ${first.metrics.targetsCorrect}/${first.metrics.targetsExpected}; wrong targets: ${first.metrics.wrongTargets}`,
       `Saved XPath mutations: ${first.savedLocator.passed}/${first.savedLocator.trials}; fresh resolutions: ${first.freshResolution?.passed ?? 0}/${first.freshResolution?.trials ?? 0}`,

@@ -6,5 +6,6 @@ public sealed record BrowserSessionState(
     string ViewPath,
     PageState[] Pages,
     long ActivationVersion,
-    string BrowserType = "chromium"
+    string BrowserType = "chromium",
+    string Resolution = "1280x800"
 );

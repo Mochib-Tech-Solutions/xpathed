@@ -3,14 +3,21 @@ using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Xpathed.Common.Contracts;
 
 namespace Xpathed.Resolver.Tests;
 
 internal sealed class DeterministicServicesHandler : HttpMessageHandler
 {
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     public Func<string, CancellationToken, Task>? BeforeRespondAsync { get; init; }
     public string? ProviderBody { get; set; }
     public HttpStatusCode ProviderStatus { get; init; } = HttpStatusCode.OK;
+    public string RouterBody { get; init; } = RouterResponse(0.01, 0.01);
+    public HttpStatusCode RouterStatus { get; init; } = HttpStatusCode.OK;
+    public string ImageBody { get; init; } =
+        """{"sessionId":"session-1","pageId":"page-1","documentId":"document-1","captureId":"capture-1","image":{"png":"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jPz8AAAAASUVORK5CYII=","width":1,"height":1}}""";
+    public HttpStatusCode ImageStatus { get; init; } = HttpStatusCode.OK;
     public string PricingBody { get; set; } =
         """
             {"data":{"endpoints":[{"provider_name":"Wafer","tag":"wafer","pricing":{"prompt":"0.0000000749","completion":"0.00000044"}}]}}
@@ -26,10 +33,18 @@ internal sealed class DeterministicServicesHandler : HttpMessageHandler
             """;
     public HttpStatusCode SelectionStatus { get; init; } = HttpStatusCode.OK;
     public string? SelectionBody { get; init; }
+    public string? XPathEvidenceBody { get; init; }
     public JsonElement ModelRequest { get; private set; }
     public JsonElement CaptureRequest { get; private set; }
+    public JsonElement RouterRequest { get; private set; }
+    public JsonElement ImageRequest { get; private set; }
+    public int RouterRequestCount { get; private set; }
+    public int ImageRequestCount { get; private set; }
+    public int CaptureRequestCount { get; private set; }
     public int SelectionRequestCount { get; private set; }
     public int ProviderRequestCount { get; private set; }
+    public int XPathEvidenceRequestCount { get; private set; }
+    public JsonElement SelectionRequest { get; private set; }
 
     protected override async Task<HttpResponseMessage> SendAsync(
         HttpRequestMessage request,
@@ -43,6 +58,7 @@ internal sealed class DeterministicServicesHandler : HttpMessageHandler
         }
         if (path == "/pages/page-1/capture")
         {
+            CaptureRequestCount++;
             CaptureRequest = await request.Content!.ReadFromJsonAsync<JsonElement>(cancellationToken);
             return Json(CaptureBody);
         }
@@ -56,6 +72,18 @@ internal sealed class DeterministicServicesHandler : HttpMessageHandler
                 ProviderStatus
             );
         }
+        if (path == "/api/alpha/decisions")
+        {
+            RouterRequestCount++;
+            RouterRequest = await request.Content!.ReadFromJsonAsync<JsonElement>(cancellationToken);
+            return Json(RouterBody, RouterStatus);
+        }
+        if (path == "/pages/page-1/capture-image")
+        {
+            ImageRequestCount++;
+            ImageRequest = await request.Content!.ReadFromJsonAsync<JsonElement>(cancellationToken);
+            return Json(ImageBody, ImageStatus);
+        }
         if (
             path.StartsWith("/api/v1/models/", StringComparison.Ordinal)
             && path.EndsWith("/endpoints", StringComparison.Ordinal)
@@ -63,10 +91,19 @@ internal sealed class DeterministicServicesHandler : HttpMessageHandler
         {
             return Json(PricingBody, PricingStatus);
         }
+        if (path == "/pages/page-1/xpath-evidence")
+        {
+            XPathEvidenceRequestCount++;
+            var requestBody = await request.Content!.ReadFromJsonAsync<XPathEvidenceRequest>(cancellationToken);
+            return Json(
+                XPathEvidenceBody ?? JsonSerializer.Serialize(Evidence(requestBody!.CandidateIds), JsonOptions)
+            );
+        }
         if (path == "/pages/page-1/selections")
         {
             SelectionRequestCount++;
             var batch = await request.Content!.ReadFromJsonAsync<JsonElement>(cancellationToken);
+            SelectionRequest = batch.Clone();
             return Json(
                 SelectionBody
                     ?? JsonSerializer.Serialize(
@@ -96,6 +133,83 @@ internal sealed class DeterministicServicesHandler : HttpMessageHandler
         return new HttpResponseMessage(HttpStatusCode.NotFound);
     }
 
+    private XPathEvidenceBatch Evidence(string[] candidateIds)
+    {
+        var capture = JsonSerializer.Deserialize<CandidateCapture>(CaptureBody, JsonOptions)!;
+        var nodes = new Dictionary<string, XPathNodeEvidence>(StringComparer.Ordinal);
+        var targets = new List<XPathTargetEvidence>();
+        void Context(string id, string[]? hosts = null)
+        {
+            nodes.TryAdd(
+                id,
+                new(
+                    id,
+                    null,
+                    "iframe",
+                    "http://www.w3.org/1999/xhtml",
+                    new() { ["data-testid"] = id },
+                    "",
+                    [],
+                    0,
+                    false,
+                    null,
+                    1,
+                    1,
+                    null,
+                    [],
+                    [],
+                    hosts ?? []
+                )
+            );
+        }
+        void Hosts(ShadowHost[]? hosts)
+        {
+            if (hosts is null)
+            {
+                return;
+            }
+            for (var index = 0; index < hosts.Length; index++)
+            {
+                Context(hosts[index].NodeId!, hosts.Take(index).Select(host => host.NodeId!).ToArray());
+            }
+        }
+        foreach (var candidateId in candidateIds)
+        {
+            var candidate = capture.Candidates.Single(candidate => candidate.Id == candidateId);
+            var id = "node:" + candidateId;
+            targets.Add(new(candidateId, id, candidate.Frame, candidate.ShadowChain));
+            nodes.Add(
+                id,
+                new(
+                    id,
+                    candidateId,
+                    "button",
+                    "http://www.w3.org/1999/xhtml",
+                    new() { ["data-testid"] = "save-profile", ["id"] = "confirm" },
+                    candidate.Text,
+                    [],
+                    0,
+                    false,
+                    null,
+                    1,
+                    1,
+                    null,
+                    [],
+                    [],
+                    (candidate.ShadowChain ?? []).Select(host => host.NodeId!).ToArray()
+                )
+            );
+            Hosts(candidate.ShadowChain);
+
+            foreach (var owner in candidate.Frame?.Chain ?? [])
+            {
+                Hosts(owner.ShadowChain);
+                Context(owner.NodeId!, (owner.ShadowChain ?? []).Select(host => host.NodeId!).ToArray());
+            }
+        }
+        return new("browser-evidence", [.. nodes.Values], [.. nodes.Keys], [.. targets]);
+    }
+
     internal static JsonObject VerifiedTarget(string action = "click")
     {
         var target = JsonNode
@@ -114,4 +228,26 @@ internal sealed class DeterministicServicesHandler : HttpMessageHandler
 
     private static HttpResponseMessage Json(string json, HttpStatusCode status = HttpStatusCode.OK) =>
         new(status) { Content = new StringContent(json, Encoding.UTF8, "application/json") };
+
+    internal static string RouterResponse(double pixels, double appearance) =>
+        JsonSerializer.Serialize(
+            new
+            {
+                id = "routing-1",
+                model = "typesafe/jev-1.13-20260917",
+                provider = "TypeSafe",
+                answers = new
+                {
+                    pixel_content = new { type = "noul", noul = pixels },
+                    rendered_appearance = new { type = "noul", noul = appearance },
+                },
+                usage = new
+                {
+                    input_tokens = 80,
+                    output_tokens = 0,
+                    total_tokens = 80,
+                    cost = 0.00000336m,
+                },
+            }
+        );
 }

@@ -1,5 +1,0 @@
-# Keep action lists and request-owned cost
-
-Basic workspace scope is superseded by [ADR-0014](0014-resolve-one-action-across-current-page-targets.md): one action across multiple current-page targets. The multi-action implementation below is historical; [ADR-0024](0024-keep-one-resolution-implementation.md) removes retired runtime contracts.
-
-The original migration preserved the single-action contract while letting the workspace opt into bounded action lists. One completion covers the full capture; Resolver validates the entire model response before Browser atomically verifies retained nodes. Assign action identity/order locally, preserve instruction-step order and sort unordered plural targets by capture order. Reject invalid/incomplete lists as request errors rather than presenting usable partial output; legitimate mixed outcomes retain independent results. Share usage and charges once through request diagnostics, and revalidate one inspected action's highlight without inference or execution. Model-declared completeness is not semantic proof: expected action lists stay outside model inputs and are independently graded.

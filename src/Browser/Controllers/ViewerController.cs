@@ -1,7 +1,5 @@
-using System.Net.Sockets;
 using Microsoft.AspNetCore.Mvc;
 using Xpathed.Browser.Sessions;
-using Xpathed.Browser.Viewing;
 using Xpathed.Common.Http;
 
 namespace Xpathed.Browser.Controllers;
@@ -26,11 +24,8 @@ public sealed class ViewerController(BrowserSessions sessions, IConfiguration co
             throw new ApiException(400, "websocket_required", "A WebSocket connection is required.");
         }
 
-        var session = sessions.FindSession(id);
-        using var tcp = new TcpClient();
-        await tcp.ConnectAsync("127.0.0.1", session.Port, cancellationToken);
+        sessions.FindSession(id);
         using var socket = await HttpContext.WebSockets.AcceptWebSocketAsync();
-        using var lifetime = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, session.Stop.Token);
-        await VncRelay.RelayAsync(socket, tcp.GetStream(), lifetime.Token);
+        await sessions.ConnectViewerAsync(id, socket, cancellationToken);
     }
 }

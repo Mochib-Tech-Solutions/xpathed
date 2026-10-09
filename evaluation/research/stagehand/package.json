@@ -1,9 +1,0 @@
-{
-  "name": "xpathed-stagehand-evaluation",
-  "private": true,
-  "type": "module",
-  "version": "1.0.0",
-  "dependencies": {
-    "@browserbasehq/stagehand": "4.1.0"
-  }
-}

@@ -3,10 +3,11 @@ import { randomUUID } from "node:crypto";
 import { test } from "node:test";
 import { setTimeout as delay } from "node:timers/promises";
 
-const browser = "http://browser:8080";
-const resolver = "http://resolver:8080";
-const fixture = "http://resolution-fixture:8090";
+const browser = process.env.XPATHED_BROWSER_URL ?? "http://browser:8080";
+const resolver = process.env.XPATHED_RESOLVER_URL ?? "http://resolver:8080";
+const fixture = process.env.XPATHED_FIXTURE_URL ?? "http://resolution-fixture:8090";
 async function json(url, method = "GET", body) {
+  if (url.endsWith("/resolve") && body) body = { imageMode: "text_only", ...body };
   const response = await fetch(url, {
     method,
     headers: body ? { "Content-Type": "application/json" } : undefined,
@@ -135,6 +136,79 @@ test("provider-live-inference-resolves-plural-frame-targets-and-scoped-absence",
   }
 });
 
+test("provider-live-image-selects-visual-shape-and-scoped-duplicate", async () => {
+  const session = await json(`${browser}/sessions`, "POST");
+  try {
+    for (const [duplicate, instruction, expected] of [
+      [false, "Click the button showing a blue triangle.", "visual-primary"],
+      [true, "Click the button showing a blue triangle in Secondary controls.", "visual-secondary"],
+    ]) {
+      const run = randomUUID();
+      const page = await json(`${browser}/pages/${session.pageId}/navigate`, "POST", {
+        url: `${fixture}/visual?run=${run}${duplicate ? "&duplicate=1" : ""}`,
+      });
+      const capture = await json(`${browser}/pages/${page.pageId}/capture`, "POST", {
+        documentId: page.documentId,
+      });
+      assert.doesNotMatch(
+        JSON.stringify(capture.candidates),
+        /\b(?:triangle|circle|square|blue|red)\b|2563eb|dc2626/i,
+        "The visual distinction must not be supplied by DOM names or text",
+      );
+      const result = await json(`${resolver}/pages/${page.pageId}/resolve`, "POST", {
+        instruction,
+        documentId: page.documentId,
+        imageMode: "auto",
+      });
+      console.log(
+        JSON.stringify({
+          case: duplicate ? "visual-scoped-duplicate" : "visual-shape",
+          outcome: result.outcome,
+          code: result.diagnostics.code,
+          model: result.diagnostics.model,
+          provider: result.diagnostics.provider,
+          generationId: result.diagnostics.generationId,
+          usage: result.diagnostics.usage,
+          providerCalls: result.diagnostics.providerCalls,
+          imageRouting: result.diagnostics.imageRouting,
+          costEstimate: result.diagnostics.costEstimate,
+          timingsMs: result.diagnostics.timingsMs,
+        }),
+      );
+      assert.equal(
+        result.outcome,
+        "found",
+        `Visual route failed: ${result.diagnostics.code ?? result.outcome}`,
+      );
+      assert.equal(result.actions.length, 1);
+      assert.equal(result.actions[0].action, "click");
+      assert.equal(result.diagnostics.modelCalls, 2);
+      assert.equal(result.diagnostics.imageRouting.status, "included");
+      assert.equal(result.diagnostics.model, "deepseek/deepseek-v4.1-flash");
+      assert.equal(result.diagnostics.provider?.toLowerCase(), "wafer");
+      assert.match(result.diagnostics.generationId ?? "", /^gen-/);
+      await json(`${fixture}/oracle?run=${run}`, "POST", {
+        xpaths: result.actions[0].target.xpaths,
+      });
+      let observed;
+      for (let attempt = 0; attempt < 100 && !observed; attempt++) {
+        observed = await json(`${fixture}/observation?run=${run}`);
+        if (!observed) await delay(50);
+      }
+      assert.ok(
+        observed,
+        "Visual selection must be checked against the fixture's independent target identity",
+      );
+      assert.deepEqual(observed.matches, [[expected]]);
+      assert.equal(observed.clicks, 0);
+      assert.equal(observed.events.click ?? 0, 0);
+      assert.equal(observed.scrollY, 0);
+    }
+  } finally {
+    await fetch(`${browser}/sessions/${session.sessionId}`, { method: "DELETE" });
+  }
+});
+
 test("cardinality-live-explicit-count-preserves-missing-target", async () => {
   const session = await json(`${browser}/sessions`, "POST");
   try {
@@ -157,6 +231,8 @@ test("cardinality-live-explicit-count-preserves-missing-target", async () => {
           actions: result.actions,
           usage: result.diagnostics.usage,
           generationId: result.diagnostics.generationId,
+          timingsMs: result.diagnostics.timingsMs,
+          modelInputBytes: result.diagnostics.modelInputBytes,
         }),
       );
       assert.equal(result.outcome, missing ? "partial" : "found");

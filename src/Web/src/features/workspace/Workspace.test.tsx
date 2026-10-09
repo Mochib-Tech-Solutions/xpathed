@@ -5,18 +5,14 @@ import { mockSystemTheme } from "@/test/systemTheme";
 import { ThemeProvider } from "../theme/ThemeProvider";
 import Workspace from "./Workspace";
 
-vi.mock("@novnc/novnc", () => ({
-  default: class extends EventTarget {
-    disconnect = vi.fn();
-    focus = vi.fn();
-  },
-}));
+vi.mock("./BrowserViewer", () => ({ default: () => <div aria-label="Managed browser" /> }));
 
 const session = {
   sessionId: "session-1",
   pageId: "page-1",
   viewPath: "/view/page-1",
   browserType: "chromium" as const,
+  resolution: "1280x800",
 };
 const page = {
   ...session,
@@ -76,7 +72,15 @@ function mockApi(resolve = () => Promise.resolve(Response.json(found)), currentP
       if (options?.method === "DELETE") return Promise.resolve(new Response(null, { status: 204 }));
       if (path === "/api/sessions/options")
         return Promise.resolve(
-          Response.json({ defaultBrowserType: "chromium", browserTypes: ["chromium", "firefox"] }),
+          Response.json({
+            defaultBrowserType: "chromium",
+            browserTypes: ["chromium"],
+            defaultResolution: "1280x800",
+            resolutions: [
+              { id: "1280x800", width: 1280, height: 800 },
+              { id: "1920x1080", width: 1920, height: 1080 },
+            ],
+          }),
         );
       if (path === "/api/sessions") return Promise.resolve(Response.json(session));
       if (path === "/api/sessions/session-1")
@@ -87,6 +91,7 @@ function mockApi(resolve = () => Promise.resolve(Response.json(found)), currentP
             activationVersion: 1,
             viewPath: session.viewPath,
             browserType: "chromium" as const,
+            resolution: "1280x800",
             pages: [currentPage()],
           }),
         );
@@ -112,6 +117,94 @@ async function submitInstruction(user: ReturnType<typeof userEvent.setup>) {
 }
 
 describe("Workspace resolution", () => {
+  it("defaults to automatic screenshots and preserves text only through retry", async () => {
+    mockApi();
+    const user = await openWorkspace();
+    const mode = screen.getByRole("combobox", { name: "Screenshots" });
+    expect(mode).toHaveValue("auto");
+    expect(mode).toHaveAccessibleDescription(
+      "Auto sends a masked screenshot to the model provider when visual details may help. Other visible content can be shared.",
+    );
+    await submitInstruction(user);
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Retry instruction" })).toBeEnabled(),
+    );
+    const requests = () =>
+      vi
+        .mocked(fetch)
+        .mock.calls.filter(([path]) => typeof path === "string" && path.endsWith("/resolve"))
+        .map(
+          ([, options]) =>
+            JSON.parse(options?.body as string) as { imageMode: string; includeImage?: boolean },
+        );
+    expect(requests()[0]).toEqual(expect.objectContaining({ imageMode: "auto" }));
+    expect(requests()[0]).not.toHaveProperty("includeImage");
+    expect(screen.queryByText("Image used")).not.toBeInTheDocument();
+    await user.selectOptions(mode, "text_only");
+    expect(mode).toHaveAccessibleDescription(
+      "Text only sends page text and structure, without screenshots.",
+    );
+    await submitInstruction(user);
+    await waitFor(() =>
+      expect(screen.getAllByRole("button", { name: "Retry instruction" })[1]).toBeEnabled(),
+    );
+    expect(requests()[1]?.imageMode).toBe("text_only");
+    expect(mode).toHaveValue("text_only");
+    await user.click(screen.getAllByRole("button", { name: "Retry instruction" })[1]!);
+    await waitFor(() => expect(requests()).toHaveLength(3));
+    expect(requests()[2]?.imageMode).toBe("text_only");
+    await waitFor(() => expect(mode).toBeEnabled());
+    await user.selectOptions(mode, "auto");
+    await submitInstruction(user);
+    await waitFor(() => expect(requests()).toHaveLength(4));
+    expect(requests()[3]?.imageMode).toBe("auto");
+  });
+
+  it.each([
+    [
+      "included",
+      "visual_evidence",
+      "Image used",
+      "An image was chosen to help with visual details.",
+    ],
+    [
+      "unavailable",
+      "image_unavailable",
+      "Image unavailable",
+      "A usable screenshot was unavailable.",
+    ],
+    ["text_only", "semantic_evidence", "Text only", "Page text and structure appeared sufficient."],
+  ])(
+    "shows actual server image status %s instead of requested policy",
+    async (status, reason, label, explanation) => {
+      let complete!: (response: Response) => void;
+      mockApi(
+        () =>
+          new Promise((resolve) => {
+            complete = resolve;
+          }),
+      );
+      const user = await openWorkspace();
+      await submitInstruction(user);
+      expect(screen.queryByText("Image used")).not.toBeInTheDocument();
+      expect(screen.getByRole("combobox", { name: "Screenshots" })).toBeDisabled();
+      complete(
+        Response.json({
+          ...found,
+          diagnostics: {
+            ...found.diagnostics,
+            imageRouting: { mode: "auto", status, reason, score: null, cached: false },
+          },
+        }),
+      );
+      const indicator = await screen.findByLabelText(`${label}: ${explanation}`);
+      expect(indicator).toHaveTextContent(label);
+      expect(indicator).toHaveAttribute("title", explanation);
+      if (status !== "included") expect(screen.queryByText("Image used")).not.toBeInTheDocument();
+      expect(screen.queryByText("Screenshot included")).not.toBeInTheDocument();
+    },
+  );
+
   it("keeps a covered target in its numbered card beside the ready target", async () => {
     mockApi(() =>
       Promise.resolve(
@@ -614,6 +707,7 @@ describe("Workspace resolution", () => {
           body: JSON.stringify({
             instruction: "Click all confirmation buttons in the list",
             documentId: "document-1",
+            imageMode: "auto",
           }),
         }),
       );
@@ -843,6 +937,7 @@ describe("Workspace resolution", () => {
         body: JSON.stringify({
           instruction: "Click Pay now",
           documentId: "document-1",
+          imageMode: "auto",
         }),
       }),
     );
@@ -1514,6 +1609,7 @@ describe("Workspace resolution", () => {
       pageId: "page-2",
       viewPath: "/view/session-2",
       browserType: "chromium" as const,
+      resolution: "1280x800",
     };
     const freshPage = {
       ...page,
@@ -1555,7 +1651,12 @@ describe("Workspace resolution", () => {
           return Promise.resolve(
             Response.json({
               defaultBrowserType: "chromium",
-              browserTypes: ["chromium", "firefox"],
+              browserTypes: ["chromium"],
+              defaultResolution: "1280x800",
+              resolutions: [
+                { id: "1280x800", width: 1280, height: 800 },
+                { id: "1920x1080", width: 1920, height: 1080 },
+              ],
             }),
           );
         if (input === "/api/sessions") return Promise.resolve(Response.json(freshSession));
@@ -1611,6 +1712,7 @@ describe("Workspace resolution", () => {
         body: JSON.stringify({
           instruction: "Click Fresh target",
           documentId: "document-2",
+          imageMode: "auto",
         }),
       }),
     );
@@ -2040,7 +2142,15 @@ describe("Workspace resolution", () => {
         typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
       if (path === "/api/sessions/options")
         return Promise.resolve(
-          Response.json({ defaultBrowserType: "chromium", browserTypes: ["chromium", "firefox"] }),
+          Response.json({
+            defaultBrowserType: "chromium",
+            browserTypes: ["chromium"],
+            defaultResolution: "1280x800",
+            resolutions: [
+              { id: "1280x800", width: 1280, height: 800 },
+              { id: "1920x1080", width: 1920, height: 1080 },
+            ],
+          }),
         );
       if (path === "/api/sessions") return Promise.resolve(Response.json(session));
       if (path === "/api/sessions/session-1")
@@ -2051,6 +2161,7 @@ describe("Workspace resolution", () => {
             activationVersion: 1,
             viewPath: session.viewPath,
             browserType: "chromium" as const,
+            resolution: "1280x800",
             pages: [page],
           }),
         );
@@ -2058,6 +2169,7 @@ describe("Workspace resolution", () => {
         expect(JSON.parse(typeof options?.body === "string" ? options.body : "null")).toEqual({
           instruction: "Click Pay now",
           documentId: "document-1",
+          imageMode: "auto",
         });
         return Promise.resolve(Response.json(found));
       }

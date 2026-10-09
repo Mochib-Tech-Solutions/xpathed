@@ -6,12 +6,252 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Xpathed.Common.Contracts;
 using Xpathed.Resolver.Controllers;
 
 namespace Xpathed.Resolver.Tests;
 
 public sealed class ResolutionContractTests
 {
+    [Fact]
+    public async Task CoreSelectionRejectsNullActionEntriesBeforeCallingBrowser()
+    {
+        var handler = new DeterministicServicesHandler();
+        await using var application = CreateApplication(handler);
+        using var client = application.CreateClient();
+        using var response = await client.PostAsJsonAsync(
+            "/pages/page-1/selections",
+            new
+            {
+                documentId = "document-1",
+                captureId = "capture-1",
+                actions = new object?[] { null },
+            }
+        );
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(0, handler.XPathEvidenceRequestCount);
+        Assert.Equal(0, handler.SelectionRequestCount);
+        Assert.Equal(0, handler.ProviderRequestCount);
+    }
+
+    [Theory]
+    [InlineData("{}")]
+    [InlineData("{\"nodes\":[],\"targetNodeIds\":[],\"targets\":[]}")]
+    [InlineData("{\"nodes\":")]
+    public async Task CoreSelectionRejectsMalformedStructuralEvidenceBeforeVerification(string evidence)
+    {
+        var handler = new DeterministicServicesHandler { XPathEvidenceBody = evidence };
+        await using var application = CreateApplication(handler);
+        using var client = application.CreateClient();
+        using var response = await client.PostAsJsonAsync(
+            "/pages/page-1/selections",
+            new
+            {
+                documentId = "document-1",
+                captureId = "capture-1",
+                actions = new[]
+                {
+                    new
+                    {
+                        actionId = "a1",
+                        candidateId = "button-save",
+                        action = "click",
+                    },
+                },
+            }
+        );
+        Assert.Equal(HttpStatusCode.BadGateway, response.StatusCode);
+        var error = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("invalid_xpath_evidence", error.GetProperty("code").GetString());
+        Assert.Equal(0, handler.SelectionRequestCount);
+        Assert.Equal(0, handler.ProviderRequestCount);
+    }
+
+    [Fact]
+    public async Task CoreSelectionRejectsAnOmittedFrameOwnerShadowDependency()
+    {
+        static XPathNodeEvidence Node(string id, string? candidateId, string[] hosts) =>
+            new(
+                id,
+                candidateId,
+                "button",
+                "http://www.w3.org/1999/xhtml",
+                [],
+                "",
+                [],
+                0,
+                false,
+                null,
+                1,
+                1,
+                null,
+                [],
+                [],
+                hosts
+            );
+        var evidence = new XPathEvidenceBatch(
+            "evidence",
+            [Node("target", "button-save", []), Node("owner", null, ["host"]), Node("host", null, [])],
+            ["target", "owner", "host"],
+            [new("button-save", "target", new("f1", "child", [new("f1", "", "Frame", NodeId: "owner")]), null)]
+        );
+        var handler = new DeterministicServicesHandler
+        {
+            XPathEvidenceBody = JsonSerializer.Serialize(evidence, JsonSerializerOptions.Web),
+        };
+        await using var application = CreateApplication(handler);
+        using var client = application.CreateClient();
+        using var response = await client.PostAsJsonAsync(
+            "/pages/page-1/selections",
+            new ActionSelectionRequest("document-1", "capture-1", [new("a1", "button-save", "click")])
+        );
+        Assert.Equal(HttpStatusCode.BadGateway, response.StatusCode);
+        var error = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("invalid_xpath_evidence", error.GetProperty("code").GetString());
+        Assert.Equal(0, handler.SelectionRequestCount);
+        Assert.Equal(0, handler.ProviderRequestCount);
+    }
+
+    [Fact]
+    public async Task CoreSelectionGeneratesItsOwnProposalsWithoutModelInference()
+    {
+        var handler = new DeterministicServicesHandler();
+        await using var application = CreateApplication(handler);
+        using var client = application.CreateClient();
+        using var response = await client.PostAsJsonAsync(
+            "/pages/page-1/selections",
+            new
+            {
+                documentId = "document-1",
+                captureId = "capture-1",
+                actions = new[]
+                {
+                    new
+                    {
+                        actionId = "a1",
+                        candidateId = "button-save",
+                        action = "click",
+                    },
+                },
+                xpathProposals = new[]
+                {
+                    new
+                    {
+                        nodeId = "client-invented",
+                        proposals = new[]
+                        {
+                            new { expression = "//client-invented", requirements = Array.Empty<object>() },
+                        },
+                    },
+                },
+                xpathEvidenceId = "client-invented",
+            }
+        );
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(0, handler.ProviderRequestCount);
+        Assert.Equal(1, handler.XPathEvidenceRequestCount);
+        Assert.Equal(1, handler.SelectionRequestCount);
+        Assert.Equal("browser-evidence", handler.SelectionRequest.GetProperty("xpathEvidenceId").GetString());
+        Assert.Equal(
+            "//*[@data-testid='save-profile']",
+            handler
+                .SelectionRequest.GetProperty("xpathProposals")[0]
+                .GetProperty("proposals")[0]
+                .GetProperty("expression")
+                .GetString()
+        );
+        Assert.DoesNotContain("client-invented", handler.SelectionRequest.GetRawText(), StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("none")]
+    [InlineData("frame-omitted")]
+    [InlineData("frame-ancestor-omitted")]
+    [InlineData("frame-order")]
+    [InlineData("shadow-omitted")]
+    [InlineData("shadow-order")]
+    [InlineData("owner-shadow-omitted")]
+    public async Task CoreSelectionBindsTheCompleteCapturedFrameAndShadowContext(string mutation)
+    {
+        var capture = JsonNode.Parse(new DeterministicServicesHandler().CaptureBody)!;
+        var frame = JsonNode.Parse(
+            """{"id":"f2","documentId":"child-document","chain":[{"frameId":"f1","nodeId":"outer","xpath":"","label":"Outer","shadowChain":[{"nodeId":"owner-host","xpath":"","label":"Owner host"}]},{"frameId":"f2","nodeId":"inner","xpath":"","label":"Inner"}]}"""
+        )!;
+        var shadow = JsonNode.Parse(
+            """[{"nodeId":"host-one","xpath":"","label":"First"},{"nodeId":"host-two","xpath":"","label":"Second"}]"""
+        )!;
+        capture["candidates"]![0]!["frame"] = frame.DeepClone();
+        capture["candidates"]![0]!["shadowChain"] = shadow.DeepClone();
+        var target = DeterministicServicesHandler.VerifiedTarget();
+        target["frame"] = frame;
+        target["shadowChain"] = shadow;
+        foreach (var step in frame["chain"]!.AsArray().Concat(shadow.AsArray()))
+        {
+            step!["xpath"] = $"//*[@data-testid='{step["nodeId"]!.GetValue<string>()}']";
+        }
+        frame["chain"]![0]!["shadowChain"]![0]!["xpath"] = "//*[@data-testid='owner-host']";
+        switch (mutation)
+        {
+            case "frame-omitted":
+                target.Remove("frame");
+                break;
+            case "frame-ancestor-omitted":
+                frame["chain"]!.AsArray().RemoveAt(0);
+                break;
+            case "frame-order":
+                frame["chain"] = new JsonArray(
+                    frame["chain"]!.AsArray().Reverse().Select(step => step!.DeepClone()).ToArray()
+                );
+                break;
+            case "shadow-omitted":
+                target.Remove("shadowChain");
+                break;
+            case "shadow-order":
+                target["shadowChain"] = new JsonArray(
+                    shadow.AsArray().Reverse().Select(step => step!.DeepClone()).ToArray()
+                );
+                break;
+            case "owner-shadow-omitted":
+                frame["chain"]![0]!.AsObject().Remove("shadowChain");
+                break;
+        }
+        var handler = new DeterministicServicesHandler
+        {
+            CaptureBody = capture.ToJsonString(),
+            SelectionBody = new JsonObject
+            {
+                ["actions"] = new JsonArray(new JsonObject { ["actionId"] = "a1", ["target"] = target }),
+                ["inspectedActionId"] = "a1",
+            }.ToJsonString(),
+        };
+        await using var application = CreateApplication(handler);
+        using var client = application.CreateClient();
+        using var response = await client.PostAsJsonAsync(
+            "/pages/page-1/selections",
+            new
+            {
+                documentId = "document-1",
+                captureId = "capture-1",
+                actions = new[]
+                {
+                    new
+                    {
+                        actionId = "a1",
+                        candidateId = "button-save",
+                        action = "click",
+                    },
+                },
+            }
+        );
+        Assert.Equal(mutation == "none" ? HttpStatusCode.OK : HttpStatusCode.BadGateway, response.StatusCode);
+        if (mutation != "none")
+        {
+            var error = await response.Content.ReadFromJsonAsync<JsonElement>();
+            Assert.Equal("invalid_browser_selection", error.GetProperty("code").GetString());
+        }
+        Assert.Equal(0, handler.ProviderRequestCount);
+    }
+
     [Theory]
     [InlineData("/pages/page-1/capture", false)]
     [InlineData("/api/v1/chat/completions", false)]
@@ -65,7 +305,12 @@ public sealed class ResolutionContractTests
         client.DefaultRequestHeaders.Add("X-Xpathed-Attempt-Id", Guid.NewGuid().ToString("N"));
         using var response = await client.PostAsJsonAsync(
             (diagnostic ? "/internal" : "") + "/pages/page-1/resolve",
-            new { instruction, documentId = "document-1" }
+            new
+            {
+                instruction,
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
         return await response.Content.ReadFromJsonAsync<JsonElement>();
     }
@@ -109,7 +354,12 @@ public sealed class ResolutionContractTests
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click Help", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Help",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
         var result = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal(
@@ -184,7 +434,12 @@ public sealed class ResolutionContractTests
             handler.ProviderBody = body.ToJsonString();
             using var response = await client.PostAsJsonAsync(
                 "/pages/page-1/resolve",
-                new { instruction = "Click Save", documentId = "document-1" }
+                new
+                {
+                    instruction = "Click Save",
+                    documentId = "document-1",
+                    imageMode = "text_only",
+                }
             );
             var result = await response.Content.ReadFromJsonAsync<JsonElement>();
             Assert.Equal("found", result.GetProperty("outcome").GetString());
@@ -208,6 +463,105 @@ public sealed class ResolutionContractTests
         }
         Assert.Equal(1, pricingCalls);
         Assert.Equal(2, handler.ProviderRequestCount);
+    }
+
+    [Fact]
+    public async Task PendingPricingDoesNotDelayResolutionOrRepeatTheLookup()
+    {
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var pricingCalls = 0;
+        var handler = new DeterministicServicesHandler
+        {
+            BeforeRespondAsync = async (path, token) =>
+            {
+                if (path.EndsWith("/endpoints", StringComparison.Ordinal))
+                {
+                    Interlocked.Increment(ref pricingCalls);
+                    started.TrySetResult();
+                    await release.Task.WaitAsync(token);
+                }
+            },
+        };
+        await using var application = CreateApplication(handler);
+        using var client = application.CreateClient();
+        try
+        {
+            var pending = client.PostAsJsonAsync(
+                "/pages/page-1/resolve",
+                new
+                {
+                    instruction = "Click Save",
+                    documentId = "document-1",
+                    imageMode = "text_only",
+                }
+            );
+            await started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            using var first = await pending.WaitAsync(TimeSpan.FromSeconds(1));
+            using var second = await client
+                .PostAsJsonAsync(
+                    "/pages/page-1/resolve",
+                    new
+                    {
+                        instruction = "Click Save",
+                        documentId = "document-1",
+                        imageMode = "text_only",
+                    }
+                )
+                .WaitAsync(TimeSpan.FromSeconds(1));
+            foreach (var response in new[] { first, second })
+            {
+                var result = await response.Content.ReadFromJsonAsync<JsonElement>();
+                Assert.Equal("found", result.GetProperty("outcome").GetString());
+                var diagnostics = result.GetProperty("diagnostics");
+                Assert.Equal(JsonValueKind.Null, diagnostics.GetProperty("costEstimate").ValueKind);
+                Assert.Equal(0.0000215m, diagnostics.GetProperty("usage").GetProperty("cost").GetDecimal());
+            }
+            Assert.Equal(1, pricingCalls);
+            Assert.Equal(2, handler.SelectionRequestCount);
+        }
+        finally
+        {
+            release.TrySetResult();
+        }
+    }
+
+    [Fact]
+    public async Task UnavailablePricingIsCachedWithoutLosingReportedCharges()
+    {
+        var pricingCalls = 0;
+        var handler = new DeterministicServicesHandler
+        {
+            PricingStatus = HttpStatusCode.ServiceUnavailable,
+            BeforeRespondAsync = (path, _) =>
+            {
+                if (path.EndsWith("/endpoints", StringComparison.Ordinal))
+                {
+                    Interlocked.Increment(ref pricingCalls);
+                }
+                return Task.CompletedTask;
+            },
+        };
+        await using var application = CreateApplication(handler);
+        using var client = application.CreateClient();
+        for (var attempt = 0; attempt < 2; attempt++)
+        {
+            using var response = await client.PostAsJsonAsync(
+                "/pages/page-1/resolve",
+                new
+                {
+                    instruction = "Click Save",
+                    documentId = "document-1",
+                    imageMode = "text_only",
+                }
+            );
+            var result = await response.Content.ReadFromJsonAsync<JsonElement>();
+            Assert.Equal("found", result.GetProperty("outcome").GetString());
+            var diagnostics = result.GetProperty("diagnostics");
+            Assert.Equal(JsonValueKind.Null, diagnostics.GetProperty("costEstimate").ValueKind);
+            Assert.Equal(0.0000215m, diagnostics.GetProperty("usage").GetProperty("cost").GetDecimal());
+        }
+        Assert.Equal(1, pricingCalls);
     }
 
     [Fact]
@@ -247,7 +601,12 @@ public sealed class ResolutionContractTests
             handler.PricingBody = pricing.ToJsonString();
             using var response = await client.PostAsJsonAsync(
                 "/pages/page-1/resolve",
-                new { instruction = "Click Save", documentId = "document-1" }
+                new
+                {
+                    instruction = "Click Save",
+                    documentId = "document-1",
+                    imageMode = "text_only",
+                }
             );
             var result = await response.Content.ReadFromJsonAsync<JsonElement>();
             Assert.Equal("found", result.GetProperty("outcome").GetString());
@@ -264,14 +623,15 @@ public sealed class ResolutionContractTests
     }
 
     [Theory]
-    [InlineData(true)]
-    public async Task AppearanceLimitationIsPresentInSentAndRetainedSchema(bool supported)
+    [InlineData(true, "unsupported")]
+    [InlineData(true, "click")]
+    public async Task AppearanceLimitationIsPresentInSentAndRetainedSchema(bool supported, string modelAction)
     {
         var handler = new DeterministicServicesHandler
         {
             CaptureBody = supported ? CurrentViewCapture() : new DeterministicServicesHandler().CaptureBody,
             ProviderBody = ProviderSelection(
-                """{"complete":true,"actions":[{"step":1,"instruction":"Click the red image","action":"unsupported","outcome":"unsupported","candidateId":null,"limitation":"appearance_unavailable"}]}"""
+                $$"""{"complete":true,"actions":[{"step":1,"instruction":"Click the red image","action":"{{modelAction}}","outcome":"unsupported","candidateId":null,"limitation":"appearance_unavailable"}]}"""
             ),
         };
         await using var application = CreateApplication(handler);
@@ -279,16 +639,25 @@ public sealed class ResolutionContractTests
         client.DefaultRequestHeaders.Add("X-Xpathed-Attempt-Id", Guid.NewGuid().ToString("N"));
         using var response = await client.PostAsJsonAsync(
             "/internal/pages/page-1/resolve",
-            new { instruction = "Click the red image", documentId = "document-1" }
+            new
+            {
+                instruction = "Click the red image",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
         var envelope = await response.Content.ReadFromJsonAsync<JsonElement>();
         var result = envelope.GetProperty("result");
         Assert.Equal(supported ? "unsupported" : "error", result.GetProperty("outcome").GetString());
         if (supported)
         {
+            Assert.Equal("unsupported", result.GetProperty("action").GetString());
+            Assert.Equal("unsupported", result.GetProperty("actions")[0].GetProperty("action").GetString());
+            Assert.Equal(JsonValueKind.Null, result.GetProperty("actions")[0].GetProperty("target").ValueKind);
+            Assert.Equal(1, result.GetProperty("diagnostics").GetProperty("modelCalls").GetInt32());
             Assert.Equal("appearance_unavailable", result.GetProperty("actions")[0].GetProperty("code").GetString());
             Assert.Equal(
-                "The requested appearance cannot be established from the captured CSS evidence.",
+                "The requested appearance cannot be established from the captured view.",
                 result.GetProperty("actions")[0].GetProperty("message").GetString()
             );
         }
@@ -354,7 +723,12 @@ public sealed class ResolutionContractTests
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click Save", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
         using var input = JsonDocument.Parse(
             handler.ModelRequest.GetProperty("messages")[1].GetProperty("content").GetString()!
@@ -401,7 +775,12 @@ public sealed class ResolutionContractTests
         const string instruction = "Click the red Save control at the left of Profile";
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction, documentId = "document-1" }
+            new
+            {
+                instruction,
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var result = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -467,7 +846,12 @@ public sealed class ResolutionContractTests
         using var cancellation = new CancellationTokenSource();
         var request = client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click Save", documentId = "document-1" },
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                imageMode = "text_only",
+            },
             cancellation.Token
         );
         await started.Task.WaitAsync(TimeSpan.FromSeconds(5));
@@ -504,7 +888,12 @@ public sealed class ResolutionContractTests
         using var cancellation = new CancellationTokenSource();
         var request = client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click Save", documentId = "document-1" },
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                imageMode = "text_only",
+            },
             cancellation.Token
         );
         await started.Task.WaitAsync(TimeSpan.FromSeconds(5));
@@ -542,7 +931,12 @@ public sealed class ResolutionContractTests
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click Save", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
         var result = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal("browser_timeout", result.GetProperty("diagnostics").GetProperty("code").GetString());
@@ -578,7 +972,12 @@ public sealed class ResolutionContractTests
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click Save", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
         var result = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal("invalid_browser_capture", result.GetProperty("diagnostics").GetProperty("code").GetString());
@@ -632,6 +1031,7 @@ public sealed class ResolutionContractTests
             {
                 instruction = limitation == "none" ? "Click Help" : "Scroll down and click Help",
                 documentId = "document-1",
+                imageMode = "text_only",
             }
         );
         var result = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -651,7 +1051,7 @@ public sealed class ResolutionContractTests
             ProviderBody = BilledSelection(),
             SelectionBody = """
                 {"actions":[{"actionId":"a1","target":{"candidateId":"button-save","tag":"button","label":"Save",
-                "xpaths":["//button"],"state":{"rendered":true,"inViewport":false,"enabled":true,"editable":false,"checked":null},
+                "xpaths":["//*[@data-testid='save-profile']"],"state":{"rendered":true,"inViewport":false,"enabled":true,"editable":false,"checked":null},
                 "geometry":{"x":20,"y":2000,"width":90,"height":30}}}],"inspectedActionId":"a1"}
                 """,
         };
@@ -659,7 +1059,12 @@ public sealed class ResolutionContractTests
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click Save", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
         var result = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal(outcome, result.GetProperty("outcome").GetString());
@@ -708,7 +1113,12 @@ public sealed class ResolutionContractTests
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click Save", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
         var result = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal("error", result.GetProperty("outcome").GetString());
@@ -760,7 +1170,12 @@ public sealed class ResolutionContractTests
         client.DefaultRequestHeaders.Add("X-Xpathed-Attempt-Id", Guid.NewGuid().ToString("N"));
         using var response = await client.PostAsJsonAsync(
             "/internal/pages/page-1/resolve",
-            new { instruction = "Click the unique instruction-canary", documentId = "document-1" }
+            new
+            {
+                instruction = "Click the unique instruction-canary",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var envelope = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -817,7 +1232,12 @@ public sealed class ResolutionContractTests
         }
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = failure == 2 ? "" : "Click Save", documentId = "document-1" }
+            new
+            {
+                instruction = failure == 2 ? "" : "Click Save",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal(
@@ -871,7 +1291,12 @@ public sealed class ResolutionContractTests
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click Save", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         using var input = JsonDocument.Parse(
@@ -916,7 +1341,12 @@ public sealed class ResolutionContractTests
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click Save", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         using var input = JsonDocument.Parse(
@@ -943,7 +1373,12 @@ public sealed class ResolutionContractTests
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click Save", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
         var result = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal("invalid_browser_capture", result.GetProperty("diagnostics").GetProperty("code").GetString());
@@ -965,7 +1400,12 @@ public sealed class ResolutionContractTests
         client.DefaultRequestHeaders.Add("X-Xpathed-Attempt-Id", Guid.NewGuid().ToString("N"));
         using var response = await client.PostAsJsonAsync(
             "/internal/pages/page-1/resolve",
-            new { instruction = "Click Save", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
         var envelope = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.DoesNotContain(
@@ -995,7 +1435,12 @@ public sealed class ResolutionContractTests
         }
         using var response = await client.PostAsJsonAsync(
             "/internal/pages/page-1/resolve",
-            new { instruction = "Click Save", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Equal(0, handler.ProviderRequestCount);
@@ -1012,7 +1457,12 @@ public sealed class ResolutionContractTests
         client.DefaultRequestHeaders.Add("X-Xpathed-Attempt-Id", Guid.NewGuid().ToString("N"));
         using var response = await client.PostAsJsonAsync(
             "/internal/pages/page-1/resolve",
-            new { instruction = "Click Save", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
         var envelope = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal("error", envelope.GetProperty("result").GetProperty("outcome").GetString());
@@ -1034,7 +1484,12 @@ public sealed class ResolutionContractTests
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click Save", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
         var result = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal("found", result.GetProperty("outcome").GetString());
@@ -1043,7 +1498,12 @@ public sealed class ResolutionContractTests
         client.DefaultRequestHeaders.Add("X-Xpathed-Attempt-Id", Guid.NewGuid().ToString("N"));
         using var blocked = await client.PostAsJsonAsync(
             "/internal/pages/page-1/resolve",
-            new { instruction = "Click Save", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
         Assert.Equal(HttpStatusCode.Forbidden, blocked.StatusCode);
     }
@@ -1062,7 +1522,12 @@ public sealed class ResolutionContractTests
         client.DefaultRequestHeaders.Add("X-Xpathed-Attempt-Id", Guid.NewGuid().ToString("N"));
         using var response = await client.PostAsJsonAsync(
             "/internal/pages/page-1/resolve",
-            new { instruction = "Put violet-cactus-782 there", documentId = "document-1" }
+            new
+            {
+                instruction = "Put violet-cactus-782 there",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
         var envelope = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal("fill", envelope.GetProperty("result").GetProperty("action").GetString());
@@ -1090,7 +1555,12 @@ public sealed class ResolutionContractTests
         client.DefaultRequestHeaders.Add("X-Xpathed-Attempt-Id", Guid.NewGuid().ToString("N"));
         using var response = await client.PostAsJsonAsync(
             "/internal/pages/page-1/resolve",
-            new { instruction, documentId = "document-1" }
+            new
+            {
+                instruction,
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
         var envelope = await response.Content.ReadFromJsonAsync<JsonElement>();
         var evidence = envelope.GetProperty("evidence");
@@ -1109,7 +1579,12 @@ public sealed class ResolutionContractTests
         client.DefaultRequestHeaders.Add("X-Xpathed-Attempt-Id", "0123456789abcdef0123456789abcdef");
         using var response = await client.PostAsJsonAsync(
             "/internal/pages/page-1/resolve",
-            new { instruction = "Click Save", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var envelope = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -1147,7 +1622,12 @@ public sealed class ResolutionContractTests
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click Save in Profile", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save in Profile",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
         var result = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal("found", result.GetProperty("outcome").GetString());
@@ -1187,10 +1667,11 @@ public sealed class ResolutionContractTests
     public async Task ShadowContextMustMatchTheCapturedCandidate(bool mismatch)
     {
         var capture = JsonNode.Parse(new DeterministicServicesHandler().CaptureBody)!;
-        var chain = JsonNode.Parse("""[{"xpath":"//consent-panel","label":"Preferences"}]""")!;
+        var chain = JsonNode.Parse("""[{"nodeId":"main:host-1","xpath":"","label":"Preferences"}]""")!;
         capture["candidates"]![0]!["shadowChain"] = chain.DeepClone();
         var target = DeterministicServicesHandler.VerifiedTarget();
         target["shadowChain"] = chain.DeepClone();
+        target["shadowChain"]![0]!["xpath"] = "//*[@data-testid='main:host-1']";
         if (mismatch)
         {
             target["shadowChain"]![0]!["xpath"] = "//another-panel";
@@ -1209,7 +1690,12 @@ public sealed class ResolutionContractTests
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click Save", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
         var result = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal(mismatch ? "error" : "found", result.GetProperty("outcome").GetString());
@@ -1223,7 +1709,7 @@ public sealed class ResolutionContractTests
         else
         {
             Assert.Equal(
-                "//consent-panel",
+                "//*[@data-testid='main:host-1']",
                 result
                     .GetProperty("actions")[0]
                     .GetProperty("target")
@@ -1234,7 +1720,7 @@ public sealed class ResolutionContractTests
         }
 
         var modelInput = handler.ModelRequest.GetProperty("messages")[1].GetProperty("content").GetString()!;
-        Assert.DoesNotContain("//consent-panel", modelInput, StringComparison.Ordinal);
+        Assert.DoesNotContain("main:host-1", modelInput, StringComparison.Ordinal);
     }
 
     [Theory]
@@ -1244,11 +1730,13 @@ public sealed class ResolutionContractTests
     {
         var capture = JsonNode.Parse(new DeterministicServicesHandler().CaptureBody)!;
         var frame = JsonNode.Parse(
-            """{"id":"f2","documentId":"frame-document","chain":[{"frameId":"f1","xpath":"//iframe[@id='outer']","label":"Employee"},{"frameId":"f2","xpath":"//iframe[@id='inner']","label":"Payroll"}]}"""
+            """{"id":"f2","documentId":"frame-document","chain":[{"frameId":"f1","nodeId":"main:outer","xpath":"","label":"Employee"},{"frameId":"f2","nodeId":"f1:inner","xpath":"","label":"Payroll"}]}"""
         )!;
         capture["candidates"]![0]!["frame"] = frame.DeepClone();
         var target = DeterministicServicesHandler.VerifiedTarget();
         target["frame"] = frame.DeepClone();
+        target["frame"]!["chain"]![0]!["xpath"] = "//*[@data-testid='main:outer']";
+        target["frame"]!["chain"]![1]!["xpath"] = "//*[@data-testid='f1:inner']";
         if (mismatch)
         {
             target["frame"]!["documentId"] = "another-document";
@@ -1270,7 +1758,12 @@ public sealed class ResolutionContractTests
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click Save in Payroll", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save in Payroll",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
         var result = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal(mismatch ? "error" : "found", result.GetProperty("outcome").GetString());
@@ -1319,7 +1812,12 @@ public sealed class ResolutionContractTests
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click Save", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
         var result = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal("error", result.GetProperty("outcome").GetString());
@@ -1409,7 +1907,12 @@ public sealed class ResolutionContractTests
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click Save", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
         var result = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal("error", result.GetProperty("outcome").GetString());
@@ -1472,7 +1975,12 @@ public sealed class ResolutionContractTests
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction, documentId = "document-1" }
+            new
+            {
+                instruction,
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
         response.EnsureSuccessStatusCode();
         var result = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -1536,7 +2044,12 @@ public sealed class ResolutionContractTests
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click all buttons in Profile", documentId = "document-1" }
+            new
+            {
+                instruction = "Click all buttons in Profile",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
         response.EnsureSuccessStatusCode();
         var result = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -1599,7 +2112,12 @@ public sealed class ResolutionContractTests
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click Save and Contact", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save and Contact",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
         var result = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal("error", result.GetProperty("outcome").GetString());
@@ -1628,7 +2146,12 @@ public sealed class ResolutionContractTests
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click Save and Contact", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save and Contact",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var result = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -1655,7 +2178,7 @@ public sealed class ResolutionContractTests
         var handler = new DeterministicServicesHandler
         {
             SelectionBody =
-                """{"actions":[{"actionId":"a1","target":{"candidateId":"button-save","tag":"button","label":"Save","xpaths":["//button"],"state":{"accessibilityExposed":true,"rendered":true,"inViewport":true,"enabled":false,"editable":false,"readonly":false,"checked":null},"geometry":{"x":20,"y":40,"width":90,"height":30},"interactability":{"action":"ACTION","status":"STATUS","reasons":["disabled"],"checks":{"compatibleControl":"pass","enabled":"fail","writable":"not_applicable","viewport":"pass","pointerReception":"pass","keyboard":"not_applicable","stability":"unknown","eventOutcome":"unknown"}}}}],"inspectedActionId":"a1"}"""
+                """{"actions":[{"actionId":"a1","target":{"candidateId":"button-save","tag":"button","label":"Save","xpaths":["//*[@data-testid='save-profile']"],"state":{"accessibilityExposed":true,"rendered":true,"inViewport":true,"enabled":false,"editable":false,"readonly":false,"checked":null},"geometry":{"x":20,"y":40,"width":90,"height":30},"interactability":{"action":"ACTION","status":"STATUS","reasons":["disabled"],"checks":{"compatibleControl":"pass","enabled":"fail","writable":"not_applicable","viewport":"pass","pointerReception":"pass","keyboard":"not_applicable","stability":"unknown","eventOutcome":"unknown"}}}}],"inspectedActionId":"a1"}"""
                     .Replace("ACTION", assessedAction, StringComparison.Ordinal)
                     .Replace("STATUS", status, StringComparison.Ordinal),
         };
@@ -1663,7 +2186,12 @@ public sealed class ResolutionContractTests
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click Save", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
         var result = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal(outcome, result.GetProperty("outcome").GetString());
@@ -1703,7 +2231,7 @@ public sealed class ResolutionContractTests
         var handler = new DeterministicServicesHandler
         {
             SelectionBody =
-                """{"actions":[{"actionId":"a1","target":{"candidateId":"button-save","tag":"button","label":"Save","xpaths":["//button"],"state":{"accessibilityExposed":true,"rendered":true,"inViewport":true,"enabled":true,"editable":false,"readonly":false,"checked":null},"geometry":{"x":20,"y":40,"width":90,"height":30},"interactability":{"action":"click","status":"STATUS","reasons":[],"checks":{"compatibleControl":"pass","enabled":"pass","writable":"not_applicable","viewport":"pass","pointerReception":"POINTER","keyboard":"not_applicable","stability":"unknown","eventOutcome":"unknown"}}}}],"inspectedActionId":"a1"}"""
+                """{"actions":[{"actionId":"a1","target":{"candidateId":"button-save","tag":"button","label":"Save","xpaths":["//*[@data-testid='save-profile']"],"state":{"accessibilityExposed":true,"rendered":true,"inViewport":true,"enabled":true,"editable":false,"readonly":false,"checked":null},"geometry":{"x":20,"y":40,"width":90,"height":30},"interactability":{"action":"click","status":"STATUS","reasons":[],"checks":{"compatibleControl":"pass","enabled":"pass","writable":"not_applicable","viewport":"pass","pointerReception":"POINTER","keyboard":"not_applicable","stability":"unknown","eventOutcome":"unknown"}}}}],"inspectedActionId":"a1"}"""
                     .Replace("STATUS", status, StringComparison.Ordinal)
                     .Replace("POINTER", pointerReception, StringComparison.Ordinal),
         };
@@ -1711,7 +2239,12 @@ public sealed class ResolutionContractTests
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click Save", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
         var result = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal(outcome, result.GetProperty("outcome").GetString());
@@ -1742,7 +2275,7 @@ public sealed class ResolutionContractTests
     [InlineData(2, "error")]
     public async Task ReturnsOnlyOneVerifiedXPath(int pathCount, string outcome)
     {
-        string[] paths = ["//button", "//*[@id='save']"];
+        string[] paths = ["//*[@data-testid='save-profile']", "//*[@id='save']"];
         var target = DeterministicServicesHandler.VerifiedTarget();
         target["xpaths"] = JsonSerializer.SerializeToNode(paths.Take(pathCount));
         var handler = new DeterministicServicesHandler
@@ -1755,7 +2288,12 @@ public sealed class ResolutionContractTests
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click Save", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
         var result = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal(outcome, result.GetProperty("outcome").GetString());
@@ -1776,7 +2314,12 @@ public sealed class ResolutionContractTests
 
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click Save under Profile", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save under Profile",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -1807,7 +2350,12 @@ public sealed class ResolutionContractTests
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click Save", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -1845,7 +2393,12 @@ public sealed class ResolutionContractTests
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click Save", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -1891,7 +2444,12 @@ public sealed class ResolutionContractTests
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click Save", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -1912,7 +2470,12 @@ public sealed class ResolutionContractTests
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click Save", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
 
         var result = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -1935,7 +2498,12 @@ public sealed class ResolutionContractTests
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click Save", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
 
         var result = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -1954,7 +2522,12 @@ public sealed class ResolutionContractTests
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click Save", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
 
         var result = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -1986,11 +2559,17 @@ public sealed class ResolutionContractTests
                 .Select(index =>
                     (JsonNode)(
                         shadow
-                            ? new JsonObject { ["xpath"] = $"//*[@id='host-{index}']", ["label"] = $"Host {index}" }
+                            ? new JsonObject
+                            {
+                                ["nodeId"] = $"host-{index}",
+                                ["xpath"] = "",
+                                ["label"] = $"Host {index}",
+                            }
                             : new JsonObject
                             {
                                 ["frameId"] = $"f{index}",
-                                ["xpath"] = $"//iframe[{index}]",
+                                ["nodeId"] = $"owner-{index}",
+                                ["xpath"] = "",
                                 ["label"] = "Frame",
                             }
                     )
@@ -2006,6 +2585,11 @@ public sealed class ResolutionContractTests
                 ["chain"] = chain,
             };
         capture["candidates"]![0]![property] = context.DeepClone();
+        foreach (var step in chain)
+        {
+            step!["xpath"] = $"//*[@data-testid='{step["nodeId"]!.GetValue<string>()}']";
+        }
+
         target[property] = context;
         var handler = new DeterministicServicesHandler
         {
@@ -2020,7 +2604,12 @@ public sealed class ResolutionContractTests
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click Save", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
         var result = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal("found", result.GetProperty("outcome").GetString());
@@ -2070,7 +2659,12 @@ public sealed class ResolutionContractTests
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click Missing", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Missing",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
 
         var result = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -2089,6 +2683,7 @@ public sealed class ResolutionContractTests
     [InlineData("unsupported", "unsupported", null, "stale_document")]
     [InlineData("found", "click", "button-save", "validation_budget_exceeded")]
     [InlineData("found", "click", "button-save", "inactive_page")]
+    [InlineData("found", "click", "button-save", "stale_xpath_evidence")]
     public async Task BrowserValidationFailuresPreserveSafeCodesForSemanticOutcomes(
         string outcome,
         string action,
@@ -2132,7 +2727,12 @@ public sealed class ResolutionContractTests
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click Save", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -2153,7 +2753,12 @@ public sealed class ResolutionContractTests
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click Save", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
 
         var result = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -2177,7 +2782,12 @@ public sealed class ResolutionContractTests
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click Save", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -2218,7 +2828,12 @@ public sealed class ResolutionContractTests
         using var cancellation = new CancellationTokenSource();
         var response = client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click Save", documentId = "document-1" },
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                imageMode = "text_only",
+            },
             cancellation.Token
         );
         await started.Task.WaitAsync(TimeSpan.FromSeconds(5));
@@ -2239,7 +2854,12 @@ public sealed class ResolutionContractTests
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click Save", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
 
         var result = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -2282,7 +2902,12 @@ public sealed class ResolutionContractTests
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click Save", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
         var result = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal("error", result.GetProperty("outcome").GetString());
@@ -2322,7 +2947,12 @@ public sealed class ResolutionContractTests
             using var client = application.CreateClient();
             using var response = await client.PostAsJsonAsync(
                 "/pages/page-1/resolve",
-                new { instruction, documentId = "document-1" }
+                new
+                {
+                    instruction,
+                    documentId = "document-1",
+                    imageMode = "text_only",
+                }
             );
             var result = await response.Content.ReadFromJsonAsync<JsonElement>();
             return result.GetProperty("configurationId").GetString();
@@ -2330,7 +2960,7 @@ public sealed class ResolutionContractTests
     }
 
     [Fact]
-    public async Task DefaultGeminiRequestUsesLowReasoningAndRecordsTheEffectiveSettings()
+    public async Task DefaultDeepSeekRequestDisablesReasoningAndRecordsTheEffectiveSettings()
     {
         var handler = new DeterministicServicesHandler();
         await using var application = CreateApplication(
@@ -2341,17 +2971,21 @@ public sealed class ResolutionContractTests
         client.DefaultRequestHeaders.Add("X-Xpathed-Attempt-Id", Guid.NewGuid().ToString("N"));
         using var response = await client.PostAsJsonAsync(
             "/internal/pages/page-1/resolve",
-            new { instruction = "Click Save", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var envelope = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal("found", envelope.GetProperty("result").GetProperty("outcome").GetString());
         var request = handler.ModelRequest;
-        Assert.Equal("google/gemini-3.8-flash", request.GetProperty("model").GetString());
-        Assert.Equal("google-ai-studio", request.GetProperty("provider").GetProperty("only")[0].GetString());
-        Assert.True(request.GetProperty("reasoning").GetProperty("enabled").GetBoolean());
-        Assert.Equal("low", request.GetProperty("reasoning").GetProperty("effort").GetString());
-        Assert.True(request.GetProperty("reasoning").GetProperty("exclude").GetBoolean());
+        Assert.Equal("deepseek/deepseek-v4.1-flash", request.GetProperty("model").GetString());
+        Assert.Equal("wafer", request.GetProperty("provider").GetProperty("only")[0].GetString());
+        Assert.False(request.GetProperty("reasoning").GetProperty("enabled").GetBoolean());
+        Assert.False(handler.CaptureRequest.GetProperty("includeImage").GetBoolean());
         Assert.False(request.GetProperty("provider").GetProperty("allow_fallbacks").GetBoolean());
         Assert.Equal(4096, request.GetProperty("max_tokens").GetInt32());
         Assert.True(
@@ -2389,7 +3023,12 @@ public sealed class ResolutionContractTests
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click Save", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = handler.ModelRequest;
@@ -2426,7 +3065,12 @@ public sealed class ResolutionContractTests
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click Save", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
         var result = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal("found", result.GetProperty("outcome").GetString());
@@ -2481,7 +3125,12 @@ public sealed class ResolutionContractTests
             using var client = application.CreateClient();
             using var response = await client.PostAsJsonAsync(
                 "/pages/page-1/resolve",
-                new { instruction = "Click Save", documentId = "document-1" }
+                new
+                {
+                    instruction = "Click Save",
+                    documentId = "document-1",
+                    imageMode = "text_only",
+                }
             );
             var result = await response.Content.ReadFromJsonAsync<JsonElement>();
             Assert.Equal("found", result.GetProperty("outcome").GetString());
@@ -2515,11 +3164,57 @@ public sealed class ResolutionContractTests
             using var client = application.CreateClient();
             using var response = await client.PostAsJsonAsync(
                 "/pages/page-1/resolve",
-                new { instruction = "Click Save", documentId = "document-1" }
+                new
+                {
+                    instruction = "Click Save",
+                    documentId = "document-1",
+                    imageMode = "text_only",
+                }
             );
             var result = await response.Content.ReadFromJsonAsync<JsonElement>();
             Assert.Equal("found", result.GetProperty("outcome").GetString());
             Assert.Equal(JsonValueKind.Null, result.GetProperty("diagnostics").GetProperty("costEstimate").ValueKind);
+        }
+    }
+
+    [Fact]
+    public async Task DifferentInstructionsPreserveTheExactPageEvidencePrefix()
+    {
+        var handler = new DeterministicServicesHandler { CaptureBody = CurrentViewCapture() };
+        await using var application = CreateApplication(handler);
+        using var client = application.CreateClient();
+        string? prefix = null;
+        foreach (var instruction in new[] { "Click Save", "Click the Save button" })
+        {
+            using var response = await client.PostAsJsonAsync(
+                "/pages/page-1/resolve",
+                new
+                {
+                    instruction,
+                    documentId = "document-1",
+                    imageMode = "text_only",
+                }
+            );
+            var result = await response.Content.ReadFromJsonAsync<JsonElement>();
+            Assert.Equal("found", result.GetProperty("outcome").GetString());
+            var input = handler.ModelRequest.GetProperty("messages")[1].GetProperty("content").GetString()!;
+            using var parsed = JsonDocument.Parse(input);
+            Assert.Equal(instruction, parsed.RootElement.GetProperty("instruction").GetString());
+            Assert.Equal("instruction", parsed.RootElement.EnumerateObject().Last().Name);
+            Assert.Equal(1, parsed.RootElement.GetProperty("candidates").GetArrayLength());
+            var instructionStart = input.LastIndexOf(",\"instruction\":", StringComparison.Ordinal);
+            Assert.True(instructionStart > 0);
+            prefix ??= input[..instructionStart];
+            Assert.Equal(prefix, input[..instructionStart]);
+            var timings = result.GetProperty("diagnostics").GetProperty("timingsMs");
+            var model = timings.GetProperty("model").GetDouble();
+            Assert.InRange(timings.GetProperty("provider").GetDouble(), 0, model);
+            var measured =
+                timings.GetProperty("capture").GetDouble()
+                + timings.GetProperty("preparation").GetDouble()
+                + model
+                + timings.GetProperty("validation").GetDouble();
+            Assert.InRange(measured, 0, timings.GetProperty("total").GetDouble());
         }
     }
 
@@ -2531,7 +3226,12 @@ public sealed class ResolutionContractTests
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click Save", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var input = handler.ModelRequest.GetProperty("messages")[1].GetProperty("content").GetString()!;
@@ -2575,7 +3275,12 @@ public sealed class ResolutionContractTests
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click Save", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var result = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -2593,7 +3298,7 @@ public sealed class ResolutionContractTests
             }
         );
 
-    private static WebApplicationFactory<HealthController> CreateApplication(
+    internal static WebApplicationFactory<HealthController> CreateApplication(
         DeterministicServicesHandler handler,
         Dictionary<string, string?>? settings = null,
         ILoggerProvider? logs = null

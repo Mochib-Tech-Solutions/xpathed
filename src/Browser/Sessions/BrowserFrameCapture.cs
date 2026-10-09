@@ -1,27 +1,27 @@
 using System.Text.Json;
-using Microsoft.Playwright;
+using Xpathed.Browser.Protocol;
 using Xpathed.Common.Contracts;
 using Xpathed.Common.Http;
 
 namespace Xpathed.Browser.Sessions;
 
 internal sealed class BrowserFrameCapture(
-    IFrame frame,
-    IJSHandle handle,
+    CdpFrame frame,
+    CdpRemoteObject handle,
     TargetFrame identity,
     BrowserFrameCapture? parent,
-    IElementHandle? owner
+    CdpRemoteObject? owner
 )
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
-    public IFrame Frame { get; } = frame;
-    public IJSHandle Handle { get; } = handle;
-    public TargetFrame Identity { get; } = identity;
+    public CdpFrame Frame { get; } = frame;
+    public CdpRemoteObject Handle { get; } = handle;
+    public TargetFrame Identity { get; set; } = identity;
     public BrowserFrameCapture? Parent { get; } = parent;
-    public IElementHandle? Owner { get; } = owner;
+    public CdpRemoteObject? Owner { get; } = owner;
     public HashSet<string> CandidateIds { get; } = new(StringComparer.Ordinal);
-    public IJSHandle? Highlight { get; set; }
+    public CdpRemoteObject? Highlight { get; set; }
     public string[] HighlightCandidateIds { get; set; } = [];
 
     public async Task RefreshAsync(int budgetMs, string[] candidateIds)
