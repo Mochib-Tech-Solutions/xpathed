@@ -58,6 +58,36 @@ function workspace(t) {
   return { cwd, write, env, needs, run };
 }
 
+test("browser contract logs preserve a failed test command", (t) => {
+  const workflow = readFileSync(".github/workflows/check.yml", "utf8");
+  const step = workflow.match(
+    /- name: Verify Chromium and Firefox browser contracts\n([\s\S]*?)(?=\n      - )/,
+  )?.[1];
+  assert.ok(step);
+  assert.match(step, /^        shell: bash$/m);
+  const command = step.match(/        run: \|\n([\s\S]*)/)?.[1];
+  assert.ok(command);
+  const cwd = mkdtempSync(join(tmpdir(), "xpathed-ci-browser-log-"));
+  t.after(() => rmSync(cwd, { recursive: true, force: true }));
+  const result = spawnSync(
+    "bash",
+    [
+      "--noprofile",
+      "--norc",
+      "-eo",
+      "pipefail",
+      "-c",
+      `pnpm() { echo 'fixture failure'; return 7; };\n${command}`,
+    ],
+    { cwd, encoding: "utf8" },
+  );
+  assert.equal(result.status, 7, result.stderr);
+  assert.match(
+    readFileSync(join(cwd, ".artifacts/ci/browser-contracts.log"), "utf8"),
+    /fixture failure/,
+  );
+});
+
 test("the aggregate accepts receipts from this exact checkout and run and reports the tested identity", (t) => {
   const { cwd, env, run } = workspace(t);
   const recorded = run("record", "changes");
