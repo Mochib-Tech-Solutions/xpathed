@@ -159,7 +159,7 @@ Chromium runs as `pwuser` with `ChromiumSandbox = true`. The Compose service use
 
 Validated locally on macOS Apple Silicon, Colima with native arm64/4 CPUs/8 GiB, Docker Engine 29.5.2, Compose 5.5.1 and Buildx 0.37.1. Ordinary CI builds affected apps on Ubuntu 24.04 amd64, validates Docker configuration separately, and runs deterministic Browser/Resolver evaluation in isolated containers. Release evaluation uses its separately configured runner platform and verifies saved image identities.
 
-Pinned baseline: .NET SDK 10.0.401/runtime 10.0.12, Playwright .NET/browser image 1.63.0, Node 24.16.0, pnpm 12.8.1, React 19.3.0, Vite 8.3.1, Tailwind CSS 4.3.3 and noVNC 1.7.0. TypeScript uses the stable release supported by the pinned lint stack. Package lockfiles and image digests record exact inputs. x11vnc is installed from the base image's Ubuntu repository.
+Pinned baseline: .NET SDK 10.0.401/runtime 10.0.12, Playwright .NET 1.63.0 with its matching Chromium, Node 24.16.0, pnpm 12.8.1, React 19.3.0, Vite 8.3.1, Tailwind CSS 4.3.3 and noVNC 1.7.0. TypeScript uses the stable release supported by the pinned lint stack. Package lockfiles and image digests record exact inputs. Browser’s production image uses the pinned ASP.NET runtime and installs Chromium with the CLI shipped in the locked Playwright package (`--with-deps --no-shell chromium`), plus x11vnc from Ubuntu. The installer supplies Chromium’s display libraries, Xvfb and fonts. Production excludes SDK tooling and unused browser engines; the development image retains the full Playwright SDK base. Both targets run as `pwuser` with the same sandbox and display contract.
 
 ## Quality checks
 

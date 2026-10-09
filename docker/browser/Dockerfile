@@ -26,9 +26,14 @@ RUN chown pwuser:pwuser /source
 USER pwuser
 CMD ["dotnet", "watch", "--non-interactive", "--project", "src/Browser", "run", "--no-restore", "--no-launch-profile"]
 
-FROM browser-base AS runtime
-ENV ASPNETCORE_HTTP_PORTS=8080 DOTNET_EnableDiagnostics=0
+FROM mcr.microsoft.com/dotnet/aspnet:10.0.12-noble@sha256:2d584d8147faddb0d678c5748d47953e5b8e18621ed4fb7049a91381d9d7746f AS runtime
+ENV ASPNETCORE_HTTP_PORTS=8080 DOTNET_EnableDiagnostics=0 PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 WORKDIR /app
 COPY --from=build /out .
+RUN dotnet exec --runtimeconfig Browser.runtimeconfig.json --depsfile Browser.deps.json Microsoft.Playwright.dll install --with-deps --no-shell chromium \
+    && apt-get install -y --no-install-recommends x11vnc \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd --create-home pwuser \
+    && chmod -R a+rX /ms-playwright
 USER pwuser
 ENTRYPOINT ["dotnet", "Browser.dll"]
