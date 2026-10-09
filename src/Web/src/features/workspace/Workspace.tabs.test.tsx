@@ -14,7 +14,12 @@ vi.mock("@novnc/novnc", () => ({
 }));
 
 function browserApi() {
-  const session = { sessionId: "session-1", pageId: "page-1", viewPath: "/view/session-1" };
+  const session = {
+    sessionId: "session-1",
+    pageId: "page-1",
+    viewPath: "/view/session-1",
+    browserType: "chromium" as const,
+  };
   let pages: PageState[] = [
     {
       sessionId: session.sessionId,
@@ -34,6 +39,7 @@ function browserApi() {
     activePageId,
     activationVersion,
     viewPath: session.viewPath,
+    browserType: "chromium" as const,
     pages,
   });
   const addPage = (url = "about:blank", title = "") => {
@@ -92,6 +98,10 @@ function browserApi() {
     Promise.resolve(Response.json(result(page, instruction)));
   const fetch = vi.fn<typeof globalThis.fetch>(async (input, options) => {
     const path = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+    if (path === "/api/sessions/options")
+      return Promise.resolve(
+        Response.json({ defaultBrowserType: "chromium", browserTypes: ["chromium", "firefox"] }),
+      );
     if (path === "/api/sessions") return Response.json(session);
     if (path === "/api/sessions/session-1" && snapshotFailure)
       return Response.json({ message: "Cannot verify current tabs." }, { status: 503 });

@@ -202,6 +202,12 @@ internal static class BrowserCaptureScript
           const visibleRect = element => {
             const rect = intersections.get(element);
             if (!rect || rect.width <= 0 || rect.height <= 0) return { left:0, top:0, right:0, bottom:0 };
+            // Firefox's intersection observer does not apply a target's own legacy CSS clip.
+            const css = cssFor(element), clip = css.clip.match(/^rect\(([^)]+)\)$/);
+            if (clip && ['absolute', 'fixed'].includes(css.position)) {
+              const [top, right, bottom, left] = clip[1].split(/[,\s]+/u).map(Number.parseFloat);
+              if (right <= left || bottom <= top) return { left:0, top:0, right:0, bottom:0 };
+            }
             return intersection(environment.clip, { left: environment.x + rect.x * environment.scaleX, top: environment.y + rect.y * environment.scaleY,
               right: environment.x + (rect.x + rect.width) * environment.scaleX, bottom: environment.y + (rect.y + rect.height) * environment.scaleY });
           };

@@ -397,7 +397,11 @@ export async function execute(spec, trial, options, services) {
       },
       options.timeoutMs,
     );
-    session = await request(`${services.browser}/sessions`, {}, options.timeoutMs);
+    session = await request(
+      `${services.browser}/sessions`,
+      { browserType: "chromium" },
+      options.timeoutMs,
+    );
     const page = await request(
       `${services.browser}/pages/${session.pageId}/navigate`,
       { url: `${services.fixture}/fixture?trial=${trial.id}` },

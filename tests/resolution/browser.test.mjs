@@ -11,7 +11,11 @@ const fixtureAddress = Object.values(networkInterfaces())
 const oracleCommands = new Map();
 const oracleObservers = new Map();
 const oracleScript = `<script>
+    let polling = false;
     setInterval(async () => {
+      if (polling) return;
+      polling = true;
+      try {
       const endpoint = '?page=' + encodeURIComponent(location.pathname);
       const response = await fetch('/oracle' + endpoint);
       if (response.status === 204) return;
@@ -61,13 +65,15 @@ const oracleScript = `<script>
       });
       const observedTarget = document.querySelector('#expected-target') ?? document.querySelector('#consent-host')?.shadowRoot?.querySelector('#expected-target');
       await fetch('/oracle-result' + endpoint, { method: 'POST', body: JSON.stringify({ matches, shadowMatches, scrollY, clicks: observedTarget?.dataset.clicks ?? '0', nodeCount: document.querySelectorAll('*').length,
-        cookie: document.cookie, openerPath: window.opener?.location.pathname ?? null, focused: document.hasFocus(),
+        userAgent: navigator.userAgent, cookie: document.cookie, openerPath: window.opener?.location.pathname ?? null, focused: CSS.supports("selector(:-moz-window-inactive)") ? !document.documentElement.matches(":-moz-window-inactive") : document.hasFocus(),
         activeElement: document.activeElement?.id, events: window.observedEvents ?? {},
         targetMarkup: observedTarget?.outerHTML, values: [...document.querySelectorAll('[data-observe-value]')].map(element => element.value),
+        inputTypes: [...document.querySelectorAll('input')].map(element => ({declared: element.getAttribute('type'), actual: element.type})),
         innerWidth, innerHeight, outerWidth, outerHeight, screenWidth: screen.width, screenHeight: screen.height }) });
       if (close) window.close();
       if (reload === 'hash') location.hash = 'changed';
       else if (reload) location.reload();
+      } finally { polling = false; }
     }, 30);
   </script>`;
 const targetMarkup = `<section aria-label="Employee"><h2>Employee</h2>
@@ -334,6 +340,14 @@ test("cardinality-distinct-targets-are-verified-and-inspected-without-execution"
 });
 
 async function request(path, body, method = "POST") {
+  if (
+    path === "/sessions" &&
+    method === "POST" &&
+    body === undefined &&
+    process.env.XPATHED_TEST_BROWSER_TYPE
+  ) {
+    body = { browserType: process.env.XPATHED_TEST_BROWSER_TYPE };
+  }
   const response = await fetch(`${browserUrl}${path}`, {
     method,
     headers: body === undefined ? {} : { "Content-Type": "application/json" },
@@ -440,6 +454,36 @@ async function withFixture(markup, check) {
     await new Promise((resolve) => server.close(resolve));
   }
 }
+
+test("session-empty-creation-uses-configured-default", async () => {
+  const options = await request("/sessions/options", undefined, "GET");
+  const response = await fetch(`${browserUrl}/sessions`, { method: "POST" });
+  assert.equal(response.status, 200);
+  const session = await response.json();
+  try {
+    assert.equal(session.browserType, options.defaultBrowserType);
+  } finally {
+    await request(`/sessions/${session.sessionId}`, undefined, "DELETE");
+  }
+});
+
+test("session-selected-engine-owns-viewer-and-capture", async () => {
+  await withFixture(targetMarkup, async (session, page) => {
+    const expected = process.env.XPATHED_TEST_BROWSER_TYPE ?? "chromium";
+    assert.equal(session.browserType, expected);
+    const state = await request(`/sessions/${session.sessionId}`, undefined, "GET");
+    assert.equal(state.browserType, expected);
+    const observed = await observe();
+    assert.match(observed.userAgent, expected === "firefox" ? /Firefox\// : /Chrome\//);
+    const capture = await request(`/pages/${page.pageId}/capture`, { documentId: page.documentId });
+    assert.ok(capture.candidates.some((candidate) => candidate.label === "About us"));
+    await withFramebuffer(session, async (readFrame) => {
+      const frame = await readFrame();
+      assert.equal(frame.width, 1280);
+      assert.equal(frame.height, 800);
+    });
+  });
+});
 
 test("scope-unrelated-carousel-replacement-preserves-a-fixed-target", async () => {
   await withFixture(
@@ -2586,6 +2630,12 @@ test("state-native-date-and-time-fill-and-clear-remain-passive", async () => {
     const capture = await request(`/pages/${page.pageId}/capture`, { documentId: page.documentId });
     for (const [type] of types)
       for (const readonly of [false, true]) {
+        const textFallback = session.browserType === "firefox" && ["month", "week"].includes(type);
+        assert.ok(
+          before.inputTypes.some(
+            (input) => input.declared === type && input.actual === (textFallback ? "text" : type),
+          ),
+        );
         const candidate = capture.candidates.find(
           (entry) => entry.label === `${type} ${readonly ? "readonly" : "writable"}`,
         );
@@ -2599,18 +2649,18 @@ test("state-native-date-and-time-fill-and-clear-remain-passive", async () => {
           });
           assert.equal(
             target.interactability.checks.compatibleControl,
-            action === "type" ? "fail" : "pass",
+            action === "type" && !textFallback ? "fail" : "pass",
             `${type}: ${action}`,
           );
           assert.equal(
             target.interactability.checks.keyboard,
-            action === "type" ? "unknown" : "pass",
+            action === "type" && !textFallback ? "unknown" : "pass",
           );
           assert.equal(target.state.editable, !readonly);
           assert.equal(target.interactability.checks.writable, readonly ? "fail" : "pass");
           assert.equal(
             target.interactability.status,
-            action === "type" || readonly ? "blocked" : "ready",
+            (action === "type" && !textFallback) || readonly ? "blocked" : "ready",
           );
         }
       }
@@ -3648,7 +3698,10 @@ test("targeting-icon-buttons-and-labelled-images-are-found-without-visible-text"
 
 test("session-concurrent-workspaces-remain-isolated-after-one-closes", async () => {
   await withFixture(targetMarkup, async (first, firstPage) => {
-    const second = await request("/sessions");
+    const second = await request("/sessions", {
+      browserType: first.browserType === "chromium" ? "firefox" : "chromium",
+    });
+    assert.notEqual(second.browserType, first.browserType);
     let replacement;
     try {
       const secondPage = await request(`/pages/${second.pageId}/navigate`, {
@@ -3879,15 +3932,19 @@ test("tabs-native-links-and-popups-preserve-opener-and-shared-cookies", async ()
         await observe({ focusPopup: true });
         nativeFocused = (await observe({}, "/feature-popup")).focused;
       }
-      assert.equal(nativeFocused, true, "Reused popup did not receive native focus");
+      // Firefox can decline page-script focus; routing must follow the actual native window.
+      if (session.browserType === "chromium")
+        assert.equal(nativeFocused, true, "Reused popup did not receive native focus");
+      const expectedActivePage = nativeFocused ? popupId : page.pageId;
       const reused = await waitForSession(
         session.sessionId,
         (state) =>
-          state.activePageId === popupId &&
+          state.activePageId === expectedActivePage &&
           state.pages.some((entry) => entry.pageId === popupId && entry.url.endsWith("?reused=1")),
       );
       assert.equal(reused.pages.length, 3);
-      assert.equal((await observe({}, "/feature-popup")).focused, true);
+      assert.equal((await observe({}, "/feature-popup")).focused, nativeFocused);
+      assert.equal((await observe()).focused, !nativeFocused);
       await observe({ close: true }, "/feature-popup");
       const closed = await waitForSession(
         session.sessionId,

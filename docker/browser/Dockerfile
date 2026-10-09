@@ -13,7 +13,7 @@ COPY src/Browser/ src/Browser/
 RUN dotnet publish src/Browser/Browser.csproj -c Release --no-restore -o /out && chmod -R a+rX /out
 
 FROM mcr.microsoft.com/playwright/dotnet:v1.63.0-noble@sha256:aa3eaf29a65df8c93fc32ab20cf9359f4d8ecc53e6e89f79378647ace87b46b3 AS browser-base
-RUN apt-get update && apt-get install -y --no-install-recommends x11vnc && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends x11vnc matchbox-window-manager && rm -rf /var/lib/apt/lists/*
 
 FROM browser-base AS development
 WORKDIR /source
@@ -30,8 +30,8 @@ FROM mcr.microsoft.com/dotnet/aspnet:10.0.12-noble@sha256:2d584d8147faddb0d678c5
 ENV ASPNETCORE_HTTP_PORTS=8080 DOTNET_EnableDiagnostics=0 PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 WORKDIR /app
 COPY --from=build /out .
-RUN dotnet exec --runtimeconfig Browser.runtimeconfig.json --depsfile Browser.deps.json Microsoft.Playwright.dll install --with-deps --no-shell chromium \
-    && apt-get install -y --no-install-recommends x11vnc \
+RUN dotnet exec --runtimeconfig Browser.runtimeconfig.json --depsfile Browser.deps.json Microsoft.Playwright.dll install --with-deps --no-shell chromium firefox \
+    && apt-get install -y --no-install-recommends x11vnc matchbox-window-manager \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --create-home pwuser \
     && chmod -R a+rX /ms-playwright

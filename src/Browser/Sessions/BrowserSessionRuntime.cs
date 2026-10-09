@@ -8,7 +8,7 @@ using Xpathed.Common.Http;
 
 namespace Xpathed.Browser.Sessions;
 
-internal sealed partial class BrowserSessionRuntime(int slot, ILogger logger) : IAsyncDisposable
+internal sealed partial class BrowserSessionRuntime(int slot, string browserType, ILogger logger) : IAsyncDisposable
 {
     private int blockedPopups;
     private long pageOrder;
@@ -26,6 +26,7 @@ internal sealed partial class BrowserSessionRuntime(int slot, ILogger logger) : 
     public bool HasPendingPages =>
         !pendingPages.IsEmpty || Interlocked.Read(ref focusRevision) != Interlocked.Read(ref synchronizedFocusRevision);
     public int Slot { get; } = slot;
+    public string BrowserType { get; } = browserType;
     private int DisplayNumber => 100 + Slot;
     public int Port => 5900 + Slot;
     public bool Ready { get; private set; }
@@ -37,27 +38,76 @@ internal sealed partial class BrowserSessionRuntime(int slot, ILogger logger) : 
     private IBrowser? Browser { get; set; }
     private IBrowserContext? Context { get; set; }
     private Process? Display { get; set; }
+    private Process? WindowManager { get; set; }
     private Process? Vnc { get; set; }
+    private FirefoxDisplay? firefoxDisplay;
+    private string? firefoxProfile;
+    private Task? firefoxFocusMonitor;
 
     public async Task StartAsync(CancellationToken token)
     {
         Display = Start("Xvfb", $":{DisplayNumber}", "-screen", "0", "1280x800x24", "-nolisten", "tcp", "-ac");
         await WaitUntilAsync(() => File.Exists($"/tmp/.X11-unix/X{DisplayNumber}"), token);
         Playwright = await Microsoft.Playwright.Playwright.CreateAsync();
-        Browser = await Playwright.Chromium.LaunchAsync(
-            new()
-            {
-                Headless = false,
-                ChromiumSandbox = true,
-                Env = new Dictionary<string, string> { ["DISPLAY"] = $":{DisplayNumber}" },
-                Args = ["--kiosk", "--window-position=0,0", "--window-size=1280,800"],
-                Timeout = 20000,
-            }
-        );
-        Context = await Browser.NewContextAsync(
-            new() { ViewportSize = ViewportSize.NoViewport, AcceptDownloads = false }
-        );
-        await ActivateAsync(await RegisterAsync(await Context.NewPageAsync()));
+        if (BrowserType == "firefox")
+        {
+            WindowManager = Start("matchbox-window-manager", "-display", $":{DisplayNumber}", "-use_titlebar", "no");
+            firefoxDisplay = new FirefoxDisplay($":{DisplayNumber}");
+            firefoxProfile = Directory.CreateTempSubdirectory("xpathed-firefox-").FullName;
+            Directory.CreateDirectory(Path.Combine(firefoxProfile, "chrome"));
+            // This startup preference must precede Firefox's first window; launch preferences arrive later.
+            await File.WriteAllTextAsync(
+                Path.Combine(firefoxProfile, "user.js"),
+                "user_pref(\"toolkit.legacyUserProfileCustomizations.stylesheets\", true);",
+                token
+            );
+            await File.WriteAllTextAsync(
+                Path.Combine(firefoxProfile, "chrome", "userChrome.css"),
+                "#navigator-toolbox, #titlebar, #sidebar-main, #sidebar-box, #statuspanel { visibility: collapse !important; min-height: 0 !important; height: 0 !important; }",
+                token
+            );
+            Context = await Playwright.Firefox.LaunchPersistentContextAsync(
+                firefoxProfile,
+                new()
+                {
+                    Headless = false,
+                    ViewportSize = ViewportSize.NoViewport,
+                    AcceptDownloads = false,
+                    Env = new Dictionary<string, string> { ["DISPLAY"] = $":{DisplayNumber}" },
+                    FirefoxUserPrefs = new Dictionary<string, object>
+                    {
+                        ["dom.disable_window_move_resize"] = true,
+                        ["focusmanager.testmode"] = false,
+                        ["browser.link.open_newwindow"] = 2,
+                        ["browser.link.open_newwindow.restriction"] = 0,
+                    },
+                    Timeout = 20000,
+                }
+            );
+            Browser = Context.Browser!;
+        }
+        else
+        {
+            Browser = await Playwright.Chromium.LaunchAsync(
+                new()
+                {
+                    Headless = false,
+                    ChromiumSandbox = true,
+                    Env = new Dictionary<string, string> { ["DISPLAY"] = $":{DisplayNumber}" },
+                    Args = ["--kiosk", "--window-position=0,0", "--window-size=1280,800"],
+                    Timeout = 20000,
+                }
+            );
+            Context = await Browser.NewContextAsync(
+                new() { ViewportSize = ViewportSize.NoViewport, AcceptDownloads = false }
+            );
+        }
+        var initialPage = await Context.NewPageAsync();
+        foreach (var startupPage in Context.Pages.Where(page => page != initialPage).ToArray())
+        {
+            await startupPage.CloseAsync();
+        }
+        await ActivateAsync(await RegisterAsync(initialPage));
         Context.Page += (_, page) =>
         {
             pendingPages.TryAdd(page, 0);
@@ -99,7 +149,12 @@ internal sealed partial class BrowserSessionRuntime(int slot, ILogger logger) : 
             token
         );
         token.ThrowIfCancellationRequested();
+        firefoxDisplay?.ReadFocusChanges();
         Ready = true;
+        if (firefoxDisplay is not null)
+        {
+            firefoxFocusMonitor = MonitorFirefoxFocusAsync();
+        }
     }
 
     private async Task<BrowserPageRuntime> RegisterAsync(IPage page)
@@ -110,7 +165,11 @@ internal sealed partial class BrowserSessionRuntime(int slot, ILogger logger) : 
             return existing;
         }
 
-        var managed = new BrowserPageRuntime(page, ++pageOrder);
+        var managed = new BrowserPageRuntime(
+            page,
+            ++pageOrder,
+            firefoxDisplay is null ? new ChromiumPageDisplay(page) : new FirefoxPageDisplay(page)
+        );
         await managed.InitializeAsync(Context!, NativeFocusChanged);
         Pages[managed.Id] = managed;
         pendingPages.TryRemove(page, out _);
@@ -166,6 +225,37 @@ internal sealed partial class BrowserSessionRuntime(int slot, ILogger logger) : 
         SetActive(page);
         Interlocked.Increment(ref focusRevision);
         _ = SynchronizeNativeFocusAsync();
+    }
+
+    public void ObserveNativeFocus()
+    {
+        if (firefoxDisplay is null || !firefoxDisplay.ReadFocusChanges())
+        {
+            return;
+        }
+        foreach (var page in Pages.Values)
+        {
+            page.InvalidateCapture();
+        }
+        Interlocked.Increment(ref focusRevision);
+        _ = SynchronizeNativeFocusAsync();
+    }
+
+    private async Task MonitorFirefoxFocusAsync()
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(10));
+        try
+        {
+            while (await timer.WaitForNextTickAsync(Stop.Token))
+            {
+                ObserveNativeFocus();
+            }
+        }
+        catch (OperationCanceledException) when (Stop.IsCancellationRequested) { }
+        catch (PlaywrightException)
+        {
+            await Stop.CancelAsync();
+        }
     }
 
     private async Task SynchronizeNativeFocusAsync()
@@ -250,6 +340,7 @@ internal sealed partial class BrowserSessionRuntime(int slot, ILogger logger) : 
             {
                 await ClosePageAsync(page);
             }
+            ObserveNativeFocus();
             await RefreshFocusAsync();
             var pages = new List<PageState>();
             foreach (var page in Pages.Values.OrderBy(p => p.Order))
@@ -263,7 +354,7 @@ internal sealed partial class BrowserSessionRuntime(int slot, ILogger logger) : 
             }
             if (!HasPendingPages && pages.Any(page => page.PageId == ActivePageId))
             {
-                return new(Id, ActivePageId, ViewPath, pages.ToArray(), ActivationVersion);
+                return new(Id, ActivePageId, ViewPath, pages.ToArray(), ActivationVersion, BrowserType);
             }
         }
         throw new ApiException(409, "inactive_page", "The active browser tab is changing. Try again.");
@@ -407,6 +498,12 @@ internal sealed partial class BrowserSessionRuntime(int slot, ILogger logger) : 
     {
         Ready = false;
         await Stop.CancelAsync();
+        if (firefoxFocusMonitor is not null)
+        {
+            await firefoxFocusMonitor;
+        }
+        firefoxDisplay?.Dispose();
+        firefoxDisplay = null;
         if (Browser is not null)
         {
             try
@@ -418,7 +515,12 @@ internal sealed partial class BrowserSessionRuntime(int slot, ILogger logger) : 
         }
         Playwright?.Dispose();
         Playwright = null;
-        foreach (var process in new[] { Vnc, Display })
+        if (firefoxProfile is not null && Directory.Exists(firefoxProfile))
+        {
+            Directory.Delete(firefoxProfile, true);
+        }
+        firefoxProfile = null;
+        foreach (var process in new[] { Vnc, WindowManager, Display })
         {
             if (process is null)
             {

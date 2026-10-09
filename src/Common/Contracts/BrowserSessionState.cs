@@ -5,5 +5,6 @@ public sealed record BrowserSessionState(
     string ActivePageId,
     string ViewPath,
     PageState[] Pages,
-    long ActivationVersion
+    long ActivationVersion,
+    string BrowserType = "chromium"
 );

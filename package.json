@@ -42,6 +42,7 @@
     "docker:logs": "docker/compose.sh logs --follow --tail 100",
     "docker:status": "docker/compose.sh ps",
     "clean": "node scripts/clean.mjs",
+    "test:browser": "sh scripts/resolution-check.sh --browser-only",
     "test:resolution": "scripts/resolution-check.sh",
     "test:resolution:live": "scripts/resolution-check.sh --live",
     "evaluate": "node scripts/evaluate-all.mjs",

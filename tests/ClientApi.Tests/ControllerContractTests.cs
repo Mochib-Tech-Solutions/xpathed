@@ -49,6 +49,38 @@ public sealed class ControllerContractTests
         Assert.Equal(result, await response.Content.ReadAsStringAsync());
     }
 
+    [Theory]
+    [InlineData("GET", "/api/sessions/options", "/sessions/options", null, HttpStatusCode.OK)]
+    [InlineData("POST", "/api/sessions", "/sessions", "{\"browserType\":\"firefox\"}", HttpStatusCode.OK)]
+    [InlineData("POST", "/api/sessions", "/sessions", "{\"browserType\":\"webkit\"}", HttpStatusCode.BadRequest)]
+    public async Task BrowserOptionsAndEngineSelectionAreForwarded(
+        string method,
+        string path,
+        string forwardedPath,
+        string? body,
+        HttpStatusCode status
+    )
+    {
+        const string result = "{\"browserType\":\"firefox\"}";
+        using var upstream = new ResolverHandler(status, result);
+        await using var app = Application(upstream, "browser");
+        using var client = app.CreateClient();
+        using var request = new HttpRequestMessage(new HttpMethod(method), path);
+        if (body is not null)
+        {
+            request.Content = new StringContent(body, Encoding.UTF8, "application/json");
+        }
+        using var response = await client.SendAsync(request);
+        Assert.Equal(forwardedPath, upstream.Path);
+        Assert.Equal(new HttpMethod(method), upstream.Method);
+        if (body is not null)
+        {
+            Assert.Equal(body, upstream.Body);
+        }
+        Assert.Equal(status, response.StatusCode);
+        Assert.Equal(result, await response.Content.ReadAsStringAsync());
+    }
+
     [Fact]
     public async Task ForeignOriginIsRejectedBeforeForwarding()
     {
@@ -172,10 +204,13 @@ public sealed class ControllerContractTests
                 )
             );
 
-    private static WebApplicationFactory<HealthController> Application(ResolverHandler upstream) =>
+    private static WebApplicationFactory<HealthController> Application(
+        ResolverHandler upstream,
+        string target = "resolver"
+    ) =>
         new WebApplicationFactory<HealthController>().WithWebHostBuilder(builder =>
             builder.ConfigureTestServices(services =>
-                services.AddHttpClient("resolver").ConfigurePrimaryHttpMessageHandler(() => upstream)
+                services.AddHttpClient(target).ConfigurePrimaryHttpMessageHandler(() => upstream)
             )
         );
 }

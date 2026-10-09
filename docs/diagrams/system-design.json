@@ -60,7 +60,7 @@
       "id": "browser",
       "type": "backend",
       "label": "Browser",
-      "sublabel": "Playwright + Chromium",
+      "sublabel": "Playwright",
       "pos": [
         320,
         20

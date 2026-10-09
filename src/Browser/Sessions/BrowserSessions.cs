@@ -11,8 +11,18 @@ public sealed class BrowserSessions(IConfiguration configuration, ILogger<Browse
     private readonly SemaphoreSlim creation = new(1);
     private readonly int capacity = Math.Clamp(configuration.GetValue("MaxSessions", 4), 1, 16);
 
-    public async Task<BrowserSession> CreateAsync(CancellationToken token)
+    private readonly string defaultBrowserType = ValidateBrowserType(configuration["DefaultBrowserType"] ?? "chromium");
+
+    public BrowserSessionOptions Options => new(defaultBrowserType, ["chromium", "firefox"]);
+
+    private static string ValidateBrowserType(string browserType) =>
+        browserType is "chromium" or "firefox"
+            ? browserType
+            : throw new ApiException(400, "invalid_browser_type", "Choose Chromium or Firefox.");
+
+    public async Task<BrowserSession> CreateAsync(string? browserType, CancellationToken token)
     {
+        browserType = ValidateBrowserType(browserType ?? defaultBrowserType);
         await creation.WaitAsync(token);
         BrowserSessionRuntime? session = null;
         try
@@ -27,13 +37,13 @@ public sealed class BrowserSessions(IConfiguration configuration, ILogger<Browse
                 );
             }
 
-            session = new BrowserSessionRuntime(slot, logger);
+            session = new BrowserSessionRuntime(slot, browserType, logger);
             sessions[session.Id] = session;
             await session.Gate.WaitAsync(token);
             try
             {
                 await session.StartAsync(token);
-                return new(session.Id, session.ActivePageId, session.ViewPath);
+                return new(session.Id, session.ActivePageId, session.ViewPath, session.BrowserType);
             }
             finally
             {
@@ -547,6 +557,7 @@ public sealed class BrowserSessions(IConfiguration configuration, ILogger<Browse
         string documentId
     )
     {
+        session.ObserveNativeFocus();
         RequireDocument(session, page, documentId);
         if (!await page.HasNativeFocusAsync())
         {

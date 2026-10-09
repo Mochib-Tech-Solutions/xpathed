@@ -192,7 +192,7 @@ jobs:
     needs: changes
     if: needs.changes.outputs.browser == 'true'
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -206,6 +206,13 @@ jobs:
         uses: docker/setup-compose-action@54042514f505b273907334ae2b9cdbb9a0213c1a # v2.4.0
         with:
           version: v5.5.1
+      - name: Verify Chromium and Firefox browser contracts
+        env:
+          XPATHED_ENV_FILE: /dev/null
+          OPENROUTER_API_KEY: ""
+        run: |
+          mkdir -p .artifacts/ci
+          pnpm test:browser 2>&1 | tee .artifacts/ci/browser-contracts.log
       - name: Run the complete Live-browser Resolver suite with controlled provider-free responses
         shell: bash
         env:
@@ -226,6 +233,7 @@ jobs:
           path: |
             .artifacts/ci/browser/
             .artifacts/ci/browser.log
+            .artifacts/ci/browser-contracts.log
           include-hidden-files: true
           if-no-files-found: error
           retention-days: 30

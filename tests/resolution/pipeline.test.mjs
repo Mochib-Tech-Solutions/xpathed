@@ -388,6 +388,14 @@ test("cardinality-independent-oracle-rejects-omitted-targets-despite-valid-xpath
   }
 });
 async function json(url, method = "GET", body) {
+  if (
+    url.endsWith("/api/sessions") &&
+    method === "POST" &&
+    body === undefined &&
+    process.env.XPATHED_TEST_BROWSER_TYPE
+  ) {
+    body = { browserType: process.env.XPATHED_TEST_BROWSER_TYPE };
+  }
   const response = await fetch(url, {
     method,
     headers: body ? { "Content-Type": "application/json" } : undefined,

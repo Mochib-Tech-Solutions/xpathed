@@ -3,7 +3,7 @@ set -eu
 cd "$(dirname "$0")/.."
 
 mode=${1:---deterministic}
-case "$mode" in --deterministic|--live) ;; *) echo "Use --deterministic or --live" >&2; exit 1 ;; esac
+case "$mode" in --deterministic|--live|--browser-only) ;; *) echo "Use --deterministic, --browser-only or --live" >&2; exit 1 ;; esac
 if [ -z "${XPATHED_ENV_FILE:-}" ]; then
   scripts/setup.sh
 fi
@@ -25,8 +25,16 @@ if [ "$mode" = --live ]; then
   compose up --build --wait browser resolver resolution-fixture
   compose exec -T resolution-fixture node ready.mjs http://browser:8080/health http://resolver:8080/health http://resolution-fixture:8090/health
   compose exec -T resolution-fixture node --test live.test.mjs cardinality.live.test.mjs
+elif [ "$mode" = --browser-only ]; then
+  compose up --build --wait browser resolution-fixture
+  compose exec -T resolution-fixture node ready.mjs http://browser:8080/health http://resolution-fixture:8090/health
+  for engine in chromium firefox; do
+    compose exec -T -e XPATHED_TEST_BROWSER_TYPE="$engine" -e XPATHED_VIEWER_ORIGIN="http://localhost:$XPATHED_PORT" resolution-fixture node --test browser.test.mjs
+  done
 else
   compose up --build --wait
   compose exec -T resolution-fixture node ready.mjs http://browser:8080/health http://resolver:8080/health http://resolution-fixture:8090/health http://client-api:8080/health
-  compose exec -T -e XPATHED_VIEWER_ORIGIN="http://localhost:$XPATHED_PORT" resolution-fixture node --test browser.test.mjs pipeline.test.mjs
+  for engine in chromium firefox; do
+    compose exec -T -e XPATHED_TEST_BROWSER_TYPE="$engine" -e XPATHED_VIEWER_ORIGIN="http://localhost:$XPATHED_PORT" resolution-fixture node --test browser.test.mjs pipeline.test.mjs
+  done
 fi
