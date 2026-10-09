@@ -623,14 +623,15 @@ public sealed class ResolutionContractTests
     }
 
     [Theory]
-    [InlineData(true)]
-    public async Task AppearanceLimitationIsPresentInSentAndRetainedSchema(bool supported)
+    [InlineData(true, "unsupported")]
+    [InlineData(true, "click")]
+    public async Task AppearanceLimitationIsPresentInSentAndRetainedSchema(bool supported, string modelAction)
     {
         var handler = new DeterministicServicesHandler
         {
             CaptureBody = supported ? CurrentViewCapture() : new DeterministicServicesHandler().CaptureBody,
             ProviderBody = ProviderSelection(
-                """{"complete":true,"actions":[{"step":1,"instruction":"Click the red image","action":"unsupported","outcome":"unsupported","candidateId":null,"limitation":"appearance_unavailable"}]}"""
+                $$"""{"complete":true,"actions":[{"step":1,"instruction":"Click the red image","action":"{{modelAction}}","outcome":"unsupported","candidateId":null,"limitation":"appearance_unavailable"}]}"""
             ),
         };
         await using var application = CreateApplication(handler);
@@ -650,6 +651,10 @@ public sealed class ResolutionContractTests
         Assert.Equal(supported ? "unsupported" : "error", result.GetProperty("outcome").GetString());
         if (supported)
         {
+            Assert.Equal("unsupported", result.GetProperty("action").GetString());
+            Assert.Equal("unsupported", result.GetProperty("actions")[0].GetProperty("action").GetString());
+            Assert.Equal(JsonValueKind.Null, result.GetProperty("actions")[0].GetProperty("target").ValueKind);
+            Assert.Equal(1, result.GetProperty("diagnostics").GetProperty("modelCalls").GetInt32());
             Assert.Equal("appearance_unavailable", result.GetProperty("actions")[0].GetProperty("code").GetString());
             Assert.Equal(
                 "The requested appearance cannot be established from the captured view.",

@@ -126,7 +126,8 @@ internal static class ActionSelectionStrategy
           pixels, gradients or complex effects.
 
         - If an appearance distinction cannot be established from the supplied screenshot or CSS, return one unsupported/unsupported entry
-          with limitation appearance_unavailable; never guess from labels or order.
+          with outcome "unsupported", action "unsupported", null candidateId and limitation appearance_unavailable;
+          never guess from labels or order.
 
         ## Interaction interpretation and unsupported commands
 
@@ -366,10 +367,7 @@ internal static class ActionSelectionStrategy
                         )
                         || (selection.Outcome == "unsupported") != (selection.Limitation != "none")
                         || (selection.Action == "unsupported" && selection.Outcome != "unsupported")
-                        || (
-                            selection.Limitation is "unsupported_action" or "appearance_unavailable"
-                            && selection.Action != "unsupported"
-                        )
+                        || (selection.Limitation == "unsupported_action" && selection.Action != "unsupported")
                         || (selection.Limitation == "current_state_dependency" && selection.Action == "unsupported")
                         || (
                             selection.Outcome == "found"
@@ -379,6 +377,14 @@ internal static class ActionSelectionStrategy
                     )
                     {
                         throw new JsonException();
+                    }
+                    if (actions.GetArrayLength() == 1 && selection.Limitation == "appearance_unavailable")
+                    {
+                        // A valid visual-evidence abstention has no target or executable action.
+                        selection = selection with
+                        {
+                            Action = "unsupported",
+                        };
                     }
                     if (selection.CandidateId is { } id && !candidateIds.Contains(id, StringComparer.Ordinal))
                     {
