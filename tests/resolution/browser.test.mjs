@@ -1035,6 +1035,8 @@ async function request(path, body, method = "POST") {
     method,
     headers: body === undefined ? {} : { "Content-Type": "application/json" },
     body: body === undefined ? undefined : JSON.stringify(body),
+  }).catch((cause) => {
+    throw new Error(`${method} ${path} failed`, { cause });
   });
   assert.equal(response.ok, true, `${path}: ${response.status} ${await response.clone().text()}`);
   return response.status === 204 ? undefined : response.json();
@@ -1132,9 +1134,12 @@ async function withFixture(markup, check, sessionOptions) {
     });
     await check(session, page);
   } finally {
-    if (session) await request(`/sessions/${session.sessionId}`, undefined, "DELETE");
-    server.closeAllConnections();
-    await new Promise((resolve) => server.close(resolve));
+    try {
+      if (session) await request(`/sessions/${session.sessionId}`, undefined, "DELETE");
+    } finally {
+      server.closeAllConnections();
+      await new Promise((resolve) => server.close(resolve));
+    }
   }
 }
 

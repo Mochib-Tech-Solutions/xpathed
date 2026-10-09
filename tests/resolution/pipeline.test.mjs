@@ -95,7 +95,7 @@ test("smart-routing-named-control-uses-text-without-pixels", async () => {
       mode: "auto",
       status: "text_only",
       reason: "semantic_evidence",
-      probability: 0.01,
+      score: 0.01,
       cached: false,
     });
     assert.equal(result.diagnostics.modelCalls, 2);
@@ -184,9 +184,11 @@ test("smart-routing-excludes-adversarial-page-text-from-router-without-dropping-
       assert.deepEqual(Object.keys(router.state).sort(), ["evidence", "instruction"]);
       assert.deepEqual(Object.keys(router.state.evidence).sort(), [
         "cssColors",
+        "fontAndTextStylingAvailable",
         "geometryAndOrder",
-        "opaqueVisualContent",
+        "opaqueVisualContentObserved",
         "semanticNamesAndText",
+        "shapeAndBorderStyleAvailable",
         "unresolvedAppearance",
       ]);
       const provider = await json(`${fixture}/provider-request`);

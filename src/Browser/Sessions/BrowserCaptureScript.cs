@@ -86,13 +86,14 @@ internal static class BrowserCaptureScript
             return true;
           };
           let styleCache = new WeakMap();
+          let rectCache = new WeakMap();
           let textCache = new WeakMap();
           let labelCache = new WeakMap();
           let exposureCache = new WeakMap();
           let intersections = new WeakMap();
           let siblingShapes = new WeakMap();
           const clearDerivedCaches = () => {
-            closestCache = new Map(); styleCache = new WeakMap(); textCache = new WeakMap();
+            closestCache = new Map(); styleCache = new WeakMap(); rectCache = new WeakMap(); textCache = new WeakMap();
             labelCache = new WeakMap(); exposureCache = new WeakMap(); siblingShapes = new WeakMap();
           };
           let modalityUnknown = false, modalityBudgetExceeded = false;
@@ -117,6 +118,10 @@ internal static class BrowserCaptureScript
             if (!styleCache.has(element)) styleCache.set(element, getComputedStyle(element));
             return styleCache.get(element);
           };
+          const rectFor = element => {
+            if (!rectCache.has(element)) rectCache.set(element, element.getBoundingClientRect());
+            return rectCache.get(element);
+          };
           const exposed = element => {
             if (exposureCache.has(element)) return exposureCache.get(element);
             const ancestors = [];
@@ -139,7 +144,7 @@ internal static class BrowserCaptureScript
           };
           const accessibilityExposed = element => environment.exposed && (!modal || contains(modal, element)) && exposed(element) && !['hidden', 'collapse'].includes(cssFor(element).visibility);
           const rendered = element => {
-            const rect = element.getBoundingClientRect();
+            const rect = rectFor(element);
             if (!environment.rendered || rect.width <= 0 || rect.height <= 0 || !accessibilityExposed(element)) return false;
             for (let current = element; current; current = parent(current)) {
               checkBudget();
@@ -221,7 +226,7 @@ internal static class BrowserCaptureScript
           const fillControl = element => textControl(element) || element.localName === 'input' &&
             ['date','month','week','time','datetime-local'].includes(element.type);
           const geometry = element => {
-            const { x, y, width, height } = element.getBoundingClientRect();
+            const { x, y, width, height } = rectFor(element);
             return { x: environment.x + x * environment.scaleX, y: environment.y + y * environment.scaleY,
               width: width * environment.scaleX, height: height * environment.scaleY };
           };
