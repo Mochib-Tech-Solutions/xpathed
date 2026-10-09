@@ -589,7 +589,7 @@ export function summarize(manifest, trials) {
   }
   const entries = [...first.values()];
   const groups = Object.fromEntries(
-    ["family", "split", "category", "dataset", "track"].map((key) => [
+    ["family", "split", "category"].map((key) => [
       key,
       Object.fromEntries(
         [...new Set(entries.map((entry) => cases.get(entry.caseId)[key] ?? "unspecified"))]
@@ -605,7 +605,6 @@ export function summarize(manifest, trials) {
   );
   return {
     passed: failures.length === 0 && planned.size > 0,
-    qualification: "incomplete",
     mode: manifest.mode ?? "unavailable",
     modelQualityMeasured: manifest.mode === "live",
     plannedTrials: planned.size,

@@ -53,7 +53,7 @@ export function createFixtureServer({
         });
       if (url.pathname === "/api/v1/chat/completions" && request.method === "POST") {
         const traceId = request.headers.traceparent?.split("-")[1];
-        // Legacy research runners register serial trials without a trace binding.
+        // Serial checks register their active trial without a trace binding.
         const trialId =
           traceTrials.get(traceId) ?? (!trials.get(activeTrial)?.traceId ? activeTrial : undefined);
         const current = trials.get(trialId);
@@ -137,4 +137,8 @@ async function readBody(request) {
   return Buffer.concat(chunks).toString("utf8");
 }
 
-if (import.meta.main) createFixtureServer().listen(8090, "0.0.0.0");
+if (import.meta.main)
+  createFixtureServer().listen(
+    Number(process.env.XPATHED_FIXTURE_PORT ?? "8090"),
+    process.env.XPATHED_FIXTURE_HOST ?? "0.0.0.0",
+  );

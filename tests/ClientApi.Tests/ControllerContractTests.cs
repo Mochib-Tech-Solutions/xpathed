@@ -70,7 +70,7 @@ public sealed class ControllerContractTests
 
     [Theory]
     [InlineData("GET", "/api/sessions/options", "/sessions/options", null, HttpStatusCode.OK)]
-    [InlineData("POST", "/api/sessions", "/sessions", "{\"browserType\":\"firefox\"}", HttpStatusCode.OK)]
+    [InlineData("POST", "/api/sessions", "/sessions", "{\"browserType\":\"chromium\"}", HttpStatusCode.OK)]
     [InlineData("POST", "/api/sessions", "/sessions", "{\"browserType\":\"webkit\"}", HttpStatusCode.BadRequest)]
     public async Task BrowserOptionsAndEngineSelectionAreForwarded(
         string method,
@@ -80,7 +80,7 @@ public sealed class ControllerContractTests
         HttpStatusCode status
     )
     {
-        const string result = "{\"browserType\":\"firefox\"}";
+        const string result = "{\"browserType\":\"chromium\"}";
         using var upstream = new ResolverHandler(status, result);
         await using var app = Application(upstream, "browser");
         using var client = app.CreateClient();
@@ -102,7 +102,7 @@ public sealed class ControllerContractTests
 
     [Theory]
     [InlineData("")]
-    [InlineData("{\"browserType\":\"firefox\"}")]
+    [InlineData("{\"browserType\":\"chromium\"}")]
     public async Task SessionRequestsPreserveContentLengthBeforeStreaming(string body)
     {
         using var upstream = new ResolverHandler(HttpStatusCode.OK, "{}");

@@ -18,8 +18,9 @@ internal static class BrowserCaptureScript
           };
           let closestCache = new Map();
           const privacyDependencies = new Set();
+          let activePrivacyDependencies = privacyDependencies;
           const privacySource = (element, value) => {
-            if (value) privacyDependencies.add(element);
+            if (value) activePrivacyDependencies.add(element);
             return value;
           };
           const closest = (element, selector) => {
@@ -229,7 +230,7 @@ internal static class BrowserCaptureScript
           const visibleRect = element => {
             const rect = intersections.get(element);
             if (!rect || rect.width <= 0 || rect.height <= 0) return { left:0, top:0, right:0, bottom:0 };
-            // Firefox's intersection observer does not apply a target's own legacy CSS clip.
+            // Keep the target's own legacy CSS clip in its observed geometry.
             const css = cssFor(element), clip = css.clip.match(/^rect\(([^)]+)\)$/);
             if (clip && ['absolute', 'fixed'].includes(css.position)) {
               const [top, right, bottom, left] = clip[1].split(/[,\s]+/u).map(Number.parseFloat);
@@ -446,162 +447,150 @@ internal static class BrowserCaptureScript
             complete = false;
           }
           if (!complete) { nodes.length = 0; candidates.length = 0; }
-          const literal = value => !value.includes("'") ? `'${value}'` : !value.includes('"') ? `"${value}"` : `concat(${value.split("'").map(part => `'${part}'`).join(`,"'",`)})`;
-          const tag = element => element.namespaceURI === 'http://www.w3.org/1999/xhtml' ? element.localName : `*[local-name()=${literal(element.localName)} and namespace-uri()=${literal(element.namespaceURI ?? '')}]`;
-          const testAttributes = ['data-testid', 'data-test-id', 'data-test', 'data-cy', 'data-qa'];
-          const stableAttributes = ['id', 'name', 'aria-label', 'placeholder', 'alt', 'title'];
-          const attributes = (element, names) => names.filter(name => {
-            const value = element.getAttribute(name);
-            return value && !/https?:\/\//u.test(value) && (name !== 'id' || !/(?:[a-f\d]{16}|\d{5}|^:|^\d+$|[a-f\d]{8}-[a-f\d]{4}-[a-f\d]{4}-[a-f\d]{4}-[a-f\d]{12})/iu.test(value));
-          }).map(name => `@${name}=${literal(element.getAttribute(name))}`);
-          const semanticAttributes = ['aria-label', 'placeholder', 'alt', 'title'];
-          const textPredicates = element => {
-            const semanticText = text(element);
-            if (!semanticText) return [];
-            const predicates = [`normalize-space(.)=${literal(semanticText)}`];
-            const parts = [];
-            const fragments = [];
-            const xpathNormalize = value => value.replace(/[ \t\r\n]+/gu, ' ').replace(/^ | $/gu, '');
-            let count = 0, excluded = false;
-            const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
-            for (let node = walker.nextNode(); node; node = walker.nextNode()) {
-              checkBudget();
-              if (node.textContent.length > 64000) return predicates;
-              const value = xpathNormalize(node.textContent);
-              if (value) count++;
-              // Bound expression size as well as the shared validation deadline.
-              if (count > 16) return predicates;
-              const parent = node.parentElement;
-              if (closest(parent, `${valueContainer},${ignored}`) || !accessibilityExposed(parent)) {
-                excluded = true;
-                continue;
-              }
-              parts.push(node.textContent);
-              if (value) fragments.push(`descendant::text()[normalize-space(.)!=''][${count}][normalize-space(.)=${literal(value)}]`);
+          const locatorNodes = new Map(), locatorNodeIds = new WeakMap(), verifiedXpaths = new Map();
+          let xpathPrivacyDependencies = null, xpathPrivacyTargets = null;
+          const locatorId = element => {
+            if (!locatorNodeIds.has(element)) {
+              const id = `${frame.id}:n${locatorNodes.size + 1}`;
+              locatorNodeIds.set(element, id); locatorNodes.set(id, element);
             }
-            // XPath joins descendant text without separators and normalizes only XML whitespace.
-            // Accessible-name substitutions must not silently become unrelated DOM text.
-            if (normalize(parts.join(' ')) !== semanticText) return predicates;
-            if (excluded) {
-              // Keep only exposed text literals. The count guard rejects added/replaced label fragments.
-              if (fragments.length) predicates.push(`count(descendant::text()[normalize-space(.)!=''])=${count} and ${fragments.join(' and ')}`);
-            } else {
-              const xpathText = xpathNormalize(parts.join(''));
-              if (xpathText && xpathText !== semanticText) predicates.push(`normalize-space(.)=${literal(xpathText)}`);
-            }
-            return predicates;
-          };
-          const contextPredicates = ancestor => {
-            const predicates = attributes(ancestor, [...testAttributes, 'aria-label', 'title']);
-            const heading = ancestor.querySelector(':scope > legend,:scope > h1,:scope > h2,:scope > h3,:scope > h4,:scope > h5,:scope > h6');
-            if (heading) predicates.push(...textPredicates(heading).map(predicate => `${tag(heading)}[${predicate}]`));
-            if (ancestor.matches('tr,[role=row]')) {
-              for (const cell of ancestor.children) {
-                if (cell.matches('td,th,[role=cell],[role=rowheader],[role=gridcell]'))
-                  predicates.push(...textPredicates(cell).map(predicate => `${tag(cell)}[${predicate}]`));
-              }
-            }
-            return predicates;
+            return locatorNodeIds.get(element);
           };
           const evaluate = (xpath, root) => document.evaluate(xpath, root === document ? document : root.firstElementChild,
             null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
           const uniqueMatch = (xpath, element) => {
             checkBudget();
-            const matches = evaluate(xpath, element.getRootNode());
-            return matches.snapshotLength === 1 && matches.snapshotItem(0) === element;
+            if (!element?.isConnected || element.ownerDocument !== capturedDocument) return false;
+            try {
+              const matches = evaluate(xpath, element.getRootNode());
+              return matches.snapshotLength === 1 && matches.snapshotItem(0) === element;
+            } catch (error) { if (error instanceof DOMException) return false; throw error; }
           };
-          const xpathsFor = element => {
-            const xpaths = [];
-            const add = xpath => {
-              if (!uniqueMatch(xpath, element)) return false;
-              xpaths.push(xpath);
-              return true;
-            };
-            const testPredicates = attributes(element, testAttributes);
-            // Explicit test contracts retain identity through wording and element-tag changes.
-            for (const predicate of testPredicates) if (add(`//*[${predicate}]`)) return xpaths;
-            for (const predicate of testPredicates) if (add(`//${tag(element)}[${predicate}]`)) return xpaths;
-            for (let ancestor = element.parentElement; ancestor; ancestor = ancestor.parentElement) {
-              checkBudget();
-              for (const predicate of attributes(ancestor, testAttributes)) {
-                const prefix = `//*[${predicate}]`;
-                if (!uniqueMatch(prefix, ancestor)) continue;
-                for (const targetPredicate of testPredicates)
-                  if (add(`${prefix}//*[${targetPredicate}]`)) return xpaths;
-                if (add(`${prefix}//${tag(element)}`)) return xpaths;
-              }
-            }
-            const stablePredicates = attributes(element, stableAttributes);
-            const semanticPredicates = attributes(element, semanticAttributes);
-            semanticPredicates.push(...textPredicates(element));
-            if (element.matches(buttonInput) && element.getAttribute('value')) semanticPredicates.push(`@value=${literal(element.getAttribute('value'))}`);
-            for (let ancestor = element.parentElement; ancestor && ancestor !== document.body; ancestor = ancestor.parentElement) {
-              checkBudget();
-              const prefixes = contextPredicates(ancestor).map(context => `//${tag(ancestor)}[${context}]`);
-              if (ancestor.matches('header,footer,nav,main,aside')) prefixes.push(`//${tag(ancestor)}`);
-              for (const prefix of prefixes) {
-                for (const predicate of [...testPredicates, ...semanticPredicates])
-                  if (add(`${prefix}//${tag(element)}[${predicate}]`)) return xpaths;
-              }
-            }
-            for (const associatedLabel of element.labels ?? []) {
-              if (element.id && associatedLabel.htmlFor === element.id)
-                for (const predicate of textPredicates(associatedLabel))
-                  if (add(`//${tag(element)}[@id=//label[${predicate}]/@for]`)) return xpaths;
-            }
-            for (const predicate of semanticPredicates) if (add(`//${tag(element)}[${predicate}]`)) return xpaths;
-            for (const predicate of stablePredicates) if (add(`//${tag(element)}[${predicate}]`)) return xpaths;
-            const targetPredicates = [...testPredicates, ...stablePredicates];
-            for (let first = 0; first < targetPredicates.length; first++) {
-              for (let second = first + 1; second < targetPredicates.length; second++) {
-                if (add(`//${tag(element)}[${targetPredicates[first]} and ${targetPredicates[second]}]`)) return xpaths;
-              }
-            }
-            for (let ancestor = element.parentElement; ancestor && ancestor !== document.body; ancestor = ancestor.parentElement) {
-              checkBudget();
-              const predicates = [...contextPredicates(ancestor), ...attributes(ancestor, ['id', 'name'])];
-              const prefixes = predicates.map(context => `//${tag(ancestor)}[${context}]`);
-              if (ancestor.matches('header,footer,nav,main,aside')) prefixes.push(`//${tag(ancestor)}`);
-              for (const prefix of prefixes) {
-                for (const predicate of [...targetPredicates, ...semanticPredicates]) if (add(`${prefix}//${tag(element)}[${predicate}]`)) return xpaths;
-                if (add(`${prefix}//${tag(element)}`)) return xpaths;
-              }
-            }
-            if (!xpaths.length) {
-              const segments = [];
-              for (let current = element; current; current = current.parentElement) {
-                const siblings = current.parentElement ? [...current.parentElement.children].filter(sibling => sibling.localName === current.localName && sibling.namespaceURI === current.namespaceURI) : [...element.getRootNode().children].filter(sibling => sibling.localName === current.localName && sibling.namespaceURI === current.namespaceURI);
-                segments.unshift(`${tag(current)}${siblings.length > 1 ? `[${siblings.indexOf(current) + 1}]` : ''}`);
-              }
-              add(`/${segments.join('/')}`);
-            }
-            return xpaths;
-          };
-          const chains = new WeakMap();
-          const shadowChain = element => {
+          const shadowHosts = element => {
             const hosts = [];
             for (let root = element.getRootNode(); root.host; root = root.host.getRootNode()) {
-              checkBudget();
-              hosts.unshift(root.host);
+              checkBudget(); hosts.unshift(root.host);
             }
-            return hosts.length ? hosts.map(host => {
-              if (!chains.has(host)) {
-                const xpath = xpathsFor(host)[0];
-                if (!xpath) throw budgetExceeded;
-                chains.set(host, {xpath, label:label(host)});
-              }
-              return chains.get(host);
-            }) : undefined;
+            return hosts;
           };
+          const shadowChain = element => {
+            const hosts = shadowHosts(element);
+            return hosts.length ? hosts.map(host => ({nodeId:locatorId(host), xpath:verifiedXpaths.get(locatorId(host)) ?? '', label:label(host)})) : undefined;
+          };
+          const resolvedShadowChain = chain => chain?.map(step => ({...step, xpath:verifiedXpaths.get(step.nodeId) ?? ''}));
           const validShadowChain = (element, chain) => {
             let root = document;
             for (const step of chain ?? []) {
               checkBudget();
-              const matches = evaluate(step.xpath, root);
-              if (matches.snapshotLength !== 1 || !matches.snapshotItem(0).shadowRoot) return false;
-              root = matches.snapshotItem(0).shadowRoot;
+              const host = locatorNodes.get(step.nodeId), xpath = verifiedXpaths.get(step.nodeId);
+              if (!host?.shadowRoot || host.getRootNode() !== root || !xpath || !uniqueMatch(xpath, host)) return false;
+              root = host.shadowRoot;
             }
             return root === element.getRootNode();
+          };
+          const xpathEvidence = (candidateIds, requestedNodeIds, budgetMs = 2000) => {
+            const dependencies = new Set(), retainedTargets = new Set();
+            xpathPrivacyDependencies = null; xpathPrivacyTargets = null;
+            activePrivacyDependencies = dependencies;
+            try {
+              reset(budgetMs);
+              if (!complete || document.documentElement !== capturedRoot) return {errorCode:'stale_capture'};
+              const records = new Map(), targets = new Set(), selectedTargets = [], queue = [], describedText = new Set(), describedContext = new Set();
+              const schedule = (element, withText = false, withContext = false) => {
+                const id = locatorId(element); queue.push([element, withText, withContext]); return id;
+              };
+              const target = element => {
+                if (!element?.isConnected || element.ownerDocument !== capturedDocument || !accessibilityExposed(element)) throw new Error('stale_capture');
+                retainedTargets.add(element);
+                const id = locatorId(element);
+                if (!targets.has(id)) { targets.add(id); schedule(element, true, true); }
+              };
+              for (const candidateId of candidateIds) {
+                const index = candidates.findIndex(candidate => candidate.id === candidateId), element = nodes[index], captured = candidates[index];
+                target(element);
+                if (label(element) !== captured.label || text(element) !== captured.text || role(element) !== captured.role) return {errorCode:'stale_capture'};
+                selectedTargets.push({candidateId, nodeId:locatorId(element), frame, shadowChain:captured.shadowChain ?? null});
+              }
+              for (const id of requestedNodeIds) target(locatorNodes.get(id));
+              let position = 0;
+              while (position < queue.length) {
+                checkBudget();
+                const [element, withText, withContext] = queue[position++], id = locatorId(element);
+                if (!records.has(id)) {
+                  const siblings = [...(element.parentElement?.children ?? element.getRootNode().children)]
+                    .filter(sibling => sibling.localName === element.localName && sibling.namespaceURI === element.namespaceURI);
+                  const attributes = {};
+                  if (!closest(element, ignored)) {
+                    for (const name of ['id','name','aria-label','placeholder','alt','title','type','for','role','data-testid','data-test-id','data-test','data-cy','data-qa']) {
+                      const value = element.getAttribute(name);
+                      if (value !== null) attributes[name] = privacySource(element, value);
+                    }
+                    if (element.matches(buttonInput) && element.hasAttribute('value')) attributes.value = privacySource(element, element.getAttribute('value'));
+                  }
+                  const hosts = shadowHosts(element);
+                  for (const host of hosts) target(host);
+                  records.set(id, {nodeId:id, candidateId:nodeIds.get(element) ?? null, tag:element.localName, namespaceUri:element.namespaceURI ?? '',
+                    attributes, text:'', textFragments:[], textNodeCount:0, maximumTextLength:0, excludedText:false,
+                    parentId:element.parentElement ? schedule(element.parentElement) : null,
+                    siblingIndex:siblings.indexOf(element) + 1, siblingCount:siblings.length,
+                    headingId:null, cellIds:[], labelIds:[], shadowHostIds:hosts.map(locatorId)});
+                }
+                const record = records.get(id);
+                if (withText && !describedText.has(id)) {
+                  describedText.add(id); record.text = text(element);
+                  if (record.text) {
+                    const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
+                    for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+                      checkBudget();
+                      const value = node.textContent, nonempty = value.replace(/[ \t\r\n]+/gu, ' ').replace(/^ | $/gu, '');
+                      record.maximumTextLength = Math.max(record.maximumTextLength, value.length);
+                      if (nonempty) record.textNodeCount++;
+                      if (closest(node.parentElement, valueContainer + ',' + ignored) || !accessibilityExposed(node.parentElement)) {
+                        record.excludedText = true; continue;
+                      }
+                      record.textFragments.push({index:record.textNodeCount, text:privacySource(node.parentElement, value)});
+                    }
+                  }
+                }
+                if (withContext && !describedContext.has(id)) {
+                  describedContext.add(id);
+                  if (element.parentElement) schedule(element.parentElement, false, true);
+                  const heading = element.querySelector(':scope > legend,:scope > h1,:scope > h2,:scope > h3,:scope > h4,:scope > h5,:scope > h6');
+                  if (heading && !closest(heading, ignored)) record.headingId = schedule(heading, true);
+                  if (element.matches('tr,[role=row]')) record.cellIds = [...element.children]
+                    .filter(cell => cell.matches('td,th,[role=cell],[role=rowheader],[role=gridcell]') && !closest(cell, ignored)).map(cell => schedule(cell, true));
+                  record.labelIds = [...(element.labels ?? [])].filter(reference => !closest(reference, ignored)).map(reference => schedule(reference, true));
+                }
+              }
+              xpathPrivacyDependencies = dependencies; xpathPrivacyTargets = retainedTargets;
+              return {nodes:[...records.values()], targetNodeIds:[...targets], targets:selectedTargets};
+            } catch (error) {
+              if (error === budgetExceeded) return {errorCode:'validation_budget_exceeded'};
+              if (error.message === 'stale_capture') return {errorCode:'stale_capture'};
+              throw error;
+            } finally { activePrivacyDependencies = privacyDependencies; }
+          };
+          const verifyXpathProposals = (sets, budgetMs = 2000) => {
+            try {
+              reset(budgetMs);
+              const accepted = new Map(), matches = new Map();
+              const match = (expression, nodeId) => {
+                const key = nodeId + '\0' + expression;
+                if (!matches.has(key)) matches.set(key, uniqueMatch(expression, locatorNodes.get(nodeId)));
+                return matches.get(key);
+              };
+              for (const set of sets) {
+                checkBudget();
+                const element = locatorNodes.get(set.nodeId);
+                if (!element?.isConnected || !accessibilityExposed(element)) return {errorCode:'stale_capture'};
+                const proposal = set.proposals.find(proposal => proposal.requirements.every(requirement =>
+                  match(requirement.expression, requirement.nodeId)) && match(proposal.expression, set.nodeId));
+                if (!proposal) return {errorCode:'xpath_validation_failed'};
+                accepted.set(set.nodeId, proposal.expression);
+              }
+              for (const [id, xpath] of accepted) verifiedXpaths.set(id, xpath);
+              return {};
+            } catch (error) { if (error === budgetExceeded) return {errorCode:'validation_budget_exceeded'}; throw error; }
           };
           try {
             if (complete) for (let index = 0; index < nodes.length; index++) {
@@ -611,6 +600,15 @@ internal static class BrowserCaptureScript
           } catch (error) { if (error !== budgetExceeded) throw error; complete = false; candidates.length = 0; }
           return {
             frameElements,
+            xpathEvidence,
+            verifyXpathProposals,
+            xpathPrivacyUnchanged() {
+              deadline = Infinity;
+              closestCache = new Map();
+              return xpathPrivacyTargets !== null && xpathPrivacyDependencies !== null &&
+                [...xpathPrivacyTargets].every(element => element.isConnected && element.ownerDocument === capturedDocument) &&
+                [...xpathPrivacyTargets, ...xpathPrivacyDependencies].every(element => !closest(element, '[data-private],[data-sensitive]'));
+            },
             privacyUnchanged() {
               deadline = Infinity;
               closestCache = new Map();
@@ -642,6 +640,8 @@ internal static class BrowserCaptureScript
               try {
               reset(budgetMs);
               if (!element.isConnected || element.ownerDocument !== document || !frameElements.includes(element)) throw new Error('stale_frame');
+              const verified = verifiedXpaths.get(locatorId(element));
+              if (verified && (!uniqueMatch(verified, element) || !validShadowChain(element, shadowChain(element)))) return {errorCode:'stale_capture'};
               const rect = geometry(element);
               const scaleX = element.offsetWidth ? rect.width / element.offsetWidth : environment.scaleX;
               const scaleY = element.offsetHeight ? rect.height / element.offsetHeight : environment.scaleY;
@@ -653,7 +653,7 @@ internal static class BrowserCaptureScript
                 const matrix = css.transform === 'none' ? null : new DOMMatrixReadOnly(css.transform);
                 if (matrix && (!matrix.is2D || matrix.b !== 0 || matrix.c !== 0 || matrix.a <= 0 || matrix.d <= 0) || css.perspective !== 'none' || css.rotate !== 'none' || individualScale.some(value => !Number.isFinite(value) || value <= 0)) geometrySupported = false;
               }
-              return { xpath: xpathsFor(element)[0], shadowChain: shadowChain(element), label: label(element),
+              return { nodeId:locatorId(element), xpath:verifiedXpaths.get(locatorId(element)) ?? '', shadowChain: shadowChain(element), label: label(element),
                 environment: { scope: [...new Set([...scope(element), ...(environment.scope ?? [])])], x: rect.x + element.clientLeft * scaleX, y: rect.y + element.clientTop * scaleY, scaleX: scaleX || 1, scaleY: scaleY || 1,
                   clip: intersection(visibleRect(element), { left: rect.x + element.clientLeft * scaleX, top: rect.y + element.clientTop * scaleY,
                     right: rect.x + (element.clientLeft + element.clientWidth) * scaleX, bottom: rect.y + (element.clientTop + element.clientHeight) * scaleY }),
@@ -678,9 +678,10 @@ internal static class BrowserCaptureScript
               if (!inView(element) || !validShadowChain(element, candidates[index].shadowChain)) return { errorCode: 'stale_capture' };
               const captured = candidates[index];
               if (label(element) !== captured.label || text(element) !== captured.text || role(element) !== captured.role) return { errorCode: 'stale_capture' };
-              const xpaths = xpathsFor(element);
-              if (!xpaths.length) return { errorCode: 'xpath_validation_failed' };
-              return { target: { candidateId, frame, shadowChain: candidates[index].shadowChain, tag: element.localName, role: role(element), accessibleName: label(element), label: candidates[index].label || candidates[index].text,
+              const xpath = verifiedXpaths.get(locatorId(element));
+              if (!xpath || !uniqueMatch(xpath, element)) return { errorCode: 'xpath_validation_failed' };
+              const xpaths = [xpath];
+              return { target: { candidateId, frame, shadowChain: resolvedShadowChain(candidates[index].shadowChain), tag: element.localName, role: role(element), accessibleName: label(element), label: candidates[index].label || candidates[index].text,
                 xpaths, state: state(element), geometry: geometry(element), interactability: interactability(element, action) } };
               } catch (error) {
                 if (error === budgetExceeded) return { errorCode: 'validation_budget_exceeded' };

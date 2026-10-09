@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { mockSystemTheme } from "@/test/systemTheme";
@@ -6,12 +6,7 @@ import { ThemeProvider } from "../theme/ThemeProvider";
 import Workspace from "./Workspace";
 import type { PageState } from "./api";
 
-vi.mock("@novnc/novnc", () => ({
-  default: class extends EventTarget {
-    disconnect = vi.fn();
-    focus = vi.fn();
-  },
-}));
+vi.mock("./BrowserViewer", () => ({ default: () => <div aria-label="Managed browser" /> }));
 
 function browserApi() {
   const session = {
@@ -104,7 +99,7 @@ function browserApi() {
       return Promise.resolve(
         Response.json({
           defaultBrowserType: "chromium",
-          browserTypes: ["chromium", "firefox"],
+          browserTypes: ["chromium"],
           defaultResolution: "1280x800",
           resolutions: [
             { id: "1280x800", width: 1280, height: 800 },
@@ -297,33 +292,6 @@ describe("Browser tabs and chat", () => {
     await user.tab();
     await user.keyboard("{Enter}");
     await waitFor(() => expect(screen.getByRole("tab", { name: "New tab" })).toHaveFocus());
-  });
-
-  it("blocks native tab shortcuts in the viewer while keeping normal page typing and copying", async () => {
-    browserApi();
-    const user = renderWorkspace();
-    await openFirst(user);
-    const viewer = await screen.findByRole("application");
-    for (const shortcut of [
-      { key: "t", ctrlKey: true },
-      { key: "n", metaKey: true },
-      { key: "l", ctrlKey: true },
-      { key: "Tab", ctrlKey: true },
-      { key: "F11" },
-      { key: "F12" },
-      { key: "i", ctrlKey: true, shiftKey: true },
-      { key: "j", ctrlKey: true, shiftKey: true },
-      { key: "c", ctrlKey: true, shiftKey: true },
-      { key: "d", altKey: true },
-    ]) {
-      expect(fireEvent.keyDown(viewer, { ...shortcut, bubbles: true, cancelable: true })).toBe(
-        false,
-      );
-    }
-    expect(
-      fireEvent.keyDown(viewer, { key: "c", ctrlKey: true, bubbles: true, cancelable: true }),
-    ).toBe(true);
-    expect(fireEvent.keyDown(viewer, { key: "a", bubbles: true, cancelable: true })).toBe(true);
   });
 
   it("keeps an unverified response as historical when the final session refresh fails", async () => {

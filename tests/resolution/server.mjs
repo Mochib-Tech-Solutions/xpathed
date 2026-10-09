@@ -345,4 +345,7 @@ async function readBody(request) {
   }
   return text || "null";
 }
-server.listen(8090, "0.0.0.0");
+server.listen(
+  Number(process.env.XPATHED_FIXTURE_PORT ?? "8090"),
+  process.env.XPATHED_FIXTURE_HOST ?? "0.0.0.0",
+);

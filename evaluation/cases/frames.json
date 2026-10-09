@@ -44,11 +44,6 @@
       "scopeReview": "independent source review; browser observation pending"
     },
     "sourceSplit": "regression",
-    "sourceCatalogs": [
-      "current-view-qualification-cases.json",
-      "viewport-baseline-cases.json",
-      "cases.json"
-    ],
     "sourceIds": ["clipped-frame-v4", "current-view-clipped-frame-v4", "clipped-frame-v3"],
     "group": "frames"
   },
@@ -121,7 +116,6 @@
     },
     "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
     "sourceSplit": "regression",
-    "sourceCatalogs": ["current-view-qualification-cases.json"],
     "group": "frames",
     "sourceIds": ["nested-frame-v4", "nested-frame", "nested-frame-contract-1"]
   },
@@ -177,7 +171,6 @@
     },
     "oracleSentinels": ["LABEL_MANIFEST_PRIVATE_9a71"],
     "sourceSplit": "regression",
-    "sourceCatalogs": ["current-view-qualification-cases.json", "qualification-cases.json"],
     "group": "frames",
     "sourceIds": [
       "shadow-unsupported",

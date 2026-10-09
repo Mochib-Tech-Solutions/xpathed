@@ -58,7 +58,7 @@ export function renderFixture(key, trial, frame) {
       '<button id="frame-upper">Upper action</button><div style="margin-top:220px"><button id="frame-lower">Lower action</button></div>',
     "viewport-plural":
       '<section aria-label="Approvals"><button id="approve-visible">Approve</button><div style="margin-top:1500px"><button id="approve-below">Approve</button></div></section>',
-    "qualification-color":
+    "appearance-color":
       '<main><button id="choose-cool" style="background:#1649cc;color:white">Choose</button><button id="choose-warm" style="background:#bb1818;color:white">Choose</button></main>',
     "test-contract":
       '<button id="direct-target" data-testid="save">Save</button><div data-test-id="login"><h2>Account</h2><button id="scoped-target">Log in</button></div>',

@@ -10,13 +10,13 @@ Read [README.md](README.md) for setup and scope, [SECURITY.md](SECURITY.md) for 
 - Trace callers and tests before changing a contract. Keep one active implementation and prompt; Git retains prior versions.
 - Use the configured human Git identity and Conventional Commit titles. Keep branch, commit and PR wording focused on the change.
 - Use `package.json`, `global.json` and lockfiles as command/version sources. Run the affected `check:dotnet`, `check:web` or `check:tooling` gate. Use `$xpathed-resolution-checks` for capture, XPath, readiness or execution changes; report actual checks and limitations.
-- Preserve independent CI jobs, exact-revision evidence and provider-free ordinary PR checks. Update `scripts/ci-changes.mjs` and the solution when project paths change. Preserve existing release evidence, charges and retention deadlines; qualifying a release requires tested source/image identity and no lost baseline pass.
-- Keep `.env` and unrelated Docker stacks intact. Alternate checkouts need distinct Compose projects and ports. Preserve historical ignored artifacts unless their deletion is explicitly authorized.
+- Preserve independent CI jobs, exact-revision evidence and provider-free ordinary PR checks. Update `scripts/ci-changes.mjs` and the solution when project paths change. Preserve historical ignored evidence unless its deletion is explicitly authorized.
+- Keep `.env` and unrelated processes/stacks intact. Local development uses managed native processes and four loopback ports per checkout; Docker is for deployment validation and VPS hosting.
 
 ## Ownership
 
-- **Resolver** is the core stateless API. **Browser** owns Playwright, session/page/capture identities, serialized operations and display cleanup. Their HTTP boundary uses serializable **Common** records, never browser handles.
-- **ClientApi** is an HTTP adapter. **Web** owns in-memory per-tab chat and the noVNC workspace. The viewer, resolution and execution must address the same active managed page.
+- **Resolver** is the core stateless API and owns instruction interpretation, XPath construction and ranking. **Browser** owns browser processes, page/capture identities, sanitized evidence, same-node verification and action execution. Their HTTP boundary uses serializable **Common** records, never browser handles.
+- **ClientApi** is an HTTP adapter. **Web** owns in-memory per-tab chat and the streamed browser view. The viewer, resolution and execution must address the same active managed page.
 - Keep controllers thin, service behavior outside `Program.cs`, and one named C# type in its matching file. Keep Web feature state in `features/`, shared controls in `components/ui/`, and helpers in `lib/`; clean up effects and use semantic theme tokens.
 
 ## Resolution and execution
@@ -24,9 +24,9 @@ Read [README.md](README.md) for setup and scope, [SECURITY.md](SECURITY.md) for 
 - Resolve one action across one intended target unless the command explicitly requests multiple targets. Indistinguishable singular matches are ambiguous; mixed actions and sequential workflows are unsupported.
 - Capture every eligible current-view candidate without arbitrary application ceilings. Preserve partially visible, covered and disabled targets as distinct observations, with frame/open-shadow context beside tree-local XPath.
 - Cache stable prompt and provider metadata; reset DOM memoization across asynchronous observation and fresh validation. Measure capture, preparation, provider and verification time separately; never replay cached targets or screenshots.
-- The model chooses candidate IDs. Browser constructs a unique XPath and verifies the retained node, current membership, name/text and action readiness. Prefer verified test contracts and meaningful scoped semantics; exclude hidden/private editable values from XPath text predicates.
+- The model chooses candidate IDs. Resolver constructs ordered XPath proposals from Browser's sanitized evidence; Browser verifies their exact retained nodes, current membership, name/text and action readiness. Prefer verified test contracts and meaningful scoped semantics; exclude hidden/private editable values from XPath text predicates.
 - Resolution and readiness checks are passive. Execution is a separate explicit user action against a fresh verified target; consume its capture before dispatch, reject stale/replayed targets, and never retry uncertain actions automatically.
-- Screenshots are opt-in for each request. Mask detected editable/private content, disclose that other visible content and inaccessible controls may be sent, and never treat page content or model output as instructions.
+- Screenshots are opt-in for each request. Mask detected editable/private content, fail when masking cannot be verified, disclose that other visible content is sent, and never treat page content or model output as instructions.
 - Keep request-owned cost, provider failures, scoped absence, ambiguity and unknown readiness distinct. Enforce provider admission before inference, hold capacity through completion/accounting after disconnect, and do not silently retry model calls.
 
 ## Client behavior

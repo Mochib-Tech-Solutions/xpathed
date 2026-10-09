@@ -45,10 +45,6 @@ async function browserEvidence(sha) {
     "Live-browser Resolver mode or source SHA mismatch",
   );
   ensure(
-    manifest.policy?.qualification === "incomplete",
-    "Controlled provider-free Live-browser Resolver checks cannot claim model qualification",
-  );
-  ensure(
     manifest.sourceManifestHash === hash(JSON.stringify(suite)) &&
       isDeepStrictEqual(manifest.cases, suite.cases),
     "Live-browser Resolver evidence does not cover the original full suite",
@@ -98,13 +94,17 @@ async function browserEvidence(sha) {
     ),
     "Missing or extra Live-browser Resolver trials",
   );
+  ensure(
+    /^http:\/\/127\.0\.0\.1:[1-9]\d{0,4}$/u.test(manifest.fixture ?? ""),
+    "Controlled fixture must use native loopback",
+  );
   const configurations = Object.entries(manifest.configurations ?? {});
   ensure(
     configurations.length > 0 &&
       configurations.every(
         ([id, value]) =>
           value.configurationId === id &&
-          value.effective?.endpoint === "http://evaluation-fixture:8090/api/v1/" &&
+          value.effective?.endpoint === `${manifest.fixture}/api/v1/` &&
           value.effective.responseCache === false,
       ),
     "Live-browser Resolver configuration must use the controlled provider-free fixture without response reuse",
@@ -119,7 +119,6 @@ async function browserEvidence(sha) {
       summary.completedTrials === ids.length &&
       summary.missingTrials === 0 &&
       summary.diagnosticReruns.trials === 0 &&
-      summary.qualification === "incomplete" &&
       summary.modelQualityMeasured === false,
     "Controlled provider-free Live-browser Resolver checks failed or are incomplete",
   );
@@ -209,7 +208,7 @@ async function main() {
   if (process.env.GITHUB_STEP_SUMMARY)
     await appendFile(
       process.env.GITHUB_STEP_SUMMARY,
-      `CI gate ${result.passed ? "passed" : "failed"} for \`${result.sha}\`. ${result.error ?? "Deterministic engineering checks; no model qualification."}\n`,
+      `CI gate ${result.passed ? "passed" : "failed"} for \`${result.sha}\`. ${result.error ?? "Controlled provider-free checks."}\n`,
     );
 }
 

@@ -1,170 +1,94 @@
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtemp, writeFile, rm, realpath } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import test from "node:test";
+import { checkEnvironment, checkOptions } from "./native-check.mjs";
+import { developmentConfig } from "./native.mjs";
 
-function runWrapper(
-  t,
-  project,
-  service = "web",
-  args = [],
-  { envText = "", environment = {} } = {},
-) {
-  const directory = mkdtempSync(join(tmpdir(), "xpathed-evaluation-isolation-"));
-  t.after(() => rmSync(directory, { recursive: true, force: true }));
-  const log = join(directory, "docker-calls");
-  writeFileSync(log, "");
-  const envFile = join(directory, ".env");
-  writeFileSync(envFile, envText);
-  writeFileSync(
-    join(directory, "docker"),
-    `#!/bin/sh
-printf '%s\\n' "$*" >> "$TEST_DOCKER_LOG"
-printf 'suite=%s\\n' "$XPATHED_EVALUATION_SUITE" >> "$TEST_DOCKER_LOG"
-if [ -z "$OPENROUTER_EVAL_API_KEY" ]; then key_state=empty
-elif [ "$OPENROUTER_EVAL_API_KEY" = fixture-eval ]; then key_state=selected
-else key_state=unexpected; fi
-printf 'evaluation-key=%s\\n' "$key_state" >> "$TEST_DOCKER_LOG"
-case "$1" in
-  compose) case "$*" in *"config --quiet") exit 0;; *) exit 77;; esac ;;
-  ps) printf '%s\\n' existing-container ;;
-  inspect) case "$*" in
-    *working_dir*) printf '%s\\n' "$TEST_PROJECT_DIRECTORY" ;;
-    *service*) printf '%s\\n' "$TEST_EXISTING_SERVICE" ;;
-    *) exit 77 ;;
-  esac ;;
-  *) exit 77 ;;
-esac
-`,
-    { mode: 0o755 },
-  );
-  const result = spawnSync(
-    "sh",
-    ["scripts/evaluate.sh", "--output", join(directory, "artifacts"), ...args],
-    {
-      encoding: "utf8",
-      cwd: resolve(import.meta.dirname, ".."),
-      env: {
-        ...process.env,
-        PATH: `${directory}:${process.env.PATH}`,
-        TMPDIR: directory,
-        XPATHED_EVALUATION_PROJECT: project,
-        TEST_DOCKER_LOG: log,
-        TEST_PROJECT_DIRECTORY: resolve(import.meta.dirname, ".."),
-        TEST_EXISTING_SERVICE: service,
-        OPENROUTER_API_KEY: "",
-        OPENROUTER_EVAL_API_KEY: "",
-        XPATHED_ENV_FILE: envFile,
-        ...environment,
-      },
-    },
-  );
-  return { ...result, calls: readFileSync(log, "utf8") };
+async function fixture(t, content) {
+  const root = await realpath(await mkdtemp(join(tmpdir(), "xpathed-check-config-")));
+  t.after(() => rm(root, { recursive: true, force: true }));
+  await writeFile(join(root, ".env"), content);
+  return root;
 }
 
-test("live evaluation wrappers pass the dedicated file key and reject an app-only file before Docker", async (t) => {
-  for (const args of [[], ["--qualification"]]) {
-    await t.test(args[0] ?? "direct", (t) => {
-      const selected = runWrapper(t, "xpathed-evaluation-key", "web", ["--mode", "live", ...args], {
-        envText: "OPENROUTER_API_KEY=fixture-app\nOPENROUTER_EVAL_API_KEY=fixture-eval\n",
-      });
-      assert.equal(selected.status, 2);
-      assert.match(selected.stderr, /non-evaluation service/);
-      assert.match(selected.calls, /evaluation-key=selected/);
-      const missing = runWrapper(t, "xpathed-evaluation-key", "web", ["--mode", "live", ...args], {
-        envText: "OPENROUTER_API_KEY=fixture-app\n",
-      });
-      assert.notEqual(missing.status, 0);
-      assert.match(missing.stderr, /Set OPENROUTER_EVAL_API_KEY/);
-      assert.equal(missing.calls, "");
-      assert.doesNotMatch(missing.stdout + missing.stderr, /fixture-app/);
-    });
-  }
+test("live evaluation requires its dedicated key and never uses the application key", async (t) => {
+  const root = await fixture(
+    t,
+    "OPENROUTER_API_KEY=app-private\nOPENROUTER_EVAL_API_KEY=eval-private\n",
+  );
+  const options = checkOptions(["evaluation", "--mode", "live"]);
+  const env = await checkEnvironment(root, options, {});
+  assert.equal(env.OPENROUTER_API_KEY, "eval-private");
+  const config = developmentConfig(root, env);
+  assert.equal(config.services[1].env.OpenRouter__ApiKey, "eval-private");
+  assert.doesNotMatch(JSON.stringify(config.services[0]), /eval-private|app-private/);
+  await writeFile(join(root, ".env"), "OPENROUTER_API_KEY=app-private\n");
+  await assert.rejects(checkEnvironment(root, options, {}), /Set OPENROUTER_EVAL_API_KEY/);
 });
 
-test("controlled provider-free evaluation removes the dedicated key before invoking Docker", (t) => {
-  const result = runWrapper(t, "xpathed-evaluation-key", "web", ["--qualification"], {
-    envText: "OPENROUTER_EVAL_API_KEY=fixture-eval\n",
-    environment: { OPENROUTER_EVAL_API_KEY: "fixture-eval" },
-  });
-  assert.equal(result.status, 2);
-  assert.match(result.calls, /evaluation-key=empty/);
-  assert.doesNotMatch(result.calls, /evaluation-key=selected/);
-});
-
-test("evaluation rejects the development project name before invoking Docker", (t) => {
-  const result = runWrapper(t, "xpathed");
-  assert.equal(result.status, 2);
-  assert.match(result.stderr, /xpathed-evaluation/);
-  assert.equal(result.calls, "");
-});
-
-test("evaluation refuses existing development services before teardown", (t) => {
-  const result = runWrapper(t, "xpathed-evaluation-isolation-test");
-  assert.equal(result.status, 2);
-  assert.match(result.stderr, /non-evaluation service/);
-  assert.doesNotMatch(result.calls, /\bdown\b|\bup\b|\brun\b/);
-});
-
-test("custom dataset suites cannot enter live mode or read outside the checkout", (t) => {
-  const directory = mkdtempSync(join(tmpdir(), "xpathed-custom-suite-"));
-  t.after(() => rmSync(directory, { recursive: true, force: true }));
-  const path = join(directory, "suite.json");
-  writeFileSync(path, '{"version":"1","cases":[]}');
-  const live = spawnSync("sh", ["scripts/evaluate.sh", "--mode", "live", "--suite", path], {
-    encoding: "utf8",
-    cwd: resolve(import.meta.dirname, ".."),
-  });
-  assert.equal(live.status, 2);
-  assert.match(live.stderr, /controlled provider-free evaluation only/);
-  const outside = spawnSync("sh", ["scripts/evaluate.sh", "--suite", path], {
-    encoding: "utf8",
-    cwd: resolve(import.meta.dirname, ".."),
-  });
-  assert.notEqual(outside.status, 0);
-  assert.match(outside.stderr, /under this checkout/);
-});
-
-test("qualification cannot combine strategy comparison or inject an unreviewed suite", () => {
-  for (const args of [
-    ["--qualification", "--comparison"],
-    ["--qualification", "--suite", "evaluation/cases/unavailable.json"],
-    ["--profile", "gemini"],
-  ]) {
-    const result = spawnSync("sh", ["scripts/evaluate.sh", ...args], {
-      encoding: "utf8",
-      cwd: resolve(import.meta.dirname, ".."),
-    });
-    assert.equal(result.status, 2);
-    assert.match(result.stderr, /qualification|Qualification|Unknown evaluation option/);
-  }
-});
-
-test("release comparison accepts the unified collection and forwards its container path", (t) => {
-  const result = runWrapper(t, "xpathed-evaluation-baseline", "resolver", [
-    "--qualification",
-    "--suite",
-    "evaluation/cases/index.json",
-  ]);
-  assert.equal(result.status, 77);
-  assert.match(result.calls, /suite=\/workspace\/evaluation\/cases\/index.json/);
-});
-
-test("Live-browser Resolver concurrency is bounded and cannot leak into live-inference or comparison runners", (t) => {
+test("controlled checks exclude live provider keys and preserve browser concurrency limits", async (t) => {
+  const root = await fixture(
+    t,
+    "OPENROUTER_API_KEY=app-private\nOPENROUTER_EVAL_API_KEY=eval-private\n",
+  );
+  const options = checkOptions(["evaluation", "--concurrency", "4"]);
+  const env = await checkEnvironment(root, options, {});
+  assert.equal(env.OPENROUTER_API_KEY, "deterministic-fixture-only");
+  env.OPENROUTER_BASE_URL = "http://127.0.0.1:18090/api/v1/";
+  const resolver = developmentConfig(root, env).services[1];
+  assert.equal(resolver.env.OpenRouter__BaseUrl, env.OPENROUTER_BASE_URL);
+  assert.doesNotMatch(JSON.stringify(resolver), /app-private|eval-private/);
   for (const args of [
     ["--concurrency", "0"],
     ["--concurrency", "5"],
-    ["--concurrency", "2", "--mode", "live"],
-    ["--concurrency", "2", "--qualification"],
-  ]) {
-    const result = runWrapper(t, "xpathed-evaluation-workers", "resolver", args);
-    assert.notEqual(result.status, 0);
-    assert.match(result.stderr, /concurrency/i);
-    assert.equal(result.calls, "");
-  }
-  const valid = runWrapper(t, "xpathed-evaluation-workers", "resolver", ["--concurrency", "4"]);
-  assert.equal(valid.status, 77);
-  assert.match(valid.calls, /down/);
+    ["--mode", "live", "--concurrency", "2"],
+  ])
+    assert.throws(() => checkOptions(["evaluation", ...args]), /concurrency/i);
+});
+
+test("custom suites remain confined to controlled checks inside the checkout", async (t) => {
+  const root = await fixture(t, "");
+  const outside = await fixture(t, "");
+  await writeFile(join(root, "suite.json"), "{}");
+  await writeFile(join(outside, "suite.json"), "{}");
+  const options = checkOptions(["evaluation", "--suite", "suite.json"]);
+  assert.equal(
+    (await checkEnvironment(root, options, {})).XPATHED_EVALUATION_SUITE,
+    join(root, "suite.json"),
+  );
+  await assert.rejects(
+    checkEnvironment(root, { ...options, suite: join(outside, "suite.json") }, {}),
+    /under this checkout/,
+  );
+  assert.throws(
+    () => checkOptions(["evaluation", "--mode", "live", "--suite", "suite.json"]),
+    /controlled provider-free/,
+  );
+});
+
+test("removed comparison options and conflicting modes fail before startup", () => {
+  for (const args of [
+    ["--qualification"],
+    ["--monitoring", "run"],
+    ["--profile", "configured"],
+    ["--xpath", "--xpath"],
+  ])
+    assert.throws(() => checkOptions(["evaluation", ...args]), /evaluation option/);
+  assert.throws(() => checkOptions(["evaluation", "--xpath", "--mode", "live"]), /provider-free/);
+  assert.throws(() => checkOptions(["resolution", "--live", "--browser-only"]), /Use/);
+  assert.throws(() => checkOptions(["evaluation", "--replay", "old-run"]), /evaluate:replay/);
+  assert.equal(checkOptions(["resolution", "--browser-only"]).browserOnly, true);
+});
+
+test("explicit live resolution checks retain the cheap route and application key", async (t) => {
+  const root = await fixture(
+    t,
+    "OPENROUTER_API_KEY=app-private\nOPENROUTER_MODEL=other/model\nOPENROUTER_PROVIDER=other\n",
+  );
+  const env = await checkEnvironment(root, checkOptions(["resolution", "--live"]), {});
+  assert.equal(env.OPENROUTER_API_KEY, "app-private");
+  assert.equal(env.OPENROUTER_MODEL, "deepseek/deepseek-v4.1-flash");
+  assert.equal(env.OPENROUTER_PROVIDER, "wafer");
 });

@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { readEvaluationKey } from "../evaluation/provider.mjs";
+import { readEvaluationKey } from "../evaluation/environment.mjs";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 export const categories = [
@@ -87,7 +87,7 @@ export async function main(args = process.argv.slice(2)) {
     console.log(`pnpm evaluate [--output DIRECTORY]
 Runs Live-browser Resolver with live provider inference.
 Runs XPath construction and verification with controlled provider-free selections.
-Requires Docker and OPENROUTER_EVAL_API_KEY. Makes paid model calls.
+Requires the native browser setup and OPENROUTER_EVAL_API_KEY. Makes paid model calls.
 Separate commands: evaluate:xpath, evaluate:resolver:live.
 Live-browser Resolver with controlled provider-free responses: evaluate:resolver. Replay: evaluate:replay RUN_DIRECTORY.`);
     return 0;

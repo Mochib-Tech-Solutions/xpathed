@@ -40,7 +40,6 @@ services:
     security_opt: ["seccomp=./docker/browser/seccomp.json"]
     environment:
       ViewerOrigins: http://localhost:${XPATHED_PORT:-8080},http://127.0.0.1:${XPATHED_PORT:-8080}
-      DefaultBrowserType: ${BROWSER_TYPE:-chromium}
       MaxSessions: 4
       Logging__LogLevel__Default: Warning
     stop_grace_period: 20s

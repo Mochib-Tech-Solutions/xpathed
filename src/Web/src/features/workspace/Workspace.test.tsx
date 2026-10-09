@@ -5,12 +5,7 @@ import { mockSystemTheme } from "@/test/systemTheme";
 import { ThemeProvider } from "../theme/ThemeProvider";
 import Workspace from "./Workspace";
 
-vi.mock("@novnc/novnc", () => ({
-  default: class extends EventTarget {
-    disconnect = vi.fn();
-    focus = vi.fn();
-  },
-}));
+vi.mock("./BrowserViewer", () => ({ default: () => <div aria-label="Managed browser" /> }));
 
 const session = {
   sessionId: "session-1",
@@ -79,7 +74,7 @@ function mockApi(resolve = () => Promise.resolve(Response.json(found)), currentP
         return Promise.resolve(
           Response.json({
             defaultBrowserType: "chromium",
-            browserTypes: ["chromium", "firefox"],
+            browserTypes: ["chromium"],
             defaultResolution: "1280x800",
             resolutions: [
               { id: "1280x800", width: 1280, height: 800 },
@@ -1599,7 +1594,7 @@ describe("Workspace resolution", () => {
           return Promise.resolve(
             Response.json({
               defaultBrowserType: "chromium",
-              browserTypes: ["chromium", "firefox"],
+              browserTypes: ["chromium"],
               defaultResolution: "1280x800",
               resolutions: [
                 { id: "1280x800", width: 1280, height: 800 },
@@ -2091,7 +2086,7 @@ describe("Workspace resolution", () => {
         return Promise.resolve(
           Response.json({
             defaultBrowserType: "chromium",
-            browserTypes: ["chromium", "firefox"],
+            browserTypes: ["chromium"],
             defaultResolution: "1280x800",
             resolutions: [
               { id: "1280x800", width: 1280, height: 800 },

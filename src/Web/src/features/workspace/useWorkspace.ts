@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { ApiError, request } from "./api";
 import type {
   ActionExecutionResult,
-  BrowserType,
   BrowserSessionOptions,
   PageState,
   Resolution,
@@ -65,7 +64,6 @@ function updateSession(previous: WorkspaceState, snapshot: SessionState): Worksp
 
 export default function useWorkspace() {
   const [browserOptions, setBrowserOptions] = useState<BrowserSessionOptions | null>(null);
-  const [browserType, setBrowserType] = useState<BrowserType>("chromium");
   const [resolution, setResolution] = useState("1280x800");
   const [workspace, setWorkspace] = useState(emptyWorkspace);
   const { session, snapshot, tabs } = workspace;
@@ -87,7 +85,6 @@ export default function useWorkspace() {
       .then((options) => {
         if (active) {
           setBrowserOptions(options);
-          setBrowserType(options.defaultBrowserType);
           setResolution(options.defaultResolution);
         }
       })
@@ -200,7 +197,8 @@ export default function useWorkspace() {
     if (!session && !browserOptions) return;
     void perform("Opening website…", async (isCurrent) => {
       const currentSession =
-        session ?? (await request<Session>("/sessions", "POST", { browserType, resolution }));
+        session ??
+        (await request<Session>("/sessions", "POST", { browserType: "chromium", resolution }));
       if (!isCurrent()) return;
       const pageId = page?.pageId ?? currentSession.pageId;
       setWorkspace((previous) => ({
@@ -470,7 +468,6 @@ export default function useWorkspace() {
   }
   return {
     session,
-    browserType: session?.browserType ?? browserType,
     resolution: session?.resolution ?? resolution,
     setResolution: (next: string) => {
       if (
@@ -481,10 +478,6 @@ export default function useWorkspace() {
         setResolution(next);
     },
     browserOptions,
-    setBrowserType: (next: BrowserType) => {
-      if (!session && !pending.current && browserOptions?.browserTypes.includes(next))
-        setBrowserType(next);
-    },
     page,
     pages: snapshot?.pages ?? [],
     address: page ? chat.address : workspace.initialAddress,

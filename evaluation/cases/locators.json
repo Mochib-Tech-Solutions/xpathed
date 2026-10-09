@@ -123,7 +123,6 @@
     },
     "deterministicOnly": true,
     "sourceSplit": "development",
-    "sourceCatalogs": ["cases.json"],
     "group": "locators",
     "sourceIds": [
       "mutation-wrapper-v4",
@@ -255,7 +254,6 @@
     },
     "deterministicOnly": true,
     "sourceSplit": "development",
-    "sourceCatalogs": ["cases.json"],
     "group": "locators",
     "sourceIds": [
       "mutation-sibling-v4",
@@ -387,7 +385,6 @@
     },
     "deterministicOnly": true,
     "sourceSplit": "development",
-    "sourceCatalogs": ["cases.json"],
     "group": "locators",
     "sourceIds": [
       "mutation-class-v4",
@@ -519,7 +516,6 @@
     },
     "deterministicOnly": true,
     "sourceSplit": "development",
-    "sourceCatalogs": ["cases.json"],
     "group": "locators",
     "sourceIds": ["mutation-id-v4", "locators-id-change-preserves-target-identity", "mutation-id"]
   },
@@ -647,7 +643,6 @@
     },
     "deterministicOnly": true,
     "sourceSplit": "development",
-    "sourceCatalogs": ["cases.json"],
     "group": "locators",
     "sourceIds": [
       "mutation-duplicate-v4",
@@ -779,7 +774,6 @@
     },
     "deterministicOnly": true,
     "sourceSplit": "development",
-    "sourceCatalogs": ["cases.json"],
     "group": "locators",
     "sourceIds": [
       "mutation-rerender-v4",
@@ -891,7 +885,6 @@
     },
     "deterministicOnly": true,
     "sourceSplit": "development",
-    "sourceCatalogs": ["cases.json"],
     "group": "locators",
     "sourceIds": ["mutation-remove-v4", "mutation-remove"]
   },
@@ -999,7 +992,6 @@
     },
     "deterministicOnly": true,
     "sourceSplit": "development",
-    "sourceCatalogs": ["cases.json"],
     "group": "locators",
     "sourceIds": ["mutation-replacement-v4", "mutation-replacement"]
   },
@@ -1080,7 +1072,6 @@
     },
     "deterministicOnly": true,
     "sourceSplit": "development",
-    "sourceCatalogs": ["locators.json"],
     "group": "locators",
     "sourceIds": []
   },
@@ -1170,7 +1161,6 @@
     },
     "deterministicOnly": true,
     "sourceSplit": "development",
-    "sourceCatalogs": ["locators.json"],
     "group": "locators",
     "sourceIds": [],
     "privacySentinels": ["PRIVATE_HIDDEN_VALUE"]
@@ -1253,7 +1243,6 @@
     },
     "deterministicOnly": true,
     "sourceSplit": "development",
-    "sourceCatalogs": ["locators.json"],
     "group": "locators",
     "sourceIds": []
   },
@@ -1335,7 +1324,6 @@
     },
     "deterministicOnly": true,
     "sourceSplit": "development",
-    "sourceCatalogs": ["locators.json"],
     "group": "locators",
     "sourceIds": []
   },
@@ -1433,7 +1421,6 @@
     },
     "deterministicOnly": true,
     "sourceSplit": "development",
-    "sourceCatalogs": ["locators.json"],
     "group": "locators",
     "sourceIds": []
   },
@@ -1515,7 +1502,6 @@
     },
     "deterministicOnly": true,
     "sourceSplit": "development",
-    "sourceCatalogs": ["locators.json"],
     "group": "locators",
     "sourceIds": []
   },
@@ -1597,7 +1583,6 @@
     },
     "deterministicOnly": true,
     "sourceSplit": "development",
-    "sourceCatalogs": ["locators.json"],
     "group": "locators",
     "sourceIds": []
   },
@@ -1691,7 +1676,6 @@
     },
     "deterministicOnly": true,
     "sourceSplit": "development",
-    "sourceCatalogs": ["locators.json"],
     "group": "locators",
     "sourceIds": [],
     "privacySentinels": ["PRIVATE_PREFIX"]
@@ -1786,7 +1770,6 @@
     },
     "deterministicOnly": true,
     "sourceSplit": "development",
-    "sourceCatalogs": ["locators.json"],
     "group": "locators",
     "sourceIds": [],
     "privacySentinels": ["PRIVATE_ARIA"]
@@ -1879,7 +1862,6 @@
     },
     "deterministicOnly": true,
     "sourceSplit": "development",
-    "sourceCatalogs": ["locators.json"],
     "group": "locators",
     "sourceIds": [],
     "privacySentinels": ["PRIVATE_EDITOR"]
@@ -1995,7 +1977,6 @@
     },
     "deterministicOnly": true,
     "sourceSplit": "development",
-    "sourceCatalogs": ["locators.json"],
     "group": "locators",
     "sourceIds": []
   },
@@ -2138,7 +2119,6 @@
     },
     "deterministicOnly": true,
     "sourceSplit": "development",
-    "sourceCatalogs": ["locators.json"],
     "group": "locators",
     "sourceIds": []
   },
@@ -2235,7 +2215,6 @@
     },
     "deterministicOnly": true,
     "sourceSplit": "development",
-    "sourceCatalogs": ["locators.json"],
     "group": "locators",
     "sourceIds": []
   },
@@ -2326,7 +2305,6 @@
     },
     "deterministicOnly": true,
     "sourceSplit": "development",
-    "sourceCatalogs": ["locators.json"],
     "group": "locators",
     "sourceIds": [],
     "privacySentinels": ["PRIVATE_REPLACEMENT"]
@@ -2398,7 +2376,6 @@
     },
     "deterministicOnly": true,
     "sourceSplit": "development",
-    "sourceCatalogs": ["locators.json"],
     "group": "locators",
     "sourceIds": []
   },
@@ -2469,7 +2446,6 @@
     },
     "deterministicOnly": true,
     "sourceSplit": "development",
-    "sourceCatalogs": ["locators.json"],
     "group": "locators",
     "sourceIds": []
   },
@@ -2518,7 +2494,6 @@
     },
     "deterministicOnly": true,
     "sourceSplit": "development",
-    "sourceCatalogs": ["locators.json"],
     "group": "locators",
     "sourceIds": []
   },
@@ -2589,7 +2564,6 @@
     },
     "deterministicOnly": true,
     "sourceSplit": "development",
-    "sourceCatalogs": ["locators.json"],
     "group": "locators",
     "sourceIds": []
   },
@@ -2660,7 +2634,6 @@
     },
     "deterministicOnly": true,
     "sourceSplit": "development",
-    "sourceCatalogs": ["locators.json"],
     "group": "locators",
     "sourceIds": []
   }

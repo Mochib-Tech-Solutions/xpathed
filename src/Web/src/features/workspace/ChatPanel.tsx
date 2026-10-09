@@ -647,8 +647,8 @@ export default function ChatPanel({
           Include screenshot with this request
         </label>
         <p id="screenshot-sharing" className="px-3 pt-1 text-xs text-muted-foreground">
-          Masks detected form fields. Other visible content, including inaccessible controls, is
-          sent to the model provider.
+          Masks detected form fields. Other visible content is sent to the model provider. Image
+          requests fail if masking cannot be verified.
         </p>
         <textarea
           ref={composer}

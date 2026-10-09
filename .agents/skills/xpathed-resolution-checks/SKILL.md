@@ -7,12 +7,12 @@ description: Verify xpathed capture, action, XPath, readiness and execution chan
 
 Read `README.md`, the affected Common/service contracts and `tests/AGENTS.md`. Work from the repository root with the required RTK prefix.
 
-1. Trace the changed boundary: Browser capture/selection/execution, Resolver/provider interpretation, or Web display. Follow the nearest existing scenario and preserve the single current request/response contract.
+1. Trace the changed boundary: Browser capture/verification/execution, Resolver interpretation/XPath construction, or Web display. Follow the nearest existing scenario and preserve the single current request/response contract.
 2. For Browser behavior, add a focused controlled scenario in `tests/resolution/` and run `pnpm test:resolution`. Derive target identity independently of XPath. Verify passive resolution preserves scroll/focus/forms; explicit execution tests verify intended effects and stale/replay rejection.
 3. For provider behavior, use deterministic HTTP responses. Cover rejected output and upstream failures as well as success; preserve model-call counts and request-owned cost assertions.
 4. For presentation, use colocated Web tests and `pnpm check:web`. jsdom cannot establish live hit-testing or frame geometry.
 5. Run affected gates from `package.json`; verify CI selection for added paths/projects. Report exercised boundaries and remaining gaps.
 
-`pnpm test:resolution:live` is a separate paid check when authorized. Read its route/output limits in `docker/compose.resolution-live.yaml` and `tests/resolution/live.test.mjs`; disclose request count and estimated cost before inference, then report measured cost and unknown charges separately. Use deterministic fixtures otherwise.
+`pnpm test:resolution:live` is a separate paid check when authorized. Read its route/output limits in `scripts/native-check.mjs` and `tests/resolution/live.test.mjs`; disclose request count and estimated cost before inference, then report measured cost and unknown charges separately. Use deterministic fixtures otherwise.
 
-Read `scripts/resolution-check.sh` before concurrent/alternate-checkout runs; its isolated Compose project must not replace unrelated stacks. Execution scenarios act only on controlled fixture pages.
+Read `scripts/native-check.mjs` before concurrent/alternate-checkout runs; its temporary build outputs, loopback ports and owned process groups must not replace unrelated services. Execution scenarios act only on controlled fixture pages. Docker checks validate VPS deployment separately.

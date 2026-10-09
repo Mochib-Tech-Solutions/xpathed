@@ -13,6 +13,7 @@ builder.Services.AddHttpClient("openrouter");
 builder.Services.AddMemoryCache();
 builder.Services.AddTransient<OpenRouterGateway>();
 builder.Services.AddTransient<ResolutionService>();
+builder.Services.AddTransient<XPathSelectionService>();
 builder.Services.AddSingleton<ProviderAccounting>();
 builder.Services.AddSingleton<ModelUsageLimits>();
 var app = builder.Build();

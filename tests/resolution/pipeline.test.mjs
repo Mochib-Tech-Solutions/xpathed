@@ -3,8 +3,8 @@ import { randomUUID } from "node:crypto";
 import { test } from "node:test";
 import { setTimeout as delay } from "node:timers/promises";
 
-const client = "http://client-api:8080";
-const fixture = "http://resolution-fixture:8090";
+const client = process.env.XPATHED_CLIENT_API_URL ?? "http://client-api:8080";
+const fixture = process.env.XPATHED_FIXTURE_URL ?? "http://resolution-fixture:8090";
 
 test("provider-image-opt-in-sends-masked-pixels-and-keeps-result-image-free", async () => {
   await json(`${fixture}/scenario`, "POST", { name: "found" });
@@ -430,14 +430,6 @@ test("cardinality-independent-oracle-rejects-omitted-targets-despite-valid-xpath
   }
 });
 async function json(url, method = "GET", body) {
-  if (
-    url.endsWith("/api/sessions") &&
-    method === "POST" &&
-    body === undefined &&
-    process.env.XPATHED_TEST_BROWSER_TYPE
-  ) {
-    body = { browserType: process.env.XPATHED_TEST_BROWSER_TYPE };
-  }
   const response = await fetch(url, {
     method,
     headers: body ? { "Content-Type": "application/json" } : undefined,

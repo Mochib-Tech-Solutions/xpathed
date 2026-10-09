@@ -4,7 +4,7 @@
     "family": "color-layout",
     "split": "regression",
     "category": "appearance",
-    "fixture": "qualification-color",
+    "fixture": "appearance-color",
     "instruction": "Click the red Choose button.",
     "viewport": {
       "width": 1280,
@@ -76,11 +76,6 @@
       "scopeReview": "independent source review; browser observation pending"
     },
     "sourceSplit": "regression",
-    "sourceCatalogs": [
-      "current-view-qualification-cases.json",
-      "viewport-baseline-cases.json",
-      "cases.json"
-    ],
     "sourceIds": [
       "color-only-reference-v4",
       "current-view-color-only-reference-v4",
@@ -143,7 +138,6 @@
     },
     "labelProvenance": {
       "kind": "controlled-authored",
-      "modelExposure": "Reserved for interrupted live qualification 36994124655; retained as regression without relabeling",
       "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
       "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt9-holdout-check"
     },
@@ -151,7 +145,6 @@
     "exposureRunId": "36994124655",
     "exposedAt": "2026-10-02T10:26:06.108Z",
     "sourceSplit": "regression",
-    "sourceCatalogs": ["current-view-qualification-cases.json"],
     "group": "appearance",
     "sourceIds": ["release2-palette-1"]
   },
@@ -209,7 +202,6 @@
     },
     "labelProvenance": {
       "kind": "controlled-authored",
-      "modelExposure": "Reserved for interrupted live qualification 36994124655; retained as regression without relabeling",
       "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
       "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt9-holdout-check"
     },
@@ -217,7 +209,6 @@
     "exposureRunId": "36994124655",
     "exposedAt": "2026-10-02T10:26:06.108Z",
     "sourceSplit": "regression",
-    "sourceCatalogs": ["current-view-qualification-cases.json"],
     "group": "appearance",
     "sourceIds": ["release2-palette-2"]
   },
@@ -275,7 +266,6 @@
     },
     "labelProvenance": {
       "kind": "controlled-authored",
-      "modelExposure": "Reserved for interrupted live qualification 36994124655; retained as regression without relabeling",
       "sourceReview": "Independent instruction, DOM, readiness and template-exposure review completed before model inference",
       "browserReview": "Deterministic browser identity, scope and readiness checks passed; retained in .artifacts/evaluation/prompt9-holdout-check"
     },
@@ -283,7 +273,6 @@
     "exposureRunId": "36994124655",
     "exposedAt": "2026-10-02T10:26:06.108Z",
     "sourceSplit": "regression",
-    "sourceCatalogs": ["current-view-qualification-cases.json"],
     "group": "appearance",
     "sourceIds": ["release2-palette-3"]
   },
@@ -406,7 +395,6 @@
       "scopeReview": "independent source review; browser observation pending"
     },
     "sourceSplit": "regression",
-    "sourceCatalogs": ["current-view-qualification-cases.json", "viewport-baseline-cases.json"],
     "group": "appearance",
     "sourceIds": ["above-reference-v4", "above-reference-v3", "above-reference"]
   }

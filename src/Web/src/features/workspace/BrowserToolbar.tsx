@@ -11,14 +11,9 @@ import {
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
 } from "@/components/ui/dropdown-menu";
-import type { BrowserResolution, BrowserType } from "./api";
-
-const browserNames = { chromium: "Chromium", firefox: "Firefox" };
+import type { BrowserResolution } from "./api";
 
 type Props = {
-  browserType: BrowserType;
-  browserTypes: BrowserType[];
-  onBrowserTypeChange: (type: BrowserType) => void;
   resolution: string;
   resolutions: BrowserResolution[];
   onResolutionChange: (resolution: string) => void;
@@ -33,9 +28,6 @@ type Props = {
 };
 
 export default function BrowserToolbar({
-  browserType,
-  browserTypes,
-  onBrowserTypeChange,
   resolution,
   resolutions,
   onResolutionChange,
@@ -65,35 +57,6 @@ export default function BrowserToolbar({
       className="flex min-h-14 items-center gap-2 border-b border-border px-3 py-2"
       onSubmit={submit}
     >
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            type="button"
-            variant="ghost"
-            className="gap-1 px-2"
-            aria-label={`Browser type: ${browserNames[browserType]}`}
-            title={sessionId ? "Close all tabs to change browser" : "Browser type"}
-            disabled={!!sessionId || busy || browserTypes.length === 0}
-          >
-            {browserNames[browserType]}
-            <ChevronDown className="size-3" aria-hidden="true" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="start">
-          <DropdownMenuRadioGroup
-            value={browserType}
-            onValueChange={(value) => {
-              if (value === "chromium" || value === "firefox") onBrowserTypeChange(value);
-            }}
-          >
-            {browserTypes.map((type) => (
-              <DropdownMenuRadioItem key={type} value={type}>
-                {browserNames[type]}
-              </DropdownMenuRadioItem>
-            ))}
-          </DropdownMenuRadioGroup>
-        </DropdownMenuContent>
-      </DropdownMenu>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button

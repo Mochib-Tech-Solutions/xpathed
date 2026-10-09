@@ -3,9 +3,9 @@ import { randomUUID } from "node:crypto";
 import { test } from "node:test";
 import { setTimeout as delay } from "node:timers/promises";
 
-const browser = "http://browser:8080";
-const resolver = "http://resolver:8080";
-const fixture = "http://resolution-fixture:8090";
+const browser = process.env.XPATHED_BROWSER_URL ?? "http://browser:8080";
+const resolver = process.env.XPATHED_RESOLVER_URL ?? "http://resolver:8080";
+const fixture = process.env.XPATHED_FIXTURE_URL ?? "http://resolution-fixture:8090";
 async function json(url, method = "GET", body) {
   const response = await fetch(url, {
     method,

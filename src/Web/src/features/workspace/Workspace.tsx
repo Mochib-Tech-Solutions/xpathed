@@ -12,11 +12,9 @@ const BrowserViewer = lazy(() => import("./BrowserViewer"));
 export default function Workspace() {
   const {
     session,
-    browserType,
     resolution,
     setResolution,
     browserOptions,
-    setBrowserType,
     page,
     pages,
     resolving,
@@ -124,9 +122,6 @@ export default function Workspace() {
           />
           <BrowserToolbar
             sessionId={session?.sessionId}
-            browserType={browserType}
-            browserTypes={browserOptions?.browserTypes ?? []}
-            onBrowserTypeChange={setBrowserType}
             resolution={resolution}
             resolutions={browserOptions?.resolutions ?? []}
             onResolutionChange={setResolution}

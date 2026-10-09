@@ -2,12 +2,19 @@ import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { on, once } from "node:events";
 import test from "node:test";
+import jpeg from "jpeg-js";
 import { networkInterfaces } from "node:os";
 
 const browserUrl = process.env.XPATHED_BROWSER_URL ?? "http://browser:8080";
-const fixtureAddress = Object.values(networkInterfaces())
-  .flat()
-  .find((address) => address.family === "IPv4" && !address.internal)?.address;
+const resolverUrl = process.env.XPATHED_RESOLVER_URL ?? "http://resolver:8080";
+const serviceUrl = (path) => (/\/selections?$/u.test(path) ? resolverUrl : browserUrl);
+const fixturePort = Number(process.env.XPATHED_ORACLE_PORT ?? "8070");
+const fixtureUrl = process.env.XPATHED_ORACLE_URL ?? "http://resolution-fixture:8070";
+const fixtureAddress =
+  process.env.XPATHED_CROSS_ORIGIN_HOST ??
+  Object.values(networkInterfaces())
+    .flat()
+    .find((address) => address.family === "IPv4" && !address.internal)?.address;
 const oracleCommands = new Map();
 const oracleObservers = new Map();
 const oracleScript = `<script>
@@ -65,7 +72,7 @@ const oracleScript = `<script>
       });
       const observedTarget = document.querySelector('#expected-target') ?? document.querySelector('#consent-host')?.shadowRoot?.querySelector('#expected-target');
       await fetch('/oracle-result' + endpoint, { method: 'POST', body: JSON.stringify({ matches, shadowMatches, scrollY, clicks: observedTarget?.dataset.clicks ?? '0', nodeCount: document.querySelectorAll('*').length,
-        userAgent: navigator.userAgent, cookie: document.cookie, openerPath: window.opener?.location.pathname ?? null, focused: CSS.supports("selector(:-moz-window-inactive)") ? !document.documentElement.matches(":-moz-window-inactive") : document.hasFocus(),
+        userAgent: navigator.userAgent, cookie: document.cookie, openerPath: window.opener?.location.pathname ?? null, focused: document.hasFocus(),
         activeElement: document.activeElement?.id, events: window.observedEvents ?? {},
         targetMarkup: observedTarget?.outerHTML, values: [...document.querySelectorAll('[data-observe-value]')].map(element => element.value),
         checked: [...document.querySelectorAll('input[type=checkbox]')].map(element => element.checked),
@@ -81,94 +88,103 @@ const targetMarkup = `<section aria-label="Employee"><h2>Employee</h2>
   <button id="expected-target" data-testid="about-us" onclick="this.dataset.clicks = '1'">About us</button>
 </section>`;
 
-// RFB 3.8 client exercises rendered pixels and trusted input through the public viewer seam.
+// Exercise actual streamed pixels and trusted input through the public viewer seam.
 async function withFramebuffer(session, check) {
   const socket = new WebSocket(`${browserUrl.replace("http", "ws")}${session.viewPath}`, {
     headers: { Origin: process.env.XPATHED_VIEWER_ORIGIN ?? "http://localhost:8081" },
   });
-  socket.binaryType = "arraybuffer";
-  const messages = on(socket, "message", { signal: AbortSignal.timeout(15000) });
-  let buffered = Buffer.alloc(0);
-  async function read(size) {
-    while (buffered.length < size) {
-      const {
-        value: [message],
-      } = await messages.next();
-      buffered = Buffer.concat([buffered, Buffer.from(message.data)]);
+  let latest,
+    displayed,
+    decoded,
+    previousButtons = 0;
+  const controls = [];
+  const send = (message) => socket.send(JSON.stringify(message));
+  const control = async (type, matches = () => true) => {
+    for (let attempt = 0; attempt < 250; attempt++) {
+      const index = controls.findIndex((message) => message.type === type && matches(message));
+      if (index >= 0) return controls.splice(index, 1)[0];
+      await new Promise((resolve) => setTimeout(resolve, 20));
     }
-    const result = buffered.subarray(0, size);
-    buffered = buffered.subarray(size);
-    return result;
-  }
+    assert.fail(`Viewer did not send ${type}: ${JSON.stringify(controls)}`);
+  };
+  const receive = ({ data }) => {
+    const frame = JSON.parse(data);
+    if (frame.type !== "frame") {
+      controls.push(frame);
+      return;
+    }
+    latest = frame;
+    send({ type: "ack", frameId: frame.frameId });
+  };
+  socket.addEventListener("message", receive);
+  const input = (message) => {
+    assert.ok(displayed, "Read a displayed frame before sending input");
+    send({ ...message, pageId: displayed.pageId, documentId: displayed.documentId });
+  };
   try {
-    assert.equal((await read(12)).toString(), "RFB 003.008\n");
-    socket.send(Buffer.from("RFB 003.008\n"));
-    const securityTypes = await read((await read(1))[0]);
-    assert.ok(securityTypes.includes(1));
-    socket.send(Uint8Array.of(1));
-    assert.equal((await read(4)).readUInt32BE(), 0);
-    socket.send(Uint8Array.of(1));
-    const initialization = await read(24);
-    const width = initialization.readUInt16BE(0),
-      height = initialization.readUInt16BE(2);
-    await read(initialization.readUInt32BE(20));
-    socket.send(
-      Uint8Array.from([0, 0, 0, 0, 32, 24, 0, 1, 0, 255, 0, 255, 0, 255, 16, 8, 0, 0, 0, 0]),
-    );
-    socket.send(Uint8Array.from([2, 0, 0, 1, 0, 0, 0, 0]));
-    let firstFrame = true;
-    const pixels = Buffer.alloc(width * height * 4);
+    await once(socket, "message", { signal: AbortSignal.timeout(15000) });
     await check(
-      async () => {
-        const update = Buffer.alloc(10);
-        update[0] = 3;
-        update[1] = firstFrame ? 0 : 1;
-        firstFrame = false;
-        update.writeUInt16BE(width, 6);
-        update.writeUInt16BE(height, 8);
-        socket.send(update);
-        const header = await read(4);
-        assert.equal(header[0], 0);
-        for (let index = 0; index < header.readUInt16BE(2); index++) {
-          const rectangle = await read(12);
-          const x = rectangle.readUInt16BE(0),
-            y = rectangle.readUInt16BE(2);
-          const w = rectangle.readUInt16BE(4),
-            h = rectangle.readUInt16BE(6);
-          assert.equal(rectangle.readInt32BE(8), 0);
-          const data = await read(w * h * 4);
-          for (let row = 0; row < h; row++)
-            data.copy(pixels, ((y + row) * width + x) * 4, row * w * 4, (row + 1) * w * 4);
+      async (matches = () => true) => {
+        // A static page emits no new frames. Keep its last actual rendered image.
+        for (let attempt = 0; attempt < 300; attempt++) {
+          await new Promise((resolve) => setTimeout(resolve, 50));
+          if (latest && matches(latest)) break;
         }
-        return { pixels, width, height };
+        assert.ok(latest && matches(latest), "Viewer did not render the expected current page");
+        if (displayed?.frameId !== latest.frameId) {
+          displayed = latest;
+          const image = jpeg.decode(Buffer.from(displayed.data, "base64"), {
+            maxResolutionInMP: 3,
+            maxMemoryUsageInMB: 128,
+          });
+          assert.equal(image.width, displayed.width);
+          assert.equal(image.height, displayed.height);
+          decoded = { pixels: image.data, width: image.width, height: image.height };
+        }
+        return decoded;
       },
       {
+        input,
+        raw: send,
+        control,
         pointer(x, y, buttons = 0) {
-          const event = Buffer.alloc(6);
-          event[0] = 5;
-          event[1] = buttons;
-          event.writeUInt16BE(x, 2);
-          event.writeUInt16BE(y, 4);
-          socket.send(event);
+          const event = buttons === previousButtons ? "move" : buttons ? "down" : "up";
+          input({
+            type: "mouse",
+            event,
+            x,
+            y,
+            buttons,
+            button: event === "move" && !buttons ? "none" : "left",
+            modifiers: 0,
+            ...(event === "down" || event === "up" ? { clickCount: 1 } : {}),
+          });
+          previousButtons = buttons;
         },
         key(key, down) {
-          const event = Buffer.alloc(8);
-          event[0] = 4;
-          event[1] = down ? 1 : 0;
-          event.writeUInt32BE(key, 4);
-          socket.send(event);
+          assert.equal(key, 0xffe1, "Fixture supports the Shift key");
+          input({
+            type: "key",
+            event: down ? "down" : "up",
+            key: "Shift",
+            code: "ShiftLeft",
+            modifiers: down ? 8 : 0,
+          });
         },
       },
     );
   } finally {
-    await messages.return();
-    socket.close();
+    socket.removeEventListener("message", receive);
+    if (socket.readyState !== WebSocket.CLOSED) {
+      const closed = once(socket, "close", { signal: AbortSignal.timeout(5000) }).catch(() => {});
+      socket.close(1000);
+      await closed;
+    }
   }
 }
 
-test("session-teardown-releases-display-before-slot-reuse", { timeout: 600000 }, async () => {
-  // The old forced x11vnc shutdown exhausted the default 4096 System V segments before 128 sessions.
-  // Allow the slower hosted Firefox runner to finish all 128 launches and cleanups.
+test("session-teardown-releases-runtime-before-slot-reuse", { timeout: 600000 }, async () => {
+  // Allow the hosted runner to finish all 128 launches and cleanups.
   for (let index = 0; index < 128; index++) {
     const session = await request("/sessions");
     try {
@@ -203,7 +219,7 @@ test("viewer-disconnect-completes-close-handshake-and-allows-reconnect", async (
         headers: { Origin: process.env.XPATHED_VIEWER_ORIGIN ?? "http://localhost:8081" },
       });
       const [message] = await once(socket, "message", { signal: AbortSignal.timeout(5000) });
-      assert.match(await message.data.text(), /^RFB /);
+      assert.equal(JSON.parse(message.data).type, "frame");
       const closed = once(socket, "close", { signal: AbortSignal.timeout(5000) });
       socket.close(1000);
       const [event] = await closed;
@@ -211,6 +227,257 @@ test("viewer-disconnect-completes-close-handshake-and-allows-reconnect", async (
       assert.equal(event.wasClean, true);
     }
   });
+});
+
+async function waitForObservation(matches, path = "/fixture") {
+  let last;
+  for (let attempt = 0; attempt < 100; attempt++) {
+    last = await observe({}, path);
+    if (matches(last)) return last;
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+  assert.fail(`Page effect did not settle: ${JSON.stringify(last)}`);
+}
+
+function viewerKey(viewer, key, code, text) {
+  viewer.input({
+    type: "key",
+    event: "down",
+    key,
+    code,
+    modifiers: 0,
+    ...(text !== undefined ? { text } : {}),
+  });
+  viewer.input({ type: "key", event: "up", key, code, modifiers: 0 });
+}
+
+function viewerClick(viewer, x, y) {
+  viewer.pointer(x, y, 1);
+  viewer.pointer(x, y, 0);
+}
+
+test("viewer-native-key-cancellation-text-and-enter-preserve-page-effects", async () => {
+  await withFixture(
+    `<style>body{margin:0}input,textarea,button{position:absolute;left:20px;width:220px;height:40px}#cancel{top:20px}#notes{top:80px}#expected-target{top:150px}</style>
+     <input id="cancel" data-observe-value onkeydown="event.preventDefault()">
+     <textarea id="notes" data-observe-value></textarea>
+     <button id="expected-target" onclick="this.dataset.clicks=String(Number(this.dataset.clicks??0)+1)">Activate</button>
+     <script>window.observedEvents={keys:[]};document.addEventListener('keyup',event=>observedEvents.keys.push({id:event.target.id,key:event.key}));</script>`,
+    async (session) => {
+      await withFramebuffer(session, async (readFrame, viewer) => {
+        await readFrame();
+        viewerClick(viewer, 80, 40);
+        viewerKey(viewer, "a", "KeyA", "a");
+        viewerKey(viewer, " ", "Space", " ");
+        let observed = await waitForObservation((value) => value.events.keys.length === 2);
+        assert.deepEqual(observed.values, ["", ""]);
+        assert.deepEqual(observed.events.keys, [
+          { id: "cancel", key: "a" },
+          { id: "cancel", key: " " },
+        ]);
+        viewerClick(viewer, 80, 100);
+        viewerKey(viewer, "a", "KeyA", "a");
+        viewerKey(viewer, " ", "Space", " ");
+        viewer.input({ type: "text", text: "é日本語👋" });
+        viewerKey(viewer, "Enter", "Enter");
+        observed = await waitForObservation((value) => value.events.keys.length === 5);
+        assert.deepEqual(observed.values, ["", "a é日本語👋\n"]);
+        viewerClick(viewer, 80, 170);
+        viewerKey(viewer, "Enter", "Enter");
+        viewerKey(viewer, " ", "Space", " ");
+        observed = await waitForObservation((value) => value.events.keys.length === 7);
+        assert.equal(observed.clicks, "3", "Pointer, Enter and Space each activate exactly once");
+      });
+    },
+  );
+});
+
+test("viewer-stale-document-and-inactive-page-input-cannot-reach-current-controls", async () => {
+  await withFixture("<input autofocus data-observe-value>", async (session, page) => {
+    await withFramebuffer(session, async (readFrame, viewer) => {
+      await readFrame();
+      const reloaded = await request(`/pages/${page.pageId}/navigate`, {
+        url: `${fixtureUrl}/fixture?next=1`,
+      });
+      assert.notEqual(reloaded.documentId, page.documentId);
+      viewer.raw({
+        type: "text",
+        text: "stale-document",
+        pageId: page.pageId,
+        documentId: page.documentId,
+      });
+      assert.equal((await viewer.control("error")).code, "stale_view");
+      assert.deepEqual((await observe()).values, [""]);
+      await readFrame((frame) => frame.documentId === reloaded.documentId);
+      viewer.input({ type: "text", text: "fresh" });
+      assert.deepEqual((await waitForObservation((value) => value.values[0] === "fresh")).values, [
+        "fresh",
+      ]);
+      const state = await request(`/sessions/${session.sessionId}/pages`);
+      const second = state.pages.find((entry) => entry.pageId === state.activePageId);
+      await request(`/pages/${second.pageId}/navigate`, { url: `${fixtureUrl}/second` });
+      viewer.raw({
+        type: "text",
+        text: "inactive",
+        pageId: page.pageId,
+        documentId: reloaded.documentId,
+      });
+      assert.equal((await viewer.control("error")).code, "stale_view");
+      assert.deepEqual((await observe({}, "/second")).values, [""]);
+      assert.deepEqual((await observe()).values, ["fresh"]);
+    });
+  });
+});
+
+test("viewer-dialog-reconnect-preserves-an-explicit-answer-without-replay", async () => {
+  await withFixture(
+    `<style>body{margin:0}button{position:absolute;left:20px;top:20px;width:200px;height:40px}</style>
+     <button onclick="observedEvents.answer=prompt('Choose a name','Original');observedEvents.responses++">Prompt</button>
+     <script>window.observedEvents={responses:0,answer:null};</script>`,
+    async (session) => {
+      let firstDialog;
+      await withFramebuffer(session, async (readFrame, viewer) => {
+        await readFrame();
+        viewerClick(viewer, 80, 40);
+        firstDialog = await viewer.control("dialog");
+        assert.equal(firstDialog.dialogType, "prompt");
+        assert.equal(firstDialog.message, "Choose a name");
+        assert.equal(firstDialog.defaultPrompt, "Original");
+      });
+      await withFramebuffer(session, async (readFrame, viewer) => {
+        const dialog = await viewer.control("dialog");
+        assert.equal(dialog.dialogId, firstDialog.dialogId);
+        viewer.raw({
+          type: "dialog",
+          pageId: dialog.pageId,
+          documentId: dialog.documentId,
+          dialogId: dialog.dialogId,
+          accept: true,
+          promptText: "Chosen 👋",
+        });
+        await viewer.control("dialogClosed", (message) => message.dialogId === dialog.dialogId);
+        let observed = await waitForObservation((value) => value.events.responses === 1);
+        assert.deepEqual(observed.events, { responses: 1, answer: "Chosen 👋" });
+        viewer.raw({
+          type: "dialog",
+          pageId: dialog.pageId,
+          documentId: dialog.documentId,
+          dialogId: dialog.dialogId,
+          accept: true,
+          promptText: "Replay",
+        });
+        assert.equal((await viewer.control("error")).dialogId, dialog.dialogId);
+        observed = await observe();
+        assert.deepEqual(observed.events, { responses: 1, answer: "Chosen 👋" });
+        await readFrame();
+        viewerClick(viewer, 80, 40);
+        const cancelled = await viewer.control("dialog");
+        viewer.raw({
+          type: "dialog",
+          pageId: cancelled.pageId,
+          documentId: cancelled.documentId,
+          dialogId: cancelled.dialogId,
+          accept: false,
+        });
+        await viewer.control("dialogClosed", (message) => message.dialogId === cancelled.dialogId);
+        assert.deepEqual(
+          (await waitForObservation((value) => value.events.responses === 2)).events,
+          { responses: 2, answer: null },
+        );
+      });
+    },
+  );
+});
+
+for (const kind of ["alert", "prompt"])
+  test(
+    `viewer-load-time-${kind}-can-be-answered-before-the-first-page-frame`,
+    { timeout: 30000 },
+    async () => {
+      await withFixture(
+        `<script>window.observedEvents={complete:false,answer:null};observedEvents.answer=${kind}('Initial ${kind}'${kind === "prompt" ? ",'Initial value'" : ""});observedEvents.complete=true;</script><button>Page ready</button>`,
+        async (session, page) => {
+          await withFramebuffer(session, async (readFrame, viewer) => {
+            const dialog = await viewer.control("dialog");
+            assert.equal(dialog.dialogType, kind);
+            assert.equal(dialog.message, `Initial ${kind}`);
+            assert.equal(dialog.pageId, page.pageId);
+            viewer.raw({
+              type: "dialog",
+              pageId: dialog.pageId,
+              documentId: dialog.documentId,
+              dialogId: dialog.dialogId,
+              accept: true,
+              ...(kind === "prompt" ? { promptText: "Confirmed" } : {}),
+            });
+            await viewer.control("dialogClosed", (message) => message.dialogId === dialog.dialogId);
+            const frame = await readFrame(
+              (value) => value.pageId === page.pageId && value.documentId === dialog.documentId,
+            );
+            assert.equal(frame.width, 1280);
+            assert.equal(frame.height, 800);
+            const observed = await waitForObservation((value) => value.events.complete);
+            assert.equal(observed.events.answer, kind === "prompt" ? "Confirmed" : undefined);
+          });
+        },
+      );
+    },
+  );
+
+test("viewer-select-bridge-applies-only-an-explicit-retained-option-and-cancels-cleanly", async () => {
+  await withFixture(
+    `<style>body{margin:0}select{position:absolute;left:20px;top:20px;width:220px;height:40px}</style>
+     <select data-observe-value><option value="PRIVATE_RED">Red</option><option value="PRIVATE_BLUE">Blue</option><option value="PRIVATE_DISABLED" disabled>Unavailable</option></select>
+     <script>window.observedEvents={input:0,change:0};document.querySelector('select').addEventListener('input',()=>observedEvents.input++);document.querySelector('select').addEventListener('change',()=>observedEvents.change++);</script>`,
+    async (session) => {
+      await withFramebuffer(session, async (readFrame, viewer) => {
+        await readFrame();
+        viewerClick(viewer, 80, 40);
+        const picker = await viewer.control("select");
+        assert.equal(
+          JSON.stringify(picker).includes("PRIVATE_"),
+          false,
+          "Option values stay server-side",
+        );
+        assert.deepEqual(
+          picker.options.map(({ label, disabled, selected }) => ({ label, disabled, selected })),
+          [
+            { label: "Red", disabled: false, selected: true },
+            { label: "Blue", disabled: false, selected: false },
+            { label: "Unavailable", disabled: true, selected: false },
+          ],
+        );
+        assert.deepEqual((await observe()).values, ["PRIVATE_RED"]);
+        const blue = picker.options.find((option) => option.label === "Blue");
+        const answer = {
+          type: "select",
+          pageId: picker.pageId,
+          documentId: picker.documentId,
+          pickerId: picker.pickerId,
+          optionId: blue.id,
+        };
+        viewer.raw(answer);
+        await viewer.control("selectClosed", (message) => message.pickerId === picker.pickerId);
+        assert.deepEqual((await observe()).values, ["PRIVATE_BLUE"]);
+        assert.deepEqual((await observe()).events, { input: 1, change: 1 });
+        viewer.raw(answer);
+        assert.equal((await viewer.control("error")).pickerId, picker.pickerId);
+        assert.deepEqual((await observe()).events, { input: 1, change: 1 });
+        viewerClick(viewer, 80, 40);
+        const cancel = await viewer.control("select");
+        viewer.raw({
+          type: "select",
+          pageId: cancel.pageId,
+          documentId: cancel.documentId,
+          pickerId: cancel.pickerId,
+          optionId: null,
+        });
+        await viewer.control("selectClosed", (message) => message.pickerId === cancel.pickerId);
+        assert.deepEqual((await observe()).values, ["PRIVATE_BLUE"]);
+        assert.deepEqual((await observe()).events, { input: 1, change: 1 });
+      });
+    },
+  );
 });
 
 test("targeting-descriptions-preserve-roles-and-accessible-image-names", async () => {
@@ -405,15 +672,7 @@ test("cardinality-distinct-targets-are-verified-and-inspected-without-execution"
 });
 
 async function request(path, body, method = "POST") {
-  if (
-    path === "/sessions" &&
-    method === "POST" &&
-    body?.browserType === undefined &&
-    process.env.XPATHED_TEST_BROWSER_TYPE
-  ) {
-    body = { ...body, browserType: process.env.XPATHED_TEST_BROWSER_TYPE };
-  }
-  const response = await fetch(`${browserUrl}${path}`, {
+  const response = await fetch(`${serviceUrl(path)}${path}`, {
     method,
     headers: body === undefined ? {} : { "Content-Type": "application/json" },
     body: body === undefined ? undefined : JSON.stringify(body),
@@ -471,7 +730,7 @@ async function observeFullscreen(pagePath) {
 }
 
 async function expectError(path, body, status, code) {
-  const response = await fetch(`${browserUrl}${path}`, {
+  const response = await fetch(`${serviceUrl(path)}${path}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -484,7 +743,7 @@ async function withFixture(markup, check, sessionOptions) {
   oracleCommands.clear();
   oracleObservers.clear();
   const server = createServer(async (request, response) => {
-    const url = new URL(request.url, "http://resolution-fixture:8070");
+    const url = new URL(request.url, fixtureUrl);
     const pagePath = url.searchParams.get("page");
     if (url.pathname === "/oracle") {
       const command = oracleCommands.get(pagePath);
@@ -504,13 +763,13 @@ async function withFixture(markup, check, sessionOptions) {
     const content = typeof markup === "function" ? markup(url.pathname) : markup;
     response.end(`<!doctype html><html><body>${content}${oracleScript}</body></html>`);
   });
-  server.listen(8070, "0.0.0.0");
+  server.listen(fixturePort, process.env.XPATHED_FIXTURE_HOST ?? "0.0.0.0");
   await once(server, "listening");
   let session;
   try {
     session = await request("/sessions", sessionOptions);
     const page = await request(`/pages/${session.pageId}/navigate`, {
-      url: "http://resolution-fixture:8070/fixture",
+      url: `${fixtureUrl}/fixture`,
     });
     await check(session, page);
   } finally {
@@ -768,6 +1027,27 @@ test("targeting-private-label-references-exclude-values-and-preserve-hidden-publ
   );
 });
 
+test("capture-image-rejects-inaccessible-author-shadow-content-without-blocking-text-capture", async () => {
+  await withFixture(
+    `<button>Public action</button><div id="private-host"></div>
+     <script>document.querySelector('#private-host').attachShadow({mode:'closed'}).innerHTML='<input value="CLOSED_SHADOW_PRIVATE">';</script>`,
+    async (session, page) => {
+      const body = { documentId: page.documentId };
+      const capture = await request(`/pages/${page.pageId}/capture`, body);
+      assert.ok(capture.candidates.some((candidate) => candidate.label === "Public action"));
+      assert.equal(JSON.stringify(capture).includes("CLOSED_SHADOW_PRIVATE"), false);
+      await expectError(
+        `/pages/${page.pageId}/capture`,
+        { ...body, includeImage: true },
+        409,
+        "capture_image_unavailable",
+      );
+      const after = await request(`/pages/${page.pageId}/capture`, body);
+      assert.ok(after.candidates.some((candidate) => candidate.label === "Public action"));
+    },
+  );
+});
+
 test("capture-image-wait-rechecks-private-name-sources-before-returning", async () => {
   await withFixture(
     `<span id="source" hidden aria-label="Private marker screenshot"></span>
@@ -913,12 +1193,12 @@ test("session-empty-creation-uses-configured-default", async () => {
 
 test("session-selected-engine-owns-viewer-and-capture", async () => {
   await withFixture(targetMarkup, async (session, page) => {
-    const expected = process.env.XPATHED_TEST_BROWSER_TYPE ?? "chromium";
+    const expected = "chromium";
     assert.equal(session.browserType, expected);
     const state = await request(`/sessions/${session.sessionId}`, undefined, "GET");
     assert.equal(state.browserType, expected);
     const observed = await observe();
-    assert.match(observed.userAgent, expected === "firefox" ? /Firefox\// : /Chrome\//);
+    assert.match(observed.userAgent, /Chrome\//);
     const capture = await request(`/pages/${page.pageId}/capture`, { documentId: page.documentId });
     assert.ok(capture.candidates.some((candidate) => candidate.label === "About us"));
     await withFramebuffer(session, async (readFrame) => {
@@ -956,12 +1236,17 @@ for (const [width, height] of [
           const frame = await readFrame();
           assert.equal(frame.width, width);
           assert.equal(frame.height, height);
-          assert.deepEqual([...frame.pixels.subarray(-4, -1)], [56, 34, 12]);
+          assert.ok(
+            [...frame.pixels.subarray(-4, -1)].every(
+              (channel, index) => Math.abs(channel - [12, 34, 56][index]) <= 3,
+            ),
+            "JPEG preserves the background color",
+          );
         });
         const next = await request(`/sessions/${session.sessionId}/pages`);
         assert.equal(next.resolution, resolution);
         await request(`/pages/${next.activePageId}/navigate`, {
-          url: "http://resolution-fixture:8070/new",
+          url: `${fixtureUrl}/new`,
         });
         const newTab = await observe({}, "/new");
         assert.equal(newTab.innerWidth, width);
@@ -1857,10 +2142,11 @@ for (const shadow of [false, true])
 test("highlights-outlines-leave-target-pixels-unchanged", async () => {
   await withFixture(
     `<style>body{margin:0;background:#888}button{position:absolute;left:100px;top:100px;width:240px;height:100px;border:2px solid #c23;background:white;color:black}button+button{left:340px;width:8px;height:8px;padding:0}</style>
-    <button>Readable target</button><button aria-label="Tiny target"></button>
+    <button id="expected-target">Readable target</button><button aria-label="Tiny target"></button>
     <script>const nativeMatchMedia = matchMedia; window.matchMedia = query => query === '(prefers-reduced-motion: reduce)' ? {matches:true} : nativeMatchMedia(query);</script>`,
     async (session, page) => {
       await withFramebuffer(session, async (frame) => {
+        const targetBefore = (await observe()).targetMarkup;
         const initial = await frame();
         const before = Buffer.from(initial.pixels);
         await selectHighlights(page, true);
@@ -1870,15 +2156,22 @@ test("highlights-outlines-leave-target-pixels-unchanged", async () => {
           [340, 100, 8, 8],
         ]) {
           for (let y = top; y < top + height; y++) {
-            const start = (y * after.width + left) * 4;
-            const end = start + width * 4;
-            assert.deepEqual(
-              after.pixels.subarray(start, end),
-              before.subarray(start, end),
-              `Target row ${y} stays unchanged`,
-            );
+            for (let x = left; x < left + width; x++) {
+              // JPEG changes blocks beside the outline; the inner pixels remain exact.
+              const edge =
+                x < left + 8 || x >= left + width - 8 || y < top + 8 || y >= top + height - 8;
+              const start = (y * after.width + x) * 4;
+              for (let channel = 0; channel < 3; channel++)
+                assert.ok(
+                  Math.abs(after.pixels[start + channel] - before[start + channel]) <=
+                    (edge ? 40 : 0),
+                  `Target pixel ${x},${y} stays unchanged within stream compression`,
+                );
+              assert.equal(after.pixels[start + 3], before[start + 3]);
+            }
           }
         }
+        assert.equal((await observe()).targetMarkup, targetBefore);
       });
     },
   );
@@ -2114,7 +2407,7 @@ for (const crossOrigin of [false, true])
     await withFixture(
       (path) =>
         path === "/fixture"
-          ? `${highlightFixture}<iframe title="Approval frame" src="${crossOrigin ? `http://${fixtureAddress}:8070` : ""}/highlight-frame" style="position:absolute;left:100px;top:300px;width:800px;height:300px;border:0"></iframe>`
+          ? `${highlightFixture}<iframe title="Approval frame" src="${crossOrigin ? `http://${fixtureAddress}:${fixturePort}` : ""}/highlight-frame" style="position:absolute;left:100px;top:300px;width:800px;height:300px;border:0"></iframe>`
           : `<style>body{margin:0;background:white}button{position:absolute;left:100px;top:20px;width:240px;height:100px;background:white;border:0}</style><button id="expected-target">Frame approval</button>`,
       async (session, page) => {
         await observe({}, "/highlight-frame");
@@ -3117,11 +3410,8 @@ test("state-native-date-and-time-fill-and-clear-remain-passive", async () => {
     const capture = await request(`/pages/${page.pageId}/capture`, { documentId: page.documentId });
     for (const [type] of types)
       for (const readonly of [false, true]) {
-        const textFallback = session.browserType === "firefox" && ["month", "week"].includes(type);
         assert.ok(
-          before.inputTypes.some(
-            (input) => input.declared === type && input.actual === (textFallback ? "text" : type),
-          ),
+          before.inputTypes.some((input) => input.declared === type && input.actual === type),
         );
         const candidate = capture.candidates.find(
           (entry) => entry.label === `${type} ${readonly ? "readonly" : "writable"}`,
@@ -3136,18 +3426,18 @@ test("state-native-date-and-time-fill-and-clear-remain-passive", async () => {
           });
           assert.equal(
             target.interactability.checks.compatibleControl,
-            action === "type" && !textFallback ? "fail" : "pass",
+            action === "type" ? "fail" : "pass",
             `${type}: ${action}`,
           );
           assert.equal(
             target.interactability.checks.keyboard,
-            action === "type" && !textFallback ? "unknown" : "pass",
+            action === "type" ? "unknown" : "pass",
           );
           assert.equal(target.state.editable, !readonly);
           assert.equal(target.interactability.checks.writable, readonly ? "fail" : "pass");
           assert.equal(
             target.interactability.status,
-            (action === "type" && !textFallback) || readonly ? "blocked" : "ready",
+            action === "type" || readonly ? "blocked" : "ready",
           );
         }
       }
@@ -3301,7 +3591,7 @@ test("frames-cross-origin-clipping-and-obstruction-are-passive-and-navigation-in
     (path) =>
       path === "/fixture"
         ? `<style>body{margin:0}#clip{position:absolute;left:100px;top:100px;width:200px;height:100px;overflow:hidden}iframe{width:400px;height:300px;border:0}#cover{position:absolute;left:100px;top:100px;width:160px;height:80px;background:black;z-index:2}</style>
-        <div id="clip"><iframe title="External" src="http://${fixtureAddress}:8070/external"></iframe></div><div id="cover"></div>`
+        <div id="clip"><iframe title="External" src="http://${fixtureAddress}:${fixturePort}/external"></iframe></div><div id="cover"></div>`
         : `<style>body{margin:0}button{position:absolute;left:20px;top:20px;width:120px;height:40px}#below{top:180px}</style><button id="expected-target">Covered child</button><button id="below">Clipped child</button>`,
     async (session, page) => {
       await observe({}, "/external");
@@ -3760,7 +4050,9 @@ test("shadow-highlights-preserve-target-pixels-and-passive-state", async () => {
         const pixel = (x, y) => [
           ...image.pixels.subarray((y * image.width + x) * 4, (y * image.width + x) * 4 + 3),
         ];
-        assert.deepEqual(pixel(70, 140), [200, 80, 21]);
+        pixel(70, 140).forEach((channel, index) =>
+          assert.ok(Math.abs(channel - [21, 80, 200][index]) <= 3),
+        );
         assert.ok(pixel(140, 93).every((channel) => channel < 30));
         assert.ok(pixel(140, 95).every((channel) => channel > 225));
       });
@@ -4185,14 +4477,13 @@ test("targeting-icon-buttons-and-labelled-images-are-found-without-visible-text"
 
 test("session-concurrent-workspaces-remain-isolated-after-one-closes", async () => {
   await withFixture(targetMarkup, async (first, firstPage) => {
-    const second = await request("/sessions", {
-      browserType: first.browserType === "chromium" ? "firefox" : "chromium",
-    });
-    assert.notEqual(second.browserType, first.browserType);
+    const second = await request("/sessions");
+    assert.equal(first.browserType, "chromium");
+    assert.equal(second.browserType, "chromium");
     let replacement;
     try {
       const secondPage = await request(`/pages/${second.pageId}/navigate`, {
-        url: "http://resolution-fixture:8070/second",
+        url: `${fixtureUrl}/second`,
       });
       for (const id of [first.sessionId, second.sessionId, first.pageId, second.pageId])
         assert.match(id, /^[a-f0-9]{32}$/);
@@ -4295,7 +4586,7 @@ test("session-close-all-tabs-allows-fresh-captures-and-selections", async () => 
         if (cycle < 5) {
           session = await request("/sessions");
           page = await request(`/pages/${session.pageId}/navigate`, {
-            url: "http://resolution-fixture:8070/fixture",
+            url: `${fixtureUrl}/fixture`,
           });
         }
       }
@@ -4419,9 +4710,7 @@ test("tabs-native-links-and-popups-preserve-opener-and-shared-cookies", async ()
         await observe({ focusPopup: true });
         nativeFocused = (await observe({}, "/feature-popup")).focused;
       }
-      // Firefox can decline page-script focus; routing must follow the actual native window.
-      if (session.browserType === "chromium")
-        assert.equal(nativeFocused, true, "Reused popup did not receive native focus");
+      assert.equal(nativeFocused, true, "Reused popup did not receive native focus");
       const expectedActivePage = nativeFocused ? popupId : page.pageId;
       const reused = await waitForSession(
         session.sessionId,
@@ -4473,7 +4762,7 @@ test("tabs-only-active-page-can-resolve-and-switching-invalidates-capture", asyn
       );
 
       const secondPage = await request(`/pages/${secondId}/navigate`, {
-        url: "http://resolution-fixture:8070/second",
+        url: `${fixtureUrl}/second`,
       });
       const secondCapture = await request(`/pages/${secondId}/capture`, {
         documentId: secondPage.documentId,
@@ -4532,7 +4821,7 @@ test("tabs-limits-reject-excess-pages-and-closing-restores-capacity", async () =
     await expectError(`${sessionPath}/pages`, undefined, 409, "tab_limit");
     const activeId = state.activePageId;
     const page = await request(`/pages/${activeId}/navigate`, {
-      url: "http://resolution-fixture:8070/limit",
+      url: `${fixtureUrl}/limit`,
     });
     await observe({ open: { url: "/overflow" } }, "/limit");
     const rejected = await waitForSession(session.sessionId, (current) =>
@@ -4556,4 +4845,121 @@ test("tabs-limits-reject-excess-pages-and-closing-restores-capacity", async () =
       "about:blank",
     );
   });
+});
+
+for (const source of ["context", "unrelated"]) {
+  test(`xpath-evidence-rechecks-only-retained-privacy-sources-${source}`, async () => {
+    await withFixture(
+      `<section><h2 id="context">Billing</h2><button id="expected-target">Save</button></section>
+      <button id="unrelated">Other action</button>
+      <script>window.mutateXpathFixture = () => document.querySelector('#${source}').setAttribute('data-private', '');</script>`,
+      async (session, page) => {
+        const capture = await request(`/pages/${page.pageId}/capture`, {
+          documentId: page.documentId,
+        });
+        const candidate = capture.candidates.find((item) => item.label === "Save");
+        assert.ok(candidate);
+        const identity = { documentId: page.documentId, captureId: capture.captureId };
+        const evidence = await request(`/pages/${page.pageId}/xpath-evidence`, {
+          ...identity,
+          candidateIds: [candidate.id],
+        });
+        assert.ok(evidence.nodes.some((node) => node.tag === "h2" && node.text === "Billing"));
+        const target = evidence.targets.find((item) => item.candidateId === candidate.id);
+        assert.ok(target);
+        await observe({ mutateXpath: true });
+        const expression = "//section[h2[normalize-space(.)='Billing']]//button";
+        // Deliberately exercise Browser's generic verifier after collecting its evidence.
+        const response = await fetch(`${browserUrl}/pages/${page.pageId}/selections`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...identity,
+            xpathEvidenceId: evidence.evidenceId,
+            actions: [{ actionId: "single", candidateId: candidate.id, action: "click" }],
+            xpathProposals: [
+              { nodeId: target.nodeId, proposals: [{ expression, requirements: [] }] },
+            ],
+          }),
+        });
+        const result = await response.json();
+        assert.equal(response.status, source === "context" ? 409 : 200, JSON.stringify(result));
+        if (source === "context") {
+          assert.equal(result.code, "stale_capture");
+        } else {
+          assert.deepEqual(result.actions[0].target.xpaths, [expression]);
+          assert.deepEqual((await verify([expression])).matches, [["expected-target"]]);
+        }
+      },
+    );
+  });
+}
+
+test("xpath-evidence-rejects-interleaved-capture-batches", async () => {
+  await withFixture(
+    `<section><h2 id="first-context">Private later</h2><button id="first">First action</button></section>
+    <section><h2>Public context</h2><button id="second" onclick="window.observedEvents = { second: 1 }">Second action</button></section>
+    <script>window.mutateXpathFixture = () => document.querySelector('#first-context').setAttribute('data-private', '');</script>`,
+    async (session, page) => {
+      const capture = await request(`/pages/${page.pageId}/capture`, {
+        documentId: page.documentId,
+      });
+      const first = capture.candidates.find((item) => item.label === "First action");
+      const second = capture.candidates.find((item) => item.label === "Second action");
+      assert.ok(first && second);
+      const identity = { documentId: page.documentId, captureId: capture.captureId };
+      const evidence = (candidate) =>
+        request(`/pages/${page.pageId}/xpath-evidence`, {
+          ...identity,
+          candidateIds: [candidate.id],
+        });
+      const firstEvidence = await evidence(first);
+      await observe({ mutateXpath: true });
+      const secondEvidence = await evidence(second);
+      assert.equal(typeof firstEvidence.evidenceId, "string");
+      assert.ok(firstEvidence.evidenceId);
+      assert.notEqual(firstEvidence.evidenceId, secondEvidence.evidenceId);
+      const verifyBatch = (candidate, batch, expression) =>
+        fetch(`${browserUrl}/pages/${page.pageId}/selections`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            ...identity,
+            xpathEvidenceId: batch.evidenceId,
+            actions: [{ actionId: "single", candidateId: candidate.id, action: "click" }],
+            xpathProposals: [
+              {
+                nodeId: batch.targets.find((item) => item.candidateId === candidate.id).nodeId,
+                proposals: [{ expression, requirements: [] }],
+              },
+            ],
+          }),
+        });
+      // The first request's verification is delayed until a concurrent request replaces its evidence.
+      const [stale, current] = await Promise.all([
+        verifyBatch(
+          first,
+          firstEvidence,
+          "//section[h2[normalize-space(.)='Private later']]//button",
+        ),
+        verifyBatch(second, secondEvidence, "//button[@id='second']"),
+      ]);
+      assert.equal(stale.status, 409);
+      assert.equal((await stale.json()).code, "stale_xpath_evidence");
+      assert.equal(current.status, 200);
+      const selected = await current.json();
+      assert.equal(selected.actions[0].target.candidateId, second.id);
+      assert.deepEqual((await verify(selected.actions[0].target.xpaths)).matches, [["second"]]);
+      const obsoleteAfterSuccess = await verifyBatch(first, firstEvidence, "//button[@id='first']");
+      assert.equal(obsoleteAfterSuccess.status, 409);
+      assert.equal((await obsoleteAfterSuccess.json()).code, "stale_xpath_evidence");
+      const execution = await request(`/pages/${page.pageId}/execute`, {
+        ...identity,
+        sessionId: session.sessionId,
+        actionId: "single",
+      });
+      assert.equal(execution.status, "completed");
+      assert.equal((await observe()).events.second, 1);
+    },
+  );
 });

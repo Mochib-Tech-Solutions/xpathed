@@ -3,6 +3,7 @@
 **/node_modules/
 **/dist/
 **/.vitest/
+**/__pycache__/
 .env
 .env.*
 !.env.example

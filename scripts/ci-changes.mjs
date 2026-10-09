@@ -67,7 +67,7 @@ export function classifyChanges(paths) {
       projects.forEach((project) => affected.add(project));
     if (path.startsWith("tests/Common.")) projects.forEach((project) => affected.add(project));
     if (
-      /^(evaluation\/|scripts\/(evaluate[.-]|release\/evaluate[.]|ci-browser[.])|tests\/resolution\/(ready\.mjs|browser\.test\.mjs|server\.mjs)$|scripts\/resolution-check\.sh$|docker\/(browser\/|resolver\/|evaluation-fixture\/|compose\.(yaml|resolution-check\.yaml|evaluation\.yaml|context\.yaml|sh)$)|\.dockerignore$|pnpm-(lock|workspace)\.yaml$|\.npmrc$|\.node-version$|\.nvmrc$)/.test(
+      /^(evaluation\/|scripts\/(evaluate[.-]|native[.-]|service-process[.])|tests\/resolution\/(ready\.mjs|browser\.test\.mjs|server\.mjs)$|scripts\/resolution-check\.sh$|docker\/(browser\/|resolver\/|compose\.(yaml|sh)$)|\.dockerignore$|pnpm-(lock|workspace)\.yaml$|\.npmrc$|\.node-version$|\.nvmrc$)/.test(
         path,
       )
     )

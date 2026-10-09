@@ -5,7 +5,6 @@ import {
   runTrials,
   validateCases,
   parseOptions,
-  toArtifact,
   prune,
   main,
   replay,
@@ -136,7 +135,7 @@ async function runWithServices(
             candidates: [{ id: "candidate", label: "Save changes", tag: "button" }],
           });
     }
-    if (path === "/browser/pages/page/selections")
+    if (path === "/resolver/pages/page/selections")
       return send({
         actions: body.actions.map((action) => ({
           target: { candidateId: action.candidateId, xpaths: ["//button"] },
@@ -337,60 +336,19 @@ test("options-invalid-or-ambiguous-arguments-are-rejected-before-paid-calls", ()
   assert.throws(() => parseOptions(["--unknown", "value"]));
 });
 
-test("evidence-model-input-remains-inside-expiring-artifacts", () => {
-  const trial = {
-    id: "a".repeat(32),
-    caseId: "save",
-    createdAt: "2026-09-30T12:00:00Z",
-    result: { pageId: "page", traceId: "trace", configurationId: "config", outcome: "found" },
-    evidence: { modelInput: "synthetic" },
-    observation: { actions: [] },
-    elapsedMs: 20,
-  };
-  const artifact = toArtifact({ code: { revision: "revision" }, id: "run" }, trial, {
-    passed: true,
-  });
-  assert.equal(artifact.kind, "evaluation");
-  assert.equal(artifact.provenance.caseId, "save");
-  assert.equal(artifact.result.evidence, undefined);
-  assert.equal(artifact.evidence.modelInput, "synthetic");
-  assert.equal(
-    Date.parse(artifact.evidenceExpiresAt) - Date.parse(artifact.createdAt),
-    30 * 86400000,
-  );
-});
-
 test("retention-expired-inputs-are-erased-without-discarding-outcomes", async () => {
   const path = await mkdtemp(join(tmpdir(), "evaluation-retention-"));
   try {
     await mkdir(join(path, "trials"));
-    await mkdir(join(path, "imports"));
-    await mkdir(join(path, "offline"));
-    await writeFile(
-      join(path, "offline", "a.request.json"),
-      JSON.stringify({ input: "raw input" }),
-    );
-    await writeFile(
-      join(path, "offline", "a.response.json"),
-      JSON.stringify({ prepared: "raw prompt", result: "raw output" }),
-    );
-    const expected = { actions: [{ target: { candidateId: "c1" } }] };
     await writeFile(
       join(path, "manifest.json"),
       JSON.stringify({
         version: "1",
-        id: "f403d014-b959-4752-8861-4d203448c592",
+        id: "retained-run",
         createdAt: "2026-08-01T00:00:00Z",
         plan: { trials: [] },
         code: { revision: "test" },
         contentHash: "original-frozen-hash",
-        cases: [
-          {
-            id: "offline",
-            expected,
-            input: { instruction: "Click Save", candidates: [{ id: "c1", text: "raw input" }] },
-          },
-        ],
       }),
     );
     await writeFile(
@@ -399,75 +357,21 @@ test("retention-expired-inputs-are-erased-without-discarding-outcomes", async ()
         result: { outcome: "found" },
         provider: [{ forwarded: true, reportedUsd: 0.001 }],
         evidence: { modelInput: "secret" },
-        baseline: { result: { outcome: "not_found" }, evidence: { modelInput: "baseline secret" } },
         mutation: { fresh: { evidence: { modelInput: "secret" } } },
       }),
     );
     await writeFile(join(path, "trials", "a.json.partial"), '{"evidence":"interrupted raw input"');
     assert.equal(await prune(path, new Date("2026-08-30T00:00:00Z")), "retained");
-    const retained = JSON.parse(await readFile(join(path, "manifest.json"), "utf8"));
-    assert.ok(retained.cases[0].input);
     assert.equal(await prune(path, new Date("2026-08-31T00:00:00Z")), "evidence_deleted");
     const expired = JSON.parse(await readFile(join(path, "manifest.json"), "utf8"));
-    assert.equal(expired.cases[0].input, undefined);
-    assert.deepEqual(expired.cases[0].expected, expected);
     assert.equal(expired.evidenceAvailability, "expired");
     assert.equal(expired.contentHash, "original-frozen-hash");
-    await assert.rejects(readFile(join(path, "offline", "a.request.json")), { code: "ENOENT" });
-    await assert.rejects(readFile(join(path, "offline", "a.response.json")), { code: "ENOENT" });
-    await assert.rejects(() => readFile(join(path, "trials", "a.json.partial")), {
-      code: "ENOENT",
-    });
+    await assert.rejects(readFile(join(path, "trials", "a.json.partial")), { code: "ENOENT" });
     const trial = JSON.parse(await readFile(join(path, "trials", "a.json"), "utf8"));
     assert.equal(trial.evidence, null);
     assert.equal(trial.mutation.fresh.evidence, null);
-    assert.equal(trial.baseline.evidence, null);
-    assert.equal(trial.baseline.result.outcome, "not_found");
     assert.equal(trial.result.outcome, "found");
     assert.deepEqual(trial.provider, [{ forwarded: true, reportedUsd: 0.001 }]);
-  } finally {
-    await rm(path, { recursive: true, force: true });
-  }
-});
-
-test("retention-prepared-requests-and-preflight-evidence-expire-before-records", async () => {
-  const path = await mkdtemp(join(tmpdir(), "context-retention-"));
-  try {
-    for (const sub of ["trials", "preflight", "provider"]) await mkdir(join(path, sub));
-    const manifest = {
-      version: 1,
-      kind: "context-experiment",
-      id: "context-run",
-      createdAt: "2026-08-01T00:00:00Z",
-      plan: [],
-      code: { revision: "test" },
-      preparedRequests: { a: [{ messages: [{ content: "private input" }] }] },
-      contentHash: "original-frozen-hash",
-    };
-    await writeFile(join(path, "manifest.json"), JSON.stringify(manifest));
-    for (const sub of ["trials", "preflight"])
-      await writeFile(
-        join(path, sub, "a.json"),
-        JSON.stringify({
-          result: { outcome: "found" },
-          evidence: { modelInput: "private input" },
-        }),
-      );
-    await writeFile(join(path, "provider", "a.json"), JSON.stringify({ request: "private input" }));
-    assert.equal(await prune(path, new Date("2026-08-30T00:00:00Z")), "retained");
-    assert.deepEqual(JSON.parse(await readFile(join(path, "manifest.json"), "utf8")), manifest);
-    assert.equal(await prune(path, new Date("2026-08-31T00:00:00Z")), "evidence_deleted");
-    const expired = JSON.parse(await readFile(join(path, "manifest.json"), "utf8"));
-    assert.equal(expired.preparedRequests, undefined);
-    assert.equal(expired.evidenceAvailability, "expired");
-    assert.equal(expired.contentHash, manifest.contentHash);
-    for (const sub of ["trials", "preflight"]) {
-      const trial = JSON.parse(await readFile(join(path, sub, "a.json"), "utf8"));
-      assert.equal(trial.evidence, null);
-      assert.equal(trial.evidenceAvailability, "expired");
-      assert.equal(trial.result.outcome, "found");
-    }
-    await assert.rejects(readFile(join(path, "provider", "a.json")), { code: "ENOENT" });
     assert.equal(await prune(path, new Date("2026-10-30T00:00:00Z")), "records_deleted");
     await assert.rejects(readFile(join(path, "manifest.json")), { code: "ENOENT" });
   } finally {
@@ -527,7 +431,7 @@ test("workers-pending-cleanup-completes-before-infrastructure-failure-is-reporte
   assert.throws(() => parseOptions(["--mode", "live", "--concurrency", "2"]), /Live evaluation/);
 });
 
-test("workers-serial-execution-preserves-comparison-fixture-protocol", async (t) => {
+test("workers-serial-execution-preserves-fixture-protocol", async (t) => {
   const { trial, attempts } = await runWithServices(
     t,
     "locators-wrapper-insertion-preserves-current-view-target",

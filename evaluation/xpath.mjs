@@ -28,6 +28,29 @@ export function selectXPathCases(cases) {
   return { cases: selected, exclusions };
 }
 
+export function verifiedFrameMatches(captured, verified) {
+  if (!captured || !verified) return false;
+  if (
+    !(verified.chain ?? []).every(
+      (owner) =>
+        typeof owner.xpath === "string" &&
+        owner.xpath.trim() &&
+        (owner.shadowChain ?? []).every(
+          (host) => typeof host.xpath === "string" && host.xpath.trim(),
+        ),
+    )
+  )
+    return false;
+  const identity = ({ chain, ...frame }) => ({
+    ...frame,
+    chain: chain?.map(({ xpath, shadowChain, ...owner }) => ({
+      ...owner,
+      shadowChain: shadowChain?.map(({ xpath, ...host }) => host),
+    })),
+  });
+  return isDeepStrictEqual(identity(captured), identity(verified));
+}
+
 export async function resolveXPathTrial(spec, trial, session, page, options, services, channelId) {
   const started = performance.now();
   try {
@@ -49,7 +72,7 @@ export async function resolveXPathTrial(spec, trial, session, page, options, ser
       action: item.action,
     }));
     const validation = await request(
-      `${services.browser}/pages/${session.pageId}/selections`,
+      `${services.resolver}/pages/${session.pageId}/selections`,
       { documentId: page.documentId, captureId: capture.captureId, actions },
       options.timeoutMs,
     );
@@ -65,11 +88,11 @@ export async function resolveXPathTrial(spec, trial, session, page, options, ser
         (selected.candidateId === null
           ? verified.target !== null
           : verified.target?.candidateId !== selected.candidateId ||
-            !isDeepStrictEqual(verified.target?.frame, candidate?.frame))
+            !verifiedFrameMatches(candidate?.frame, verified.target?.frame))
       )
         throw new Error("XPath verification returned a different selection or frame");
     }
-    // Grader adapter only: retain the raw Browser response above; no Resolver call was made.
+    // Grader adapter only: retain the verification response above; no model call was made.
     const outcomes = [...new Set(selections.map((item) => item.outcome))];
     trial.result = {
       outcome: outcomes.length === 1 ? outcomes[0] : "partial",

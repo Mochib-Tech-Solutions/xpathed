@@ -7,7 +7,7 @@
     "node": "^24.16.0"
   },
   "scripts": {
-    "setup": "scripts/setup.sh && pnpm install --frozen-lockfile",
+    "setup": "scripts/setup.sh && pnpm install --frozen-lockfile && node scripts/setup-native.mjs",
     "restore": "dotnet tool restore && pnpm restore:dotnet && pnpm install --frozen-lockfile",
     "restore:dotnet": "dotnet restore Xpathed.slnx --locked-mode",
     "dev": "node scripts/dev.mjs",
@@ -49,24 +49,14 @@
     "evaluate:xpath": "scripts/evaluate.sh --xpath",
     "evaluate:resolver": "scripts/evaluate.sh",
     "evaluate:resolver:live": "scripts/evaluate.sh --mode live",
-    "evaluate:qualify": "scripts/evaluate.sh --qualification",
-    "evaluate:qualify:replay": "node evaluation/compare.mjs --replay",
-    "release:seal": "node scripts/release/evidence.mjs seal",
-    "release:verify": "node scripts/release/evidence.mjs verify",
-    "release:bundle": "node scripts/release/bundle.mjs create",
-    "release:bundle:verify": "node scripts/release/bundle.mjs verify",
-    "release:bundle:restore": "node scripts/release/bundle.mjs restore",
-    "release:evaluate": "node scripts/release/evaluate.mjs",
     "evaluate:replay": "node evaluation/run.mjs --replay",
     "prepare": "node scripts/install-hooks.mjs",
     "hooks:install": "node scripts/install-hooks.mjs",
     "check:staged": "node scripts/pre-commit.mjs",
-    "release:archive": "node scripts/release/archive.mjs pack",
-    "release:archive:restore": "node scripts/release/archive.mjs restore",
-    "release:download": "node scripts/release/download.mjs",
-    "release:monitor": "node scripts/release/monitor.mjs"
+    "dev:stop": "node scripts/dev.mjs --stop"
   },
   "devDependencies": {
+    "jpeg-js": "0.4.4",
     "prettier": "3.9.9"
   }
 }

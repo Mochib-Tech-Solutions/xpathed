@@ -209,7 +209,8 @@ internal static partial class BrowserEvidence
             && frame.Chain.All(ancestor =>
                 ancestor is not null
                 && !string.IsNullOrWhiteSpace(ancestor.FrameId)
-                && !string.IsNullOrWhiteSpace(ancestor.Xpath)
+                && !string.IsNullOrWhiteSpace(ancestor.NodeId)
+                && ancestor.Xpath is not null
                 && ancestor.Label is not null
                 && ValidShadowChain(ancestor.ShadowChain)
             )
@@ -230,7 +231,7 @@ internal static partial class BrowserEvidence
                         pair.First is not null
                         && pair.Second is not null
                         && pair.First.FrameId == pair.Second.FrameId
-                        && pair.First.Xpath == pair.Second.Xpath
+                        && pair.First.NodeId == pair.Second.NodeId
                         && pair.First.Label == pair.Second.Label
                         && SameShadowChain(pair.First.ShadowChain, pair.Second.ShadowChain)
                     );
@@ -238,12 +239,21 @@ internal static partial class BrowserEvidence
     private static bool ValidShadowChain(ShadowHost[]? chain) =>
         chain is null
         || chain is { Length: > 0 }
-            && chain.All(host => host is not null && !string.IsNullOrWhiteSpace(host.Xpath) && host.Label is not null);
+            && chain.All(host =>
+                host is not null
+                && host.Xpath is not null
+                && !string.IsNullOrWhiteSpace(host.NodeId)
+                && host.Label is not null
+            );
 
     private static bool SameShadowChain(ShadowHost[]? actual, ShadowHost[]? expected) =>
-        ValidShadowChain(actual) && (actual ?? []).SequenceEqual(expected ?? []);
+        ValidShadowChain(actual)
+        && (actual ?? []).Length == (expected ?? []).Length
+        && (actual ?? [])
+            .Zip(expected ?? [])
+            .All(pair => pair.First.NodeId == pair.Second.NodeId && pair.First.Label == pair.Second.Label);
 
-    private static bool ValidInteractability(ResolvedTarget target, string action)
+    internal static bool ValidInteractability(ResolvedTarget target, string action)
     {
         var assessment = target.Interactability;
         if (assessment?.Checks is not { } checks)

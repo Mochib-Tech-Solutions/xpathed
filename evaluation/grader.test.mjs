@@ -353,7 +353,6 @@ test("reports recompute first attempts, preserve missing repetitions and isolate
   second.grade = { passed: true };
   const rerun = { ...trial(), repetition: 2, attempt: 2, elapsedMs: 15 };
   const report = summarize(manifest, [first, second, rerun]);
-  assert.equal(report.qualification, "incomplete");
   assert.equal(report.mode, "unavailable");
   assert.equal(report.modelQualityMeasured, false);
   assert.equal(report.passed, false);

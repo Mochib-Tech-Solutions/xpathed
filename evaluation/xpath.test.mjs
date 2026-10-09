@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createServer } from "node:http";
 import { once } from "node:events";
-import { resolveXPathTrial, selectXPathCases } from "./xpath.mjs";
+import { resolveXPathTrial, selectXPathCases, verifiedFrameMatches } from "./xpath.mjs";
 import { gradeTrial } from "./grader.mjs";
 import { loadCases } from "./cases/load.mjs";
 
@@ -15,6 +15,43 @@ test("xpath-selection-retains-mutations-and-excludes-cases-without-verifiable-ta
   assert.ok(
     cases.every((item) => item.expected.actions.some((action) => action.outcome === "found")),
   );
+});
+
+test("xpath-frame-verification-preserves-complete-ordered-identities-while-generating-owner-paths", () => {
+  const captured = {
+    id: "inner",
+    documentId: "inner-document",
+    chain: [
+      {
+        frameId: "outer",
+        nodeId: "outer-node",
+        label: "Outer",
+        xpath: "",
+        shadowChain: [{ nodeId: "host-node", label: "Host", xpath: "" }],
+      },
+      { frameId: "inner", nodeId: "inner-node", label: "Inner", xpath: "" },
+    ],
+  };
+  const verified = structuredClone(captured);
+  verified.chain[0].xpath = "//iframe[@title='Outer']";
+  verified.chain[0].shadowChain[0].xpath = "//*[@data-testid='host']";
+  verified.chain[1].xpath = "//iframe[@title='Inner']";
+  assert.equal(verifiedFrameMatches(captured, verified), true);
+  for (const mutate of [
+    (value) => value.chain.reverse(),
+    (value) => value.chain.pop(),
+    (value) => (value.chain[0].xpath = ""),
+    (value) => (value.chain[0].shadowChain[0].xpath = ""),
+    (value) => (value.chain[0].shadowChain[0].nodeId = "wrong-host"),
+    (value) => delete value.chain[1].nodeId,
+    (value) => (value.chain[1].frameId = "wrong-frame"),
+    (value) => (value.chain[1].label = "Changed label"),
+    (value) => (value.documentId = "wrong-document"),
+  ]) {
+    const changed = structuredClone(verified);
+    mutate(changed);
+    assert.equal(verifiedFrameMatches(captured, changed), false, JSON.stringify(changed));
+  }
 });
 
 test("xpath-browser-verification-rejects-unique-match-for-wrong-node", async (t) => {
@@ -31,7 +68,7 @@ test("xpath-browser-verification-rejects-unique-match-for-wrong-node", async (t)
     const path = new URL(req.url, "http://localhost").pathname;
     requests.push(path);
     let value;
-    if (path === "/pages/page/capture")
+    if (path === "/browser/pages/page/capture")
       value = {
         pageId: "page",
         documentId: "document",
@@ -41,7 +78,7 @@ test("xpath-browser-verification-rejects-unique-match-for-wrong-node", async (t)
           { id: "selected", tag: "button", label: "Save changes", frame: { id: "main" } },
         ],
       };
-    else if (path === "/pages/page/selections") {
+    else if (path === "/resolver/pages/page/selections") {
       assert.equal(body.actions[0].candidateId, "selected");
       assert.equal(body.actions[0].action, "click");
       value = {
@@ -103,7 +140,7 @@ test("xpath-browser-verification-rejects-unique-match-for-wrong-node", async (t)
       { pageId: "page" },
       { documentId: "document" },
       { timeoutMs: 1000 },
-      { browser: url, fixture: url, resolver: "http://must-not-call.invalid" },
+      { browser: `${url}/browser`, fixture: url, resolver: `${url}/resolver` },
       "trial",
     );
     assert.equal(trial.error, undefined);
@@ -114,7 +151,12 @@ test("xpath-browser-verification-rejects-unique-match-for-wrong-node", async (t)
   }
   assert.ok(
     requests.every((path) =>
-      ["/pages/page/capture", "/pages/page/selections", "/command", "/observation"].includes(path),
+      [
+        "/browser/pages/page/capture",
+        "/resolver/pages/page/selections",
+        "/command",
+        "/observation",
+      ].includes(path),
     ),
   );
 });

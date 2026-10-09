@@ -23,7 +23,7 @@ test("fixtures-reviewed-cases-preserve-family-boundaries-without-oracle-instruct
   }
   for (const spec of cases) {
     assert.equal(spec.review.status, "reviewed");
-    const html = renderFixture(spec.fixture, "qualification-test");
+    const html = renderFixture(spec.fixture, "fixture-test");
     assert.ok(html.startsWith("<!doctype html>"));
     for (const sentinel of spec.oracleSentinels ?? []) assert.ok(!html.includes(sentinel));
   }
@@ -299,7 +299,7 @@ test("provider-controlled-failures-preserve-distinct-response-outcomes", async (
 test("selection-default-suite-covers-reviewed-current-view-behaviors", async () => {
   const suite = loadCases(new URL("../cases/index.json", import.meta.url));
   const cases = suite.cases.filter((entry) => true);
-  for (const fixture of ["viewport-clipped", "viewport-plural", "offscreen", "qualification-color"])
+  for (const fixture of ["viewport-clipped", "viewport-plural", "offscreen", "appearance-color"])
     assert.ok(
       cases.some((entry) => entry.fixture === fixture),
       `Missing current-view ${fixture}`,

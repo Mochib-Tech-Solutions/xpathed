@@ -1,4 +1,3 @@
-using Microsoft.Playwright;
 using Xpathed.Common.Http;
 
 namespace Xpathed.Browser.Sessions;
@@ -61,67 +60,6 @@ internal static class BrowserActionExecution
         )
         {
             throw new ApiException(400, "invalid_action_value", "Choose a supported keyboard key.");
-        }
-    }
-
-    public static async Task ExecuteAsync(IElementHandle element, string action, string? value)
-    {
-        const float timeout = 3000;
-        switch (action)
-        {
-            case "click":
-                await element.ClickAsync(new() { Timeout = timeout });
-                break;
-            case "double_click":
-                await element.DblClickAsync(new() { Timeout = timeout });
-                break;
-            case "right_click":
-                await element.ClickAsync(new() { Button = MouseButton.Right, Timeout = timeout });
-                break;
-            case "hover":
-                await element.HoverAsync(new() { Timeout = timeout });
-                break;
-            case "fill":
-                await element.FillAsync(value!, new() { Timeout = timeout });
-                break;
-            case "type":
-                // A locator can retarget a replacement node; typing must use the retained capture handle.
-#pragma warning disable CS0612
-                await element.TypeAsync(value!, new() { Timeout = timeout });
-#pragma warning restore CS0612
-                break;
-            case "clear":
-                await element.FillAsync(string.Empty, new() { Timeout = timeout });
-                break;
-            case "check":
-                await element.CheckAsync(new() { Timeout = timeout });
-                break;
-            case "uncheck":
-                await element.UncheckAsync(new() { Timeout = timeout });
-                break;
-            case "focus":
-                await element.FocusAsync();
-                break;
-            case "blur":
-                await element.EvaluateAsync("element => element.blur()");
-                break;
-            case "press":
-                await element.PressAsync(value == "Space" ? " " : value!, new() { Timeout = timeout });
-                break;
-            case "select":
-                var optionIndex = await element.EvaluateAsync<int>(
-                    "(element, value) => { const options = [...element.options].filter(option => option.value === value && !option.matches(':disabled')); return options.length === 1 ? options[0].index : -1; }",
-                    value
-                );
-                if (optionIndex < 0)
-                {
-                    throw new ApiException(409, "invalid_action_value", "The value must match one enabled option.");
-                }
-                await element.SelectOptionAsync(
-                    new SelectOptionValue { Index = optionIndex, Value = value },
-                    new() { Timeout = timeout }
-                );
-                break;
         }
     }
 }

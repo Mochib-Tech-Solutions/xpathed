@@ -1,6 +1,6 @@
 export type ShadowHost = { xpath: string; label: string };
 
-export type BrowserType = "chromium" | "firefox";
+export type BrowserType = "chromium";
 export type BrowserResolution = { id: string; width: number; height: number };
 export type BrowserSessionOptions = {
   defaultBrowserType: BrowserType;

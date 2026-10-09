@@ -10,7 +10,8 @@ public sealed partial class ResolutionService(
     IHttpClientFactory clients,
     OpenRouterGateway gateway,
     ILogger<ResolutionService> logger,
-    ProviderAccounting accounting
+    ProviderAccounting accounting,
+    XPathSelectionService xpathSelection
 )
 {
     public Task<ResolutionResult> ResolveAsync(
@@ -93,7 +94,7 @@ public sealed partial class ResolutionService(
                 new CaptureRequest(request.DocumentId, "current_view", request.IncludeImage),
                 cancellationToken
             );
-            await EnsureBrowserSuccessAsync(captureResponse, cancellationToken);
+            await BrowserResponse.EnsureSuccessAsync(captureResponse, cancellationToken);
             capture =
                 await captureResponse.Content.ReadFromJsonAsync<CandidateCapture>(cancellationToken)
                 ?? throw new ApiException(502, "invalid_upstream_response", "The browser returned an invalid capture.");
@@ -187,17 +188,15 @@ public sealed partial class ResolutionService(
             var requestedActions = selections
                 .Select((item, index) => new ActionSelection($"a{index + 1}", item.CandidateId, item.Action))
                 .ToArray();
-            using var response = await browser.PostAsJsonAsync(
-                $"/pages/{Uri.EscapeDataString(pageId)}/selections",
-                new ActionSelectionRequest(request.DocumentId, capture.CaptureId, requestedActions),
-                cancellationToken
-            );
-            await EnsureBrowserSuccessAsync(response, cancellationToken);
             var validation = BrowserEvidence.ValidateSelection(
                 capture,
                 selections,
                 requestedActions,
-                await response.Content.ReadFromJsonAsync<ActionSelectionValidation>(cancellationToken)
+                await xpathSelection.SelectAsync(
+                    pageId,
+                    new ActionSelectionRequest(request.DocumentId, capture.CaptureId, requestedActions),
+                    cancellationToken
+                )
             );
             var results = selections
                 .Select(
@@ -356,54 +355,4 @@ public sealed partial class ResolutionService(
         string configurationId,
         string evidenceReference
     );
-
-    private static async Task EnsureBrowserSuccessAsync(
-        HttpResponseMessage response,
-        CancellationToken cancellationToken
-    )
-    {
-        if (response.IsSuccessStatusCode)
-        {
-            return;
-        }
-        string? code = null;
-        try
-        {
-            var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
-            if (
-                body.ValueKind == JsonValueKind.Object
-                && body.TryGetProperty("code", out var value)
-                && value.ValueKind == JsonValueKind.String
-            )
-            {
-                code = value.GetString();
-            }
-        }
-        catch (JsonException)
-        {
-            // Invalid error bodies contain no trustworthy diagnostic data.
-        }
-        code = code
-            is "page_not_found"
-                or "inactive_page"
-                or "stale_document"
-                or "stale_capture"
-                or "capture_budget_exceeded"
-                or "capture_exposure_unknown"
-                or "validation_budget_exceeded"
-                or "unknown_candidate"
-                or "xpath_validation_failed"
-            ? code
-            : "browser_unavailable";
-        throw new ApiException(
-            (int)response.StatusCode,
-            code,
-            code switch
-            {
-                "inactive_page" => "The active tab changed. Resolve the instruction again.",
-                "stale_capture" => "The page or current view changed. Resolve the instruction again.",
-                _ => "The browser could not validate the current page and target.",
-            }
-        );
-    }
 }

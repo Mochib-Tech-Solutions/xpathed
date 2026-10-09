@@ -6,12 +6,252 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Xpathed.Common.Contracts;
 using Xpathed.Resolver.Controllers;
 
 namespace Xpathed.Resolver.Tests;
 
 public sealed class ResolutionContractTests
 {
+    [Fact]
+    public async Task CoreSelectionRejectsNullActionEntriesBeforeCallingBrowser()
+    {
+        var handler = new DeterministicServicesHandler();
+        await using var application = CreateApplication(handler);
+        using var client = application.CreateClient();
+        using var response = await client.PostAsJsonAsync(
+            "/pages/page-1/selections",
+            new
+            {
+                documentId = "document-1",
+                captureId = "capture-1",
+                actions = new object?[] { null },
+            }
+        );
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal(0, handler.XPathEvidenceRequestCount);
+        Assert.Equal(0, handler.SelectionRequestCount);
+        Assert.Equal(0, handler.ProviderRequestCount);
+    }
+
+    [Theory]
+    [InlineData("{}")]
+    [InlineData("{\"nodes\":[],\"targetNodeIds\":[],\"targets\":[]}")]
+    [InlineData("{\"nodes\":")]
+    public async Task CoreSelectionRejectsMalformedStructuralEvidenceBeforeVerification(string evidence)
+    {
+        var handler = new DeterministicServicesHandler { XPathEvidenceBody = evidence };
+        await using var application = CreateApplication(handler);
+        using var client = application.CreateClient();
+        using var response = await client.PostAsJsonAsync(
+            "/pages/page-1/selections",
+            new
+            {
+                documentId = "document-1",
+                captureId = "capture-1",
+                actions = new[]
+                {
+                    new
+                    {
+                        actionId = "a1",
+                        candidateId = "button-save",
+                        action = "click",
+                    },
+                },
+            }
+        );
+        Assert.Equal(HttpStatusCode.BadGateway, response.StatusCode);
+        var error = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("invalid_xpath_evidence", error.GetProperty("code").GetString());
+        Assert.Equal(0, handler.SelectionRequestCount);
+        Assert.Equal(0, handler.ProviderRequestCount);
+    }
+
+    [Fact]
+    public async Task CoreSelectionRejectsAnOmittedFrameOwnerShadowDependency()
+    {
+        static XPathNodeEvidence Node(string id, string? candidateId, string[] hosts) =>
+            new(
+                id,
+                candidateId,
+                "button",
+                "http://www.w3.org/1999/xhtml",
+                [],
+                "",
+                [],
+                0,
+                false,
+                null,
+                1,
+                1,
+                null,
+                [],
+                [],
+                hosts
+            );
+        var evidence = new XPathEvidenceBatch(
+            "evidence",
+            [Node("target", "button-save", []), Node("owner", null, ["host"]), Node("host", null, [])],
+            ["target", "owner", "host"],
+            [new("button-save", "target", new("f1", "child", [new("f1", "", "Frame", NodeId: "owner")]), null)]
+        );
+        var handler = new DeterministicServicesHandler
+        {
+            XPathEvidenceBody = JsonSerializer.Serialize(evidence, JsonSerializerOptions.Web),
+        };
+        await using var application = CreateApplication(handler);
+        using var client = application.CreateClient();
+        using var response = await client.PostAsJsonAsync(
+            "/pages/page-1/selections",
+            new ActionSelectionRequest("document-1", "capture-1", [new("a1", "button-save", "click")])
+        );
+        Assert.Equal(HttpStatusCode.BadGateway, response.StatusCode);
+        var error = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("invalid_xpath_evidence", error.GetProperty("code").GetString());
+        Assert.Equal(0, handler.SelectionRequestCount);
+        Assert.Equal(0, handler.ProviderRequestCount);
+    }
+
+    [Fact]
+    public async Task CoreSelectionGeneratesItsOwnProposalsWithoutModelInference()
+    {
+        var handler = new DeterministicServicesHandler();
+        await using var application = CreateApplication(handler);
+        using var client = application.CreateClient();
+        using var response = await client.PostAsJsonAsync(
+            "/pages/page-1/selections",
+            new
+            {
+                documentId = "document-1",
+                captureId = "capture-1",
+                actions = new[]
+                {
+                    new
+                    {
+                        actionId = "a1",
+                        candidateId = "button-save",
+                        action = "click",
+                    },
+                },
+                xpathProposals = new[]
+                {
+                    new
+                    {
+                        nodeId = "client-invented",
+                        proposals = new[]
+                        {
+                            new { expression = "//client-invented", requirements = Array.Empty<object>() },
+                        },
+                    },
+                },
+                xpathEvidenceId = "client-invented",
+            }
+        );
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(0, handler.ProviderRequestCount);
+        Assert.Equal(1, handler.XPathEvidenceRequestCount);
+        Assert.Equal(1, handler.SelectionRequestCount);
+        Assert.Equal("browser-evidence", handler.SelectionRequest.GetProperty("xpathEvidenceId").GetString());
+        Assert.Equal(
+            "//*[@data-testid='save-profile']",
+            handler
+                .SelectionRequest.GetProperty("xpathProposals")[0]
+                .GetProperty("proposals")[0]
+                .GetProperty("expression")
+                .GetString()
+        );
+        Assert.DoesNotContain("client-invented", handler.SelectionRequest.GetRawText(), StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("none")]
+    [InlineData("frame-omitted")]
+    [InlineData("frame-ancestor-omitted")]
+    [InlineData("frame-order")]
+    [InlineData("shadow-omitted")]
+    [InlineData("shadow-order")]
+    [InlineData("owner-shadow-omitted")]
+    public async Task CoreSelectionBindsTheCompleteCapturedFrameAndShadowContext(string mutation)
+    {
+        var capture = JsonNode.Parse(new DeterministicServicesHandler().CaptureBody)!;
+        var frame = JsonNode.Parse(
+            """{"id":"f2","documentId":"child-document","chain":[{"frameId":"f1","nodeId":"outer","xpath":"","label":"Outer","shadowChain":[{"nodeId":"owner-host","xpath":"","label":"Owner host"}]},{"frameId":"f2","nodeId":"inner","xpath":"","label":"Inner"}]}"""
+        )!;
+        var shadow = JsonNode.Parse(
+            """[{"nodeId":"host-one","xpath":"","label":"First"},{"nodeId":"host-two","xpath":"","label":"Second"}]"""
+        )!;
+        capture["candidates"]![0]!["frame"] = frame.DeepClone();
+        capture["candidates"]![0]!["shadowChain"] = shadow.DeepClone();
+        var target = DeterministicServicesHandler.VerifiedTarget();
+        target["frame"] = frame;
+        target["shadowChain"] = shadow;
+        foreach (var step in frame["chain"]!.AsArray().Concat(shadow.AsArray()))
+        {
+            step!["xpath"] = $"//*[@data-testid='{step["nodeId"]!.GetValue<string>()}']";
+        }
+        frame["chain"]![0]!["shadowChain"]![0]!["xpath"] = "//*[@data-testid='owner-host']";
+        switch (mutation)
+        {
+            case "frame-omitted":
+                target.Remove("frame");
+                break;
+            case "frame-ancestor-omitted":
+                frame["chain"]!.AsArray().RemoveAt(0);
+                break;
+            case "frame-order":
+                frame["chain"] = new JsonArray(
+                    frame["chain"]!.AsArray().Reverse().Select(step => step!.DeepClone()).ToArray()
+                );
+                break;
+            case "shadow-omitted":
+                target.Remove("shadowChain");
+                break;
+            case "shadow-order":
+                target["shadowChain"] = new JsonArray(
+                    shadow.AsArray().Reverse().Select(step => step!.DeepClone()).ToArray()
+                );
+                break;
+            case "owner-shadow-omitted":
+                frame["chain"]![0]!.AsObject().Remove("shadowChain");
+                break;
+        }
+        var handler = new DeterministicServicesHandler
+        {
+            CaptureBody = capture.ToJsonString(),
+            SelectionBody = new JsonObject
+            {
+                ["actions"] = new JsonArray(new JsonObject { ["actionId"] = "a1", ["target"] = target }),
+                ["inspectedActionId"] = "a1",
+            }.ToJsonString(),
+        };
+        await using var application = CreateApplication(handler);
+        using var client = application.CreateClient();
+        using var response = await client.PostAsJsonAsync(
+            "/pages/page-1/selections",
+            new
+            {
+                documentId = "document-1",
+                captureId = "capture-1",
+                actions = new[]
+                {
+                    new
+                    {
+                        actionId = "a1",
+                        candidateId = "button-save",
+                        action = "click",
+                    },
+                },
+            }
+        );
+        Assert.Equal(mutation == "none" ? HttpStatusCode.OK : HttpStatusCode.BadGateway, response.StatusCode);
+        if (mutation != "none")
+        {
+            var error = await response.Content.ReadFromJsonAsync<JsonElement>();
+            Assert.Equal("invalid_browser_selection", error.GetProperty("code").GetString());
+        }
+        Assert.Equal(0, handler.ProviderRequestCount);
+    }
+
     [Theory]
     [InlineData("/pages/page-1/capture", false)]
     [InlineData("/api/v1/chat/completions", false)]
@@ -732,7 +972,7 @@ public sealed class ResolutionContractTests
             ProviderBody = BilledSelection(),
             SelectionBody = """
                 {"actions":[{"actionId":"a1","target":{"candidateId":"button-save","tag":"button","label":"Save",
-                "xpaths":["//button"],"state":{"rendered":true,"inViewport":false,"enabled":true,"editable":false,"checked":null},
+                "xpaths":["//*[@data-testid='save-profile']"],"state":{"rendered":true,"inViewport":false,"enabled":true,"editable":false,"checked":null},
                 "geometry":{"x":20,"y":2000,"width":90,"height":30}}}],"inspectedActionId":"a1"}
                 """,
         };
@@ -1268,10 +1508,11 @@ public sealed class ResolutionContractTests
     public async Task ShadowContextMustMatchTheCapturedCandidate(bool mismatch)
     {
         var capture = JsonNode.Parse(new DeterministicServicesHandler().CaptureBody)!;
-        var chain = JsonNode.Parse("""[{"xpath":"//consent-panel","label":"Preferences"}]""")!;
+        var chain = JsonNode.Parse("""[{"nodeId":"main:host-1","xpath":"","label":"Preferences"}]""")!;
         capture["candidates"]![0]!["shadowChain"] = chain.DeepClone();
         var target = DeterministicServicesHandler.VerifiedTarget();
         target["shadowChain"] = chain.DeepClone();
+        target["shadowChain"]![0]!["xpath"] = "//*[@data-testid='main:host-1']";
         if (mismatch)
         {
             target["shadowChain"]![0]!["xpath"] = "//another-panel";
@@ -1304,7 +1545,7 @@ public sealed class ResolutionContractTests
         else
         {
             Assert.Equal(
-                "//consent-panel",
+                "//*[@data-testid='main:host-1']",
                 result
                     .GetProperty("actions")[0]
                     .GetProperty("target")
@@ -1315,7 +1556,7 @@ public sealed class ResolutionContractTests
         }
 
         var modelInput = handler.ModelRequest.GetProperty("messages")[1].GetProperty("content").GetString()!;
-        Assert.DoesNotContain("//consent-panel", modelInput, StringComparison.Ordinal);
+        Assert.DoesNotContain("main:host-1", modelInput, StringComparison.Ordinal);
     }
 
     [Theory]
@@ -1325,11 +1566,13 @@ public sealed class ResolutionContractTests
     {
         var capture = JsonNode.Parse(new DeterministicServicesHandler().CaptureBody)!;
         var frame = JsonNode.Parse(
-            """{"id":"f2","documentId":"frame-document","chain":[{"frameId":"f1","xpath":"//iframe[@id='outer']","label":"Employee"},{"frameId":"f2","xpath":"//iframe[@id='inner']","label":"Payroll"}]}"""
+            """{"id":"f2","documentId":"frame-document","chain":[{"frameId":"f1","nodeId":"main:outer","xpath":"","label":"Employee"},{"frameId":"f2","nodeId":"f1:inner","xpath":"","label":"Payroll"}]}"""
         )!;
         capture["candidates"]![0]!["frame"] = frame.DeepClone();
         var target = DeterministicServicesHandler.VerifiedTarget();
         target["frame"] = frame.DeepClone();
+        target["frame"]!["chain"]![0]!["xpath"] = "//*[@data-testid='main:outer']";
+        target["frame"]!["chain"]![1]!["xpath"] = "//*[@data-testid='f1:inner']";
         if (mismatch)
         {
             target["frame"]!["documentId"] = "another-document";
@@ -1736,7 +1979,7 @@ public sealed class ResolutionContractTests
         var handler = new DeterministicServicesHandler
         {
             SelectionBody =
-                """{"actions":[{"actionId":"a1","target":{"candidateId":"button-save","tag":"button","label":"Save","xpaths":["//button"],"state":{"accessibilityExposed":true,"rendered":true,"inViewport":true,"enabled":false,"editable":false,"readonly":false,"checked":null},"geometry":{"x":20,"y":40,"width":90,"height":30},"interactability":{"action":"ACTION","status":"STATUS","reasons":["disabled"],"checks":{"compatibleControl":"pass","enabled":"fail","writable":"not_applicable","viewport":"pass","pointerReception":"pass","keyboard":"not_applicable","stability":"unknown","eventOutcome":"unknown"}}}}],"inspectedActionId":"a1"}"""
+                """{"actions":[{"actionId":"a1","target":{"candidateId":"button-save","tag":"button","label":"Save","xpaths":["//*[@data-testid='save-profile']"],"state":{"accessibilityExposed":true,"rendered":true,"inViewport":true,"enabled":false,"editable":false,"readonly":false,"checked":null},"geometry":{"x":20,"y":40,"width":90,"height":30},"interactability":{"action":"ACTION","status":"STATUS","reasons":["disabled"],"checks":{"compatibleControl":"pass","enabled":"fail","writable":"not_applicable","viewport":"pass","pointerReception":"pass","keyboard":"not_applicable","stability":"unknown","eventOutcome":"unknown"}}}}],"inspectedActionId":"a1"}"""
                     .Replace("ACTION", assessedAction, StringComparison.Ordinal)
                     .Replace("STATUS", status, StringComparison.Ordinal),
         };
@@ -1784,7 +2027,7 @@ public sealed class ResolutionContractTests
         var handler = new DeterministicServicesHandler
         {
             SelectionBody =
-                """{"actions":[{"actionId":"a1","target":{"candidateId":"button-save","tag":"button","label":"Save","xpaths":["//button"],"state":{"accessibilityExposed":true,"rendered":true,"inViewport":true,"enabled":true,"editable":false,"readonly":false,"checked":null},"geometry":{"x":20,"y":40,"width":90,"height":30},"interactability":{"action":"click","status":"STATUS","reasons":[],"checks":{"compatibleControl":"pass","enabled":"pass","writable":"not_applicable","viewport":"pass","pointerReception":"POINTER","keyboard":"not_applicable","stability":"unknown","eventOutcome":"unknown"}}}}],"inspectedActionId":"a1"}"""
+                """{"actions":[{"actionId":"a1","target":{"candidateId":"button-save","tag":"button","label":"Save","xpaths":["//*[@data-testid='save-profile']"],"state":{"accessibilityExposed":true,"rendered":true,"inViewport":true,"enabled":true,"editable":false,"readonly":false,"checked":null},"geometry":{"x":20,"y":40,"width":90,"height":30},"interactability":{"action":"click","status":"STATUS","reasons":[],"checks":{"compatibleControl":"pass","enabled":"pass","writable":"not_applicable","viewport":"pass","pointerReception":"POINTER","keyboard":"not_applicable","stability":"unknown","eventOutcome":"unknown"}}}}],"inspectedActionId":"a1"}"""
                     .Replace("STATUS", status, StringComparison.Ordinal)
                     .Replace("POINTER", pointerReception, StringComparison.Ordinal),
         };
@@ -1823,7 +2066,7 @@ public sealed class ResolutionContractTests
     [InlineData(2, "error")]
     public async Task ReturnsOnlyOneVerifiedXPath(int pathCount, string outcome)
     {
-        string[] paths = ["//button", "//*[@id='save']"];
+        string[] paths = ["//*[@data-testid='save-profile']", "//*[@id='save']"];
         var target = DeterministicServicesHandler.VerifiedTarget();
         target["xpaths"] = JsonSerializer.SerializeToNode(paths.Take(pathCount));
         var handler = new DeterministicServicesHandler
@@ -2067,11 +2310,17 @@ public sealed class ResolutionContractTests
                 .Select(index =>
                     (JsonNode)(
                         shadow
-                            ? new JsonObject { ["xpath"] = $"//*[@id='host-{index}']", ["label"] = $"Host {index}" }
+                            ? new JsonObject
+                            {
+                                ["nodeId"] = $"host-{index}",
+                                ["xpath"] = "",
+                                ["label"] = $"Host {index}",
+                            }
                             : new JsonObject
                             {
                                 ["frameId"] = $"f{index}",
-                                ["xpath"] = $"//iframe[{index}]",
+                                ["nodeId"] = $"owner-{index}",
+                                ["xpath"] = "",
                                 ["label"] = "Frame",
                             }
                     )
@@ -2087,6 +2336,11 @@ public sealed class ResolutionContractTests
                 ["chain"] = chain,
             };
         capture["candidates"]![0]![property] = context.DeepClone();
+        foreach (var step in chain)
+        {
+            step!["xpath"] = $"//*[@data-testid='{step["nodeId"]!.GetValue<string>()}']";
+        }
+
         target[property] = context;
         var handler = new DeterministicServicesHandler
         {
@@ -2170,6 +2424,7 @@ public sealed class ResolutionContractTests
     [InlineData("unsupported", "unsupported", null, "stale_document")]
     [InlineData("found", "click", "button-save", "validation_budget_exceeded")]
     [InlineData("found", "click", "button-save", "inactive_page")]
+    [InlineData("found", "click", "button-save", "stale_xpath_evidence")]
     public async Task BrowserValidationFailuresPreserveSafeCodesForSemanticOutcomes(
         string outcome,
         string action,

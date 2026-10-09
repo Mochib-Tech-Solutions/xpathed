@@ -58,8 +58,6 @@ def rules(version, addresses):
         for protocol in ("udp", "tcp"):
             result.append(["-p", protocol, "-m", "conntrack", "--ctorigdst", "127.0.0.11",
                            "--ctorigdstport", "53", "-j", "RETURN"])
-        # Browser's trusted viewer relay connects only to these local RFB ports.
-        result.append(["-d", "127.0.0.1/32", "-p", "tcp", "--dport", "5900:5915", "-j", "RETURN"])
         result += [["-d", destination, "-j", "REJECT"] for destination in (*PRIVATE_V4, *addresses)]
         result.append(["-j", "RETURN"])
     else:

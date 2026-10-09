@@ -26,6 +26,7 @@ public sealed class ControllerContractTests(WebApplicationFactory<HealthControll
     [InlineData("webkit")]
     [InlineData("")]
     [InlineData("Firefox")]
+    [InlineData("firefox")]
     [InlineData("/usr/bin/firefox")]
     public async Task InvalidEngineIsRejectedBeforeStartingADisplay(string browserType)
     {
@@ -47,7 +48,6 @@ public sealed class ControllerContractTests(WebApplicationFactory<HealthControll
 
     [Theory]
     [InlineData("chromium")]
-    [InlineData("firefox")]
     public async Task SessionOptionsExposeConfiguredDefaultAndInstalledEngines(string defaultType)
     {
         using var configured = application.WithWebHostBuilder(builder =>
@@ -71,10 +71,7 @@ public sealed class ControllerContractTests(WebApplicationFactory<HealthControll
                 && choice.GetProperty("width").GetInt32() == 1920
                 && choice.GetProperty("height").GetInt32() == 1080
         );
-        Assert.Equal(
-            ["chromium", "firefox"],
-            body.GetProperty("browserTypes").EnumerateArray().Select(type => type.GetString())
-        );
+        Assert.Equal(["chromium"], body.GetProperty("browserTypes").EnumerateArray().Select(type => type.GetString()));
     }
 
     [Theory]
@@ -144,8 +141,8 @@ public sealed class ControllerContractTests(WebApplicationFactory<HealthControll
     [InlineData("capture", "{\"documentId\":null}")]
     [InlineData("capture", "{\"documentId\":\"document\",\"scope\":\"visible\"}")]
     [InlineData("capture", "{\"documentId\":\"document\",\"scope\":null}")]
-    [InlineData("selection", "{}")]
-    [InlineData("selection", "{\"documentId\":\"document\",\"captureId\":\"capture\"}")]
+    [InlineData("selections", "{}")]
+    [InlineData("selections", "{\"documentId\":\"document\",\"captureId\":\"capture\"}")]
     [InlineData("selections", "{\"documentId\":\"document\",\"captureId\":\"capture\",\"actions\":[null]}")]
     [InlineData("selections", "{\"documentId\":\"document\",\"captureId\":\"capture\",\"actions\":[]}")]
     [InlineData("highlight", "{}")]
@@ -168,13 +165,20 @@ public sealed class ControllerContractTests(WebApplicationFactory<HealthControll
     {
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
-            "/pages/missing/selection",
+            "/pages/missing/selections",
             new
             {
                 documentId = "document",
                 captureId = "capture",
-                candidateId = "candidate",
-                action = "execute",
+                actions = new[]
+                {
+                    new
+                    {
+                        actionId = "action",
+                        candidateId = "candidate",
+                        action = "execute",
+                    },
+                },
             }
         );
 

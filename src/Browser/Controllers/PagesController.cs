@@ -38,19 +38,19 @@ public sealed class PagesController(BrowserSessions sessions) : ControllerBase
         CancellationToken cancellationToken
     ) => sessions.CaptureAsync(id, request, cancellationToken);
 
-    [HttpPost("{id}/selection")]
-    public Task<SelectionValidation> Select(
-        string id,
-        [FromBody] SelectionRequest request,
-        CancellationToken cancellationToken
-    ) => sessions.SelectAsync(id, request, cancellationToken);
-
     [HttpPost("{id}/selections")]
     public Task<ActionSelectionValidation> SelectActions(
         string id,
         [FromBody] ActionSelectionRequest request,
         CancellationToken cancellationToken
     ) => sessions.SelectActionsAsync(id, request, cancellationToken);
+
+    [HttpPost("{id}/xpath-evidence")]
+    public Task<XPathEvidenceBatch> XPathEvidence(
+        string id,
+        [FromBody] XPathEvidenceRequest request,
+        CancellationToken cancellationToken
+    ) => sessions.XPathEvidenceAsync(id, request, cancellationToken);
 
     [HttpPost("{id}/highlight")]
     public Task<ValidatedAction> InspectAction(
