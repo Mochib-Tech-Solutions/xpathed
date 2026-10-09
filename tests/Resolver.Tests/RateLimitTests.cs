@@ -160,7 +160,12 @@ public sealed class RateLimitTests
         client.DefaultRequestHeaders.Add("X-Xpathed-Attempt-Id", Guid.NewGuid().ToString("N"));
         return client.PostAsJsonAsync(
             (diagnostic ? "/internal" : "") + "/pages/page-1/resolve",
-            new { instruction = "Click Save", documentId = "document-1" },
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                imageMode = "text_only",
+            },
             token
         );
     }

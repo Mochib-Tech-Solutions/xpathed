@@ -24,8 +24,8 @@ export default function Workspace() {
     address,
     addressFocus,
     instruction,
-    includeImage,
-    setIncludeImage,
+    imageMode,
+    setImageMode,
     history,
     busy,
     error,
@@ -94,8 +94,8 @@ export default function Workspace() {
         <ChatPanel
           key={page?.pageId ?? "closed"}
           instruction={instruction}
-          includeImage={includeImage}
-          onIncludeImageChange={setIncludeImage}
+          imageMode={imageMode}
+          onImageModeChange={setImageMode}
           history={history}
           ready={!!page && /^https?:\/\//i.test(page.url)}
           disabled={!page || !/^https?:\/\//i.test(page.url) || !!busy}

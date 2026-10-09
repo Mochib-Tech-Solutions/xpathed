@@ -7,6 +7,24 @@ namespace Xpathed.Resolver.Services;
 
 internal static partial class BrowserEvidence
 {
+    internal static void ValidateImage(CandidateCapture capture, CaptureImageResult? result)
+    {
+        if (result is null)
+        {
+            throw new ApiException(502, "invalid_browser_capture", "The browser returned an invalid screenshot.");
+        }
+        if (
+            result.SessionId != capture.SessionId
+            || result.PageId != capture.PageId
+            || result.DocumentId != capture.DocumentId
+            || result.CaptureId != capture.CaptureId
+        )
+        {
+            throw new ApiException(409, "stale_capture", "The screenshot belongs to another capture.");
+        }
+        ValidateCapture(capture with { Image = result.Image }, capture.PageId, capture.DocumentId, true);
+    }
+
     internal static void ValidateCapture(
         CandidateCapture capture,
         string pageId,

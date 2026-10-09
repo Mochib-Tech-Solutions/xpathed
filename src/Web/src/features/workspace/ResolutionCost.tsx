@@ -1,28 +1,26 @@
 import { useId, useLayoutEffect, useRef, useState } from "react";
-import type { ResolutionResult } from "./api";
+import type { ProviderCall, ResolutionResult } from "./api";
+
+function validCost(value: number | null | undefined): value is number {
+  return value != null && Number.isFinite(value) && value >= 0;
+}
 
 function usd(value: number | null | undefined) {
-  if (value == null || !Number.isFinite(value) || value < 0) return "Unavailable";
+  if (!validCost(value)) return "Unavailable";
   if (value > 0 && value < 0.00000001) return "< $0.00000001";
   return `$${value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 8 })}`;
 }
 
-export default function ResolutionCost({
-  diagnostics,
-}: {
-  diagnostics: ResolutionResult["diagnostics"];
-}) {
-  const [open, setOpen] = useState(false);
-  const id = useId();
-  const anchor = `--cost-${id.replace(/[^a-z0-9_-]/gi, "")}`;
-  const tooltip = useRef<HTMLDivElement>(null);
-  useLayoutEffect(() => {
-    if (open) tooltip.current?.showPopover?.();
-  }, [open]);
-  const { usage, costEstimate: estimate } = diagnostics;
+function total(calls: ProviderCall[], amount: (call: ProviderCall) => number | null | undefined) {
+  const values = calls.map(amount);
+  return values.every(validCost) ? values.reduce((sum, value) => sum + value, 0) : null;
+}
+
+function CostRows({ call }: { call: ProviderCall }) {
+  const { usage, costEstimate: estimate } = call;
   const rows = [
-    ["Model", diagnostics.model ?? "Unavailable"],
-    ["Provider", diagnostics.provider ?? "Unavailable"],
+    ["Model", call.model ?? "Unavailable"],
+    ["Provider", call.provider ?? "Unavailable"],
     ["Input tokens", usage?.inputTokens?.toLocaleString() ?? "Unavailable"],
     ["Output tokens", usage?.outputTokens?.toLocaleString() ?? "Unavailable"],
     [
@@ -38,6 +36,63 @@ export default function ResolutionCost({
     ["Estimated total", usd(estimate?.totalCost)],
     ["Reported cost", usd(usage?.cost)],
   ];
+  return (
+    <>
+      <dl className="space-y-1.5">
+        {rows.map(([label, value]) => (
+          <div key={label} className="flex justify-between gap-3">
+            <dt>{label}</dt>
+            <dd className="min-w-0 text-right break-words tabular-nums">{value}</dd>
+          </div>
+        ))}
+      </dl>
+      {estimate && (
+        <p className="mt-1 text-muted-foreground">
+          Rates fetched {new Date(estimate.pricingFetchedAt).toLocaleString()}.
+        </p>
+      )}
+    </>
+  );
+}
+
+export default function ResolutionCost({
+  diagnostics,
+}: {
+  diagnostics: ResolutionResult["diagnostics"];
+}) {
+  const [open, setOpen] = useState(false);
+  const id = useId();
+  const anchor = `--cost-${id.replace(/[^a-z0-9_-]/gi, "")}`;
+  const tooltip = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    if (open) tooltip.current?.showPopover?.();
+  }, [open]);
+  const detailed = diagnostics.providerCalls != null;
+  const calls: ProviderCall[] = diagnostics.providerCalls ?? [
+    {
+      purpose: "selection",
+      model: diagnostics.model,
+      provider: diagnostics.provider,
+      usage: diagnostics.usage,
+      costEstimate: diagnostics.costEstimate,
+      accounting: diagnostics.providerAccounting,
+    },
+  ];
+  const reported = total(calls, (call) => call.usage?.cost);
+  const estimated = total(calls, (call) => call.costEstimate?.totalCost);
+  const pending = calls.some((call) => call.accounting === "pending");
+  const label =
+    calls.length === 0
+      ? "No model calls"
+      : detailed && reported != null
+        ? `Reported cost: ${usd(reported)}`
+        : estimated != null
+          ? `Estimated cost: ${usd(estimated)}`
+          : reported != null
+            ? `Reported cost: ${usd(reported)}`
+            : pending
+              ? "Cost pending"
+              : "Cost unavailable";
 
   return (
     <div
@@ -56,13 +111,7 @@ export default function ResolutionCost({
         aria-describedby={open ? id : undefined}
         style={{ anchorName: anchor }}
       >
-        {estimate
-          ? `Estimated cost: ${usd(estimate.totalCost)}`
-          : usage?.cost != null
-            ? `Reported cost: ${usd(usage.cost)}`
-            : diagnostics.providerAccounting === "pending"
-              ? "Cost pending"
-              : "Cost unavailable"}
+        {label}
       </button>
       {open && (
         <div
@@ -80,24 +129,55 @@ export default function ResolutionCost({
         >
           <div className="max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-lg border border-border bg-popover p-3 text-popover-foreground shadow-md">
             <p className="mb-2 font-medium">Cost breakdown · USD</p>
-            {diagnostics.providerAccounting === "pending" && (
-              <p className="mb-2">The provider may still charge this timed-out request.</p>
+            {pending && (
+              <p className="mb-2">
+                {detailed
+                  ? "A provider call is still being accounted for. Its charge may arrive later."
+                  : "The provider may still charge this timed-out request."}
+              </p>
             )}
-            <dl className="space-y-1.5">
-              {rows.map(([label, value]) => (
-                <div key={label} className="flex justify-between gap-3">
-                  <dt>{label}</dt>
-                  <dd className="min-w-0 text-right break-words tabular-nums">{value}</dd>
+            {detailed && calls.length > 0 && (
+              <dl className="mb-3 space-y-1.5 border-b border-border pb-3">
+                <div className="flex justify-between gap-3">
+                  <dt>Reported request total</dt>
+                  <dd>{usd(reported)}</dd>
                 </div>
-              ))}
-            </dl>
-            <p className="mt-3 text-muted-foreground">
-              Estimate uses listed rates before cache discounts. Reported cost is OpenRouter’s
-              charge.
-            </p>
-            {estimate && (
-              <p className="mt-1 text-muted-foreground">
-                Rates fetched {new Date(estimate.pricingFetchedAt).toLocaleString()}.
+                <div className="flex justify-between gap-3">
+                  <dt>Estimated request total</dt>
+                  <dd>{usd(estimated)}</dd>
+                </div>
+              </dl>
+            )}
+            {detailed && reported == null && (
+              <p className="mb-3">
+                Some calls have no reported charge. Known charges below are not a complete total.
+              </p>
+            )}
+            {calls.map((call, index) => (
+              <section
+                key={index}
+                className={index > 0 ? "mt-3 border-t border-border pt-3" : undefined}
+                aria-label={
+                  call.purpose === "image_routing"
+                    ? "Image decision cost"
+                    : "Element selection cost"
+                }
+              >
+                {detailed && (
+                  <p className="mb-2 font-medium">
+                    {call.purpose === "image_routing" ? "Image decision" : "Element selection"}
+                    {call.accounting === "pending" ? " · Pending" : ""}
+                  </p>
+                )}
+                <CostRows call={call} />
+              </section>
+            ))}
+            {calls.length === 0 ? (
+              <p>No provider calls were made for this request.</p>
+            ) : (
+              <p className="mt-3 text-muted-foreground">
+                Estimates use listed rates before cache discounts. Reported costs are provider
+                charges.
               </p>
             )}
           </div>

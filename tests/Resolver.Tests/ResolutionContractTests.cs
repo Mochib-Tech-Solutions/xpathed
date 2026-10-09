@@ -305,7 +305,12 @@ public sealed class ResolutionContractTests
         client.DefaultRequestHeaders.Add("X-Xpathed-Attempt-Id", Guid.NewGuid().ToString("N"));
         using var response = await client.PostAsJsonAsync(
             (diagnostic ? "/internal" : "") + "/pages/page-1/resolve",
-            new { instruction, documentId = "document-1" }
+            new
+            {
+                instruction,
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
         return await response.Content.ReadFromJsonAsync<JsonElement>();
     }
@@ -349,7 +354,12 @@ public sealed class ResolutionContractTests
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click Help", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Help",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
         var result = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal(
@@ -424,7 +434,12 @@ public sealed class ResolutionContractTests
             handler.ProviderBody = body.ToJsonString();
             using var response = await client.PostAsJsonAsync(
                 "/pages/page-1/resolve",
-                new { instruction = "Click Save", documentId = "document-1" }
+                new
+                {
+                    instruction = "Click Save",
+                    documentId = "document-1",
+                    imageMode = "text_only",
+                }
             );
             var result = await response.Content.ReadFromJsonAsync<JsonElement>();
             Assert.Equal("found", result.GetProperty("outcome").GetString());
@@ -474,12 +489,25 @@ public sealed class ResolutionContractTests
         {
             var pending = client.PostAsJsonAsync(
                 "/pages/page-1/resolve",
-                new { instruction = "Click Save", documentId = "document-1" }
+                new
+                {
+                    instruction = "Click Save",
+                    documentId = "document-1",
+                    imageMode = "text_only",
+                }
             );
             await started.Task.WaitAsync(TimeSpan.FromSeconds(5));
             using var first = await pending.WaitAsync(TimeSpan.FromSeconds(1));
             using var second = await client
-                .PostAsJsonAsync("/pages/page-1/resolve", new { instruction = "Click Save", documentId = "document-1" })
+                .PostAsJsonAsync(
+                    "/pages/page-1/resolve",
+                    new
+                    {
+                        instruction = "Click Save",
+                        documentId = "document-1",
+                        imageMode = "text_only",
+                    }
+                )
                 .WaitAsync(TimeSpan.FromSeconds(1));
             foreach (var response in new[] { first, second })
             {
@@ -520,7 +548,12 @@ public sealed class ResolutionContractTests
         {
             using var response = await client.PostAsJsonAsync(
                 "/pages/page-1/resolve",
-                new { instruction = "Click Save", documentId = "document-1" }
+                new
+                {
+                    instruction = "Click Save",
+                    documentId = "document-1",
+                    imageMode = "text_only",
+                }
             );
             var result = await response.Content.ReadFromJsonAsync<JsonElement>();
             Assert.Equal("found", result.GetProperty("outcome").GetString());
@@ -568,7 +601,12 @@ public sealed class ResolutionContractTests
             handler.PricingBody = pricing.ToJsonString();
             using var response = await client.PostAsJsonAsync(
                 "/pages/page-1/resolve",
-                new { instruction = "Click Save", documentId = "document-1" }
+                new
+                {
+                    instruction = "Click Save",
+                    documentId = "document-1",
+                    imageMode = "text_only",
+                }
             );
             var result = await response.Content.ReadFromJsonAsync<JsonElement>();
             Assert.Equal("found", result.GetProperty("outcome").GetString());
@@ -600,7 +638,12 @@ public sealed class ResolutionContractTests
         client.DefaultRequestHeaders.Add("X-Xpathed-Attempt-Id", Guid.NewGuid().ToString("N"));
         using var response = await client.PostAsJsonAsync(
             "/internal/pages/page-1/resolve",
-            new { instruction = "Click the red image", documentId = "document-1" }
+            new
+            {
+                instruction = "Click the red image",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
         var envelope = await response.Content.ReadFromJsonAsync<JsonElement>();
         var result = envelope.GetProperty("result");
@@ -675,7 +718,12 @@ public sealed class ResolutionContractTests
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click Save", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
         using var input = JsonDocument.Parse(
             handler.ModelRequest.GetProperty("messages")[1].GetProperty("content").GetString()!
@@ -722,7 +770,12 @@ public sealed class ResolutionContractTests
         const string instruction = "Click the red Save control at the left of Profile";
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction, documentId = "document-1" }
+            new
+            {
+                instruction,
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var result = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -788,7 +841,12 @@ public sealed class ResolutionContractTests
         using var cancellation = new CancellationTokenSource();
         var request = client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click Save", documentId = "document-1" },
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                imageMode = "text_only",
+            },
             cancellation.Token
         );
         await started.Task.WaitAsync(TimeSpan.FromSeconds(5));
@@ -825,7 +883,12 @@ public sealed class ResolutionContractTests
         using var cancellation = new CancellationTokenSource();
         var request = client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click Save", documentId = "document-1" },
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                imageMode = "text_only",
+            },
             cancellation.Token
         );
         await started.Task.WaitAsync(TimeSpan.FromSeconds(5));
@@ -863,7 +926,12 @@ public sealed class ResolutionContractTests
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click Save", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
         var result = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal("browser_timeout", result.GetProperty("diagnostics").GetProperty("code").GetString());
@@ -899,7 +967,12 @@ public sealed class ResolutionContractTests
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click Save", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
         var result = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal("invalid_browser_capture", result.GetProperty("diagnostics").GetProperty("code").GetString());
@@ -953,6 +1026,7 @@ public sealed class ResolutionContractTests
             {
                 instruction = limitation == "none" ? "Click Help" : "Scroll down and click Help",
                 documentId = "document-1",
+                imageMode = "text_only",
             }
         );
         var result = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -980,7 +1054,12 @@ public sealed class ResolutionContractTests
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click Save", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
         var result = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal(outcome, result.GetProperty("outcome").GetString());
@@ -1029,7 +1108,12 @@ public sealed class ResolutionContractTests
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click Save", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
         var result = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal("error", result.GetProperty("outcome").GetString());
@@ -1081,7 +1165,12 @@ public sealed class ResolutionContractTests
         client.DefaultRequestHeaders.Add("X-Xpathed-Attempt-Id", Guid.NewGuid().ToString("N"));
         using var response = await client.PostAsJsonAsync(
             "/internal/pages/page-1/resolve",
-            new { instruction = "Click the unique instruction-canary", documentId = "document-1" }
+            new
+            {
+                instruction = "Click the unique instruction-canary",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var envelope = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -1138,7 +1227,12 @@ public sealed class ResolutionContractTests
         }
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = failure == 2 ? "" : "Click Save", documentId = "document-1" }
+            new
+            {
+                instruction = failure == 2 ? "" : "Click Save",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal(
@@ -1192,7 +1286,12 @@ public sealed class ResolutionContractTests
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click Save", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         using var input = JsonDocument.Parse(
@@ -1237,7 +1336,12 @@ public sealed class ResolutionContractTests
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click Save", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         using var input = JsonDocument.Parse(
@@ -1264,7 +1368,12 @@ public sealed class ResolutionContractTests
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click Save", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
         var result = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal("invalid_browser_capture", result.GetProperty("diagnostics").GetProperty("code").GetString());
@@ -1286,7 +1395,12 @@ public sealed class ResolutionContractTests
         client.DefaultRequestHeaders.Add("X-Xpathed-Attempt-Id", Guid.NewGuid().ToString("N"));
         using var response = await client.PostAsJsonAsync(
             "/internal/pages/page-1/resolve",
-            new { instruction = "Click Save", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
         var envelope = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.DoesNotContain(
@@ -1316,7 +1430,12 @@ public sealed class ResolutionContractTests
         }
         using var response = await client.PostAsJsonAsync(
             "/internal/pages/page-1/resolve",
-            new { instruction = "Click Save", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
         Assert.Equal(0, handler.ProviderRequestCount);
@@ -1333,7 +1452,12 @@ public sealed class ResolutionContractTests
         client.DefaultRequestHeaders.Add("X-Xpathed-Attempt-Id", Guid.NewGuid().ToString("N"));
         using var response = await client.PostAsJsonAsync(
             "/internal/pages/page-1/resolve",
-            new { instruction = "Click Save", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
         var envelope = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal("error", envelope.GetProperty("result").GetProperty("outcome").GetString());
@@ -1355,7 +1479,12 @@ public sealed class ResolutionContractTests
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click Save", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
         var result = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal("found", result.GetProperty("outcome").GetString());
@@ -1364,7 +1493,12 @@ public sealed class ResolutionContractTests
         client.DefaultRequestHeaders.Add("X-Xpathed-Attempt-Id", Guid.NewGuid().ToString("N"));
         using var blocked = await client.PostAsJsonAsync(
             "/internal/pages/page-1/resolve",
-            new { instruction = "Click Save", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
         Assert.Equal(HttpStatusCode.Forbidden, blocked.StatusCode);
     }
@@ -1383,7 +1517,12 @@ public sealed class ResolutionContractTests
         client.DefaultRequestHeaders.Add("X-Xpathed-Attempt-Id", Guid.NewGuid().ToString("N"));
         using var response = await client.PostAsJsonAsync(
             "/internal/pages/page-1/resolve",
-            new { instruction = "Put violet-cactus-782 there", documentId = "document-1" }
+            new
+            {
+                instruction = "Put violet-cactus-782 there",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
         var envelope = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal("fill", envelope.GetProperty("result").GetProperty("action").GetString());
@@ -1411,7 +1550,12 @@ public sealed class ResolutionContractTests
         client.DefaultRequestHeaders.Add("X-Xpathed-Attempt-Id", Guid.NewGuid().ToString("N"));
         using var response = await client.PostAsJsonAsync(
             "/internal/pages/page-1/resolve",
-            new { instruction, documentId = "document-1" }
+            new
+            {
+                instruction,
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
         var envelope = await response.Content.ReadFromJsonAsync<JsonElement>();
         var evidence = envelope.GetProperty("evidence");
@@ -1430,7 +1574,12 @@ public sealed class ResolutionContractTests
         client.DefaultRequestHeaders.Add("X-Xpathed-Attempt-Id", "0123456789abcdef0123456789abcdef");
         using var response = await client.PostAsJsonAsync(
             "/internal/pages/page-1/resolve",
-            new { instruction = "Click Save", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var envelope = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -1468,7 +1617,12 @@ public sealed class ResolutionContractTests
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click Save in Profile", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save in Profile",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
         var result = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal("found", result.GetProperty("outcome").GetString());
@@ -1531,7 +1685,12 @@ public sealed class ResolutionContractTests
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click Save", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
         var result = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal(mismatch ? "error" : "found", result.GetProperty("outcome").GetString());
@@ -1594,7 +1753,12 @@ public sealed class ResolutionContractTests
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click Save in Payroll", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save in Payroll",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
         var result = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal(mismatch ? "error" : "found", result.GetProperty("outcome").GetString());
@@ -1643,7 +1807,12 @@ public sealed class ResolutionContractTests
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click Save", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
         var result = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal("error", result.GetProperty("outcome").GetString());
@@ -1733,7 +1902,12 @@ public sealed class ResolutionContractTests
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click Save", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
         var result = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal("error", result.GetProperty("outcome").GetString());
@@ -1796,7 +1970,12 @@ public sealed class ResolutionContractTests
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction, documentId = "document-1" }
+            new
+            {
+                instruction,
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
         response.EnsureSuccessStatusCode();
         var result = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -1860,7 +2039,12 @@ public sealed class ResolutionContractTests
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click all buttons in Profile", documentId = "document-1" }
+            new
+            {
+                instruction = "Click all buttons in Profile",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
         response.EnsureSuccessStatusCode();
         var result = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -1923,7 +2107,12 @@ public sealed class ResolutionContractTests
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click Save and Contact", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save and Contact",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
         var result = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal("error", result.GetProperty("outcome").GetString());
@@ -1952,7 +2141,12 @@ public sealed class ResolutionContractTests
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click Save and Contact", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save and Contact",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var result = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -1987,7 +2181,12 @@ public sealed class ResolutionContractTests
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click Save", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
         var result = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal(outcome, result.GetProperty("outcome").GetString());
@@ -2035,7 +2234,12 @@ public sealed class ResolutionContractTests
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click Save", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
         var result = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal(outcome, result.GetProperty("outcome").GetString());
@@ -2079,7 +2283,12 @@ public sealed class ResolutionContractTests
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click Save", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
         var result = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal(outcome, result.GetProperty("outcome").GetString());
@@ -2100,7 +2309,12 @@ public sealed class ResolutionContractTests
 
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click Save under Profile", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save under Profile",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -2131,7 +2345,12 @@ public sealed class ResolutionContractTests
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click Save", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -2169,7 +2388,12 @@ public sealed class ResolutionContractTests
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click Save", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -2215,7 +2439,12 @@ public sealed class ResolutionContractTests
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click Save", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -2236,7 +2465,12 @@ public sealed class ResolutionContractTests
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click Save", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
 
         var result = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -2259,7 +2493,12 @@ public sealed class ResolutionContractTests
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click Save", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
 
         var result = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -2278,7 +2517,12 @@ public sealed class ResolutionContractTests
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click Save", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
 
         var result = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -2355,7 +2599,12 @@ public sealed class ResolutionContractTests
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click Save", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
         var result = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal("found", result.GetProperty("outcome").GetString());
@@ -2405,7 +2654,12 @@ public sealed class ResolutionContractTests
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click Missing", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Missing",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
 
         var result = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -2468,7 +2722,12 @@ public sealed class ResolutionContractTests
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click Save", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -2489,7 +2748,12 @@ public sealed class ResolutionContractTests
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click Save", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
 
         var result = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -2513,7 +2777,12 @@ public sealed class ResolutionContractTests
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click Save", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -2554,7 +2823,12 @@ public sealed class ResolutionContractTests
         using var cancellation = new CancellationTokenSource();
         var response = client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click Save", documentId = "document-1" },
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                imageMode = "text_only",
+            },
             cancellation.Token
         );
         await started.Task.WaitAsync(TimeSpan.FromSeconds(5));
@@ -2575,7 +2849,12 @@ public sealed class ResolutionContractTests
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click Save", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
 
         var result = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -2618,7 +2897,12 @@ public sealed class ResolutionContractTests
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click Save", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
         var result = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal("error", result.GetProperty("outcome").GetString());
@@ -2658,7 +2942,12 @@ public sealed class ResolutionContractTests
             using var client = application.CreateClient();
             using var response = await client.PostAsJsonAsync(
                 "/pages/page-1/resolve",
-                new { instruction, documentId = "document-1" }
+                new
+                {
+                    instruction,
+                    documentId = "document-1",
+                    imageMode = "text_only",
+                }
             );
             var result = await response.Content.ReadFromJsonAsync<JsonElement>();
             return result.GetProperty("configurationId").GetString();
@@ -2677,7 +2966,12 @@ public sealed class ResolutionContractTests
         client.DefaultRequestHeaders.Add("X-Xpathed-Attempt-Id", Guid.NewGuid().ToString("N"));
         using var response = await client.PostAsJsonAsync(
             "/internal/pages/page-1/resolve",
-            new { instruction = "Click Save", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var envelope = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -2709,91 +3003,6 @@ public sealed class ResolutionContractTests
         Assert.Equal(1, handler.ProviderRequestCount);
     }
 
-    [Fact]
-    public async Task ScreenshotOptInSendsOneMaskedImageWithoutRetainingPixelsInEvidence()
-    {
-        const string png =
-            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jPz8AAAAASUVORK5CYII=";
-        var capture = JsonNode.Parse(new DeterministicServicesHandler().CaptureBody)!;
-        capture["image"] = JsonSerializer.SerializeToNode(
-            new
-            {
-                png,
-                width = 1,
-                height = 1,
-            }
-        );
-        var handler = new DeterministicServicesHandler { CaptureBody = capture.ToJsonString() };
-        await using var application = CreateApplication(handler);
-        using var client = application.CreateClient();
-        client.DefaultRequestHeaders.Add("X-Xpathed-Attempt-Id", Guid.NewGuid().ToString("N"));
-        using var response = await client.PostAsJsonAsync(
-            "/internal/pages/page-1/resolve",
-            new
-            {
-                instruction = "Click Save",
-                documentId = "document-1",
-                includeImage = true,
-            }
-        );
-        var responseText = await response.Content.ReadAsStringAsync();
-        using var envelope = JsonDocument.Parse(responseText);
-        Assert.Equal("found", envelope.RootElement.GetProperty("result").GetProperty("outcome").GetString());
-        Assert.True(handler.CaptureRequest.GetProperty("includeImage").GetBoolean());
-        var content = handler.ModelRequest.GetProperty("messages")[1].GetProperty("content");
-        Assert.Equal(2, content.GetArrayLength());
-        Assert.Equal("text", content[0].GetProperty("type").GetString());
-        Assert.Equal("image_url", content[1].GetProperty("type").GetString());
-        Assert.Equal(
-            "data:image/png;base64," + png,
-            content[1].GetProperty("image_url").GetProperty("url").GetString()
-        );
-        Assert.DoesNotContain(png, responseText, StringComparison.Ordinal);
-        Assert.DoesNotContain("data:image", responseText, StringComparison.Ordinal);
-        Assert.Equal(1, handler.ProviderRequestCount);
-        Assert.Equal(1, handler.SelectionRequestCount);
-    }
-
-    [Theory]
-    [InlineData("missing")]
-    [InlineData("malformed")]
-    [InlineData("dimensions")]
-    [InlineData("unexpected")]
-    public async Task InvalidOrUnrequestedScreenshotMakesNoProviderCall(string scenario)
-    {
-        const string png =
-            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jPz8AAAAASUVORK5CYII=";
-        var capture = JsonNode.Parse(new DeterministicServicesHandler().CaptureBody)!;
-        if (scenario != "missing")
-        {
-            capture["image"] = JsonSerializer.SerializeToNode(
-                new
-                {
-                    png = scenario == "malformed" ? Convert.ToBase64String(new byte[24]) : png,
-                    width = scenario == "dimensions" ? 2 : 1,
-                    height = 1,
-                }
-            );
-        }
-        var handler = new DeterministicServicesHandler { CaptureBody = capture.ToJsonString() };
-        await using var application = CreateApplication(handler);
-        using var client = application.CreateClient();
-        using var response = await client.PostAsJsonAsync(
-            "/pages/page-1/resolve",
-            new
-            {
-                instruction = "Click Save",
-                documentId = "document-1",
-                includeImage = scenario != "unexpected",
-            }
-        );
-        var result = await response.Content.ReadFromJsonAsync<JsonElement>();
-        Assert.Equal("error", result.GetProperty("outcome").GetString());
-        Assert.Equal("invalid_browser_capture", result.GetProperty("diagnostics").GetProperty("code").GetString());
-        Assert.Equal(0, handler.ProviderRequestCount);
-        Assert.Equal(0, handler.SelectionRequestCount);
-    }
-
     [Theory]
     [InlineData("deepseek/deepseek-v4.1-flash", "wafer")]
     [InlineData("openai/gpt-6-luna", "openai")]
@@ -2809,7 +3018,12 @@ public sealed class ResolutionContractTests
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click Save", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = handler.ModelRequest;
@@ -2846,7 +3060,12 @@ public sealed class ResolutionContractTests
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click Save", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
         var result = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal("found", result.GetProperty("outcome").GetString());
@@ -2901,7 +3120,12 @@ public sealed class ResolutionContractTests
             using var client = application.CreateClient();
             using var response = await client.PostAsJsonAsync(
                 "/pages/page-1/resolve",
-                new { instruction = "Click Save", documentId = "document-1" }
+                new
+                {
+                    instruction = "Click Save",
+                    documentId = "document-1",
+                    imageMode = "text_only",
+                }
             );
             var result = await response.Content.ReadFromJsonAsync<JsonElement>();
             Assert.Equal("found", result.GetProperty("outcome").GetString());
@@ -2935,7 +3159,12 @@ public sealed class ResolutionContractTests
             using var client = application.CreateClient();
             using var response = await client.PostAsJsonAsync(
                 "/pages/page-1/resolve",
-                new { instruction = "Click Save", documentId = "document-1" }
+                new
+                {
+                    instruction = "Click Save",
+                    documentId = "document-1",
+                    imageMode = "text_only",
+                }
             );
             var result = await response.Content.ReadFromJsonAsync<JsonElement>();
             Assert.Equal("found", result.GetProperty("outcome").GetString());
@@ -2954,7 +3183,12 @@ public sealed class ResolutionContractTests
         {
             using var response = await client.PostAsJsonAsync(
                 "/pages/page-1/resolve",
-                new { instruction, documentId = "document-1" }
+                new
+                {
+                    instruction,
+                    documentId = "document-1",
+                    imageMode = "text_only",
+                }
             );
             var result = await response.Content.ReadFromJsonAsync<JsonElement>();
             Assert.Equal("found", result.GetProperty("outcome").GetString());
@@ -2987,7 +3221,12 @@ public sealed class ResolutionContractTests
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click Save", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var input = handler.ModelRequest.GetProperty("messages")[1].GetProperty("content").GetString()!;
@@ -3031,7 +3270,12 @@ public sealed class ResolutionContractTests
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
-            new { instruction = "Click Save", documentId = "document-1" }
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                imageMode = "text_only",
+            }
         );
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var result = await response.Content.ReadFromJsonAsync<JsonElement>();
@@ -3049,7 +3293,7 @@ public sealed class ResolutionContractTests
             }
         );
 
-    private static WebApplicationFactory<HealthController> CreateApplication(
+    internal static WebApplicationFactory<HealthController> CreateApplication(
         DeterministicServicesHandler handler,
         Dictionary<string, string?>? settings = null,
         ILoggerProvider? logs = null

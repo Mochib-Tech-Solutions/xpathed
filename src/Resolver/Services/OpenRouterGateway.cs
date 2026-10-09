@@ -12,7 +12,7 @@ using PricingRates = (decimal Input, decimal Output, decimal Request, System.Dat
 
 namespace Xpathed.Resolver.Services;
 
-public sealed class OpenRouterGateway(
+public sealed partial class OpenRouterGateway(
     IHttpClientFactory clients,
     IConfiguration configuration,
     IMemoryCache pricingCache,
@@ -83,7 +83,16 @@ public sealed class OpenRouterGateway(
             endpoint = Uri.TryCreate(endpoint, UriKind.Absolute, out var address) ? address.AbsoluteUri : endpoint,
             timeoutSeconds = timeoutSeconds.ToString("R", CultureInfo.InvariantCulture),
             modelInputBudgetBytes = (int?)null,
-            imageInput = "opt_in_masked_viewport_png",
+            imageInput = "auto_masked_viewport_png",
+            imageRouting = new
+            {
+                model = ImageRoutingModel,
+                provider = ImageRoutingProvider,
+                timeoutMilliseconds = ImageRoutingTimeoutMilliseconds,
+                decisionCacheSeconds = ImageRoutingCache.LifetimeSeconds,
+                decisionCacheEntries = ImageRoutingCache.EntryLimit,
+                policy = ImageRoutingPolicy.Describe(),
+            },
             responseCache = false,
             maximumActions = ActionSelectionStrategy.MaximumActions,
             usageLimits = new
@@ -245,17 +254,21 @@ public sealed class OpenRouterGateway(
         );
     }
 
-    private ModelCostEstimate? EstimateCost(ResolutionDiagnostics diagnostics, CancellationToken cancellationToken)
+    private ModelCostEstimate? EstimateCost(
+        ResolutionDiagnostics diagnostics,
+        CancellationToken cancellationToken,
+        string? pricingModel = null
+    )
     {
         if (
             diagnostics.Usage is not { InputTokens: { } inputTokens, OutputTokens: { } outputTokens }
-            || diagnostics.Model?.Split('/') is not { Length: 2 } model
+            || (pricingModel ?? diagnostics.Model)?.Split('/') is not { Length: 2 } model
             || string.IsNullOrWhiteSpace(diagnostics.Provider)
         )
         {
             return null;
         }
-        var key = (typeof(OpenRouterGateway), endpoint, diagnostics.Model, diagnostics.Provider);
+        var key = (typeof(OpenRouterGateway), endpoint, pricingModel ?? diagnostics.Model, diagnostics.Provider);
         Task<PricingRates?> pending;
         lock (PricingSync)
         {

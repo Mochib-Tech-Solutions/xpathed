@@ -49,6 +49,10 @@ internal static class BrowserCaptureScript
               const walker = walkers.at(-1);
               if (!walker.nextNode()) { walkers.pop(); continue; }
               const element = walker.currentNode;
+              if (trackImageRoots && !imageRoots.has(element)) {
+                imageRoots.set(element, element.shadowRoot);
+                if (element.shadowRoot) imageObserver.observe(element.shadowRoot, imageObservation);
+              }
               yield element;
               if (element.shadowRoot) walkers.push(document.createTreeWalker(element.shadowRoot, NodeFilter.SHOW_ELEMENT));
             }
@@ -58,6 +62,29 @@ internal static class BrowserCaptureScript
           const budgetExceeded = {};
           let deadline = Infinity;
           const checkBudget = () => { if (deadline !== Infinity && performance.now() > deadline) throw budgetExceeded; };
+          const imageRoots = new Map(), imageMaskNodes = new WeakSet();
+          let trackImageRoots = true, imageDomChanged = false;
+          const imageObservation = {subtree:true, childList:true, attributes:true, attributeOldValue:true, characterData:true};
+          const imageMutations = records => {
+            if (imageDomChanged) return;
+            imageDomChanged = records.some(record => {
+              if (imageMaskNodes.has(record.target)) return false;
+              if (record.type === 'childList' && [...record.addedNodes, ...record.removedNodes].every(node => imageMaskNodes.has(node))) return false;
+              const element = record.target.nodeType === Node.ELEMENT_NODE ? record.target : record.target.parentElement;
+              const hiddenText = record.type === 'characterData' || record.type === 'childList' &&
+                [...record.addedNodes, ...record.removedNodes].every(node => node.nodeType === Node.TEXT_NODE);
+              return !(hiddenText && element?.closest('[hidden]') && !element.closest('style'));
+            });
+            if (imageDomChanged) imageObserver.disconnect();
+          };
+          const imageObserver = new MutationObserver(imageMutations);
+          imageObserver.observe(document, imageObservation);
+          const imageTreeUnchanged = () => {
+            imageMutations(imageObserver.takeRecords());
+            if (imageDomChanged) return false;
+            for (const [element, root] of imageRoots) if (element.shadowRoot !== root) return false;
+            return true;
+          };
           let styleCache = new WeakMap();
           let textCache = new WeakMap();
           let labelCache = new WeakMap();
@@ -598,10 +625,64 @@ internal static class BrowserCaptureScript
               if (chain) candidates[index].shadowChain = chain;
             }
           } catch (error) { if (error !== budgetExceeded) throw error; complete = false; candidates.length = 0; }
+          const imageEvidence = (element, candidate = describe(element, 0)) => [
+            candidate.tag, candidate.role, candidate.text, candidate.label, candidate.placeholder, candidate.scope,
+            state(element), candidate.geometry, candidate.appearance, visibleRect(element),
+            shadowHosts(element).map(host => [locatorId(host), label(host)])
+          ];
+          const imageNodes = complete ? [...nodes, ...frameElements] : [];
+          const imageSnapshot = imageNodes.map((element, index) => imageEvidence(element, candidates[index]));
+          trackImageRoots = false;
+          const imageMembership = () => {
+            const dependencies = activePrivacyDependencies, current = {nodes:[], frames:[]};
+            activePrivacyDependencies = new Set();
+            try {
+              for (const element of imageRoots.keys()) {
+                if (!element.isConnected) continue;
+                if (eligible(element)) current.nodes.push(element);
+                if (element.matches('iframe,frame') && accessibilityExposed(element)) current.frames.push(element);
+              }
+              return current;
+            } finally { activePrivacyDependencies = dependencies; }
+          };
           return {
             frameElements,
             xpathEvidence,
             verifyXpathProposals,
+            dispose() { imageObserver.disconnect(); },
+            imageMaskNode(node) { imageMaskNodes.add(node); },
+            imageMaskStyle(element, update) {
+              imageMutations(imageObserver.takeRecords());
+              const previous = element.getAttribute('style');
+              update();
+              let skipped = false;
+              imageMutations(imageObserver.takeRecords().filter(record => {
+                if (!skipped && record.type === 'attributes' && record.target === element && record.attributeName === 'style' && record.oldValue === previous) {
+                  skipped = true; return false;
+                }
+                return true;
+              }));
+            },
+            async imageUnchanged(value) {
+              if (!complete || !imageTreeUnchanged() || capturedDocument !== document || capturedRoot !== document.documentElement || !viewUnchanged() ||
+                imageNodes.some(element => !element.isConnected || element.ownerDocument !== capturedDocument)) return false;
+              environment = value ? JSON.parse(value) : { x:0, y:0, scaleX:1, scaleY:1, exposed:true, rendered:true, clip:{left:0,top:0,right:innerWidth,bottom:innerHeight} };
+              reset();
+              const dependencies = [...privacyDependencies];
+              const membership = imageMembership(), observed = new Set([...membership.nodes, ...membership.frames]);
+              try { await observeIntersections(observed); }
+              finally { for (const source of dependencies) privacyDependencies.add(source); }
+              const current = imageMembership();
+              if ([...current.nodes, ...current.frames].some(element => !observed.has(element))) return false;
+              const currentNodes = current.nodes.filter(inView), currentFrames = current.frames.filter(inView);
+              if (currentNodes.length !== nodes.length || currentNodes.some(element => !nodeIds.has(element)) ||
+                currentFrames.length !== frameElements.length || currentFrames.some(element => !frameElements.includes(element))) return false;
+              // Eligibility reads are not serialized evidence; collect the retained names' actual sources again.
+              textCache = new WeakMap(); labelCache = new WeakMap();
+              return !modalityUnknown && !modalityBudgetExceeded && imageTreeUnchanged() && viewUnchanged() &&
+                imageNodes.every((element, index) => element.isConnected && element.ownerDocument === capturedDocument &&
+                  accessibilityExposed(element) && JSON.stringify(imageEvidence(element)) === JSON.stringify(imageSnapshot[index]));
+            },
             xpathPrivacyUnchanged() {
               deadline = Infinity;
               closestCache = new Map();

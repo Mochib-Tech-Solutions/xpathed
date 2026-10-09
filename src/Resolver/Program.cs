@@ -15,6 +15,7 @@ builder.Services.AddTransient<OpenRouterGateway>();
 builder.Services.AddTransient<ResolutionService>();
 builder.Services.AddTransient<XPathSelectionService>();
 builder.Services.AddSingleton<ProviderAccounting>();
+builder.Services.AddSingleton<ImageRoutingCache>();
 builder.Services.AddSingleton<ModelUsageLimits>();
 var app = builder.Build();
 _ = app.Services.GetRequiredService<ModelUsageLimits>();

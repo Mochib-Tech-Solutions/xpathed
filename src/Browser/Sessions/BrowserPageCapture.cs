@@ -18,11 +18,63 @@ internal sealed class BrowserPageCapture(BrowserPageRuntime page) : IAsyncDispos
 
     public bool UsesFrame(CdpFrame frame) => selectedFrames.Any(captured => captured.Frame == frame);
 
+    public async Task RequireImageCurrentAsync()
+    {
+        if (!complete)
+        {
+            throw new ApiException(409, "capture_incomplete", "The capture is incomplete.");
+        }
+        try
+        {
+            foreach (var frame in frames)
+            {
+                string? environment = null;
+                if (frame.Parent is not null)
+                {
+                    var info = await frame.Parent.Handle.EvaluateAsync<JsonElement>(
+                        "(capture, owner) => capture.frameInfo(owner)",
+                        frame.Owner
+                    );
+                    ThrowScriptError(info);
+                    if (
+                        !info.GetProperty("environment").GetProperty("geometrySupported").GetBoolean()
+                        || !info.GetProperty("environment").GetProperty("exposed").GetBoolean()
+                    )
+                    {
+                        throw new ApiException(409, "stale_capture", "An ancestor frame changed after capture.");
+                    }
+                    environment = info.GetProperty("environment").GetRawText();
+                }
+                if (
+                    frame.Frame.IsDetached
+                    || !await frame.Handle.EvaluateAsync<bool>(
+                        "(capture, environment) => capture.imageUnchanged(environment)",
+                        environment
+                    )
+                )
+                {
+                    throw new ApiException(409, "stale_capture", "The captured view changed before image export.");
+                }
+            }
+            if (!await PrivacyUnchangedAsync())
+            {
+                throw new ApiException(409, "stale_capture", "Private content changed after capture.");
+            }
+        }
+        catch (CdpException)
+        {
+            throw new ApiException(409, "stale_capture", "The captured view is no longer available for image export.");
+        }
+    }
+
     public async Task<CaptureImage> CaptureImageAsync()
     {
         try
         {
-            var png = await CdpScreenshot.CaptureAsync(page.Page);
+            var png = await CdpScreenshot.CaptureAsync(
+                page.Page,
+                frames.ToDictionary(frame => frame.Frame, frame => frame.Handle)
+            );
             return new CaptureImage(
                 png,
                 BinaryPrimitives.ReadInt32BigEndian(png.AsSpan(16, 4)),
@@ -564,6 +616,11 @@ internal sealed class BrowserPageCapture(BrowserPageRuntime page) : IAsyncDispos
         await ClearHighlightAsync();
         foreach (var frame in frames)
         {
+            try
+            {
+                await frame.Handle.EvaluateAsync("capture => capture.dispose()");
+            }
+            catch (CdpException) { }
             try
             {
                 await frame.Handle.DisposeAsync();

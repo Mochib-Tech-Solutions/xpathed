@@ -185,6 +185,27 @@ async function openFirst(user: ReturnType<typeof userEvent.setup>) {
 }
 
 describe("Browser tabs and chat", () => {
+  it("preserves text only across tab revisits and navigation without changing another tab", async () => {
+    browserApi();
+    const user = renderWorkspace();
+    await openFirst(user);
+    const mode = () => screen.getByRole("combobox", { name: "Screenshots" });
+    await user.selectOptions(mode(), "text_only");
+    await user.click(screen.getByRole("button", { name: "New tab" }));
+    expect(mode()).toHaveValue("auto");
+    await user.type(screen.getByRole("textbox", { name: "Page address" }), "second.test{Enter}");
+    await waitFor(() => expect(mode()).toBeEnabled());
+    await user.click(screen.getByRole("tab", { name: "First" }));
+    await waitFor(() => expect(mode()).toHaveValue("text_only"));
+    const address = screen.getByRole("textbox", { name: "Page address" });
+    await user.clear(address);
+    await user.type(address, "first.test/changed{Enter}");
+    await waitFor(() => expect(mode()).toBeEnabled());
+    expect(mode()).toHaveValue("text_only");
+    await user.click(screen.getByRole("tab", { name: "Second" }));
+    await waitFor(() => expect(mode()).toHaveValue("auto"));
+  });
+
   it("retries a historical prompt on its active tab's current document without clearing drafts", async () => {
     const api = browserApi();
     const user = renderWorkspace();

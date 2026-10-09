@@ -39,6 +39,7 @@ test("cardinality-live-singular-login-is-ambiguous-and-plural-login-enumerates",
       });
       const result = await json(`${resolver}/pages/${session.pageId}/resolve`, {
         instruction,
+        imageMode: "text_only",
         documentId: page.documentId,
       });
       knownReportedCostUsd += result.diagnostics.usage?.cost ?? 0;

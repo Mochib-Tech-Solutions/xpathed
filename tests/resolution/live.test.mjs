@@ -7,6 +7,7 @@ const browser = process.env.XPATHED_BROWSER_URL ?? "http://browser:8080";
 const resolver = process.env.XPATHED_RESOLVER_URL ?? "http://resolver:8080";
 const fixture = process.env.XPATHED_FIXTURE_URL ?? "http://resolution-fixture:8090";
 async function json(url, method = "GET", body) {
+  if (url.endsWith("/resolve") && body) body = { imageMode: "text_only", ...body };
   const response = await fetch(url, {
     method,
     headers: body ? { "Content-Type": "application/json" } : undefined,
@@ -31,7 +32,6 @@ test("provider-live-inference-resolves-plural-frame-targets-and-scoped-absence",
       const result = await json(`${resolver}/pages/${session.pageId}/resolve`, "POST", {
         instruction,
         documentId: page.documentId,
-        includeImage: true,
       });
       console.log(
         JSON.stringify({
@@ -158,7 +158,7 @@ test("provider-live-image-selects-visual-shape-and-scoped-duplicate", async () =
       const result = await json(`${resolver}/pages/${page.pageId}/resolve`, "POST", {
         instruction,
         documentId: page.documentId,
-        includeImage: true,
+        imageMode: "auto",
       });
       console.log(
         JSON.stringify({
@@ -169,6 +169,8 @@ test("provider-live-image-selects-visual-shape-and-scoped-duplicate", async () =
           provider: result.diagnostics.provider,
           generationId: result.diagnostics.generationId,
           usage: result.diagnostics.usage,
+          providerCalls: result.diagnostics.providerCalls,
+          imageRouting: result.diagnostics.imageRouting,
           costEstimate: result.diagnostics.costEstimate,
           timingsMs: result.diagnostics.timingsMs,
         }),
@@ -180,7 +182,8 @@ test("provider-live-image-selects-visual-shape-and-scoped-duplicate", async () =
       );
       assert.equal(result.actions.length, 1);
       assert.equal(result.actions[0].action, "click");
-      assert.equal(result.diagnostics.modelCalls, 1);
+      assert.equal(result.diagnostics.modelCalls, 2);
+      assert.equal(result.diagnostics.imageRouting.status, "included");
       assert.equal(result.diagnostics.model, "deepseek/deepseek-v4.1-flash");
       assert.equal(result.diagnostics.provider?.toLowerCase(), "wafer");
       assert.match(result.diagnostics.generationId ?? "", /^gen-/);

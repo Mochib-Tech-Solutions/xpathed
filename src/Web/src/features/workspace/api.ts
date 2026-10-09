@@ -35,6 +35,39 @@ export type SessionState = {
   pages: PageState[];
 };
 
+export type ImageMode = "auto" | "text_only";
+
+export type ModelUsage = {
+  inputTokens: number | null;
+  outputTokens: number | null;
+  totalTokens: number | null;
+  reasoningTokens: number | null;
+  cachedTokens: number | null;
+  cost: number | null;
+};
+
+export type ModelCostEstimate = {
+  currency: "USD";
+  inputPricePerMillion: number;
+  outputPricePerMillion: number;
+  inputCost: number;
+  outputCost: number;
+  requestCost: number;
+  totalCost: number;
+  pricingFetchedAt: string;
+};
+
+export type ProviderCall = {
+  purpose: "image_routing" | "selection";
+  model?: string | null;
+  provider?: string | null;
+  generationId?: string | null;
+  usage?: ModelUsage | null;
+  costEstimate?: ModelCostEstimate | null;
+  accounting?: "pending" | "completed" | "unavailable" | null;
+  code?: string | null;
+};
+
 export type ResolutionResult = {
   outcome: "found" | "not_found" | "unsupported" | "error" | "partial";
   sessionId: string | null;
@@ -95,28 +128,20 @@ export type ResolutionResult = {
   diagnostics: {
     code: string | null;
     message: string | null;
-    timingsMs?: { total?: number };
+    timingsMs?: { total?: number; [stage: string]: number | undefined };
     model?: string | null;
     provider?: string | null;
     providerAccounting?: "pending" | "completed" | "unavailable" | null;
-    usage?: {
-      inputTokens: number | null;
-      outputTokens: number | null;
-      totalTokens: number | null;
-      reasoningTokens: number | null;
-      cachedTokens: number | null;
-      cost: number | null;
+    usage?: ModelUsage | null;
+    costEstimate?: ModelCostEstimate | null;
+    imageRouting?: {
+      mode: ImageMode;
+      status: "not_requested" | "text_only" | "included" | "unavailable";
+      reason: string;
+      score: number | null;
+      cached: boolean;
     } | null;
-    costEstimate?: {
-      currency: "USD";
-      inputPricePerMillion: number;
-      outputPricePerMillion: number;
-      inputCost: number;
-      outputCost: number;
-      requestCost: number;
-      totalCost: number;
-      pricingFetchedAt: string;
-    } | null;
+    providerCalls?: ProviderCall[] | null;
   };
 };
 
@@ -136,7 +161,6 @@ export type ActionResolution = {
 
 export type Resolution = {
   id: string;
-  includedImage?: boolean;
   instruction: string;
   createdAt: string;
   respondedAt: string | null;

@@ -256,6 +256,36 @@ test("unavailable accounting does not change a successful resolver grade", () =>
   assert.equal(gradeTrial(caseSpec, actual).passed, true);
 });
 
+test("response accounting includes image routing and preserves an unknown charge", () => {
+  const actual = trial();
+  actual.result.diagnostics = {
+    modelCalls: 2,
+    usage: { cost: 9, inputTokens: 999 },
+    providerCalls: [
+      { purpose: "image_routing", usage: { cost: 0.001, inputTokens: 30, outputTokens: 0 } },
+      { purpose: "selection", usage: { cost: 0.003, inputTokens: 100, outputTokens: 20 } },
+    ],
+  };
+  let metrics = gradeTrial(caseSpec, actual).metrics;
+  assert.equal(metrics.reportedCostUsd, 0.004);
+  assert.equal(metrics.usage.inputTokens, 130);
+  assert.equal(metrics.accountingSource, "response_provider_calls");
+  const report = summarize(
+    { cases: [caseSpec], plan: { caseOrder: [caseSpec.id], repetitions: 1 } },
+    [actual],
+  );
+  assert.equal(report.firstAttempt.accountingSources.response_provider_calls, 1);
+  assert.equal(
+    Object.values(report.firstAttempt.accountingSources).reduce((sum, count) => sum + count, 0),
+    report.firstAttempt.trials,
+  );
+  actual.result.diagnostics.providerCalls[0].usage.cost = null;
+  metrics = gradeTrial(caseSpec, actual).metrics;
+  assert.equal(metrics.reportedCostUsd, null);
+  assert.equal(metrics.usage.inputTokens, 130);
+  assert.equal(metrics.estimatedCostUsd, null);
+});
+
 test("provider accounting sums each forwarded call and preserves unknown charges and usage", () => {
   const actual = trial();
   actual.result.diagnostics = {

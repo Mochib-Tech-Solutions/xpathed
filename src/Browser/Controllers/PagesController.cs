@@ -38,6 +38,13 @@ public sealed class PagesController(BrowserSessions sessions) : ControllerBase
         CancellationToken cancellationToken
     ) => sessions.CaptureAsync(id, request, cancellationToken);
 
+    [HttpPost("{id}/capture-image")]
+    public Task<CaptureImageResult> CaptureImage(
+        string id,
+        [FromBody] CaptureImageRequest request,
+        CancellationToken cancellationToken
+    ) => sessions.CaptureImageAsync(id, request, cancellationToken);
+
     [HttpPost("{id}/selections")]
     public Task<ActionSelectionValidation> SelectActions(
         string id,

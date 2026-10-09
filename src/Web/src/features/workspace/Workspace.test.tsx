@@ -117,17 +117,15 @@ async function submitInstruction(user: ReturnType<typeof userEvent.setup>) {
 }
 
 describe("Workspace resolution", () => {
-  it("shares a screenshot only for the opted-in request and resets the choice before retry", async () => {
+  it("defaults to automatic screenshots and preserves text only through retry", async () => {
     mockApi();
     const user = await openWorkspace();
-    const screenshot = screen.getByRole("checkbox", {
-      name: "Include screenshot with this request",
-    });
-    expect(screenshot).not.toBeChecked();
-    await submitInstruction(user);
-    await waitFor(() =>
-      expect(screen.getByRole("button", { name: "Resolve instruction" })).toBeDisabled(),
+    const mode = screen.getByRole("combobox", { name: "Screenshots" });
+    expect(mode).toHaveValue("auto");
+    expect(mode).toHaveAccessibleDescription(
+      "Auto sends a masked screenshot to the model provider when visual details may help. Other visible content can be shared.",
     );
+    await submitInstruction(user);
     await waitFor(() =>
       expect(screen.getByRole("button", { name: "Retry instruction" })).toBeEnabled(),
     );
@@ -135,20 +133,77 @@ describe("Workspace resolution", () => {
       vi
         .mocked(fetch)
         .mock.calls.filter(([path]) => typeof path === "string" && path.endsWith("/resolve"))
-        .map(([, options]) => JSON.parse(options?.body as string) as { includeImage?: boolean });
-    expect(requests()).toEqual([expect.not.objectContaining({ includeImage: true })]);
-    await user.click(screenshot);
+        .map(
+          ([, options]) =>
+            JSON.parse(options?.body as string) as { imageMode: string; includeImage?: boolean },
+        );
+    expect(requests()[0]).toEqual(expect.objectContaining({ imageMode: "auto" }));
+    expect(requests()[0]).not.toHaveProperty("includeImage");
+    expect(screen.queryByText("Image used")).not.toBeInTheDocument();
+    await user.selectOptions(mode, "text_only");
+    expect(mode).toHaveAccessibleDescription(
+      "Text only sends page text and structure, without screenshots.",
+    );
     await submitInstruction(user);
     await waitFor(() =>
       expect(screen.getAllByRole("button", { name: "Retry instruction" })[1]).toBeEnabled(),
     );
-    expect(requests()[1]?.includeImage).toBe(true);
-    expect(screenshot).not.toBeChecked();
-    expect(screen.getByText("Screenshot included")).toBeInTheDocument();
+    expect(requests()[1]?.imageMode).toBe("text_only");
+    expect(mode).toHaveValue("text_only");
     await user.click(screen.getAllByRole("button", { name: "Retry instruction" })[1]!);
     await waitFor(() => expect(requests()).toHaveLength(3));
-    expect(requests()[2]?.includeImage).not.toBe(true);
+    expect(requests()[2]?.imageMode).toBe("text_only");
+    await waitFor(() => expect(mode).toBeEnabled());
+    await user.selectOptions(mode, "auto");
+    await submitInstruction(user);
+    await waitFor(() => expect(requests()).toHaveLength(4));
+    expect(requests()[3]?.imageMode).toBe("auto");
   });
+
+  it.each([
+    [
+      "included",
+      "visual_evidence",
+      "Image used",
+      "An image was chosen to help with visual details.",
+    ],
+    [
+      "unavailable",
+      "image_unavailable",
+      "Image unavailable",
+      "A usable screenshot was unavailable.",
+    ],
+    ["text_only", "semantic_evidence", "Text only", "Page text and structure appeared sufficient."],
+  ])(
+    "shows actual server image status %s instead of requested policy",
+    async (status, reason, label, explanation) => {
+      let complete!: (response: Response) => void;
+      mockApi(
+        () =>
+          new Promise((resolve) => {
+            complete = resolve;
+          }),
+      );
+      const user = await openWorkspace();
+      await submitInstruction(user);
+      expect(screen.queryByText("Image used")).not.toBeInTheDocument();
+      expect(screen.getByRole("combobox", { name: "Screenshots" })).toBeDisabled();
+      complete(
+        Response.json({
+          ...found,
+          diagnostics: {
+            ...found.diagnostics,
+            imageRouting: { mode: "auto", status, reason, score: null, cached: false },
+          },
+        }),
+      );
+      const indicator = await screen.findByLabelText(`${label}: ${explanation}`);
+      expect(indicator).toHaveTextContent(label);
+      expect(indicator).toHaveAttribute("title", explanation);
+      if (status !== "included") expect(screen.queryByText("Image used")).not.toBeInTheDocument();
+      expect(screen.queryByText("Screenshot included")).not.toBeInTheDocument();
+    },
+  );
 
   it("keeps a covered target in its numbered card beside the ready target", async () => {
     mockApi(() =>
@@ -652,6 +707,7 @@ describe("Workspace resolution", () => {
           body: JSON.stringify({
             instruction: "Click all confirmation buttons in the list",
             documentId: "document-1",
+            imageMode: "auto",
           }),
         }),
       );
@@ -881,6 +937,7 @@ describe("Workspace resolution", () => {
         body: JSON.stringify({
           instruction: "Click Pay now",
           documentId: "document-1",
+          imageMode: "auto",
         }),
       }),
     );
@@ -1655,6 +1712,7 @@ describe("Workspace resolution", () => {
         body: JSON.stringify({
           instruction: "Click Fresh target",
           documentId: "document-2",
+          imageMode: "auto",
         }),
       }),
     );
@@ -2111,6 +2169,7 @@ describe("Workspace resolution", () => {
         expect(JSON.parse(typeof options?.body === "string" ? options.body : "null")).toEqual({
           instruction: "Click Pay now",
           documentId: "document-1",
+          imageMode: "auto",
         });
         return Promise.resolve(Response.json(found));
       }

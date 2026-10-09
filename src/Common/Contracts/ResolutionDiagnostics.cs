@@ -11,6 +11,8 @@ public sealed record ResolutionDiagnostics
     public int ModelInputBytes { get; init; }
     public int? ModelInputBudgetBytes { get; init; }
     public int ModelCalls { get; init; }
+    public ModelCallDiagnostics[] ProviderCalls { get; init; } = [];
+    public ImageRouting? ImageRouting { get; init; }
     public string Strategy { get; init; } = "candidate-selection";
     public string? Model { get; init; }
     public string? Provider { get; init; }

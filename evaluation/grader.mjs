@@ -174,6 +174,23 @@ export function gradeTrial(caseSpec, trial) {
       )
     : null;
   metrics.accountingSource = metrics.usage ? "response_diagnostics" : "unavailable";
+  const responseCalls = trial?.result?.diagnostics?.providerCalls;
+  if (Array.isArray(responseCalls)) {
+    const sum = (read) => {
+      const values = responseCalls.map((call) => number(read(call)));
+      return values.every((value) => value !== null)
+        ? number(values.reduce((total, value) => total + value, 0))
+        : null;
+    };
+    metrics.reportedCostUsd = sum((call) => call.usage?.cost);
+    metrics.estimatedCostUsd = sum((call) => call.costEstimate?.totalCost);
+    metrics.usage = Object.fromEntries(
+      ["inputTokens", "outputTokens", "totalTokens", "reasoningTokens", "cachedTokens"].map(
+        (key) => [key, sum((call) => call.usage?.[key])],
+      ),
+    );
+    metrics.accountingSource = "response_provider_calls";
+  }
   if (Array.isArray(trial?.provider)) {
     const calls = trial.provider.filter((record) => record?.forwarded === true);
     const sum = (value) => {
@@ -189,8 +206,8 @@ export function gradeTrial(caseSpec, trial) {
     metrics.accountingSource = "provider_records";
     metrics.reportedCostUsd = sum((call) => call.reportedUsd);
     metrics.usage = {
-      inputTokens: sum((call) => call.usage?.prompt_tokens),
-      outputTokens: sum((call) => call.usage?.completion_tokens),
+      inputTokens: sum((call) => call.usage?.prompt_tokens ?? call.usage?.input_tokens),
+      outputTokens: sum((call) => call.usage?.completion_tokens ?? call.usage?.output_tokens),
       totalTokens: sum((call) => call.usage?.total_tokens),
       reasoningTokens: sum((call) => call.usage?.completion_tokens_details?.reasoning_tokens),
       cachedTokens: sum((call) => call.usage?.prompt_tokens_details?.cached_tokens),
@@ -509,11 +526,13 @@ function aggregate(entries) {
       ),
     ),
     accountingSources: Object.fromEntries(
-      ["provider_records", "response_diagnostics", "unavailable"].map((source) => [
-        source,
-        grades.filter((grade) => (grade.metrics.accountingSource ?? "unavailable") === source)
-          .length,
-      ]),
+      ["provider_records", "response_provider_calls", "response_diagnostics", "unavailable"].map(
+        (source) => [
+          source,
+          grades.filter((grade) => (grade.metrics.accountingSource ?? "unavailable") === source)
+            .length,
+        ],
+      ),
     ),
     savedLocator: {
       trials: mutations.length,

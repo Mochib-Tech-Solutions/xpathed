@@ -12,7 +12,7 @@ cd xpathed
 pnpm run setup
 ```
 
-Add your OpenRouter API key to the generated, ignored `.env` file. The default is DeepSeek V4.1 Flash through Wafer on OpenRouter; model and provider settings live in `.env`. Use a dedicated key with a provider spending limit; resolving instructions makes paid requests.
+Add your OpenRouter API key to the generated, ignored `.env` file. The default is DeepSeek V4.1 Flash through Wafer on OpenRouter, with Jev for image routing; selection model and provider settings live in `.env`. Use a dedicated key with a provider spending limit; resolving instructions makes paid requests.
 
 ```sh
 pnpm dev
@@ -22,7 +22,7 @@ Open [localhost:8080](http://localhost:8080), choose a resolution, then enter a 
 
 The launcher starts the three APIs and Vite with hot reload. Browser uses an isolated temporary profile. Set `BROWSER_EXECUTABLE_PATH` in `.env` if Chrome is installed in a custom location.
 
-**Include screenshot** adds visual evidence for that request. It masks detected form fields and marked private content; image requests fail when masking cannot be verified, including author-created closed shadow roots. Other visible page content is sent to the model provider. Images are not stored in chat or diagnostics.
+**Screenshots: Auto** lets Jev decide whether a screenshot adds missing visual evidence. Named controls usually need only text; shapes and graphics may need pixels. Choose **Text only** to prevent image sharing. Auto may include an image when routing is uncertain or unavailable. Detected form fields and marked private content are masked; when masking cannot be verified, resolution uses text and reports the limitation. Other visible content is sent to the provider. Images are never stored in chat or diagnostics.
 
 Use **Execute** on a current result to perform its action. Enter text, an option value, or a key when needed; these values go directly to Browser. Execution rechecks the target and consumes the result, so resolve again for another action. Completion describes the browser interaction; check the page for its effect.
 
@@ -47,7 +47,7 @@ curl --fail -X DELETE http://localhost:8080/api/sessions/SESSION_ID
 
 Replace the uppercase IDs with values returned by the preceding requests. Each found target has a unique XPath verified against its captured node. Frame and open-shadow context are returned separately. Requests cover the current viewport; ambiguity, missing targets and blocked controls remain explicit.
 
-`GET /api/sessions/options` lists the supported resolutions. Add `"includeImage":true` to opt into a screenshot. Execute a returned action with `POST /api/pages/PAGE_ID/execute` and its `sessionId`, `documentId`, `captureId`, `actionId`, plus `value` if required. Resolution itself never executes an action.
+`GET /api/sessions/options` lists the supported resolutions. Resolution defaults to `"imageMode":"auto"`; use `"imageMode":"text_only"` to skip image routing and sharing. Auto captures text first and requests a masked image only when needed, rejecting a changed page. Routing decisions may be reused for five minutes; page captures, images and target selections are always fresh. Response diagnostics report image use and each provider call's timing and cost. Execute a returned action with `POST /api/pages/PAGE_ID/execute` and its `sessionId`, `documentId`, `captureId`, `actionId`, plus `value` if required. Resolution itself never executes an action.
 
 Page content is untrusted. Keep credentials out of instructions and use the workspace only with pages you are allowed to inspect. API quotas limit traffic; a provider key limit controls spending.
 

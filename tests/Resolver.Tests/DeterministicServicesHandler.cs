@@ -13,6 +13,11 @@ internal sealed class DeterministicServicesHandler : HttpMessageHandler
     public Func<string, CancellationToken, Task>? BeforeRespondAsync { get; init; }
     public string? ProviderBody { get; set; }
     public HttpStatusCode ProviderStatus { get; init; } = HttpStatusCode.OK;
+    public string RouterBody { get; init; } = RouterResponse(0.01, 0.01);
+    public HttpStatusCode RouterStatus { get; init; } = HttpStatusCode.OK;
+    public string ImageBody { get; init; } =
+        """{"sessionId":"session-1","pageId":"page-1","documentId":"document-1","captureId":"capture-1","image":{"png":"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jPz8AAAAASUVORK5CYII=","width":1,"height":1}}""";
+    public HttpStatusCode ImageStatus { get; init; } = HttpStatusCode.OK;
     public string PricingBody { get; set; } =
         """
             {"data":{"endpoints":[{"provider_name":"Wafer","tag":"wafer","pricing":{"prompt":"0.0000000749","completion":"0.00000044"}}]}}
@@ -31,6 +36,11 @@ internal sealed class DeterministicServicesHandler : HttpMessageHandler
     public string? XPathEvidenceBody { get; init; }
     public JsonElement ModelRequest { get; private set; }
     public JsonElement CaptureRequest { get; private set; }
+    public JsonElement RouterRequest { get; private set; }
+    public JsonElement ImageRequest { get; private set; }
+    public int RouterRequestCount { get; private set; }
+    public int ImageRequestCount { get; private set; }
+    public int CaptureRequestCount { get; private set; }
     public int SelectionRequestCount { get; private set; }
     public int ProviderRequestCount { get; private set; }
     public int XPathEvidenceRequestCount { get; private set; }
@@ -48,6 +58,7 @@ internal sealed class DeterministicServicesHandler : HttpMessageHandler
         }
         if (path == "/pages/page-1/capture")
         {
+            CaptureRequestCount++;
             CaptureRequest = await request.Content!.ReadFromJsonAsync<JsonElement>(cancellationToken);
             return Json(CaptureBody);
         }
@@ -60,6 +71,18 @@ internal sealed class DeterministicServicesHandler : HttpMessageHandler
                     ?? """{"id":"generation-1","model":"deepseek/deepseek-v4.1-flash","provider":"Wafer","service_tier":"default","choices":[{"finish_reason":"stop","message":{"content":"{\"complete\":true,\"actions\":[{\"step\":1,\"instruction\":\"Click Save\",\"outcome\":\"found\",\"action\":\"click\",\"candidateId\":\"button-save\",\"limitation\":\"none\"}]}"}}],"usage":{"prompt_tokens":140,"completion_tokens":15,"total_tokens":155,"cost":2.15e-05,"completion_tokens_details":{"reasoning_tokens":0}}}""",
                 ProviderStatus
             );
+        }
+        if (path == "/api/alpha/decisions")
+        {
+            RouterRequestCount++;
+            RouterRequest = await request.Content!.ReadFromJsonAsync<JsonElement>(cancellationToken);
+            return Json(RouterBody, RouterStatus);
+        }
+        if (path == "/pages/page-1/capture-image")
+        {
+            ImageRequestCount++;
+            ImageRequest = await request.Content!.ReadFromJsonAsync<JsonElement>(cancellationToken);
+            return Json(ImageBody, ImageStatus);
         }
         if (
             path.StartsWith("/api/v1/models/", StringComparison.Ordinal)
@@ -205,4 +228,26 @@ internal sealed class DeterministicServicesHandler : HttpMessageHandler
 
     private static HttpResponseMessage Json(string json, HttpStatusCode status = HttpStatusCode.OK) =>
         new(status) { Content = new StringContent(json, Encoding.UTF8, "application/json") };
+
+    internal static string RouterResponse(double pixels, double appearance) =>
+        JsonSerializer.Serialize(
+            new
+            {
+                id = "routing-1",
+                model = "typesafe/jev-1.13-20260917",
+                provider = "TypeSafe",
+                answers = new
+                {
+                    pixel_content = new { type = "noul", noul = pixels },
+                    rendered_appearance = new { type = "noul", noul = appearance },
+                },
+                usage = new
+                {
+                    input_tokens = 80,
+                    output_tokens = 0,
+                    total_tokens = 80,
+                    cost = 0.00000336m,
+                },
+            }
+        );
 }

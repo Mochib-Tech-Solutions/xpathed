@@ -329,6 +329,45 @@ public sealed class BrowserSessions(IConfiguration configuration) : IAsyncDispos
             token
         );
 
+    public Task<CaptureImageResult> CaptureImageAsync(
+        string pageId,
+        CaptureImageRequest request,
+        CancellationToken token
+    ) =>
+        OnPageAsync(
+            pageId,
+            async (session, page) =>
+            {
+                await RequireCaptureAsync(session, page, request.DocumentId, request.CaptureId);
+                var capture = page.Capture!;
+                await capture.RequireImageCurrentAsync();
+                CaptureImage image;
+                try
+                {
+                    image = await capture.CaptureImageAsync();
+                }
+                catch (ApiException error) when (error.Code == "capture_image_unavailable")
+                {
+                    await RequireCurrentAsync();
+                    throw;
+                }
+                await RequireCurrentAsync();
+                return new CaptureImageResult(session.Id, page.Id, request.DocumentId, request.CaptureId, image);
+
+                async Task RequireCurrentAsync()
+                {
+                    await RequireCaptureAsync(session, page, request.DocumentId, request.CaptureId);
+                    await capture.RequireImageCurrentAsync();
+                    RequireDocument(session, page, request.DocumentId);
+                    if (page.Capture != capture || page.CaptureId != request.CaptureId)
+                    {
+                        throw new ApiException(409, "stale_capture", "This capture is no longer current.");
+                    }
+                }
+            },
+            token
+        );
+
     public Task<XPathEvidenceBatch> XPathEvidenceAsync(
         string pageId,
         XPathEvidenceRequest request,

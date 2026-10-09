@@ -6,9 +6,10 @@ namespace Xpathed.Browser.Protocol;
 internal static class CdpScreenshot
 {
     private const string Prepare = """
-        async () => {
+        async capture => {
           const selector = 'input,textarea,select,[contenteditable]:not([contenteditable=false]),[role=textbox],[role=combobox],[data-private],[data-sensitive]';
           const roots = [], controls = [], styles = [], masks = [], previousOpacity = [];
+          const updateStyle = (element, update) => capture ? capture.imageMaskStyle(element, update) : update();
           const collect = (root, inheritedPrivate = false) => {
             roots.push(root);
             for (const element of root.querySelectorAll('*')) {
@@ -32,10 +33,11 @@ internal static class CdpScreenshot
           }).map(element => { const rect = element.getBoundingClientRect(); return [rect.x,rect.y,rect.width,rect.height]; });
           for (const element of controls) {
             previousOpacity.push([element.style.getPropertyValue('opacity'), element.style.getPropertyPriority('opacity')]);
-            element.style.setProperty('opacity','0','important');
+            updateStyle(element, () => element.style.setProperty('opacity','0','important'));
           }
           for (const root of roots) {
             const style = document.createElement('style');
+            capture?.imageMaskNode(style);
             style.textContent = `:is(${selector}), :is(${selector}) * { opacity: 0 !important; color: transparent !important; -webkit-text-fill-color: transparent !important; text-shadow: none !important; transition: none !important; } * { caret-color: transparent !important; }`;
             (root === document ? document.documentElement : root).append(style);
             styles.push(style);
@@ -43,6 +45,7 @@ internal static class CdpScreenshot
           for (const [x,y,width,height] of maskBoxes) {
             if (width <= 0 || height <= 0) continue;
             const mask = document.createElement('div');
+            capture?.imageMaskNode(mask);
             mask.style.cssText = `all: initial !important; position: fixed !important; left:${x}px !important; top:${y}px !important; width:${width}px !important; height:${height}px !important; background:rgb(119,119,119) !important; opacity:1 !important; z-index:2147483647 !important; pointer-events:none !important;`;
             document.documentElement.append(mask);
             masks.push(mask);
@@ -61,7 +64,7 @@ internal static class CdpScreenshot
             clear: () => {
               for (let index=0; index<controls.length; index++) {
                 const [value,priority]=previousOpacity[index];
-                if (value) controls[index].style.setProperty('opacity',value,priority); else controls[index].style.removeProperty('opacity');
+                updateStyle(controls[index], () => { if (value) controls[index].style.setProperty('opacity',value,priority); else controls[index].style.removeProperty('opacity'); });
               }
               for (const element of [...styles,...masks]) element.remove();
             }
@@ -69,7 +72,7 @@ internal static class CdpScreenshot
         }
         """;
 
-    public static async Task<byte[]> CaptureAsync(CdpPage page)
+    public static async Task<byte[]> CaptureAsync(CdpPage page, IReadOnlyDictionary<CdpFrame, CdpRemoteObject> captures)
     {
         var frames = page.Frames;
         var prepared = new List<CdpRemoteObject>();
@@ -78,7 +81,11 @@ internal static class CdpScreenshot
             await RejectClosedAuthorRootsAsync(page);
             foreach (var frame in frames)
             {
-                prepared.Add(await frame.EvaluateHandleAsync(Prepare));
+                prepared.Add(
+                    captures.TryGetValue(frame, out var capture)
+                        ? await capture.EvaluateHandleAsync($"capture => ({Prepare})(capture)")
+                        : await frame.EvaluateHandleAsync(Prepare)
+                );
             }
             var screenshot = await page.SendAsync(
                 "Page.captureScreenshot",

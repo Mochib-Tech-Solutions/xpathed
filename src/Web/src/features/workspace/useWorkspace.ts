@@ -3,6 +3,7 @@ import { ApiError, request } from "./api";
 import type {
   ActionExecutionResult,
   BrowserSessionOptions,
+  ImageMode,
   PageState,
   Resolution,
   ResolutionResult,
@@ -13,7 +14,7 @@ import type {
 type TabChat = {
   address: string;
   instruction: string;
-  includeImage: boolean;
+  imageMode: ImageMode;
   history: Resolution[];
 };
 type WorkspaceState = {
@@ -28,7 +29,7 @@ const emptyWorkspace: WorkspaceState = {
   tabs: {},
   initialAddress: "",
 };
-const emptyChat: TabChat = { address: "", instruction: "", includeImage: false, history: [] };
+const emptyChat: TabChat = { address: "", instruction: "", imageMode: "auto", history: [] };
 const pageAddress = (page: PageState) => (page.url === "about:blank" ? "" : page.url);
 const historical = (entries: Resolution[]) =>
   entries.map((entry) => (entry.historical ? entry : { ...entry, historical: true }));
@@ -46,8 +47,6 @@ function updateSession(previous: WorkspaceState, snapshot: SessionState): Worksp
     tabs[page.pageId] = chat
       ? {
           ...chat,
-          includeImage:
-            leftPage || oldPage?.documentId !== page.documentId ? false : chat.includeImage,
           address:
             oldPage?.url !== page.url && (oldPage !== undefined || page.url !== "about:blank")
               ? pageAddress(page)
@@ -208,7 +207,6 @@ export default function useWorkspace() {
           ...previous.tabs,
           [pageId]: {
             ...(previous.tabs[pageId] ?? emptyChat),
-            includeImage: false,
             address: previous.tabs[pageId]?.address ?? previous.initialAddress,
             history: historical(previous.tabs[pageId]?.history ?? []),
           },
@@ -250,7 +248,6 @@ export default function useWorkspace() {
     const entry: Resolution = {
       id: crypto.randomUUID(),
       instruction: text,
-      includedImage: chat.includeImage,
       createdAt: new Date().toISOString(),
       respondedAt: null,
       pageUrl: page.url,
@@ -268,7 +265,6 @@ export default function useWorkspace() {
           [page.pageId]: {
             ...previous.tabs[page.pageId]!,
             instruction: instruction === undefined ? "" : previous.tabs[page.pageId]!.instruction,
-            includeImage: false,
             history: [...historical(previous.tabs[page.pageId]!.history), entry],
           },
         },
@@ -279,7 +275,7 @@ export default function useWorkspace() {
         result = await request<ResolutionResult>(`/pages/${page.pageId}/resolve`, "POST", {
           instruction: text,
           documentId: page.documentId,
-          ...(chat.includeImage ? { includeImage: true } : {}),
+          imageMode: chat.imageMode,
         });
         if (!isCurrent()) return;
         await readSession(session.sessionId, isCurrent);
@@ -450,7 +446,6 @@ export default function useWorkspace() {
         [page.pageId]: {
           ...previous.tabs[page.pageId]!,
           instruction: "",
-          includeImage: false,
           history: [],
         },
       },
@@ -483,12 +478,12 @@ export default function useWorkspace() {
     address: page ? chat.address : workspace.initialAddress,
     addressFocus,
     instruction: chat.instruction,
-    includeImage: chat.includeImage,
-    setIncludeImage: (includeImage: boolean) => {
+    imageMode: chat.imageMode,
+    setImageMode: (imageMode: ImageMode) => {
       if (!page || pending.current) return;
       setWorkspace((previous) => ({
         ...previous,
-        tabs: { ...previous.tabs, [page.pageId]: { ...previous.tabs[page.pageId]!, includeImage } },
+        tabs: { ...previous.tabs, [page.pageId]: { ...previous.tabs[page.pageId]!, imageMode } },
       }));
     },
     history: chat.history,

@@ -10,7 +10,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import type { Resolution, ResolutionResult, ShadowHost } from "./api";
+import type { ImageMode, Resolution, ResolutionResult, ShadowHost } from "./api";
 import ResolutionCost from "./ResolutionCost";
 import ExecuteAction from "./ExecuteAction";
 
@@ -107,10 +107,20 @@ const instructionTitles: Record<string, string> = {
   unsupported_scope: "Unsupported page content",
 };
 
+const imageReasons: Record<string, string> = {
+  text_only_requested: "You chose text only.",
+  no_candidates: "There were no captured elements to inspect.",
+  semantic_evidence: "Page text and structure appeared sufficient.",
+  visual_evidence: "An image was chosen to help with visual details.",
+  uncertain_route: "A screenshot could help clarify the available evidence.",
+  router_unavailable: "The automatic image decision was unavailable.",
+  image_unavailable: "A usable screenshot was unavailable.",
+};
+
 type Props = {
   instruction: string;
-  includeImage: boolean;
-  onIncludeImageChange: (includeImage: boolean) => void;
+  imageMode: ImageMode;
+  onImageModeChange: (imageMode: ImageMode) => void;
   history: Resolution[];
   ready: boolean;
   disabled: boolean;
@@ -125,8 +135,8 @@ type Props = {
 
 export default function ChatPanel({
   instruction,
-  includeImage,
-  onIncludeImageChange,
+  imageMode,
+  onImageModeChange,
   history,
   ready,
   disabled,
@@ -248,6 +258,16 @@ export default function ChatPanel({
         {history.map((resolution) => {
           const result = resolution.result;
           const actions = result?.actions ?? [];
+          const imageRouting = result?.diagnostics.imageRouting;
+          const imageStatus =
+            imageRouting?.status === "included"
+              ? "Image used"
+              : imageRouting?.status === "unavailable"
+                ? "Image unavailable"
+                : "Text only";
+          const imageReason = imageRouting
+            ? (imageReasons[imageRouting.reason] ?? "Image use was decided for this request.")
+            : "";
           const totalMs = result?.diagnostics.timingsMs?.total;
           const duration =
             typeof totalMs === "number" && Number.isFinite(totalMs) && totalMs >= 0
@@ -320,7 +340,6 @@ export default function ChatPanel({
                 </div>
                 <div className="flex items-center gap-2 px-1 text-xs text-muted-foreground">
                   <span>You</span>
-                  {resolution.includedImage && <span>Screenshot included</span>}
                   <MessageTime value={resolution.createdAt} label="Sent" />
                 </div>
               </div>
@@ -606,6 +625,11 @@ export default function ChatPanel({
                   )}
                   {result && (
                     <>
+                      {imageRouting && (
+                        <span title={imageReason} aria-label={`${imageStatus}: ${imageReason}`}>
+                          {imageStatus}
+                        </span>
+                      )}
                       {duration && (
                         <span title="Duration reported by the resolver">
                           Resolution time: {duration}
@@ -636,19 +660,25 @@ export default function ChatPanel({
           Current view only
         </p>
         <label className="mx-3 mt-2 flex items-center gap-2 text-xs text-muted-foreground">
-          <input
-            type="checkbox"
-            checked={includeImage}
-            onChange={(event) => onIncludeImageChange(event.currentTarget.checked)}
+          Screenshots
+          <select
+            value={imageMode}
+            onChange={(event) => {
+              const value = event.currentTarget.value;
+              if (value === "auto" || value === "text_only") onImageModeChange(value);
+            }}
             disabled={disabled || resolving}
             aria-describedby="screenshot-sharing"
-            className="accent-primary"
-          />
-          Include screenshot with this request
+            className="rounded-md border border-input bg-background px-2 py-1 text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <option value="auto">Auto</option>
+            <option value="text_only">Text only</option>
+          </select>
         </label>
         <p id="screenshot-sharing" className="px-3 pt-1 text-xs text-muted-foreground">
-          Masks detected form fields. Other visible content is sent to the model provider. Image
-          requests fail if masking cannot be verified.
+          {imageMode === "auto"
+            ? "Auto sends a masked screenshot to the model provider when visual details may help. Other visible content can be shared."
+            : "Text only sends page text and structure, without screenshots."}
         </p>
         <textarea
           ref={composer}

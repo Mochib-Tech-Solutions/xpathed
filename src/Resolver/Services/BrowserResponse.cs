@@ -37,6 +37,7 @@ internal static class BrowserResponse
                 or "capture_budget_exceeded"
                 or "capture_exposure_unknown"
                 or "capture_incomplete"
+                or "capture_image_unavailable"
                 or "validation_budget_exceeded"
                 or "unknown_candidate"
                 or "xpath_validation_failed"
