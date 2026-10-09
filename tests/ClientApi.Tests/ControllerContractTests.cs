@@ -81,6 +81,23 @@ public sealed class ControllerContractTests
         Assert.Equal(result, await response.Content.ReadAsStringAsync());
     }
 
+    [Theory]
+    [InlineData("")]
+    [InlineData("{\"browserType\":\"firefox\"}")]
+    public async Task SessionRequestsPreserveContentLengthBeforeStreaming(string body)
+    {
+        using var upstream = new ResolverHandler(HttpStatusCode.OK, "{}");
+        await using var app = Application(upstream, "browser");
+        using var client = app.CreateClient();
+        using var content = new StringContent(body, Encoding.UTF8, "application/json");
+        using var response = await client.PostAsync("/api/sessions", content);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(Encoding.UTF8.GetByteCount(body), upstream.ContentLength);
+        Assert.Equal(body, upstream.Body);
+        Assert.Equal("application/json", upstream.ContentType);
+    }
+
     [Fact]
     public async Task ForeignOriginIsRejectedBeforeForwarding()
     {

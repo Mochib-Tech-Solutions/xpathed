@@ -6,6 +6,22 @@ import { setTimeout as delay } from "node:timers/promises";
 const client = "http://client-api:8080";
 const fixture = "http://resolution-fixture:8090";
 
+test("session-empty-json-request-through-client-uses-configured-default", async () => {
+  const options = await json(`${client}/api/sessions/options`);
+  const response = await fetch(`${client}/api/sessions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+  });
+  assert.equal(response.status, 200, await response.clone().text());
+  const session = await response.json();
+  try {
+    assert.equal(session.browserType, options.defaultBrowserType);
+  } finally {
+    const closed = await fetch(`${client}/api/sessions/${session.sessionId}`, { method: "DELETE" });
+    assert.equal(closed.status, 204);
+  }
+});
+
 for (const [mutation, expected, readiness] of [
   ["carousel", "found", "ready"],
   ["carousel-replace", "found", "ready"],
