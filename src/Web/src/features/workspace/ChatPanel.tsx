@@ -10,7 +10,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import type { ImageMode, Resolution, ResolutionResult, ShadowHost } from "./api";
+import type { ActionResolution, ImageMode, Resolution, ResolutionResult, ShadowHost } from "./api";
 import ResolutionCost from "./ResolutionCost";
 import ExecuteAction from "./ExecuteAction";
 
@@ -95,15 +95,21 @@ const instructionLimits: Record<string, string> = {
   ambiguous:
     "The instruction does not identify a unique target. Specify its exact name, section, or position, such as left or right.",
   current_state_dependency:
-    "This element depends on a page change. Make that change, then try again.",
+    "This command needs separate steps. Resolve one interaction in the current view, then request the next step after any required page change. No action was executed.",
+  state_unavailable:
+    "That form state is withheld from target selection. Identify the element by its label or position instead.",
+  target_not_addressable:
+    "That part of the graphic is not a separate page element. Request the whole graphic or a separately exposed element.",
   unsupported_action: "This interaction is not supported.",
 };
 
 const instructionTitles: Record<string, string> = {
   ambiguous: "Ambiguous target",
   unsupported_action: "Unsupported interaction",
-  current_state_dependency: "Page change required",
+  current_state_dependency: "Separate steps required",
   appearance_unavailable: "Appearance unavailable",
+  state_unavailable: "State unavailable",
+  target_not_addressable: "Graphic detail unavailable",
   unsupported_scope: "Unsupported page content",
 };
 
@@ -116,6 +122,26 @@ const imageReasons: Record<string, string> = {
   router_unavailable: "The automatic image decision was unavailable.",
   image_unavailable: "A usable screenshot was unavailable.",
 };
+
+function instructionLimit(
+  action: ActionResolution,
+  imageRouting: ResolutionResult["diagnostics"]["imageRouting"],
+) {
+  if (action.code === "appearance_unavailable") {
+    if (imageRouting?.status === "unavailable")
+      return "A screenshot was unavailable for this request. Identify the element by its label, section, or position.";
+    if (imageRouting?.status === "text_only" && imageRouting.reason === "text_only_requested")
+      return "That visual detail could not be established from page text and structure. Choose Auto screenshots, or specify a label, section, or position.";
+    return "That visual detail could not be established from the current view. Specify a label, section, or position.";
+  }
+  const knownLimit = instructionLimits[action.code ?? ""];
+  if (knownLimit && action.code !== "unsupported_action") return knownLimit;
+  return (
+    action.message ??
+    knownLimit ??
+    "This instruction cannot be resolved within the supported scope."
+  );
+}
 
 type Props = {
   instruction: string;
@@ -484,6 +510,15 @@ export default function ChatPanel({
                             ) : (
                               <p className="text-xs text-muted-foreground">No accessible name</p>
                             )}
+                            {action.instruction &&
+                              (actions.length > 1 ||
+                                (!(target.accessibleName ?? target.label) &&
+                                  (target.role === "img" ||
+                                    ["img", "svg", "canvas", "video"].includes(target.tag)))) && (
+                                <p className="text-xs text-muted-foreground">
+                                  Requested: <bdi>{action.instruction}</bdi>
+                                </p>
+                              )}
                           </div>
                         )}
                         {action.action &&
@@ -504,14 +539,7 @@ export default function ChatPanel({
                             <h2 className="text-base font-semibold">
                               {instructionTitles[action.code ?? ""] ?? "Unsupported instruction"}
                             </h2>
-                            <p>
-                              {action.code === "ambiguous" ||
-                              action.code === "current_state_dependency"
-                                ? instructionLimits[action.code]
-                                : (action.message ??
-                                  instructionLimits[action.code ?? ""] ??
-                                  "This instruction cannot be resolved within the supported scope.")}
-                            </p>
+                            <p>{instructionLimit(action, imageRouting)}</p>
                           </>
                         )}
                         {action.outcome === "error" && (

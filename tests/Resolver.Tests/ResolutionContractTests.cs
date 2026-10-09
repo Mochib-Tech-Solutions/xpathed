@@ -623,15 +623,19 @@ public sealed class ResolutionContractTests
     }
 
     [Theory]
-    [InlineData(true, "unsupported")]
-    [InlineData(true, "click")]
-    public async Task AppearanceLimitationIsPresentInSentAndRetainedSchema(bool supported, string modelAction)
+    [InlineData("appearance_unavailable", "unsupported")]
+    [InlineData("appearance_unavailable", "click")]
+    [InlineData("state_unavailable", "unsupported")]
+    [InlineData("state_unavailable", "click")]
+    [InlineData("target_not_addressable", "unsupported")]
+    [InlineData("target_not_addressable", "click")]
+    public async Task EvidenceLimitationIsPresentInSentAndRetainedSchema(string limitation, string modelAction)
     {
         var handler = new DeterministicServicesHandler
         {
-            CaptureBody = supported ? CurrentViewCapture() : new DeterministicServicesHandler().CaptureBody,
+            CaptureBody = CurrentViewCapture(),
             ProviderBody = ProviderSelection(
-                $$"""{"complete":true,"actions":[{"step":1,"instruction":"Click the red image","action":"{{modelAction}}","outcome":"unsupported","candidateId":null,"limitation":"appearance_unavailable"}]}"""
+                $$"""{"complete":true,"actions":[{"step":1,"instruction":"Click the requested target","action":"{{modelAction}}","outcome":"unsupported","candidateId":null,"limitation":"{{limitation}}"}]}"""
             ),
         };
         await using var application = CreateApplication(handler);
@@ -648,26 +652,13 @@ public sealed class ResolutionContractTests
         );
         var envelope = await response.Content.ReadFromJsonAsync<JsonElement>();
         var result = envelope.GetProperty("result");
-        Assert.Equal(supported ? "unsupported" : "error", result.GetProperty("outcome").GetString());
-        if (supported)
-        {
-            Assert.Equal("unsupported", result.GetProperty("action").GetString());
-            Assert.Equal("unsupported", result.GetProperty("actions")[0].GetProperty("action").GetString());
-            Assert.Equal(JsonValueKind.Null, result.GetProperty("actions")[0].GetProperty("target").ValueKind);
-            Assert.Equal(1, result.GetProperty("diagnostics").GetProperty("modelCalls").GetInt32());
-            Assert.Equal("appearance_unavailable", result.GetProperty("actions")[0].GetProperty("code").GetString());
-            Assert.Equal(
-                "The requested appearance cannot be established from the captured view.",
-                result.GetProperty("actions")[0].GetProperty("message").GetString()
-            );
-        }
-        else
-        {
-            Assert.Equal(
-                "provider_malformed_response",
-                result.GetProperty("diagnostics").GetProperty("code").GetString()
-            );
-        }
+        Assert.Equal("unsupported", result.GetProperty("outcome").GetString());
+        Assert.Equal("unsupported", result.GetProperty("action").GetString());
+        Assert.Equal("unsupported", result.GetProperty("actions")[0].GetProperty("action").GetString());
+        Assert.Equal(JsonValueKind.Null, result.GetProperty("actions")[0].GetProperty("target").ValueKind);
+        Assert.Equal(1, result.GetProperty("diagnostics").GetProperty("modelCalls").GetInt32());
+        Assert.Equal(limitation, result.GetProperty("actions")[0].GetProperty("code").GetString());
+        Assert.False(string.IsNullOrWhiteSpace(result.GetProperty("actions")[0].GetProperty("message").GetString()));
         var sent = handler.ModelRequest.GetProperty("response_format").GetProperty("json_schema").GetProperty("schema");
         using var retained = JsonDocument.Parse(
             envelope.GetProperty("evidence").GetProperty("outputSchema").GetString()!
@@ -687,16 +678,15 @@ public sealed class ResolutionContractTests
                     .GetProperty("schema")
             )
         );
-        Assert.Equal(
-            supported,
+        Assert.Contains(
             sent.GetProperty("properties")
                 .GetProperty("actions")
                 .GetProperty("items")
                 .GetProperty("properties")
                 .GetProperty("limitation")
                 .GetProperty("enum")
-                .EnumerateArray()
-                .Any(item => item.GetString() == "appearance_unavailable")
+                .EnumerateArray(),
+            item => item.GetString() == limitation
         );
     }
 
@@ -990,7 +980,7 @@ public sealed class ResolutionContractTests
         "unsupported",
         "click",
         "current_state_dependency",
-        "This step depends on a future page state. No earlier action was executed."
+        "This command requires separate steps or a page change. No action was executed."
     )]
     public async Task CurrentViewMissingAndFutureStateOutcomesRemainDistinct(
         string outcome,

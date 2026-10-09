@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { test } from "node:test";
 import { setTimeout as delay } from "node:timers/promises";
+import { visualCases, visualStyleFixture } from "./visual-fixtures.mjs";
 
 const client = process.env.XPATHED_CLIENT_API_URL ?? "http://client-api:8080";
 const fixture = process.env.XPATHED_FIXTURE_URL ?? "http://resolution-fixture:8090";
@@ -86,6 +87,128 @@ function assertPassive(observed, expected) {
   assert.equal(observed.events.click ?? 0, 0);
   assert.equal(observed.scrollY, 0);
 }
+
+for (const entry of visualCases) {
+  test(`visual-quality-${entry.id}`, async () => {
+    await withRoutingFixture(
+      {
+        path: `/visual-quality/${entry.id}`,
+        name: "batch",
+        actions: entry.response,
+        routing: entry.image ? "pixels" : "text",
+      },
+      async ({ resolve, observe }) => {
+        const result = await resolve(entry.instruction);
+        assert.equal(result.outcome, entry.expected.outcome, JSON.stringify(result));
+        assert.equal(result.action, entry.expected.action);
+        assert.equal(result.actions.length, entry.expected.targets.length || 1);
+        assert.ok(result.actions.every((action) => action.outcome === entry.expected.outcome));
+        if (entry.expected.limitation)
+          assert.equal(result.actions[0].code, entry.expected.limitation);
+        assert.deepEqual(
+          result.actions
+            .filter((action) => action.target)
+            .map((action) => action.target.accessibleName),
+          entry.expected.names,
+        );
+        assert.equal(result.diagnostics.modelCalls, 2);
+        assert.equal(
+          result.diagnostics.imageRouting.status,
+          entry.image ? "included" : "text_only",
+        );
+        assert.equal(result.diagnostics.modelInputCount, result.diagnostics.capture.capturedCount);
+        const provider = await json(`${fixture}/provider-request`);
+        const input = entry.image
+          ? assertImageRequest(provider)
+          : JSON.parse(provider.messages[1].content);
+        assert.equal(input.instruction, entry.instruction);
+        assert.equal(input.candidates.length, result.diagnostics.capture.capturedCount);
+        assert.doesNotMatch(JSON.stringify(input), /data-oracle|data:image|<svg|<path/);
+        const router = await json(`${fixture}/router-request`);
+        assert.equal(router.state.instruction, entry.instruction);
+        assert.deepEqual(Object.keys(router.state).sort(), ["evidence", "instruction"]);
+        assert.doesNotMatch(JSON.stringify(router.state.evidence), /Option A|Marker A|Photo A/);
+        const observed = await observe(
+          result.actions.flatMap((action) => action.target?.xpaths ?? []),
+        );
+        assertPassive(
+          observed,
+          entry.expected.targets.map((id) => [id]),
+        );
+        assert.equal(observed.imagesReady, true);
+        assert.equal(observed.events.input ?? 0, 0);
+        assert.equal(observed.events.change ?? 0, 0);
+        if (entry.id === "depicted-image-overrides-misleading-alt") {
+          assert.ok(input.candidates.some((candidate) => candidate.label === "Photo A"));
+          assert.ok(input.candidates.some((candidate) => candidate.label === "Yellow bicycle"));
+        }
+        if (entry.id === "icon-reference-selects-neighbor") {
+          for (const label of ["Marker A", "Marker B", "Option A", "Option B", "Option C"])
+            assert.ok(
+              input.candidates.some((candidate) => candidate.label === label),
+              label,
+            );
+          const reference = observed.elements.find(
+            (element) => element.id === "triangle-reference",
+          );
+          const target = observed.elements.find((element) => element.id === "triangle-neighbor");
+          assert.ok(target.geometry.x > reference.geometry.x + reference.geometry.width);
+        }
+        if (entry.id === "ordered-plural-excludes-circled-star") {
+          const positions = entry.expected.targets.map(
+            (id) => observed.elements.find((element) => element.id === id).geometry.x,
+          );
+          assert.ok(positions[0] < positions[1]);
+          assert.deepEqual(
+            result.actions.map((action) => action.step),
+            [1, 2],
+          );
+        }
+        if (entry.id === "css-text-versus-background") {
+          const colors = input.candidates
+            .filter((candidate) => candidate.label === "Choose")
+            .map((candidate) => input.context[candidate.appearance] ?? candidate.appearance);
+          assert.equal(colors[0].backgroundColor, "rgb(37, 99, 235)");
+          assert.equal(colors[1].textColor, "rgb(37, 99, 235)");
+          assert.notEqual(colors[0].textColor, colors[1].textColor);
+        }
+        if (entry.id === "checkbox-state-withheld-abstains") {
+          const checkboxes = input.candidates.filter((candidate) => candidate.role === "checkbox");
+          assert.equal(checkboxes.length, 2);
+          assert.ok(checkboxes.every((candidate) => candidate.state?.checked == null));
+          assert.ok(observed.elements.every((element) => element.checked === null));
+        }
+        assert.doesNotMatch(JSON.stringify(result), /data:image|iVBOR/);
+      },
+    );
+  });
+}
+
+test("visual-quality-global-styling-remains-unavailable-until-captured", async () => {
+  await withRoutingFixture(
+    {
+      path: `/visual-quality/${visualStyleFixture.id}`,
+      name: "batch",
+      actions: visualStyleFixture.response,
+      routing: "pixels",
+    },
+    async ({ resolve, observe }) => {
+      const result = await resolve(visualStyleFixture.instruction);
+      assert.equal(result.outcome, "found", JSON.stringify(result));
+      assert.equal(
+        (await json(`${fixture}/router-request`)).state.evidence.fontAndTextStylingAvailable,
+        false,
+      );
+      assertImageRequest(await json(`${fixture}/provider-request`));
+      const observed = await observe(result.actions[0].target.xpaths);
+      assertPassive(observed, [["bold-continue"]]);
+      assert.deepEqual(
+        observed.elements.map((element) => element.fontWeight),
+        ["400", "700"],
+      );
+    },
+  );
+});
 
 test("smart-routing-named-control-uses-text-without-pixels", async () => {
   await withRoutingFixture({ routing: "text" }, async ({ resolve, observe }) => {

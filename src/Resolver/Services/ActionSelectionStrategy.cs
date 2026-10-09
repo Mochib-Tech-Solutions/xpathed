@@ -59,9 +59,16 @@ internal static class ActionSelectionStrategy
         - Geometry is in main-viewport CSS pixels; use it for left/right/above/below and visual order, not DOM
           order. A button description may identify a link, image or custom role.
 
-        - Named targets must match their own accessible label or safe text. If a requested named control is
+        - Literal or quoted target names must match their own accessible label or safe text. Prefer exact names
+          that satisfy the other constraints; allow clear paraphrases, translations and typos only when no exact
+          name fits. A depicted subject is a visual constraint, not a required alt-text
+          match. Apply every requested name, appearance, scope and exclusion together. If a requested named control is
           absent, return not_found; text mentioning it in a scope/ancestor or another differently named visible
           control does not supply that target.
+
+        - Separate the target from its references: "Save beside the star icon" selects Save, using the icon as
+          its visual anchor. "The photo showing a cat" describes pixels; "the image named Cat" describes its
+          accessible name. Quoted names such as "Blue" or "Star" alone are not color or shape constraints.
 
         - Resolve spatial references before choosing the target: identify the named reference, then compare
           candidate rectangles. Below/under means a lower visual row with horizontal overlap; right/left means
@@ -96,6 +103,10 @@ internal static class ActionSelectionStrategy
         - If the requested whole card is not supplied, do not replace it with an arbitrary child. If spatial
           evidence does not distinguish one intended target, return ambiguous.
 
+        - Apply ordinals after filtering by all requested constraints, including "except" and "not". Use
+          top-to-bottom rows and left-to-right within each row for explicit visual order unless the command
+          specifies another direction. If a reference or an ordinal remains tied, do not choose by ID order.
+
         - Match the requested target itself using its tag, role and accessible label. Scope containers, headings
           and descendant text are context, not additional matching controls; select a container only when the
           command explicitly requests that item/card/container itself.
@@ -108,13 +119,25 @@ internal static class ActionSelectionStrategy
         - When a screenshot is supplied, it and candidate rectangles use the same viewport in CSS pixels. Use
           the image to recognize visible icons, pictures, colors and layout, then map that evidence to supplied
           candidate IDs. Never invent an ID or select a pixel coordinate. Candidate names remain browser-derived;
-          do not rename an unnamed image from pixels. DOM evidence owns identity, cardinality and control state.
+          do not rename an unnamed image from pixels. The original command owns requested multiplicity; pixels
+          may establish which supplied candidates match. Retained DOM candidates own element identity and state.
+
+        - Match the requested level: a button containing a star is a button; an image inside that button is a
+          different target. A depicted object inside an image, canvas or video is not itself a DOM candidate.
+          If the command targets an internal detail with no separately supplied candidate, return one
+          unsupported/unsupported entry with target_not_addressable; never substitute the whole graphic or a
+          coordinate. Selecting the whole image by what it depicts is supported.
 
         - Solid gray screenshot masks conceal private form/editable values. They are unavailable evidence,
           not actual page appearance. Do not infer their content or select targets by masked values.
 
         - Omitted state fields mean rendered=true, inViewport=true, enabled=true, editable=false,
           readonly=false; omitted appearance limitations mean none.
+
+        - Checked/selected states, current form values and selected option counts are withheld, not false or
+          empty. If identifying the target requires those values, return one unsupported/unsupported entry with
+          state_unavailable. Do not guess from names, defaults or masked pixels. A supplied enabled/readonly
+          flag is different evidence and may be used.
 
         - Omitted candidate frame means the capture's frameId; otherwise frame.id and labels describe its
           containing frames. An omitted state object means all state defaults above.
@@ -169,7 +192,9 @@ internal static class ActionSelectionStrategy
         - Explicitly ordered/named targets use consecutive steps in instruction order. Frame identity is part of
           target identity.
 
-        - Every entry includes a brief target instruction (1-300 characters).
+        - Every entry includes a brief target instruction (1-300 characters) retaining the requested visual
+          description, scope, exclusions and position needed to distinguish that target. Do not add unobserved
+          names, explanations or claims that the action ran.
 
         - complete describes target enumeration, not whether targets exist or are ready. A missing or
           unsupported target is fully represented by its own entry.
@@ -248,7 +273,9 @@ internal static class ActionSelectionStrategy
                       "ambiguous",
                       "unsupported_action",
                       "current_state_dependency",
-                      "appearance_unavailable"
+                      "appearance_unavailable",
+                      "state_unavailable",
+                      "target_not_addressable"
                     ]
                   }
                 },
@@ -363,7 +390,8 @@ internal static class ActionSelectionStrategy
                         || (
                             selection.Limitation
                                 is not ("none" or "ambiguous" or "unsupported_action" or "current_state_dependency")
-                            && selection.Limitation != "appearance_unavailable"
+                            && selection.Limitation
+                                is not ("appearance_unavailable" or "state_unavailable" or "target_not_addressable")
                         )
                         || (selection.Outcome == "unsupported") != (selection.Limitation != "none")
                         || (selection.Action == "unsupported" && selection.Outcome != "unsupported")
@@ -378,9 +406,15 @@ internal static class ActionSelectionStrategy
                     {
                         throw new JsonException();
                     }
-                    if (actions.GetArrayLength() == 1 && selection.Limitation == "appearance_unavailable")
+                    if (
+                        actions.GetArrayLength() == 1
+                        && selection.Limitation
+                            is "appearance_unavailable"
+                                or "state_unavailable"
+                                or "target_not_addressable"
+                    )
                     {
-                        // A valid visual-evidence abstention has no target or executable action.
+                        // A valid evidence abstention has no target or executable action.
                         selection = selection with
                         {
                             Action = "unsupported",
