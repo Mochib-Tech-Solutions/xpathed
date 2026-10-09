@@ -12,6 +12,7 @@ internal static class HttpForwarder
         )
         {
             request.Content = new StreamContent(context.Request.Body);
+            request.Content.Headers.ContentLength = context.Request.ContentLength;
             if (context.Request.ContentType is { } contentType)
             {
                 request.Content.Headers.TryAddWithoutValidation("Content-Type", contentType);

@@ -12,6 +12,7 @@ internal sealed class ResolverHandler(HttpStatusCode status, string result) : Ht
     public string? Path { get; private set; }
     public string? Body { get; private set; }
     public string? ContentType { get; private set; }
+    public long? ContentLength { get; private set; }
 
     protected override async Task<HttpResponseMessage> SendAsync(
         HttpRequestMessage request,
@@ -25,6 +26,7 @@ internal sealed class ResolverHandler(HttpStatusCode status, string result) : Ht
         }
         Method = request.Method;
         Path = request.RequestUri?.AbsolutePath;
+        ContentLength = request.Content?.Headers.ContentLength;
         Body = request.Content is null ? null : await request.Content.ReadAsStringAsync(cancellationToken);
         ContentType = request.Content?.Headers.ContentType?.MediaType;
         var response = new HttpResponseMessage(status)
