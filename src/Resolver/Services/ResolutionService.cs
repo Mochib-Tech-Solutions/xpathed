@@ -90,7 +90,7 @@ public sealed partial class ResolutionService(
             using var browser = clients.CreateClient("browser");
             using var captureResponse = await browser.PostAsJsonAsync(
                 $"/pages/{Uri.EscapeDataString(pageId)}/capture",
-                new CaptureRequest(request.DocumentId, "current_view"),
+                new CaptureRequest(request.DocumentId, "current_view", request.IncludeImage),
                 cancellationToken
             );
             await EnsureBrowserSuccessAsync(captureResponse, cancellationToken);
@@ -99,7 +99,7 @@ public sealed partial class ResolutionService(
                 ?? throw new ApiException(502, "invalid_upstream_response", "The browser returned an invalid capture.");
             diagnostics.TimingsMs["capture"] = timer.Elapsed.TotalMilliseconds;
             diagnostics = diagnostics with { Capture = capture.Coverage };
-            BrowserEvidence.ValidateCapture(capture, pageId, request.DocumentId);
+            BrowserEvidence.ValidateCapture(capture, pageId, request.DocumentId, request.IncludeImage);
             var input = CandidateInput.PrepareInput(request.Instruction, capture);
             diagnostics = diagnostics with
             {
@@ -110,11 +110,17 @@ public sealed partial class ResolutionService(
                 ModelInputBytes = System.Text.Encoding.UTF8.GetByteCount(input),
             };
             observeInput?.Invoke(input);
+            diagnostics.TimingsMs["preparation"] = timer.Elapsed.TotalMilliseconds - diagnostics.TimingsMs["capture"];
             cancellationToken.ThrowIfCancellationRequested();
             ProviderCompletion completion;
             ResolutionDiagnostics? received = null;
             var pending = accounting.Start(token =>
-                gateway.CompleteAsync(input, token, observed => Volatile.Write(ref received, observed))
+                gateway.CompleteAsync(
+                    input,
+                    token,
+                    observed => Volatile.Write(ref received, observed),
+                    request.IncludeImage ? capture.Image : null
+                )
             );
             diagnostics = diagnostics with { ModelCalls = 1, ProviderAccounting = "pending" };
             try
@@ -162,7 +168,15 @@ public sealed partial class ResolutionService(
                 CostEstimate = completion.Diagnostics.CostEstimate,
                 ProviderAccounting = completion.Diagnostics.Usage?.Cost is not null ? "completed" : "unavailable",
             };
-            diagnostics.TimingsMs["model"] = timer.Elapsed.TotalMilliseconds - diagnostics.TimingsMs["capture"];
+            diagnostics.TimingsMs["model"] =
+                timer.Elapsed.TotalMilliseconds
+                - diagnostics.TimingsMs["capture"]
+                - diagnostics.TimingsMs["preparation"];
+            if (completion.Diagnostics.TimingsMs.TryGetValue("provider", out var providerMs))
+            {
+                // Provider transport is part of model time, not another serial stage.
+                diagnostics.TimingsMs["provider"] = providerMs;
+            }
             if (completion.Diagnostics.Code is { } code)
             {
                 throw new ApiException(502, code, "OpenRouter could not return a valid selection.");
@@ -202,7 +216,7 @@ public sealed partial class ResolutionService(
                                 "current_state_dependency" =>
                                     "This step depends on a future page state. No earlier action was executed.",
                                 "appearance_unavailable" =>
-                                    "The requested appearance cannot be established from the captured CSS evidence.",
+                                    "The requested appearance cannot be established from the captured view.",
                                 "ambiguous" => "The instruction does not identify one intended target.",
                                 "unsupported_action" =>
                                     "Use one supported interaction type per command. It may target several elements in the current view; mixed interactions are unsupported.",
@@ -228,7 +242,10 @@ public sealed partial class ResolutionService(
                 .ToArray();
             var inspected = results.FirstOrDefault(item => item.Target is not null)?.ActionId;
             diagnostics.TimingsMs["validation"] =
-                timer.Elapsed.TotalMilliseconds - diagnostics.TimingsMs["capture"] - diagnostics.TimingsMs["model"];
+                timer.Elapsed.TotalMilliseconds
+                - diagnostics.TimingsMs["capture"]
+                - diagnostics.TimingsMs["preparation"]
+                - diagnostics.TimingsMs["model"];
             diagnostics = diagnostics with { Stage = "complete" };
             var outcomes = results.Select(item => item.Outcome).Distinct().ToArray();
             var outcome = outcomes.Length == 1 ? outcomes[0] : "partial";
@@ -292,6 +309,7 @@ public sealed partial class ResolutionService(
                 diagnostics.TimingsMs[stage] =
                     timer.Elapsed.TotalMilliseconds
                     - (stage == "capture" ? 0 : diagnostics.TimingsMs.GetValueOrDefault("capture"))
+                    - (stage == "capture" ? 0 : diagnostics.TimingsMs.GetValueOrDefault("preparation"))
                     - (stage == "validation" ? diagnostics.TimingsMs.GetValueOrDefault("model") : 0);
             }
             diagnostics = diagnostics with { Code = code, Message = message };

@@ -8,7 +8,12 @@ using Xpathed.Common.Http;
 
 namespace Xpathed.Browser.Sessions;
 
-internal sealed partial class BrowserSessionRuntime(int slot, string browserType, ILogger logger) : IAsyncDisposable
+internal sealed partial class BrowserSessionRuntime(
+    int slot,
+    string browserType,
+    BrowserResolution resolution,
+    ILogger logger
+) : IAsyncDisposable
 {
     private int blockedPopups;
     private long pageOrder;
@@ -27,6 +32,7 @@ internal sealed partial class BrowserSessionRuntime(int slot, string browserType
         !pendingPages.IsEmpty || Interlocked.Read(ref focusRevision) != Interlocked.Read(ref synchronizedFocusRevision);
     public int Slot { get; } = slot;
     public string BrowserType { get; } = browserType;
+    public BrowserResolution Resolution { get; } = resolution;
     private int DisplayNumber => 100 + Slot;
     public int Port => 5900 + Slot;
     public bool Ready { get; private set; }
@@ -46,12 +52,22 @@ internal sealed partial class BrowserSessionRuntime(int slot, string browserType
 
     public async Task StartAsync(CancellationToken token)
     {
-        Display = Start("Xvfb", $":{DisplayNumber}", "-screen", "0", "1280x800x24", "-nolisten", "tcp", "-ac");
+        Display = Start(
+            "Xvfb",
+            $":{DisplayNumber}",
+            "-screen",
+            "0",
+            $"{Resolution.Width}x{Resolution.Height}x24",
+            "-nolisten",
+            "tcp",
+            "-ac"
+        );
         await WaitUntilAsync(() => File.Exists($"/tmp/.X11-unix/X{DisplayNumber}"), token);
+        // Chromium leaves monitor-sized X11 windows one pixel short until a window manager completes fullscreen.
+        WindowManager = Start("matchbox-window-manager", "-display", $":{DisplayNumber}", "-use_titlebar", "no");
         Playwright = await Microsoft.Playwright.Playwright.CreateAsync();
         if (BrowserType == "firefox")
         {
-            WindowManager = Start("matchbox-window-manager", "-display", $":{DisplayNumber}", "-use_titlebar", "no");
             firefoxDisplay = new FirefoxDisplay($":{DisplayNumber}");
             firefoxProfile = Directory.CreateTempSubdirectory("xpathed-firefox-").FullName;
             Directory.CreateDirectory(Path.Combine(firefoxProfile, "chrome"));
@@ -94,7 +110,12 @@ internal sealed partial class BrowserSessionRuntime(int slot, string browserType
                     Headless = false,
                     ChromiumSandbox = true,
                     Env = new Dictionary<string, string> { ["DISPLAY"] = $":{DisplayNumber}" },
-                    Args = ["--kiosk", "--window-position=0,0", "--window-size=1280,800"],
+                    Args =
+                    [
+                        "--kiosk",
+                        "--window-position=0,0",
+                        $"--window-size={Resolution.Width},{Resolution.Height}",
+                    ],
                     Timeout = 20000,
                 }
             );
@@ -168,7 +189,9 @@ internal sealed partial class BrowserSessionRuntime(int slot, string browserType
         var managed = new BrowserPageRuntime(
             page,
             ++pageOrder,
-            firefoxDisplay is null ? new ChromiumPageDisplay(page) : new FirefoxPageDisplay(page)
+            firefoxDisplay is null
+                ? new ChromiumPageDisplay(page, Resolution)
+                : new FirefoxPageDisplay(page, Resolution)
         );
         await managed.InitializeAsync(Context!, NativeFocusChanged);
         Pages[managed.Id] = managed;
@@ -354,7 +377,7 @@ internal sealed partial class BrowserSessionRuntime(int slot, string browserType
             }
             if (!HasPendingPages && pages.Any(page => page.PageId == ActivePageId))
             {
-                return new(Id, ActivePageId, ViewPath, pages.ToArray(), ActivationVersion, BrowserType);
+                return new(Id, ActivePageId, ViewPath, pages.ToArray(), ActivationVersion, BrowserType, Resolution.Id);
             }
         }
         throw new ApiException(409, "inactive_page", "The active browser tab is changing. Try again.");

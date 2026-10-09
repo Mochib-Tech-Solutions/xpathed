@@ -8,6 +8,7 @@ using System.Threading.RateLimiting;
 using Microsoft.Extensions.Caching.Memory;
 using Xpathed.Common.Contracts;
 using Xpathed.Common.Http;
+using PricingRates = (decimal Input, decimal Output, decimal Request, System.DateTimeOffset FetchedAt);
 
 namespace Xpathed.Resolver.Services;
 
@@ -18,8 +19,10 @@ public sealed class OpenRouterGateway(
     ModelUsageLimits usageLimits
 )
 {
-    public string Model { get; } = configuration["OpenRouter:Model"] ?? "google/gemini-3.8-flash";
-    public string Provider { get; } = configuration["OpenRouter:Provider"] ?? "google-ai-studio";
+    private static readonly object PricingSync = new();
+
+    public string Model { get; } = configuration["OpenRouter:Model"] ?? "deepseek/deepseek-v4.1-flash";
+    public string Provider { get; } = configuration["OpenRouter:Provider"] ?? "wafer";
 
     private readonly string? apiKey = configuration["OpenRouter:ApiKey"];
     private readonly string endpoint =
@@ -79,7 +82,8 @@ public sealed class OpenRouterGateway(
             pricingCacheSeconds = 300,
             endpoint = Uri.TryCreate(endpoint, UriKind.Absolute, out var address) ? address.AbsoluteUri : endpoint,
             timeoutSeconds = timeoutSeconds.ToString("R", CultureInfo.InvariantCulture),
-            modelInputBudgetBytes = scope == "offline" ? OfflineSelectionEvaluation.InputBudgetBytes : (int?)null,
+            modelInputBudgetBytes = (int?)null,
+            imageInput = "opt_in_masked_viewport_png",
             responseCache = false,
             maximumActions = ActionSelectionStrategy.MaximumActions,
             usageLimits = new
@@ -91,21 +95,13 @@ public sealed class OpenRouterGateway(
             request = CreateRequest(string.Empty),
         };
 
-    private object CreateRequest(string input) =>
+    private object CreateRequest(string input, CaptureImage? image = null) =>
         new
         {
             model = Model,
             stream = false,
             max_tokens = ActionSelectionStrategy.OutputTokens,
-            reasoning = Model == "google/gemini-3.8-flash"
-                ? (object)
-                    new
-                    {
-                        enabled = true,
-                        effort = "low",
-                        exclude = true,
-                    }
-                : new { enabled = false },
+            reasoning = new { enabled = false },
             provider = new
             {
                 only = new[] { Provider },
@@ -114,10 +110,24 @@ public sealed class OpenRouterGateway(
                 require_parameters = true,
             },
             plugins = new[] { new { id = "context-compression", enabled = false } },
-            messages = new[]
+            messages = new object[]
             {
                 new { role = "system", content = ActionSelectionStrategy.Prompt },
-                new { role = "user", content = input },
+                new
+                {
+                    role = "user",
+                    content = image is null
+                        ? (object)input
+                        : new object[]
+                        {
+                            new { type = "text", text = input },
+                            new
+                            {
+                                type = "image_url",
+                                image_url = new { url = "data:image/png;base64," + Convert.ToBase64String(image.Png) },
+                            },
+                        },
+                },
             },
             response_format = new
             {
@@ -134,15 +144,17 @@ public sealed class OpenRouterGateway(
     internal Task<ProviderCompletion> CompleteAsync(
         string input,
         CancellationToken cancellationToken,
-        Action<ResolutionDiagnostics>? observeUsage = null
+        Action<ResolutionDiagnostics>? observeUsage = null,
+        CaptureImage? image = null
     )
     {
         cancellationToken.ThrowIfCancellationRequested();
-        return CompleteCoreAsync(input, observeUsage, usageLimits.Acquire(), cancellationToken);
+        return CompleteCoreAsync(input, image, observeUsage, usageLimits.Acquire(), cancellationToken);
     }
 
     private async Task<ProviderCompletion> CompleteCoreAsync(
         string input,
+        CaptureImage? image,
         Action<ResolutionDiagnostics>? observeUsage,
         RateLimitLease lease,
         CancellationToken cancellationToken
@@ -156,7 +168,7 @@ public sealed class OpenRouterGateway(
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
         request.Headers.Add("X-OpenRouter-Cache", "false");
         request.Headers.Add("X-OpenRouter-Metadata", "enabled");
-        request.Content = JsonContent.Create(CreateRequest(input));
+        request.Content = JsonContent.Create(CreateRequest(input, image));
         var providerTimer = Stopwatch.StartNew();
         using var response = await client.SendAsync(request, cancellationToken);
         JsonElement body;
@@ -228,15 +240,12 @@ public sealed class OpenRouterGateway(
             diagnostics with
             {
                 Code = code,
-                CostEstimate = await EstimateCostAsync(diagnostics, cancellationToken),
+                CostEstimate = EstimateCost(diagnostics, cancellationToken),
             }
         );
     }
 
-    private async Task<ModelCostEstimate?> EstimateCostAsync(
-        ResolutionDiagnostics diagnostics,
-        CancellationToken cancellationToken
-    )
+    private ModelCostEstimate? EstimateCost(ResolutionDiagnostics diagnostics, CancellationToken cancellationToken)
     {
         if (
             diagnostics.Usage is not { InputTokens: { } inputTokens, OutputTokens: { } outputTokens }
@@ -246,73 +255,24 @@ public sealed class OpenRouterGateway(
         {
             return null;
         }
+        var key = (typeof(OpenRouterGateway), endpoint, diagnostics.Model, diagnostics.Provider);
+        Task<PricingRates?> pending;
+        lock (PricingSync)
+        {
+            if (!pricingCache.TryGetValue(key, out pending!))
+            {
+                pending = FetchPricingAsync(model, diagnostics.Provider, cancellationToken);
+                // Share in-flight and unavailable lookups as well as successful rates.
+                pricingCache.Set(key, pending, TimeSpan.FromMinutes(5));
+            }
+        }
+        if (!pending.IsCompletedSuccessfully || pending.Result is not { } rates)
+        {
+            return null;
+        }
         try
         {
-            var key = (typeof(OpenRouterGateway), endpoint, diagnostics.Model, diagnostics.Provider);
-            if (
-                !pricingCache.TryGetValue<(decimal Input, decimal Output, decimal Request, DateTimeOffset FetchedAt)>(
-                    key,
-                    out var rates
-                )
-            )
-            {
-                using var client = clients.CreateClient("openrouter");
-                client.BaseAddress = new Uri(endpoint);
-                client.Timeout = TimeSpan.FromSeconds(2);
-                using var request = new HttpRequestMessage(
-                    HttpMethod.Get,
-                    $"models/{Uri.EscapeDataString(model[0])}/{Uri.EscapeDataString(model[1])}/endpoints"
-                );
-                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
-                using var response = await client.SendAsync(request, cancellationToken);
-                if (!response.IsSuccessStatusCode)
-                {
-                    return null;
-                }
-                var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
-                var endpoints = Property(Property(body, "data"), "endpoints");
-                if (endpoints.ValueKind != JsonValueKind.Array)
-                {
-                    return null;
-                }
-                var prices = endpoints
-                    .EnumerateArray()
-                    .Where(route =>
-                        string.Equals(
-                            ReadString(route, "provider_name"),
-                            diagnostics.Provider,
-                            StringComparison.OrdinalIgnoreCase
-                        )
-                    )
-                    .Select(route => Property(route, "pricing"))
-                    .ToArray();
-                if (
-                    prices.Length == 0
-                    || prices.Any(price => Property(price, "overrides").ValueKind == JsonValueKind.Array)
-                )
-                {
-                    return null;
-                }
-                var distinctRates = prices
-                    .Select(price =>
-                        (
-                            Input: ReadPrice(price, "prompt"),
-                            Output: ReadPrice(price, "completion"),
-                            Request: Property(price, "request").ValueKind == JsonValueKind.Undefined
-                                ? 0m
-                                : ReadPrice(price, "request")
-                        )
-                    )
-                    .Distinct()
-                    .ToArray();
-                if (distinctRates is not [{ Input: { } inputRate, Output: { } outputRate, Request: { } requestRate }])
-                {
-                    return null;
-                }
-                rates = (inputRate, outputRate, requestRate, DateTimeOffset.UtcNow);
-                pricingCache.Set(key, rates, TimeSpan.FromMinutes(5));
-            }
-            // ponytail: listed token rates before cache discounts; reported usage cost remains authoritative.
+            // Listed rates exclude cache discounts; reported usage cost remains authoritative.
             var inputCost = inputTokens * rates.Input;
             var outputCost = outputTokens * rates.Output;
             return new ModelCostEstimate(
@@ -325,12 +285,78 @@ public sealed class OpenRouterGateway(
                 rates.FetchedAt
             );
         }
+        catch (OverflowException)
+        {
+            return null;
+        }
+    }
+
+    private async Task<PricingRates?> FetchPricingAsync(
+        string[] model,
+        string provider,
+        CancellationToken cancellationToken
+    )
+    {
+        try
+        {
+            using var client = clients.CreateClient("openrouter");
+            client.BaseAddress = new Uri(endpoint);
+            client.Timeout = TimeSpan.FromSeconds(2);
+            using var request = new HttpRequestMessage(
+                HttpMethod.Get,
+                $"models/{Uri.EscapeDataString(model[0])}/{Uri.EscapeDataString(model[1])}/endpoints"
+            );
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+            using var response = await client.SendAsync(request, cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                return null;
+            }
+            var body = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+            var endpoints = Property(Property(body, "data"), "endpoints");
+            if (endpoints.ValueKind != JsonValueKind.Array)
+            {
+                return null;
+            }
+            var prices = endpoints
+                .EnumerateArray()
+                .Where(route =>
+                    string.Equals(ReadString(route, "provider_name"), provider, StringComparison.OrdinalIgnoreCase)
+                )
+                .Select(route => Property(route, "pricing"))
+                .ToArray();
+            if (
+                prices.Length == 0
+                || prices.Any(price => Property(price, "overrides").ValueKind == JsonValueKind.Array)
+            )
+            {
+                return null;
+            }
+            var distinctRates = prices
+                .Select(price =>
+                    (
+                        Input: ReadPrice(price, "prompt"),
+                        Output: ReadPrice(price, "completion"),
+                        Request: Property(price, "request").ValueKind == JsonValueKind.Undefined
+                            ? 0m
+                            : ReadPrice(price, "request")
+                    )
+                )
+                .Distinct()
+                .ToArray();
+            return distinctRates is [{ Input: { } inputRate, Output: { } outputRate, Request: { } requestRate }]
+                ? (inputRate, outputRate, requestRate, DateTimeOffset.UtcNow)
+                : null;
+        }
         catch (Exception error)
-            when (error is HttpRequestException or JsonException or OverflowException
-                || error is OperationCanceledException && !cancellationToken.IsCancellationRequested
+            when (error
+                    is HttpRequestException
+                        or JsonException
+                        or OperationCanceledException
+                        or ObjectDisposedException
             )
         {
-            // Optional pricing must not discard a completed selection or its reported usage.
+            // Optional metadata never holds up target verification or reported provider accounting.
             return null;
         }
     }

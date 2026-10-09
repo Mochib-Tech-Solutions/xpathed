@@ -1,5 +1,4 @@
 import { retiredReleaseCommit, assertSameSourceTree } from "./baseline.mjs";
-import { startOfflineWorker } from "./offline.mjs";
 import { execFileSync, spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
@@ -277,20 +276,14 @@ async function main() {
     for (const key of Object.keys(env)) if (key.startsWith("GIT_")) delete env[key];
     const forwarded = [...qualificationArgs];
     if (!forwarded.includes("--output")) forwarded.push("--output", output);
-    const stopOffline = startOfflineWorker(state, docker);
-    let status;
-    try {
-      status = await new Promise((resolve, reject) => {
-        const child = spawn("sh", ["scripts/evaluate.sh", "--qualification", ...forwarded], {
-          env,
-          stdio: "inherit",
-        });
-        child.on("error", reject);
-        child.on("exit", (code) => resolve(code ?? 1));
+    const status = await new Promise((resolve, reject) => {
+      const child = spawn("sh", ["scripts/evaluate.sh", "--qualification", ...forwarded], {
+        env,
+        stdio: "inherit",
       });
-    } finally {
-      await stopOffline();
-    }
+      child.on("error", reject);
+      child.on("exit", (code) => resolve(code ?? 1));
+    });
     ensure(status === 0, "Exact-artifact comparison failed; runtime default unchanged");
   } finally {
     await rm(temporary, { recursive: true, force: true });

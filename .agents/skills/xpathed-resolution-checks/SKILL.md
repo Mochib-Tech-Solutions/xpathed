@@ -1,18 +1,18 @@
 ---
 name: xpathed-resolution-checks
-description: Verify xpathed capture, action, XPath and readiness changes through deterministic service and real-browser checks. Use for resolution regressions or contract changes, not general frontend styling.
+description: Verify xpathed capture, action, XPath, readiness and execution changes through deterministic service and real-browser checks. Use for resolution regressions or contract changes, not general frontend styling.
 ---
 
 # Verify resolution changes
 
-Read `docs/resolution.md` for the affected contract and `tests/AGENTS.md` for test ownership. Work from the repository root; use its documented RTK prefix.
+Read `README.md`, the affected Common/service contracts and `tests/AGENTS.md`. Work from the repository root with the required RTK prefix.
 
-1. Identify which boundary changed: browser capture/selection, resolver/provider interpretation, or Web display. Follow the existing scenario nearest that boundary. Verify the single current-view request and response contract; Git records historical implementations. Historical evidence retains its original payload.
-2. For browser behavior, add a controlled scenario in `tests/resolution/` and run `pnpm test:resolution`. Derive expected target identity independently of the returned XPath; verify one intended match in its frame context, correct action observations and unchanged scrolling/focus/form state where relevant. Include the failure that motivated the change, not a broad inventory of unrelated cases.
-3. For provider behavior, use deterministic responses in the existing service/pipeline tests. Check rejected model output and upstream failures as well as success. Keep model-call counts and request-owned cost assertions when changing orchestration.
-4. For displayed observations, use colocated Web tests and `pnpm check:web`. A jsdom assertion cannot establish live browser hit-testing or frame geometry.
-5. Run affected local gates from `package.json`; check CI selection for added projects or paths. Report which boundaries were actually exercised and any gaps.
+1. Trace the changed boundary: Browser capture/selection/execution, Resolver/provider interpretation, or Web display. Follow the nearest existing scenario and preserve the single current request/response contract.
+2. For Browser behavior, add a focused controlled scenario in `tests/resolution/` and run `pnpm test:resolution`. Derive target identity independently of XPath. Verify passive resolution preserves scroll/focus/forms; explicit execution tests verify intended effects and stale/replay rejection.
+3. For provider behavior, use deterministic HTTP responses. Cover rejected output and upstream failures as well as success; preserve model-call counts and request-owned cost assertions.
+4. For presentation, use colocated Web tests and `pnpm check:web`. jsdom cannot establish live hit-testing or frame geometry.
+5. Run affected gates from `package.json`; verify CI selection for added paths/projects. Report exercised boundaries and remaining gaps.
 
-`pnpm test:resolution:live` is a separate paid check when the task calls for real provider evidence. Follow the current cheap-route/output-limit guidance in `docs/resolution.md`, preserve reported and estimated costs separately, and retain the measured result. Deterministic fixtures are the default.
+`pnpm test:resolution:live` is a separate paid check when authorized. Read its route/output limits in `docker/compose.resolution-live.yaml` and `tests/resolution/live.test.mjs`; disclose request count and estimated cost before inference, then report measured cost and unknown charges separately. Use deterministic fixtures otherwise.
 
-The runner owns an isolated Compose project and port; read `scripts/resolution-check.sh` before concurrent or alternate-checkout runs. Preserve unrelated development stacks. This workflow does not execute the user's requested page actions.
+Read `scripts/resolution-check.sh` before concurrent/alternate-checkout runs; its isolated Compose project must not replace unrelated stacks. Execution scenarios act only on controlled fixture pages.

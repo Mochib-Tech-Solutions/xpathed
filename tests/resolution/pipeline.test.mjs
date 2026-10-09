@@ -6,6 +6,32 @@ import { setTimeout as delay } from "node:timers/promises";
 const client = "http://client-api:8080";
 const fixture = "http://resolution-fixture:8090";
 
+test("provider-image-opt-in-sends-masked-pixels-and-keeps-result-image-free", async () => {
+  await json(`${fixture}/scenario`, "POST", { name: "found" });
+  const session = await json(`${client}/api/sessions`, "POST");
+  try {
+    const page = await json(`${client}/api/pages/${session.pageId}/navigate`, "POST", {
+      url: `${fixture}/fixture`,
+    });
+    const result = await json(`${client}/api/pages/${page.pageId}/resolve`, "POST", {
+      instruction: "Click About us",
+      documentId: page.documentId,
+      includeImage: true,
+    });
+    assert.equal(result.outcome, "found", JSON.stringify(result));
+    assert.equal(result.diagnostics.modelCalls, 1);
+    const provider = await json(`${fixture}/provider-request`);
+    const content = provider.messages[1].content;
+    assert.equal(content.length, 2);
+    assert.equal(content[0].type, "text");
+    assert.equal(content[1].type, "image_url");
+    assert.match(content[1].image_url.url, /^data:image\/png;base64,iVBOR/);
+    assert.doesNotMatch(JSON.stringify(result), /data:image|iVBOR/);
+  } finally {
+    await fetch(`${client}/api/sessions/${session.sessionId}`, { method: "DELETE" });
+  }
+});
+
 test("session-empty-json-request-through-client-uses-configured-default", async () => {
   const options = await json(`${client}/api/sessions/options`);
   const response = await fetch(`${client}/api/sessions`, {

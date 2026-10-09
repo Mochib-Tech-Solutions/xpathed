@@ -55,6 +55,8 @@ test("cardinality-live-singular-login-is-ambiguous-and-plural-login-enumerates",
           generationId: result.diagnostics.generationId,
           usage: result.diagnostics.usage,
           costEstimate: result.diagnostics.costEstimate,
+          timingsMs: result.diagnostics.timingsMs,
+          modelInputBytes: result.diagnostics.modelInputBytes,
         }),
       );
       try {

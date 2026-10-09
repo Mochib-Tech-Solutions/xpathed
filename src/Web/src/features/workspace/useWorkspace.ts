@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ApiError, request } from "./api";
 import type {
+  ActionExecutionResult,
   BrowserType,
   BrowserSessionOptions,
   PageState,
@@ -10,7 +11,12 @@ import type {
   SessionState,
 } from "./api";
 
-type TabChat = { address: string; instruction: string; history: Resolution[] };
+type TabChat = {
+  address: string;
+  instruction: string;
+  includeImage: boolean;
+  history: Resolution[];
+};
 type WorkspaceState = {
   session: Session | null;
   snapshot: SessionState | null;
@@ -23,7 +29,7 @@ const emptyWorkspace: WorkspaceState = {
   tabs: {},
   initialAddress: "",
 };
-const emptyChat: TabChat = { address: "", instruction: "", history: [] };
+const emptyChat: TabChat = { address: "", instruction: "", includeImage: false, history: [] };
 const pageAddress = (page: PageState) => (page.url === "about:blank" ? "" : page.url);
 const historical = (entries: Resolution[]) =>
   entries.map((entry) => (entry.historical ? entry : { ...entry, historical: true }));
@@ -41,6 +47,8 @@ function updateSession(previous: WorkspaceState, snapshot: SessionState): Worksp
     tabs[page.pageId] = chat
       ? {
           ...chat,
+          includeImage:
+            leftPage || oldPage?.documentId !== page.documentId ? false : chat.includeImage,
           address:
             oldPage?.url !== page.url && (oldPage !== undefined || page.url !== "about:blank")
               ? pageAddress(page)
@@ -58,6 +66,7 @@ function updateSession(previous: WorkspaceState, snapshot: SessionState): Worksp
 export default function useWorkspace() {
   const [browserOptions, setBrowserOptions] = useState<BrowserSessionOptions | null>(null);
   const [browserType, setBrowserType] = useState<BrowserType>("chromium");
+  const [resolution, setResolution] = useState("1280x800");
   const [workspace, setWorkspace] = useState(emptyWorkspace);
   const { session, snapshot, tabs } = workspace;
   const page = snapshot?.pages.find((entry) => entry.pageId === snapshot.activePageId) ?? null;
@@ -79,6 +88,7 @@ export default function useWorkspace() {
         if (active) {
           setBrowserOptions(options);
           setBrowserType(options.defaultBrowserType);
+          setResolution(options.defaultResolution);
         }
       })
       .catch(() => {
@@ -190,7 +200,7 @@ export default function useWorkspace() {
     if (!session && !browserOptions) return;
     void perform("Opening website…", async (isCurrent) => {
       const currentSession =
-        session ?? (await request<Session>("/sessions", "POST", { browserType }));
+        session ?? (await request<Session>("/sessions", "POST", { browserType, resolution }));
       if (!isCurrent()) return;
       const pageId = page?.pageId ?? currentSession.pageId;
       setWorkspace((previous) => ({
@@ -200,6 +210,7 @@ export default function useWorkspace() {
           ...previous.tabs,
           [pageId]: {
             ...(previous.tabs[pageId] ?? emptyChat),
+            includeImage: false,
             address: previous.tabs[pageId]?.address ?? previous.initialAddress,
             history: historical(previous.tabs[pageId]?.history ?? []),
           },
@@ -241,6 +252,7 @@ export default function useWorkspace() {
     const entry: Resolution = {
       id: crypto.randomUUID(),
       instruction: text,
+      includedImage: chat.includeImage,
       createdAt: new Date().toISOString(),
       respondedAt: null,
       pageUrl: page.url,
@@ -258,6 +270,7 @@ export default function useWorkspace() {
           [page.pageId]: {
             ...previous.tabs[page.pageId]!,
             instruction: instruction === undefined ? "" : previous.tabs[page.pageId]!.instruction,
+            includeImage: false,
             history: [...historical(previous.tabs[page.pageId]!.history), entry],
           },
         },
@@ -268,6 +281,7 @@ export default function useWorkspace() {
         result = await request<ResolutionResult>(`/pages/${page.pageId}/resolve`, "POST", {
           instruction: text,
           documentId: page.documentId,
+          ...(chat.includeImage ? { includeImage: true } : {}),
         });
         if (!isCurrent()) return;
         await readSession(session.sessionId, isCurrent);
@@ -350,6 +364,76 @@ export default function useWorkspace() {
       }
     });
   }
+  function execute(entry: Resolution, actionId: string, value?: string) {
+    const result = entry.result;
+    if (
+      entry.historical ||
+      !result?.captureId ||
+      !session ||
+      !page ||
+      result.pageId !== page.pageId ||
+      result.documentId !== page.documentId ||
+      result.sessionId !== session.sessionId ||
+      !result.actions?.some((action) => action.actionId === actionId && action.outcome === "found")
+    )
+      return;
+    void perform("Executing…", async (isCurrent) => {
+      function updateExecution(execution: NonNullable<Resolution["execution"]>) {
+        setWorkspace((previous) => {
+          const origin = previous.tabs[page!.pageId];
+          if (!origin || previous.session?.sessionId !== session!.sessionId) return previous;
+          return {
+            ...previous,
+            tabs: {
+              ...previous.tabs,
+              [page!.pageId]: {
+                ...origin,
+                history: historical(origin.history).map((old) =>
+                  old.id === entry.id ? { ...old, execution } : old,
+                ),
+              },
+            },
+          };
+        });
+      }
+      updateExecution({ actionId, status: "pending", message: "Executing…" });
+      try {
+        const execution = await request<ActionExecutionResult>(
+          `/pages/${page.pageId}/execute`,
+          "POST",
+          {
+            sessionId: session.sessionId,
+            documentId: result.documentId,
+            captureId: result.captureId,
+            actionId,
+            ...(value === undefined ? {} : { value }),
+          },
+        );
+        if (!isCurrent()) return;
+        if (
+          execution.actionId !== actionId ||
+          !["completed", "uncertain"].includes(execution.status)
+        )
+          throw new Error(
+            "The browser could not confirm completion. Check the page before resolving again.",
+          );
+        updateExecution(execution);
+      } catch (failure) {
+        if (!isCurrent()) return;
+        const rejected =
+          failure instanceof ApiError && failure.status >= 400 && failure.status < 500;
+        updateExecution({
+          actionId,
+          status: rejected ? "failed" : "uncertain",
+          message: rejected
+            ? failure.message
+            : "The browser could not confirm completion. Check the page before resolving again.",
+        });
+      } finally {
+        if (isCurrent()) await readSession(session.sessionId, isCurrent);
+      }
+    });
+  }
   function setInstruction(instruction: string) {
     if (page)
       setWorkspace((previous) => ({
@@ -365,7 +449,12 @@ export default function useWorkspace() {
       ...previous,
       tabs: {
         ...previous.tabs,
-        [page.pageId]: { ...previous.tabs[page.pageId]!, instruction: "", history: [] },
+        [page.pageId]: {
+          ...previous.tabs[page.pageId]!,
+          instruction: "",
+          includeImage: false,
+          history: [],
+        },
       },
     }));
   }
@@ -382,6 +471,15 @@ export default function useWorkspace() {
   return {
     session,
     browserType: session?.browserType ?? browserType,
+    resolution: session?.resolution ?? resolution,
+    setResolution: (next: string) => {
+      if (
+        !session &&
+        !pending.current &&
+        browserOptions?.resolutions.some((choice) => choice.id === next)
+      )
+        setResolution(next);
+    },
     browserOptions,
     setBrowserType: (next: BrowserType) => {
       if (!session && !pending.current && browserOptions?.browserTypes.includes(next))
@@ -392,6 +490,14 @@ export default function useWorkspace() {
     address: page ? chat.address : workspace.initialAddress,
     addressFocus,
     instruction: chat.instruction,
+    includeImage: chat.includeImage,
+    setIncludeImage: (includeImage: boolean) => {
+      if (!page || pending.current) return;
+      setWorkspace((previous) => ({
+        ...previous,
+        tabs: { ...previous.tabs, [page.pageId]: { ...previous.tabs[page.pageId]!, includeImage } },
+      }));
+    },
     history: chat.history,
     busy,
     error,
@@ -406,6 +512,7 @@ export default function useWorkspace() {
     setInstruction,
     resetChat,
     spotlight,
+    execute,
     setAddress,
     dismissError: () => setError(""),
   };

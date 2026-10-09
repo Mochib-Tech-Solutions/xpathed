@@ -59,6 +59,13 @@ public sealed class PagesController(BrowserSessions sessions) : ControllerBase
         CancellationToken cancellationToken
     ) => sessions.InspectActionAsync(id, request, cancellationToken);
 
+    [HttpPost("{id}/execute")]
+    public Task<ActionExecutionResult> ExecuteAction(
+        string id,
+        [FromBody] ExecuteActionRequest request,
+        CancellationToken cancellationToken
+    ) => sessions.ExecuteActionAsync(id, request, cancellationToken);
+
     [HttpPost("{id}/spotlight")]
     public async Task<IActionResult> Spotlight(
         string id,

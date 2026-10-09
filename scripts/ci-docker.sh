@@ -15,9 +15,7 @@ docker/compose.sh --env-file /dev/null -f docker/compose.resolution-check.yaml -
 docker/compose.sh --env-file /dev/null -f docker/compose.evaluation.yaml config --quiet
 docker/compose.sh --env-file /dev/null -f docker/compose.evaluation.yaml -f docker/compose.evaluation-live.yaml config --quiet
 docker/compose.sh --env-file /dev/null -f docker/compose.evaluation.yaml -f docker/compose.qualification.yaml config --quiet
-XPATHED_BASIC_BROWSER=sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa XPATHED_BASIC_RESOLVER=sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb docker/compose.sh --env-file /dev/null -f docker/compose.evaluation.yaml -f docker/compose.comparison.yaml config --quiet
 XPATHED_BROWSER_IMAGE=sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa XPATHED_RESOLVER_IMAGE=sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb OPENROUTER_MODEL=configuration-check OPENROUTER_PROVIDER=configuration-check docker compose --env-file /dev/null -f docker/compose.release.yaml config --quiet
-docker buildx build --check --file docker/stagehand.Dockerfile .
 sh -n docker/hosted/browser-entrypoint.sh
 caddy_image=$(awk '/image: caddy@sha256:/ { print $2 }' docker/hosted/compose.security.yaml)
 docker run --rm --network none --entrypoint caddy -e XPATHED_HOST=configuration-check.invalid --mount "type=bind,source=$(pwd)/docker/hosted/Caddyfile,target=/etc/caddy/Caddyfile,readonly" "$caddy_image" validate --config /etc/caddy/Caddyfile --adapter caddyfile

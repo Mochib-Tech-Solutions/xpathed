@@ -68,6 +68,7 @@ const oracleScript = `<script>
         userAgent: navigator.userAgent, cookie: document.cookie, openerPath: window.opener?.location.pathname ?? null, focused: CSS.supports("selector(:-moz-window-inactive)") ? !document.documentElement.matches(":-moz-window-inactive") : document.hasFocus(),
         activeElement: document.activeElement?.id, events: window.observedEvents ?? {},
         targetMarkup: observedTarget?.outerHTML, values: [...document.querySelectorAll('[data-observe-value]')].map(element => element.value),
+        checked: [...document.querySelectorAll('input[type=checkbox]')].map(element => element.checked),
         inputTypes: [...document.querySelectorAll('input')].map(element => ({declared: element.getAttribute('type'), actual: element.type})),
         innerWidth, innerHeight, outerWidth, outerHeight, screenWidth: screen.width, screenHeight: screen.height }) });
       if (close) window.close();
@@ -259,6 +260,59 @@ test("targeting-descriptions-preserve-roles-and-accessible-image-names", async (
   );
 });
 
+test("capture-opt-in-image-masks-private-values-across-frames-and-shadow-roots", async () => {
+  await withFixture(
+    `${targetMarkup}<style>input,textarea,select,[contenteditable],[data-private],[data-sensitive]{display:block;width:200px;height:30px;margin:4px;border:1px solid black}iframe{width:250px;height:80px}</style>
+      <input id="focused" aria-label="Email" value="PRIVATE_FIRST" data-observe-value>
+      <input type="password" value="PRIVATE_FIRST"><input type="hidden" value="PRIVATE_HIDDEN">
+      <textarea>PRIVATE_FIRST</textarea><select><option>PRIVATE_FIRST</option></select>
+      <div contenteditable="true">PRIVATE_FIRST<span style="position:fixed;left:400px;top:200px">PRIVATE_FIRST</span></div>
+      <div data-private>PRIVATE_FIRST</div><div data-sensitive>PRIVATE_FIRST</div><div id="shadow"></div>
+      <iframe title="Private form" srcdoc="<input aria-label='Secret' value='PRIVATE_FIRST'>"></iframe>
+      <script>
+        const root = document.querySelector('#shadow').attachShadow({mode:'open'});
+        root.innerHTML = '<input aria-label="Shadow secret" value="PRIVATE_FIRST"><div contenteditable>PRIVATE_FIRST</div>';
+        const update = scope => {
+          for (const element of scope.querySelectorAll('input,textarea')) element.value='PRIVATE_OTHER';
+          for (const element of scope.querySelectorAll('option,[contenteditable],[contenteditable] span,[data-private],[data-sensitive]')) element.textContent='PRIVATE_OTHER';
+        };
+        window.mutateXpathFixture = () => { update(document); update(root); update(document.querySelector('iframe').contentDocument); };
+        document.querySelector('#focused').focus();
+      </script>`,
+    async (_session, page) => {
+      const before = await observe();
+      const capture = await request(`/pages/${page.pageId}/capture`, {
+        documentId: page.documentId,
+        includeImage: true,
+      });
+      assert.equal(capture.image.width, before.innerWidth);
+      assert.equal(capture.image.height, before.innerHeight);
+      const image = Buffer.from(capture.image.png, "base64");
+      assert.deepEqual([...image.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);
+      assert.ok(!JSON.stringify(capture.candidates).includes("PRIVATE_"));
+      const unchanged = await observe();
+      assert.equal(unchanged.activeElement, before.activeElement);
+      assert.equal(unchanged.scrollY, before.scrollY);
+      assert.deepEqual(unchanged.values, before.values);
+      await observe({ mutateXpath: true });
+      const changed = await request(`/pages/${page.pageId}/capture`, {
+        documentId: page.documentId,
+        includeImage: true,
+      });
+      assert.equal(
+        changed.image.png,
+        capture.image.png,
+        "Changing only private values must not change exported pixels",
+      );
+      assert.ok(!JSON.stringify(changed.candidates).includes("PRIVATE_"));
+      const withoutImage = await request(`/pages/${page.pageId}/capture`, {
+        documentId: page.documentId,
+      });
+      assert.equal(withoutImage.image, null);
+    },
+  );
+});
+
 test("targeting-labels-with-comment-nodes-retain-action-targets", async () => {
   await withFixture(
     `<section aria-label="Videos"><a id="expected-target" href="#first">First<!-- PRIVATE_COMMENT_SENTINEL --> video</a>
@@ -354,10 +408,10 @@ async function request(path, body, method = "POST") {
   if (
     path === "/sessions" &&
     method === "POST" &&
-    body === undefined &&
+    body?.browserType === undefined &&
     process.env.XPATHED_TEST_BROWSER_TYPE
   ) {
-    body = { browserType: process.env.XPATHED_TEST_BROWSER_TYPE };
+    body = { ...body, browserType: process.env.XPATHED_TEST_BROWSER_TYPE };
   }
   const response = await fetch(`${browserUrl}${path}`, {
     method,
@@ -426,7 +480,7 @@ async function expectError(path, body, status, code) {
   assert.equal((await response.json()).code, code);
 }
 
-async function withFixture(markup, check) {
+async function withFixture(markup, check, sessionOptions) {
   oracleCommands.clear();
   oracleObservers.clear();
   const server = createServer(async (request, response) => {
@@ -454,7 +508,7 @@ async function withFixture(markup, check) {
   await once(server, "listening");
   let session;
   try {
-    session = await request("/sessions");
+    session = await request("/sessions", sessionOptions);
     const page = await request(`/pages/${session.pageId}/navigate`, {
       url: "http://resolution-fixture:8070/fixture",
     });
@@ -465,6 +519,385 @@ async function withFixture(markup, check) {
     await new Promise((resolve) => server.close(resolve));
   }
 }
+
+async function prepareExecution(session, page, action, label) {
+  const capture = await request(`/pages/${page.pageId}/capture`, { documentId: page.documentId });
+  const candidate = capture.candidates.find((candidate) => candidate.label === label);
+  assert.ok(candidate, `Missing controlled target ${label}`);
+  await request(`/pages/${page.pageId}/selections`, {
+    documentId: page.documentId,
+    captureId: capture.captureId,
+    actions: [{ actionId: "execute-1", candidateId: candidate.id, action }],
+  });
+  return {
+    sessionId: session.sessionId,
+    documentId: page.documentId,
+    captureId: capture.captureId,
+    actionId: "execute-1",
+  };
+}
+
+test("execution-click-is-explicit-and-consumes-the-capture", async () => {
+  await withFixture(
+    '<button id="expected-target" onclick="this.dataset.clicks = String(Number(this.dataset.clicks ?? 0) + 1)">Save</button>',
+    async (session, page) => {
+      const execution = await prepareExecution(session, page, "click", "Save");
+      assert.equal((await observe()).clicks, "0");
+      await expectError(
+        `/pages/${page.pageId}/execute`,
+        { ...execution, sessionId: "different-session" },
+        409,
+        "stale_session",
+      );
+      const result = await request(`/pages/${page.pageId}/execute`, execution);
+      assert.equal(result.status, "completed");
+      assert.equal((await observe()).clicks, "1");
+      await expectError(`/pages/${page.pageId}/execute`, execution, 409, "stale_capture");
+      assert.equal((await observe()).clicks, "1");
+    },
+  );
+});
+
+test("execution-rejects-a-replaced-retained-target", async () => {
+  await withFixture(targetMarkup, async (session, page) => {
+    const execution = await prepareExecution(session, page, "click", "About us");
+    await observe({ replaceTarget: true });
+    await expectError(`/pages/${page.pageId}/execute`, execution, 409, "stale_capture");
+    assert.equal((await observe()).clicks, "0");
+  });
+});
+
+test("execution-rechecks-readiness-and-consumes-a-failed-attempt", async () => {
+  await withFixture(
+    `${targetMarkup}<button id="disable" onclick="document.querySelector('#expected-target').disabled = true">Disable</button>`,
+    async (session, page) => {
+      const execution = await prepareExecution(session, page, "click", "About us");
+      await observe({ click: "#disable" });
+      await expectError(`/pages/${page.pageId}/execute`, execution, 409, "action_not_ready");
+      await expectError(`/pages/${page.pageId}/execute`, execution, 409, "stale_capture");
+      assert.equal((await observe()).clicks, "0");
+    },
+  );
+});
+
+test("execution-edits-only-the-retained-input-with-explicit-values", async () => {
+  await withFixture(
+    '<label>Notes<input id="expected-target" data-observe-value></label><label>Other<input data-observe-value value="untouched"></label>',
+    async (session, page) => {
+      for (const [action, value, expected] of [
+        ["fill", "private-test-value", "private-test-value"],
+        ["type", " appended", "private-test-value appended"],
+        ["clear", undefined, ""],
+      ]) {
+        const execution = await prepareExecution(session, page, action, "Notes");
+        const result = await request(`/pages/${page.pageId}/execute`, {
+          ...execution,
+          ...(value === undefined ? {} : { value }),
+        });
+        assert.equal(result.status, "completed");
+        assert.ok(!JSON.stringify(result).includes("private-test-value"));
+        assert.deepEqual((await observe()).values, [expected, "untouched"]);
+      }
+    },
+  );
+});
+
+test("execution-check-and-select-use-native-controls", async () => {
+  await withFixture(
+    '<label>Consent<input type="checkbox"></label><label>Color<select data-observe-value><option value="red">Red</option><option value="blue">Blue</option><option value="">No color</option><option value="disabled" disabled>Unavailable</option><optgroup label="Unavailable group" disabled><option value="grouped">Grouped</option></optgroup><option value="duplicate">First duplicate</option><option value="duplicate">Second duplicate</option></select></label>',
+    async (session, page) => {
+      for (const [action, expected] of [
+        ["check", true],
+        ["uncheck", false],
+      ]) {
+        const execution = await prepareExecution(session, page, action, "Consent");
+        assert.equal(
+          (await request(`/pages/${page.pageId}/execute`, execution)).status,
+          "completed",
+        );
+        assert.deepEqual((await observe()).checked, [expected]);
+      }
+      const selection = await prepareExecution(session, page, "select", "Color");
+      assert.equal(
+        (await request(`/pages/${page.pageId}/execute`, { ...selection, value: "blue" })).status,
+        "completed",
+      );
+      assert.deepEqual((await observe()).values, ["blue"]);
+      for (const value of ["disabled", "grouped", "duplicate"]) {
+        const rejected = await prepareExecution(session, page, "select", "Color");
+        await expectError(
+          `/pages/${page.pageId}/execute`,
+          { ...rejected, value },
+          409,
+          "invalid_action_value",
+        );
+        assert.deepEqual((await observe()).values, ["blue"]);
+        await expectError(
+          `/pages/${page.pageId}/execute`,
+          { ...rejected, value: "red" },
+          409,
+          "stale_capture",
+        );
+      }
+      const empty = await prepareExecution(session, page, "select", "Color");
+      assert.equal(
+        (await request(`/pages/${page.pageId}/execute`, { ...empty, value: "" })).status,
+        "completed",
+      );
+      assert.deepEqual((await observe()).values, [""]);
+    },
+  );
+});
+
+test("execution-focus-press-and-blur-stay-on-the-selected-control", async () => {
+  await withFixture(
+    '<label>Notes<input id="expected-target" onkeydown="window.observedEvents = { key: event.key }"></label>',
+    async (session, page) => {
+      let execution = await prepareExecution(session, page, "focus", "Notes");
+      assert.equal((await request(`/pages/${page.pageId}/execute`, execution)).status, "completed");
+      assert.equal((await observe()).activeElement, "expected-target");
+      execution = await prepareExecution(session, page, "press", "Notes");
+      assert.equal(
+        (await request(`/pages/${page.pageId}/execute`, { ...execution, value: "ArrowRight" }))
+          .status,
+        "completed",
+      );
+      assert.equal((await observe()).events.key, "ArrowRight");
+      execution = await prepareExecution(session, page, "blur", "Notes");
+      assert.equal((await request(`/pages/${page.pageId}/execute`, execution)).status, "completed");
+      assert.equal((await observe()).activeElement, "");
+      execution = await prepareExecution(session, page, "press", "Notes");
+      await expectError(
+        `/pages/${page.pageId}/execute`,
+        { ...execution, value: "Control+L" },
+        400,
+        "invalid_action_value",
+      );
+    },
+  );
+});
+
+test("execution-keeps-frame-and-shadow-target-identity", async () => {
+  await withFixture(
+    (path) =>
+      path === "/child"
+        ? '<button id="expected-target" onclick="this.dataset.clicks = \'1\'">Child Save</button>'
+        : '<iframe src="/child" title="Child" style="width:400px;height:200px"></iframe><div id="consent-host"></div><script>document.querySelector("#consent-host").attachShadow({mode:"open"}).innerHTML = `<button id="expected-target" onclick="this.dataset.clicks = 1">Shadow Save</button>`;</script>',
+    async (session, page) => {
+      let execution = await prepareExecution(session, page, "click", "Child Save");
+      assert.equal((await request(`/pages/${page.pageId}/execute`, execution)).status, "completed");
+      assert.equal((await observe({}, "/child")).clicks, "1");
+      assert.equal((await observe()).clicks, "0");
+      execution = await prepareExecution(session, page, "click", "Shadow Save");
+      assert.equal((await request(`/pages/${page.pageId}/execute`, execution)).status, "completed");
+      assert.equal((await observe()).clicks, "1");
+    },
+  );
+});
+
+test("capture-rendering-boundary-rechecks-new-private-ancestors-and-targets", async () => {
+  await withFixture(
+    `<button id="expected-target" aria-labelledby="private-reference">Keep me</button>
+    <span id="private-reference" data-private hidden aria-label="Private marker reference"></span>
+    <button style="position:absolute;top:1600px">Offscreen</button>
+    <section id="private-group" aria-label="Private marker context">
+      <h2>Private marker heading</h2><input placeholder="Private marker placeholder">
+      <button aria-label="Private marker name">Private marker text</button>
+    </section>
+    <button id="private-direct" aria-label="Private marker direct">Private marker direct text</button>
+    <div id="sensitive-host"></div>
+    <script>
+      document.querySelector('#sensitive-host').attachShadow({mode:'open'}).innerHTML = '<button aria-label="Private marker shadow">Private marker shadow text</button>';
+      const NativeObserver = window.IntersectionObserver;
+      window.IntersectionObserver = class extends NativeObserver {
+        constructor(callback, options) {
+          super(callback, options);
+          requestAnimationFrame(() => {
+            document.querySelector('#private-group').setAttribute('data-private', '');
+            document.querySelector('#private-direct').setAttribute('data-private', '');
+            document.querySelector('#sensitive-host').setAttribute('data-sensitive', '');
+          });
+        }
+      };
+    </script>`,
+    async (session, page) => {
+      const capture = await request(`/pages/${page.pageId}/capture`, {
+        documentId: page.documentId,
+      });
+      assert.ok(!JSON.stringify(capture.candidates).includes("Private marker"));
+      assert.deepEqual(
+        capture.candidates.map((candidate) => candidate.label),
+        ["Keep me"],
+      );
+      assert.equal(capture.coverage.complete, true);
+      assert.equal(capture.coverage.eligibleCount, 2);
+      assert.equal(capture.coverage.capturedCount, 1);
+      assert.equal(capture.coverage.excludedOffscreenCount, 1);
+      const observation = await verify(["//*[@id='private-group' and @data-private]"]);
+      assert.deepEqual(observation.matches, [["private-group"]]);
+      assert.equal(observation.clicks, "0");
+    },
+  );
+});
+
+test("targeting-private-label-references-exclude-values-and-preserve-hidden-public-names", async () => {
+  await withFixture(
+    `<span id="public-hidden" hidden aria-label="Hidden public name"></span>
+    <div data-sensitive><span id="private-label" aria-label="Private reference name"></span></div>
+    <img id="private-alt" data-private alt="Private reference image">
+    <button aria-labelledby="private-label">Label fallback</button>
+    <button aria-labelledby="private-alt">Image fallback</button>
+    <button aria-labelledby="public-hidden">Public text</button>
+    <label for="public-input" data-private aria-label="Private reference associated"></label>
+    <input id="public-input" placeholder="Public input">`,
+    async (session, page) => {
+      const capture = await request(`/pages/${page.pageId}/capture`, {
+        documentId: page.documentId,
+      });
+      assert.ok(!JSON.stringify(capture.candidates).includes("Private reference"));
+      assert.deepEqual(
+        capture.candidates
+          .filter((candidate) => candidate.tag === "button")
+          .map((candidate) => candidate.label),
+        ["Label fallback", "Image fallback", "Hidden public name"],
+      );
+      const input = capture.candidates.find((candidate) => candidate.tag === "input");
+      assert.equal(input.label, "");
+      assert.equal(input.placeholder, "Public input");
+    },
+  );
+});
+
+test("capture-image-wait-rechecks-private-name-sources-before-returning", async () => {
+  await withFixture(
+    `<span id="source" hidden aria-label="Private marker screenshot"></span>
+    <button aria-labelledby="source">Public fallback</button>
+    <script>
+      new MutationObserver(records => {
+        if (records.some(record => [...record.addedNodes].some(node => node.nodeName === 'STYLE' && node.textContent.includes('data-sensitive'))))
+          document.querySelector('#source').setAttribute('data-private', '');
+      }).observe(document.documentElement, {childList:true});
+    </script>`,
+    async (session, page) => {
+      const body = { documentId: page.documentId };
+      const withoutImage = await request(`/pages/${page.pageId}/capture`, body);
+      assert.ok(
+        withoutImage.candidates.some(
+          (candidate) => candidate.label === "Private marker screenshot",
+        ),
+      );
+      await expectError(
+        `/pages/${page.pageId}/capture`,
+        { ...body, includeImage: true },
+        409,
+        "stale_capture",
+      );
+      const observation = await verify(["//*[@id='source' and @data-private]"]);
+      assert.deepEqual(observation.matches, [["source"]]);
+    },
+  );
+});
+
+for (const source of [
+  "frame-owner",
+  "referenced-name",
+  "associated-label",
+  "scope-text",
+  "unrelated",
+  "offscreen",
+]) {
+  test(`frames-private-source-changed-during-child-capture-${source}`, async () => {
+    const controls = {
+      "frame-owner": `<button>Keep me</button><iframe id="source" src="/child" title="Child"></iframe>`,
+      "referenced-name": `<span id="source" hidden aria-label="Private marker reference"></span><button aria-labelledby="source">Keep me</button>`,
+      "associated-label": `<label id="source" for="public-input">Private marker associated</label><input id="public-input">`,
+      "scope-text": `<section><h2 id="source">Private marker scope</h2><button>Keep me</button></section>`,
+      unrelated: `<span id="source" hidden>Unrelated hidden text</span><button>Keep me</button>`,
+      offscreen: `<div style="position:absolute;top:1600px"><article><h2 id="source">Offscreen first</h2><button>View</button></article><article><h2>Offscreen second</h2><button>View</button></article></div><button>Keep me</button>`,
+    };
+    await withFixture(
+      (path) =>
+        path === "/child"
+          ? `<button>Child control</button><script>
+            const NativeObserver = window.IntersectionObserver;
+            window.IntersectionObserver = class extends NativeObserver {
+              constructor(callback, options) {
+                super(callback, options);
+                requestAnimationFrame(() => parent.document.querySelector('#source').setAttribute('data-private', ''));
+              }
+            };
+          </script>`
+          : `${controls[source]}${source === "frame-owner" ? "" : '<iframe src="/child" title="Child"></iframe>'}`,
+      async (session, page) => {
+        const requestBody = { documentId: page.documentId };
+        if (["unrelated", "offscreen"].includes(source)) {
+          const capture = await request(`/pages/${page.pageId}/capture`, requestBody);
+          assert.equal(capture.coverage.complete, true);
+          assert.ok(capture.candidates.some((candidate) => candidate.label === "Keep me"));
+          assert.ok(capture.candidates.some((candidate) => candidate.label === "Child control"));
+        } else {
+          await expectError(`/pages/${page.pageId}/capture`, requestBody, 409, "stale_capture");
+        }
+        const observation = await verify(["//*[@id='source' and @data-private]"]);
+        assert.deepEqual(observation.matches, [["source"]]);
+      },
+    );
+  });
+}
+
+test("capture-caches-refresh-ancestor-privacy-disabled-state-and-scope", async () => {
+  await withFixture(
+    `<section id="group" aria-label="Original context">
+      <div id="state-host"><button id="expected-target">Save</button></div>
+      <div id="private-host"><button>Private later</button></div>
+    </section>
+    <script>window.mutateXpathFixture = () => {
+      document.querySelector('#group').setAttribute('aria-label', 'Updated context');
+      document.querySelector('#state-host').setAttribute('aria-disabled', 'true');
+      document.querySelector('#private-host').setAttribute('data-private', '');
+    };</script>`,
+    async (session, page) => {
+      const capture = await request(`/pages/${page.pageId}/capture`, {
+        documentId: page.documentId,
+      });
+      const save = capture.candidates.find((candidate) => candidate.label === "Save");
+      const privateTarget = capture.candidates.find(
+        (candidate) => candidate.label === "Private later",
+      );
+      assert.ok(save.scope.includes("Original context"));
+      assert.ok(privateTarget);
+      const selection = {
+        documentId: page.documentId,
+        captureId: capture.captureId,
+        candidateId: save.id,
+        action: "click",
+      };
+      assert.equal(
+        (await request(`/pages/${page.pageId}/selection`, selection)).target.state.enabled,
+        true,
+      );
+      await observe({ mutateXpath: true });
+      const changed = await request(`/pages/${page.pageId}/selection`, selection);
+      assert.equal(changed.target.state.enabled, false);
+      assert.ok(changed.target.interactability.reasons.includes("disabled"));
+      await expectError(
+        `/pages/${page.pageId}/selection`,
+        { ...selection, candidateId: privateTarget.id },
+        409,
+        "stale_capture",
+      );
+      const refreshed = await request(`/pages/${page.pageId}/capture`, {
+        documentId: page.documentId,
+      });
+      const current = refreshed.candidates.find((candidate) => candidate.label === "Save");
+      assert.ok(current.scope.includes("Updated context"));
+      assert.ok(!current.scope.includes("Original context"));
+      assert.equal(current.state.enabled, false);
+      assert.ok(!JSON.stringify(refreshed.candidates).includes("Private later"));
+      assert.equal((await observe()).clicks, "0");
+    },
+  );
+});
 
 test("session-empty-creation-uses-configured-default", async () => {
   const options = await request("/sessions/options", undefined, "GET");
@@ -495,6 +928,49 @@ test("session-selected-engine-owns-viewer-and-capture", async () => {
     });
   });
 });
+
+for (const [width, height] of [
+  [1024, 768],
+  [1280, 800],
+  [1366, 768],
+  [1440, 900],
+  [1920, 1080],
+]) {
+  test(`session-resolution-${width}x${height}-matches-viewer-and-current-view`, async () => {
+    const resolution = `${width}x${height}`;
+    await withFixture(
+      `<style>html { background: rgb(12, 34, 56); }</style>${targetMarkup}`,
+      async (session, page) => {
+        assert.equal(session.resolution, resolution);
+        const observed = await observe();
+        assert.equal(observed.innerWidth, width);
+        assert.equal(observed.innerHeight, height);
+        const capture = await request(`/pages/${page.pageId}/capture`, {
+          documentId: page.documentId,
+          includeImage: true,
+        });
+        assert.ok(capture.candidates.some((candidate) => candidate.label === "About us"));
+        assert.equal(capture.image.width, width);
+        assert.equal(capture.image.height, height);
+        await withFramebuffer(session, async (readFrame) => {
+          const frame = await readFrame();
+          assert.equal(frame.width, width);
+          assert.equal(frame.height, height);
+          assert.deepEqual([...frame.pixels.subarray(-4, -1)], [56, 34, 12]);
+        });
+        const next = await request(`/sessions/${session.sessionId}/pages`);
+        assert.equal(next.resolution, resolution);
+        await request(`/pages/${next.activePageId}/navigate`, {
+          url: "http://resolution-fixture:8070/new",
+        });
+        const newTab = await observe({}, "/new");
+        assert.equal(newTab.innerWidth, width);
+        assert.equal(newTab.innerHeight, height);
+      },
+      { resolution },
+    );
+  });
+}
 
 test("scope-unrelated-carousel-replacement-preserves-a-fixed-target", async () => {
   await withFixture(

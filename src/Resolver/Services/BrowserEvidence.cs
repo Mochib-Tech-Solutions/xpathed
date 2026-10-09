@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using System.Text.RegularExpressions;
 using Xpathed.Common.Contracts;
 using Xpathed.Common.Http;
@@ -6,7 +7,12 @@ namespace Xpathed.Resolver.Services;
 
 internal static partial class BrowserEvidence
 {
-    internal static void ValidateCapture(CandidateCapture capture, string pageId, string documentId)
+    internal static void ValidateCapture(
+        CandidateCapture capture,
+        string pageId,
+        string documentId,
+        bool includeImage = false
+    )
     {
         if (
             capture.Coverage is null
@@ -30,6 +36,23 @@ internal static partial class BrowserEvidence
                 502,
                 "capture_incomplete",
                 "The browser could not capture every eligible candidate."
+            );
+        }
+        if (
+            !includeImage && capture.Image is not null
+            || includeImage
+                && (
+                    capture.Image is not { Png: { Length: >= 24 }, Width: > 0, Height: > 0 } image
+                    || !image.Png.AsSpan(0, 8).SequenceEqual(new byte[] { 137, 80, 78, 71, 13, 10, 26, 10 })
+                    || BinaryPrimitives.ReadInt32BigEndian(image.Png.AsSpan(16, 4)) != image.Width
+                    || BinaryPrimitives.ReadInt32BigEndian(image.Png.AsSpan(20, 4)) != image.Height
+                )
+        )
+        {
+            throw new ApiException(
+                502,
+                "invalid_browser_capture",
+                "The browser did not return a valid masked screenshot."
             );
         }
         if (

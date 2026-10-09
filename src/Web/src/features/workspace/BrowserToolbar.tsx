@@ -11,7 +11,7 @@ import {
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
 } from "@/components/ui/dropdown-menu";
-import type { BrowserType } from "./api";
+import type { BrowserResolution, BrowserType } from "./api";
 
 const browserNames = { chromium: "Chromium", firefox: "Firefox" };
 
@@ -19,6 +19,9 @@ type Props = {
   browserType: BrowserType;
   browserTypes: BrowserType[];
   onBrowserTypeChange: (type: BrowserType) => void;
+  resolution: string;
+  resolutions: BrowserResolution[];
+  onResolutionChange: (resolution: string) => void;
   canStart: boolean;
   sessionId: string | undefined;
   pageUrl: string | undefined;
@@ -33,6 +36,9 @@ export default function BrowserToolbar({
   browserType,
   browserTypes,
   onBrowserTypeChange,
+  resolution,
+  resolutions,
+  onResolutionChange,
   canStart,
   sessionId,
   pageUrl,
@@ -83,6 +89,30 @@ export default function BrowserToolbar({
             {browserTypes.map((type) => (
               <DropdownMenuRadioItem key={type} value={type}>
                 {browserNames[type]}
+              </DropdownMenuRadioItem>
+            ))}
+          </DropdownMenuRadioGroup>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            type="button"
+            variant="ghost"
+            className="gap-1 px-2"
+            aria-label={`Browser resolution: ${resolution}`}
+            title={sessionId ? "Close all tabs to change resolution" : "Browser resolution"}
+            disabled={!!sessionId || busy || resolutions.length === 0}
+          >
+            {resolution.replace("x", " × ")}
+            <ChevronDown className="size-3" aria-hidden="true" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start">
+          <DropdownMenuRadioGroup value={resolution} onValueChange={onResolutionChange}>
+            {resolutions.map((choice) => (
+              <DropdownMenuRadioItem key={choice.id} value={choice.id}>
+                {choice.width} × {choice.height}
               </DropdownMenuRadioItem>
             ))}
           </DropdownMenuRadioGroup>

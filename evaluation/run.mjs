@@ -72,7 +72,6 @@ export function validateCases(manifest) {
   const ids = new Set(),
     families = new Map();
   for (const item of manifest.cases) {
-    const offline = item.track === "offline-selection";
     if (!/^[a-z0-9_-]+$/.test(item.id) || ids.has(item.id))
       throw new Error("Invalid or duplicate case id");
     ids.add(item.id);
@@ -92,22 +91,19 @@ export function validateCases(manifest) {
       throw new Error("A family cannot cross split boundaries");
     families.set(item.family, item.split);
     if (!Array.isArray(item.expected?.actions)) throw new Error("Expected actions are required");
-    if (!item.instruction || (!offline && !item.fixture) || !item.review || !item.category)
+    if (!item.instruction || !item.fixture || !item.review || !item.category)
       throw new Error("Case provenance is incomplete");
-    if (!offline && (item.viewport?.width !== 1280 || item.viewport?.height !== 800))
+    if (item.viewport?.width !== 1280 || item.viewport?.height !== 800)
       throw new Error("Only the managed 1280x800 viewport is currently supported");
     for (const action of item.expected.actions) {
       if (
         !Number.isInteger(action.step) ||
         action.step < 1 ||
-        (!offline && !action.action) ||
+        !action.action ||
         !["found", "not_found", "unsupported", "error"].includes(action.outcome)
       )
         throw new Error("Invalid expected action");
-      if (
-        action.outcome === "found" &&
-        !(offline ? action.target?.candidateId : action.target?.selector)
-      )
+      if (action.outcome === "found" && !action.target?.selector)
         throw new Error("Found actions require an independent target mapping");
     }
   }
@@ -522,9 +518,7 @@ export async function fingerprints(
     "docker/compose.qualification.yaml",
     "docker/compose.sh",
     "scripts/evaluate.sh",
-    "scripts/evaluate-model.mjs",
     "scripts/evaluate-all.mjs",
-    "scripts/release/offline.mjs",
     "tests/resolution/ready.mjs",
   ];
   async function collect(path) {
@@ -721,9 +715,7 @@ export async function main(args = process.argv.slice(2), track = "resolver") {
     process.env.XPATHED_EVALUATION_SUITE || join(directory, "cases/index.json"),
   );
   if (process.env.XPATHED_EVALUATION_SUITE && options.mode !== "deterministic")
-    throw new Error(
-      "External reconstructed suites use controlled provider-free browser validation; use Saved-page selection for live provider inference",
-    );
+    throw new Error("Custom suites use controlled provider-free browser validation");
   let cases = validateCases(suite);
   let exclusions = [];
   if (track === "xpath") {

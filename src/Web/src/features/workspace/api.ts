@@ -1,15 +1,19 @@
 export type ShadowHost = { xpath: string; label: string };
 
 export type BrowserType = "chromium" | "firefox";
+export type BrowserResolution = { id: string; width: number; height: number };
 export type BrowserSessionOptions = {
   defaultBrowserType: BrowserType;
   browserTypes: BrowserType[];
+  defaultResolution: string;
+  resolutions: BrowserResolution[];
 };
 export type Session = {
   sessionId: string;
   pageId: string;
   viewPath: string;
   browserType: BrowserType;
+  resolution: string;
 };
 
 export type PageState = {
@@ -23,6 +27,7 @@ export type PageState = {
 
 export type SessionState = {
   browserType: BrowserType;
+  resolution: string;
   sessionId: string;
   activePageId: string;
   activationVersion: number;
@@ -131,6 +136,7 @@ export type ActionResolution = {
 
 export type Resolution = {
   id: string;
+  includedImage?: boolean;
   instruction: string;
   createdAt: string;
   respondedAt: string | null;
@@ -140,6 +146,18 @@ export type Resolution = {
   historical: boolean;
   result: ResolutionResult | null;
   error: string | null;
+  execution?: {
+    actionId: string;
+    status: "pending" | "completed" | "uncertain" | "failed";
+    message: string;
+  };
+};
+
+export type ActionExecutionResult = {
+  actionId: string;
+  action: string;
+  status: "completed" | "uncertain";
+  message: string;
 };
 
 export class ApiError extends Error {

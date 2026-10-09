@@ -51,7 +51,7 @@ test("release notes show both arms, incomplete qualification and unknown charges
         },
         calls: [{ reportedUsd: 0.001 }, { reportedUsd: null }],
       },
-      { name: "Saved-page selection" },
+      { name: "Pending evaluation" },
     ],
     caseChanges: { added: ["new-case"], removed: [], changed: ["fixed-label"] },
     changelog: "- Add baseline comparisons (#67)",
@@ -92,13 +92,8 @@ test("release notes show both arms, incomplete qualification and unknown charges
       name: "Live-browser Resolver",
       comparison: { candidate: { correct: 2, total: 3 }, baseline: { correct: 1, total: 3 } },
     },
-    {
-      name: "Saved-page selection",
-      comparison: { candidate: { correct: 1, total: 2 }, baseline: { correct: 2, total: 2 } },
-    },
   ];
   const grouped = releaseNotes(input);
   assert.ok(grouped.includes("| Live-browser Resolver | candidate | 2/3"));
-  assert.ok(grouped.includes("| Saved-page selection | baseline | 2/2"));
   assert.ok(grouped.includes("Retained provider calls: **2**"));
 });

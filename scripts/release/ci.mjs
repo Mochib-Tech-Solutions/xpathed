@@ -7,7 +7,6 @@ import { setTimeout as delay } from "node:timers/promises";
 import { profiles, selectQualificationCases, readRun } from "../../evaluation/compare.mjs";
 import { validateCases } from "../../evaluation/run.mjs";
 import { loadCases } from "../../evaluation/cases/load.mjs";
-import { readCollection } from "../../evaluation/datasets/collection.mjs";
 import { measuredEntry } from "../../evaluation/comparison.mjs";
 import { prepareBaseline, retiredReleaseCommit } from "./baseline.mjs";
 const gh = (path) => JSON.parse(execFileSync("gh", ["api", path], { encoding: "utf8" }));
@@ -146,9 +145,7 @@ async function main() {
   const root = ".artifacts/release-ci";
   await mkdir(root, { recursive: true, mode: 0o700 });
   const suite = loadCases();
-  const collection = readCollection();
-  suite.cases.push(...collection.cases);
-  const coverage = qualificationCoverage(suite, collection.exclusions);
+  const coverage = qualificationCoverage(suite, []);
   if (!coverage.ready) throw new Error(coverage.blockers.join("; "));
   const baselineCommit = gh(`repos/${env.GITHUB_REPOSITORY}/git/ref/heads/release`).object.sha;
   if (baselineCommit !== event.pull_request.base.sha)

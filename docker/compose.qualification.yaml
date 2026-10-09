@@ -8,15 +8,15 @@ services:
   resolver:
     environment:
       <<: *qualification-environment
-      OpenRouter__Model: ${OPENROUTER_MODEL:-google/gemini-3.8-flash}
-      OpenRouter__Provider: ${OPENROUTER_PROVIDER:-google-ai-studio}
+      OpenRouter__Model: ${OPENROUTER_MODEL:-deepseek/deepseek-v4.1-flash}
+      OpenRouter__Provider: ${OPENROUTER_PROVIDER:-wafer}
   evaluation-fixture:
     environment:
-      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-google/gemini-3.8-flash}
-      OPENROUTER_PROVIDER: ${OPENROUTER_PROVIDER:-google-ai-studio}
+      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-deepseek/deepseek-v4.1-flash}
+      OPENROUTER_PROVIDER: ${OPENROUTER_PROVIDER:-wafer}
       OPENROUTER_EVAL_API_KEY: ${OPENROUTER_EVAL_API_KEY:-}
-      XPATHED_BUDGET_PATH: /budget/experiment-budget.json
+      XPATHED_BUDGET_PATH: /budget/charges.json
       XPATHED_BUDGET_GITHUB_REPOSITORY: ${XPATHED_BUDGET_GITHUB_REPOSITORY:-}
       GH_TOKEN: ${GH_TOKEN:-}
     volumes:
-      - ./.artifacts/datasets:/budget
+      - ./.artifacts/accounting:/budget

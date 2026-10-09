@@ -14,7 +14,6 @@ import { verify as verifyBundle } from "./bundle.mjs";
 import { fingerprints, configurationRecord } from "../../evaluation/run.mjs";
 import { defaultPolicy, summarizeQualification } from "../../evaluation/policy.mjs";
 import { loadCases } from "../../evaluation/cases/load.mjs";
-import { readCollection } from "../../evaluation/datasets/collection.mjs";
 
 const hash = (value) =>
   createHash("sha256")
@@ -65,8 +64,6 @@ export async function evidence(options) {
   const current = await fingerprints(process.cwd());
   const suitePath = "evaluation/cases/index.json";
   const suite = loadCases(suitePath);
-  const collection = readCollection();
-  suite.cases.push(...collection.cases);
   const { manifest: bundle } = await verifyBundle(options.bundle, options.bundleSha256);
   const artifact = validateReleaseArtifact(
     {
@@ -202,7 +199,7 @@ export async function evidence(options) {
     "Policy differs from current policy",
   );
   ensure(m.sourceManifestHash === hash(suite), "Case collection differs from reviewed collection");
-  const selection = selectQualificationCases(suite.cases, {}, collection.exclusions);
+  const selection = selectQualificationCases(suite.cases, {}, []);
   ensure(
     isDeepStrictEqual(m.cases, selection.cases) &&
       isDeepStrictEqual(m.exclusions, selection.exclusions) &&

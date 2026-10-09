@@ -3,12 +3,10 @@ import { randomUUID } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { selectModelCases } from "../evaluation/model.mjs";
 import { readEvaluationKey } from "../evaluation/provider.mjs";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
 export const categories = [
-  { name: "model", label: "Saved-page selection", args: ["--model", "--mode", "live"] },
   { name: "xpath", label: "XPath construction and verification", args: ["--xpath"] },
   { name: "resolver", label: "Live-browser Resolver", args: ["--mode", "live"] },
 ];
@@ -87,10 +85,10 @@ export async function main(args = process.argv.slice(2)) {
   args = args.filter((arg) => arg !== "--");
   if (args.length === 1 && args[0] === "--help") {
     console.log(`pnpm evaluate [--output DIRECTORY]
-Runs Saved-page selection and Live-browser Resolver with live provider inference.
+Runs Live-browser Resolver with live provider inference.
 Runs XPath construction and verification with controlled provider-free selections.
-Requires Docker, the reviewed dataset collection and OPENROUTER_EVAL_API_KEY. Makes paid model calls.
-Separate commands: evaluate:model:live, evaluate:xpath, evaluate:resolver:live.
+Requires Docker and OPENROUTER_EVAL_API_KEY. Makes paid model calls.
+Separate commands: evaluate:xpath, evaluate:resolver:live.
 Live-browser Resolver with controlled provider-free responses: evaluate:resolver. Replay: evaluate:replay RUN_DIRECTORY.`);
     return 0;
   }
@@ -102,7 +100,6 @@ Live-browser Resolver with controlled provider-free responses: evaluate:resolver
       "Use evaluate [--output DIRECTORY]; use separate category commands to filter cases",
     );
   process.chdir(root);
-  selectModelCases();
   if (!(await readEvaluationKey()))
     throw new Error("Set OPENROUTER_EVAL_API_KEY for live provider inference");
   const output = resolve(args[1] ?? join(".artifacts/evaluation", randomUUID()));

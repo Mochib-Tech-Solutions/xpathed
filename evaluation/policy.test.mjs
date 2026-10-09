@@ -3,7 +3,6 @@ import { createHash } from "node:crypto";
 import test from "node:test";
 import policy from "./policy.json" with { type: "json" };
 import { gradeTrial } from "./grader.mjs";
-import { normalize } from "./datasets/offline.mjs";
 import { summarizeQualification } from "./policy.mjs";
 
 function evidence() {
@@ -153,46 +152,6 @@ test("missing trials, duplicate attempts, changed policy, and leaked oracle labe
     change(run);
     assert.deepEqual(summarizeQualification(run.manifest, run.trials).qualifiedCandidates, []);
   }
-});
-
-test("Saved-page selection passes count and a lost baseline pass blocks release", () => {
-  const { manifest, trials } = releaseEvidence();
-  const spec = manifest.cases.at(-1),
-    trial = trials.at(-1);
-  spec.track = "offline-selection";
-  spec.expected = {
-    outcome: "found",
-    actions: [{ step: 1, outcome: "found", target: { candidateId: "c1" } }],
-  };
-  for (const arm of [trial, trial.baseline]) {
-    arm.result = normalize(
-      {
-        outcome: "found",
-        action: "click",
-        actions: [{ step: 1, action: "click", outcome: "found", candidateId: "c1" }],
-      },
-      arm.id,
-    );
-    delete arm.observation;
-  }
-  assert.equal(gradeTrial(spec, trial).metrics.processingComplete, null);
-  let summary = summarizeQualification(manifest, trials);
-  let qualification = summary.profiles.candidate.qualification;
-  assert.deepEqual(summary.qualifiedCandidates, ["candidate"]);
-  assert.deepEqual(qualification.groups["offline-selection"], { passed: 1, total: 1, rate: 1 });
-  assert.equal(qualification.comparison.groups["offline-selection"].baseline.correct, 1);
-  assert.equal(qualification.correctness.passed, manifest.cases.length);
-  assert.equal(
-    trial.result.summary,
-    undefined,
-    "Source selection must not invent browser completeness",
-  );
-  trial.result.actions[0].target.candidateId = "wrong";
-  summary = summarizeQualification(manifest, trials);
-  qualification = summary.profiles.candidate.qualification;
-  assert.deepEqual(summary.qualifiedCandidates, []);
-  assert.deepEqual(qualification.comparison.regressions, [spec.id]);
-  assert.deepEqual(qualification.groups["offline-selection"], { passed: 0, total: 1, rate: 0 });
 });
 
 test("provider evidence errors block release while accounting warnings stay descriptive", () => {

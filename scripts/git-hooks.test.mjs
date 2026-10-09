@@ -37,7 +37,7 @@ function repository(t) {
 }
 
 test("local command selection reuses CI ownership and excludes integration/paid runs", () => {
-  assert.deepEqual(checkCommands(["docs/runtime.md"]), []);
+  assert.deepEqual(checkCommands(["README.md"]), []);
   assert.deepEqual(checkCommands(["src/Web/src/App.tsx"]), [["pnpm", "check:web"]]);
   assert.deepEqual(checkCommands([".githooks/commit-msg"]), [["pnpm", "check:tooling"]]);
   assert.equal(classifyChanges([".githooks/pre-commit"]).tooling, true);

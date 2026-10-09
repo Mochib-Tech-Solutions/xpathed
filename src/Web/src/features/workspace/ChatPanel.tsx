@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import type { Resolution, ResolutionResult, ShadowHost } from "./api";
 import ResolutionCost from "./ResolutionCost";
+import ExecuteAction from "./ExecuteAction";
 
 function MessageTime({ value, label }: { value: string; label: string }) {
   const date = new Date(value);
@@ -108,6 +109,8 @@ const instructionTitles: Record<string, string> = {
 
 type Props = {
   instruction: string;
+  includeImage: boolean;
+  onIncludeImageChange: (includeImage: boolean) => void;
   history: Resolution[];
   ready: boolean;
   disabled: boolean;
@@ -117,10 +120,13 @@ type Props = {
   onResolve: (instruction?: string) => void;
   onReset: () => void;
   onSpotlight: (resolution: Resolution, actionId: string | null) => void;
+  onExecute: (resolution: Resolution, actionId: string, value?: string) => void;
 };
 
 export default function ChatPanel({
   instruction,
+  includeImage,
+  onIncludeImageChange,
   history,
   ready,
   disabled,
@@ -130,6 +136,7 @@ export default function ChatPanel({
   onResolve,
   onReset,
   onSpotlight,
+  onExecute,
 }: Props) {
   const [copied, setCopied] = useState("");
   const [copyError, setCopyError] = useState<{ entryId: string; message: string } | null>(null);
@@ -313,6 +320,7 @@ export default function ChatPanel({
                 </div>
                 <div className="flex items-center gap-2 px-1 text-xs text-muted-foreground">
                   <span>You</span>
+                  {resolution.includedImage && <span>Screenshot included</span>}
                   <MessageTime value={resolution.createdAt} label="Sent" />
                 </div>
               </div>
@@ -524,6 +532,12 @@ export default function ChatPanel({
                                 {copyError.message}
                               </p>
                             )}
+                            <ExecuteAction
+                              entry={resolution}
+                              action={action}
+                              disabled={disabled}
+                              onExecute={onExecute}
+                            />
                             <div className="space-y-2 border-t border-border/70 pt-3">
                               <h3 className="text-xs font-medium">Verification</h3>
                               {target.interactability?.reasons.map((reason) => (
@@ -620,6 +634,21 @@ export default function ChatPanel({
       >
         <p id="instruction-scope" className="px-3 pt-2 text-xs text-muted-foreground">
           Current view only
+        </p>
+        <label className="mx-3 mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+          <input
+            type="checkbox"
+            checked={includeImage}
+            onChange={(event) => onIncludeImageChange(event.currentTarget.checked)}
+            disabled={disabled || resolving}
+            aria-describedby="screenshot-sharing"
+            className="accent-primary"
+          />
+          Include screenshot with this request
+        </label>
+        <p id="screenshot-sharing" className="px-3 pt-1 text-xs text-muted-foreground">
+          Masks detected form fields. Other visible content, including inaccessible controls, is
+          sent to the model provider.
         </p>
         <textarea
           ref={composer}

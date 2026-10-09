@@ -1,8 +1,9 @@
 using Microsoft.Playwright;
+using Xpathed.Common.Contracts;
 
 namespace Xpathed.Browser.Sessions;
 
-internal sealed class ChromiumPageDisplay(IPage page) : IBrowserPageDisplay
+internal sealed class ChromiumPageDisplay(IPage page, BrowserResolution resolution) : IBrowserPageDisplay
 {
     private const string FocusWorld = "xpathed-view-state";
     private const string FocusBinding = "xpathedFocus";
@@ -78,8 +79,8 @@ internal sealed class ChromiumPageDisplay(IPage page) : IBrowserPageDisplay
         if (
             bounds.GetProperty("left").GetInt32() != 0
             || bounds.GetProperty("top").GetInt32() != 0
-            || Math.Abs(bounds.GetProperty("width").GetInt32() - 1280) > 1
-            || Math.Abs(bounds.GetProperty("height").GetInt32() - 800) > 1
+            || bounds.GetProperty("width").GetInt32() != resolution.Width
+            || bounds.GetProperty("height").GetInt32() != resolution.Height
         )
         {
             await protocol.SendAsync(
@@ -95,8 +96,8 @@ internal sealed class ChromiumPageDisplay(IPage page) : IBrowserPageDisplay
                     {
                         left = 0,
                         top = 0,
-                        width = 1280,
-                        height = 800,
+                        width = resolution.Width,
+                        height = resolution.Height,
                     },
                 }
             );
@@ -106,6 +107,11 @@ internal sealed class ChromiumPageDisplay(IPage page) : IBrowserPageDisplay
             new Dictionary<string, object> { ["windowId"] = windowId, ["bounds"] = new { windowState = "fullscreen" } }
         );
         await page.BringToFrontAsync();
+        await page.WaitForFunctionAsync(
+            "size => innerWidth === size.width && innerHeight === size.height && outerWidth === size.width && outerHeight === size.height",
+            new { width = resolution.Width, height = resolution.Height },
+            new() { Timeout = 5000 }
+        );
     }
 
     public async Task<bool> HasNativeFocusAsync()

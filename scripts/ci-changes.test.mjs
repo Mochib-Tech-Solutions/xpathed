@@ -69,7 +69,7 @@ for (const [path, expected] of [
     "tests/Resolver.Tests/ResolutionContractTests.cs",
     { ...none, dotnet: ["Resolver"], browser: true },
   ],
-  ["docs/runtime.md", none],
+  ["README.md", none],
   ["src/Web/src/features/browser/App.tsx", { ...none, web: true }],
   ["src/Web/package.json", { ...none, web: true }],
   ["pnpm-lock.yaml", { ...none, web: true, tooling: true, browser: true }],

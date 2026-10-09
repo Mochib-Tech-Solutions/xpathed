@@ -65,7 +65,6 @@ function coverage(value) {
 }
 
 export function gradeTrial(caseSpec, trial) {
-  const offline = caseSpec.track === "offline-selection";
   const failures = [];
   const fail = (category, detail) => failures.push({ category, detail });
   const expected = caseSpec.expected;
@@ -299,72 +298,51 @@ export function gradeTrial(caseSpec, trial) {
           }
           selectedTargets.add(action.target.candidateId);
         }
-        if (offline) {
-          const target = action.target;
-          if (!object(target) || Object.keys(target).some((key) => key !== "candidateId"))
-            fail(
-              "contract",
-              "Saved-page selection cannot claim browser XPath, geometry or readiness evidence.",
-            );
-          if (
-            typeof target?.candidateId !== "string" ||
-            target.candidateId !== label?.target?.candidateId
-          ) {
-            metrics.wrongTargets++;
-            fail(
-              "target_identity",
-              `Target ${index + 1} differs from its independent source mapping.`,
-            );
-          } else if (!duplicateTarget) metrics.targetsCorrect++;
-        } else {
-          if (
-            !object(action.target?.state) ||
-            [
-              "rendered",
-              "inViewport",
-              "enabled",
-              "editable",
-              "accessibilityExposed",
-              "readonly",
-            ].some((key) => typeof action.target.state[key] !== "boolean") ||
-            action.target?.interactability?.action !== action.action
-          )
-            fail("contract", `Action ${index + 1} must return matching action interactability.`);
-          const paths = action.target?.xpaths;
-          const matches = trial.observation?.actions?.[index]?.matches;
-          if (
-            !Array.isArray(paths) ||
-            paths.length !== 1 ||
-            typeof paths[0] !== "string" ||
-            !paths[0].trim()
-          )
-            fail("contract", `Action ${index + 1} must return exactly one XPath.`);
-          const correct =
-            Array.isArray(paths) &&
-            paths.length > 0 &&
-            Array.isArray(matches) &&
-            matches.length === paths.length &&
-            matches.every((match) => match?.count === 1 && match.intended === true);
-          if (!correct) {
-            fail(
-              "target_identity",
-              `Action ${index + 1} does not uniquely identify the intended node.`,
-            );
-            metrics.wrongTargets++;
-          } else if (label?.outcome === "found" && !duplicateTarget) metrics.targetsCorrect++;
-        }
+
+        if (
+          !object(action.target?.state) ||
+          [
+            "rendered",
+            "inViewport",
+            "enabled",
+            "editable",
+            "accessibilityExposed",
+            "readonly",
+          ].some((key) => typeof action.target.state[key] !== "boolean") ||
+          action.target?.interactability?.action !== action.action
+        )
+          fail("contract", `Action ${index + 1} must return matching action interactability.`);
+        const paths = action.target?.xpaths;
+        const matches = trial.observation?.actions?.[index]?.matches;
+        if (
+          !Array.isArray(paths) ||
+          paths.length !== 1 ||
+          typeof paths[0] !== "string" ||
+          !paths[0].trim()
+        )
+          fail("contract", `Action ${index + 1} must return exactly one XPath.`);
+        const correct =
+          Array.isArray(paths) &&
+          paths.length > 0 &&
+          Array.isArray(matches) &&
+          matches.length === paths.length &&
+          matches.every((match) => match?.count === 1 && match.intended === true);
+        if (!correct) {
+          fail(
+            "target_identity",
+            `Action ${index + 1} does not uniquely identify the intended node.`,
+          );
+          metrics.wrongTargets++;
+        } else if (label?.outcome === "found" && !duplicateTarget) metrics.targetsCorrect++;
       } else if (action.target != null) {
         fail("contract", `Action ${index + 1} returned a target for a non-found outcome.`);
       }
       if (label?.state) {
-        if (offline) fail("contract", "Historical state is unavailable in Saved-page selection.");
         if (!matchesPartial(action.target?.state, label.state))
           fail("target_state", `Action ${index + 1} state differs from its label.`);
         else metrics.stateCorrect++;
       }
       if (label?.interactability) {
-        if (offline)
-          fail("contract", "Historical readiness is unavailable in Saved-page selection.");
         if (!matchesPartial(action.target?.interactability, label.interactability))
           fail("interactability", `Action ${index + 1} readiness differs from its label.`);
         else metrics.readinessCorrect++;
@@ -546,55 +524,6 @@ function aggregate(entries) {
   };
 }
 
-function datasetForecast(manifest, trials) {
-  const measured = trials.filter(
-    (trial) =>
-      number(trial.result?.diagnostics?.usage?.inputTokens) !== null &&
-      number(trial.result?.diagnostics?.usage?.outputTokens) !== null,
-  );
-  const mean = (key) =>
-    measured.length
-      ? measured.reduce((sum, trial) => sum + trial.result.diagnostics.usage[key], 0) /
-        measured.length
-      : null;
-  const input = mean("inputTokens"),
-    output = mean("outputTokens");
-  const pricing = manifest.pricing;
-  const perRecord =
-    input !== null && pricing
-      ? input * Number(pricing.prompt) +
-        output * Number(pricing.completion) +
-        Number(pricing.request ?? 0)
-      : null;
-  return {
-    basis:
-      "Sample mean tokens at recorded route prices; extrapolation, not a spending authorization or worst-case bound",
-    sampleSelection: manifest.selection,
-    measuredTrials: measured.length,
-    inputTokensPerRecord: input,
-    outputTokensPerRecord: output,
-    repetitions: manifest.plan.repetitions,
-    pricing: pricing ?? null,
-    splits: Object.fromEntries(
-      Object.entries(manifest.inventory?.splits ?? {}).map(([split, inventory]) => {
-        const eligible = inventory.statuses?.["offline-eligible"] ?? 0;
-        return [
-          split,
-          {
-            eligible,
-            projectedUsd:
-              perRecord === null ? null : eligible * perRecord * manifest.plan.repetitions,
-            limitation:
-              split === manifest.selection?.split
-                ? "Pilot may not represent the full split"
-                : "Extrapolated from another split; no held-out inference was performed",
-          },
-        ];
-      }),
-    ),
-  };
-}
-
 export function summarize(manifest, trials) {
   const cases = new Map(manifest.cases.map((caseSpec) => [caseSpec.id, caseSpec]));
   const order = manifest.plan.caseOrder;
@@ -679,14 +608,6 @@ export function summarize(manifest, trials) {
     qualification: "incomplete",
     mode: manifest.mode ?? "unavailable",
     modelQualityMeasured: manifest.mode === "live",
-    ...(manifest.track === "offline-selection"
-      ? {
-          inventory: manifest.inventory,
-          forecast: datasetForecast(manifest, trials),
-          measurement: manifest.measurement,
-          unavailable: manifest.unavailable,
-        }
-      : {}),
     plannedTrials: planned.size,
     completedTrials,
     missingTrials: planned.size - completedTrials,

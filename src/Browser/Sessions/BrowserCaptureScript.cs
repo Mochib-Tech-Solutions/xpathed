@@ -16,10 +16,25 @@ internal static class BrowserCaptureScript
             for (let current = element; current; current = parent(current)) if (current === ancestor) return true;
             return false;
           };
+          let closestCache = new Map();
+          const privacyDependencies = new Set();
+          const privacySource = (element, value) => {
+            if (value) privacyDependencies.add(element);
+            return value;
+          };
           const closest = (element, selector) => {
-            for (let current = element; current; current = parent(current)) {
-              checkBudget(); if (current.matches(selector)) return current;
+            checkBudget();
+            if (!closestCache.has(selector)) closestCache.set(selector, new WeakMap());
+            const cache = closestCache.get(selector), ancestors = [];
+            let current = element;
+            while (current && !cache.has(current)) {
+              checkBudget(); ancestors.push(current);
+              if (current.matches(selector)) break;
+              current = parent(current);
             }
+            const match = current ? cache.has(current) ? cache.get(current) : current : undefined;
+            for (const ancestor of ancestors) cache.set(ancestor, match);
+            return match;
           };
           const activeElement = () => {
             let element = document.activeElement;
@@ -41,13 +56,17 @@ internal static class BrowserCaptureScript
           const capturedRoot = document.documentElement;
           const budgetExceeded = {};
           let deadline = Infinity;
-          const checkBudget = () => { if (performance.now() > deadline) throw budgetExceeded; };
+          const checkBudget = () => { if (deadline !== Infinity && performance.now() > deadline) throw budgetExceeded; };
           let styleCache = new WeakMap();
           let textCache = new WeakMap();
           let labelCache = new WeakMap();
           let exposureCache = new WeakMap();
           let intersections = new WeakMap();
           let siblingShapes = new WeakMap();
+          const clearDerivedCaches = () => {
+            closestCache = new Map(); styleCache = new WeakMap(); textCache = new WeakMap();
+            labelCache = new WeakMap(); exposureCache = new WeakMap(); siblingShapes = new WeakMap();
+          };
           let modalityUnknown = false, modalityBudgetExceeded = false;
           const currentModal = () => {
             const modals = [];
@@ -65,7 +84,7 @@ internal static class BrowserCaptureScript
           const normalize = value => (value ?? '').replace(/\s+/gu, ' ').trim().normalize('NFC');
           const valueContainer = 'input,textarea,select,[contenteditable]:not([contenteditable="false"])';
           const buttonInput = 'input[type=button],input[type=submit],input[type=reset]';
-          const ignored = 'script,style,noscript,template';
+          const ignored = 'script,style,noscript,template,[data-private],[data-sensitive]';
           const cssFor = element => {
             if (!styleCache.has(element)) styleCache.set(element, getComputedStyle(element));
             return styleCache.get(element);
@@ -100,8 +119,9 @@ internal static class BrowserCaptureScript
             }
             return true;
           };
-          const nameText = (reference, references) => reference ? normalize(reference.getAttribute('aria-label')) ||
-            normalize(reference.getAttribute('alt')) || text(reference, !accessibilityExposed(reference), references) : '';
+          const nameText = (reference, references) => reference && !closest(reference, ignored) ? privacySource(reference,
+            normalize(reference.getAttribute('aria-label')) || normalize(reference.getAttribute('alt')) ||
+            text(reference, !accessibilityExposed(reference), references)) : '';
           const text = (element, includeHidden = false, references = new Set()) => {
             if (!element || element.matches(valueContainer) || closest(element, ignored)) return '';
             if (references.has(element)) return '';
@@ -122,13 +142,13 @@ internal static class BrowserCaptureScript
               const node = pending.pop();
               const parent = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
               if (!parent || closest(parent, `${valueContainer},${ignored}`) || !includeHidden && !accessibilityExposed(parent)) continue;
-              if (node.nodeType === Node.TEXT_NODE) parts.push(node.textContent);
+              if (node.nodeType === Node.TEXT_NODE) parts.push(privacySource(parent, node.textContent));
               else if (node.nodeType === Node.ELEMENT_NODE) {
                 const referencedName = normalize((node.getAttribute('aria-labelledby') ?? '').split(/\s+/u)
                   .map(id => nameText(parent.getRootNode().getElementById(id), references)).join(' '));
                 if (referencedName) parts.push(referencedName);
-                else if (normalize(node.getAttribute('aria-label'))) parts.push(node.getAttribute('aria-label'));
-                else if (node.localName === 'img') parts.push(node.getAttribute('alt'));
+                else if (normalize(node.getAttribute('aria-label'))) parts.push(privacySource(node, node.getAttribute('aria-label')));
+                else if (node.localName === 'img') parts.push(privacySource(node, node.getAttribute('alt')));
                 else children(node);
               }
             }
@@ -143,6 +163,7 @@ internal static class BrowserCaptureScript
               normalize(element.getAttribute('alt')) || (element.matches(buttonInput) ? normalize(element.value) : '') ||
               (element.matches('button,a[href],summary,[role=button],[role=checkbox],[role=radio]') ? text(element) : '') || normalize(element.getAttribute('title'));
             labelCache.set(element, result);
+            privacySource(element, result);
             return result;
           };
           const scope = element => {
@@ -197,7 +218,13 @@ internal static class BrowserCaptureScript
                 for (const element of pending) observer.observe(element);
               });
               checkBudget();
-            } finally { clearTimeout(timeout); observer?.disconnect(); }
+            } finally {
+              clearTimeout(timeout); observer?.disconnect();
+              // Page scripts can mutate ancestry or privacy attributes while observation awaits a rendering update.
+              clearDerivedCaches();
+              privacyDependencies.clear();
+              modal = currentModal();
+            }
           };
           const visibleRect = element => {
             const rect = intersections.get(element);
@@ -224,7 +251,7 @@ internal static class BrowserCaptureScript
           };
           const reset = (budgetMs = Infinity) => {
             deadline = performance.now() + budgetMs;
-            styleCache = new WeakMap(); textCache = new WeakMap(); labelCache = new WeakMap(); exposureCache = new WeakMap(); siblingShapes = new WeakMap();
+            clearDerivedCaches();
             modal = currentModal();
           };
           const state = element => {
@@ -384,11 +411,15 @@ internal static class BrowserCaptureScript
             }
             if (complete) {
               await observeIntersections([...nodes, ...frameElements, ...scrollContainers.map(([element]) => element)]);
+              complete = !modalityUnknown && !modalityBudgetExceeded;
+              if (!complete) throw budgetExceeded;
               if (!viewUnchanged()) { viewChanged = true; throw budgetExceeded; }
-              const retained = nodes.filter(inView);
-              excludedOffscreenCount = nodes.length - retained.length;
+              const eligibleNodes = nodes.filter(element => element.isConnected && eligible(element));
+              eligibleCount = eligibleNodes.length;
+              const retained = eligibleNodes.filter(inView);
+              excludedOffscreenCount = eligibleNodes.length - retained.length;
               nodes.length = 0; nodes.push(...retained);
-              const retainedFrames = frameElements.filter(inView);
+              const retainedFrames = frameElements.filter(element => element.isConnected && accessibilityExposed(element) && inView(element));
               frameElements.length = 0; frameElements.push(...retainedFrames);
               const relevantAncestors = new Set();
               for (const node of [...nodes, ...frameElements]) {
@@ -401,6 +432,8 @@ internal static class BrowserCaptureScript
                 if (!inView(element) && !relevantAncestors.has(element)) scrollContainers.splice(index, 1);
               }
               nodes.forEach((element, index) => nodeIds.set(element, `${frame.id}:c${index + 1}`));
+              // Keep only sources read for serialized candidates, not offscreen eligibility checks.
+              privacyDependencies.clear(); textCache = new WeakMap(); labelCache = new WeakMap();
               for (const element of nodes) {
                 checkBudget();
                 const candidate = describe(element, candidates.length);
@@ -578,6 +611,12 @@ internal static class BrowserCaptureScript
           } catch (error) { if (error !== budgetExceeded) throw error; complete = false; candidates.length = 0; }
           return {
             frameElements,
+            privacyUnchanged() {
+              deadline = Infinity;
+              closestCache = new Map();
+              return frameElements.every(element => element.isConnected && element.ownerDocument === capturedDocument) &&
+                [...nodes, ...frameElements, ...privacyDependencies].every(element => !closest(element, '[data-private],[data-sensitive]'));
+            },
             highlightNodes(ids) {
               return ids.map(id => {
                 const node = nodes[candidates.findIndex(candidate => candidate.id === id)];
@@ -626,9 +665,7 @@ internal static class BrowserCaptureScript
               coverage: { scannedCount, eligibleCount, excludedOffscreenCount, capturedCount: candidates.length, complete, errorCode: complete ? null : viewChanged ? 'capture_view_changed' : modalityUnknown ? 'capture_exposure_unknown' : 'capture_incomplete' }, unsupportedBoundaryCount },
             select(candidateId, action, budgetMs = 2000) {
               try {
-              deadline = performance.now() + budgetMs;
-              styleCache = new WeakMap(); textCache = new WeakMap(); labelCache = new WeakMap(); exposureCache = new WeakMap();
-              modal = currentModal();
+              reset(budgetMs);
               if (modalityUnknown) return { errorCode: 'capture_exposure_unknown' };
               if (capturedDocument !== document) return { errorCode: 'stale_document' };
               if (!complete) return { errorCode: 'capture_incomplete' };

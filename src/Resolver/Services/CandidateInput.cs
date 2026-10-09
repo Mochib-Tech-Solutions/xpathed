@@ -83,9 +83,9 @@ internal static class CandidateInput
         return JsonSerializer.Serialize(
             new
             {
-                instruction,
                 scope = capture.Scope,
                 capture.FrameId,
+                viewport = capture.Image is { } image ? new { image.Width, image.Height } : null,
                 layout = items.Length == 0
                     ? null
                     : items.Select(item => new
@@ -103,6 +103,7 @@ internal static class CandidateInput
                     }),
                 context = context.Count == 0 ? null : context,
                 candidates,
+                instruction,
             },
             JsonOptions
         );

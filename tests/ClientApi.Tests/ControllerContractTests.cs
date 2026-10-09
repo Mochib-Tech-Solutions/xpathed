@@ -50,6 +50,25 @@ public sealed class ControllerContractTests
     }
 
     [Theory]
+    [InlineData(HttpStatusCode.OK, "{\"actionId\":\"a1\",\"status\":\"completed\"}")]
+    [InlineData(HttpStatusCode.Conflict, "{\"code\":\"stale_capture\"}")]
+    public async Task ExecutionForwardsDirectlyToBrowser(HttpStatusCode status, string result)
+    {
+        const string body =
+            "{\"sessionId\":\"session\",\"documentId\":\"doc\",\"captureId\":\"capture\",\"actionId\":\"a1\",\"value\":\"test-value\"}";
+        using var upstream = new ResolverHandler(status, result);
+        await using var app = Application(upstream, "browser");
+        using var client = app.CreateClient();
+        using var content = new StringContent(body, Encoding.UTF8, "application/json");
+        using var response = await client.PostAsync("/api/pages/page-1/execute", content);
+        Assert.Equal("/pages/page-1/execute", upstream.Path);
+        Assert.Equal(HttpMethod.Post, upstream.Method);
+        Assert.Equal(body, upstream.Body);
+        Assert.Equal(status, response.StatusCode);
+        Assert.Equal(result, await response.Content.ReadAsStringAsync());
+    }
+
+    [Theory]
     [InlineData("GET", "/api/sessions/options", "/sessions/options", null, HttpStatusCode.OK)]
     [InlineData("POST", "/api/sessions", "/sessions", "{\"browserType\":\"firefox\"}", HttpStatusCode.OK)]
     [InlineData("POST", "/api/sessions", "/sessions", "{\"browserType\":\"webkit\"}", HttpStatusCode.BadRequest)]

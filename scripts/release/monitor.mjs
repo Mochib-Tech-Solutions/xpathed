@@ -49,7 +49,6 @@ async function main() {
         stdio: "inherit",
         env: { ...process.env, XPATHED_ENV_FILE: "/dev/null" },
       });
-    run("evaluation/datasets/collection.mjs", ["fetch"]);
     await mkdir(join(source, ".artifacts"), { recursive: true });
     await rename(downloaded.directory, join(source, ".artifacts/monitor-bundle"));
     const digest = receipt.bundleSha256;

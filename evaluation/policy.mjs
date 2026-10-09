@@ -60,7 +60,7 @@ export function summarizeQualification(manifest, trials, policy = defaultPolicy)
         return { spec, trial, correct: measuredEntry(spec, trial, profile, policy).passed };
       });
       const groups = Object.fromEntries(
-        ["browser", "offline-selection"].map((track) => {
+        ["browser"].map((track) => {
           const selected = records.filter(({ spec }) => (spec.track ?? "browser") === track);
           return [
             track,

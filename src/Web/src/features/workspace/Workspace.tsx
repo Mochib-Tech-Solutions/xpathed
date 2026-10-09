@@ -13,6 +13,8 @@ export default function Workspace() {
   const {
     session,
     browserType,
+    resolution,
+    setResolution,
     browserOptions,
     setBrowserType,
     page,
@@ -24,6 +26,8 @@ export default function Workspace() {
     address,
     addressFocus,
     instruction,
+    includeImage,
+    setIncludeImage,
     history,
     busy,
     error,
@@ -34,6 +38,7 @@ export default function Workspace() {
     setInstruction,
     resetChat,
     spotlight,
+    execute,
     setAddress,
     dismissError,
   } = useWorkspace();
@@ -91,6 +96,8 @@ export default function Workspace() {
         <ChatPanel
           key={page?.pageId ?? "closed"}
           instruction={instruction}
+          includeImage={includeImage}
+          onIncludeImageChange={setIncludeImage}
           history={history}
           ready={!!page && /^https?:\/\//i.test(page.url)}
           disabled={!page || !/^https?:\/\//i.test(page.url) || !!busy}
@@ -99,6 +106,7 @@ export default function Workspace() {
           onResolve={resolve}
           onReset={resetChat}
           onSpotlight={spotlight}
+          onExecute={execute}
           resetDisabled={!page || !!busy}
         />
         <section
@@ -119,6 +127,9 @@ export default function Workspace() {
             browserType={browserType}
             browserTypes={browserOptions?.browserTypes ?? []}
             onBrowserTypeChange={setBrowserType}
+            resolution={resolution}
+            resolutions={browserOptions?.resolutions ?? []}
+            onResolutionChange={setResolution}
             canStart={!!session || !!browserOptions}
             pageUrl={page?.url}
             address={address}

@@ -83,9 +83,24 @@ const server = createServer(async (request, response) => {
         "/two-buttons",
         "/frames",
         "/shadow",
+        "/visual",
       ].includes(path)
     ) {
       let html = fixture;
+      if (path === "/visual") {
+        const triangle =
+          '<svg aria-hidden="true" width="64" height="64" viewBox="0 0 64 64"><path fill="#2563eb" d="M32 6 60 58H4Z"/></svg>';
+        html = html.replace(
+          /<nav.*?<\/nav>/s,
+          `<style>body{font-family:sans-serif}section{margin:20px;padding:12px;border:1px solid #555}button{width:100px;height:90px;margin:8px;background:#fff;border:2px solid #555;border-radius:8px}</style>
+           <section aria-label="Primary controls"><h2>Primary controls</h2>
+             <button aria-label="Option A" data-oracle="visual-circle"><svg aria-hidden="true" width="64" height="64"><circle fill="#dc2626" cx="32" cy="32" r="26"/></svg></button>
+             <button aria-label="Option B" data-oracle="visual-primary">${triangle}</button>
+             <button aria-label="Option C" data-oracle="visual-square"><svg aria-hidden="true" width="64" height="64"><rect fill="#2563eb" x="6" y="6" width="52" height="52"/></svg></button>
+           </section>
+           ${url.searchParams.has("duplicate") ? `<section aria-label="Secondary controls"><h2>Secondary controls</h2><button aria-label="Option D" data-oracle="visual-secondary">${triangle}</button></section>` : ""}`,
+        );
+      }
       if (path === "/login")
         html = html.replace(
           /<nav.*?<\/nav>/s,
@@ -233,7 +248,10 @@ const server = createServer(async (request, response) => {
       };
     } else if (path === "/api/v1/chat/completions") {
       providerRequest = body;
-      const input = JSON.parse(body.messages.find((message) => message.role === "user").content);
+      const content = body.messages.find((message) => message.role === "user").content;
+      const input = JSON.parse(
+        Array.isArray(content) ? content.find((part) => part.type === "text").text : content,
+      );
       const candidates = (input.capture?.candidates ?? input.candidates).map((candidate) => ({
         ...candidate,
         scope:

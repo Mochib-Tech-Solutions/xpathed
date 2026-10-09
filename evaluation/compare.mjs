@@ -1,7 +1,5 @@
 import { retiredReleaseCommit } from "./release-transition.mjs";
-import { readCollection, validateLabelReview } from "./datasets/collection.mjs";
 import { loadCases } from "./cases/load.mjs";
-import { executeOffline } from "./datasets/offline.mjs";
 import { createHash, randomUUID } from "node:crypto";
 import { mkdir, readFile, writeFile, rename } from "node:fs/promises";
 import { join, resolve } from "node:path";
@@ -118,17 +116,14 @@ export function selectQualificationCases(cases, options = {}, sourceExclusions =
   const selected = [],
     exclusions = [...sourceExclusions];
   for (const item of cases) {
-    const review = item.track === "offline-selection" ? validateLabelReview(item) : undefined;
     const reason =
-      review && review.disposition !== "validated"
-        ? `label ${review.disposition}: ${review.reason}`
-        : options.caseId && options.caseId !== item.id
-          ? "case filter"
-          : item.mutation
-            ? "saved-locator CI coverage"
-            : item.provider?.fault || item.deterministicOnly || item.expected?.outcome === "error"
-              ? "deterministic fault coverage"
-              : null;
+      options.caseId && options.caseId !== item.id
+        ? "case filter"
+        : item.mutation
+          ? "saved-locator CI coverage"
+          : item.provider?.fault || item.deterministicOnly || item.expected?.outcome === "error"
+            ? "deterministic fault coverage"
+            : null;
     if (reason) exclusions.push({ caseId: item.id, reason });
     else selected.push(item);
   }
@@ -297,18 +292,8 @@ export async function main(args = process.argv.slice(2)) {
       process.env.XPATHED_EVALUATION_SUITE ||
       new URL("./cases/index.json", import.meta.url),
   );
-  const collection = readCollection();
-  suite.cases.push(...collection.cases);
   const allCases = validateCases(suite);
-  const { cases, exclusions, sourceCases } = selectQualificationCases(
-    allCases,
-    options,
-    collection.exclusions,
-  );
-  if (!artifact && cases.some((spec) => spec.track === "offline-selection"))
-    throw new Error(
-      "Use release:evaluate with a verified image bundle to start the Saved-page selection worker",
-    );
+  const { cases, exclusions, sourceCases } = selectQualificationCases(allCases, options, []);
   if (
     options.mode === "live" &&
     cases.some(
@@ -350,7 +335,7 @@ export async function main(args = process.argv.slice(2)) {
     measurement: {
       latencyProtocol: "resolver-http",
       latency:
-        "Live-browser Resolver: complete Resolver HTTP response, independent setup and grading excluded. Saved-page selection: Resolver CLI inference process, preparation excluded.",
+        "Live-browser Resolver: complete Resolver HTTP response, independent setup and grading excluded.",
       serving: "standard",
       responseReuse: false,
       healing: false,
@@ -390,14 +375,11 @@ export async function main(args = process.argv.slice(2)) {
     };
     if (retain) await retain(trial);
     if (options.mode === "live") proxy.beginAttempt(trial.id, profile.id);
-    if (spec.track === "offline-selection")
-      await executeOffline(spec, trial, output, options.timeoutMs, reference);
-    else
-      await execute(spec, trial, options, {
-        ...services,
-        ...(reference ? { browser: "http://browser-baseline:8080" } : {}),
-        resolver: profile.resolver,
-      });
+    await execute(spec, trial, options, {
+      ...services,
+      ...(reference ? { browser: "http://browser-baseline:8080" } : {}),
+      resolver: profile.resolver,
+    });
     trial.configuration = configurationRecord(trial);
     if (options.mode === "live") {
       await proxy.awaitIdle();
@@ -433,7 +415,7 @@ export async function main(args = process.argv.slice(2)) {
       proxy = await createBudgetProxy({
         profiles: inferenceProfiles,
         ledgerPath:
-          process.env.XPATHED_BUDGET_PATH ?? resolve(".artifacts/datasets/experiment-budget.json"),
+          process.env.XPATHED_BUDGET_PATH ?? resolve(".artifacts/accounting/charges.json"),
         onRecord: (record) =>
           writeFile(
             join(output, "provider", `${record.id}.json`),

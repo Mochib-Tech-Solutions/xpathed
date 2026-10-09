@@ -44,7 +44,6 @@ jobs:
           XPATHED_ENV_FILE: /dev/null
           XPATHED_EVALUATION_PROJECT: xpathed-evaluation-${{ github.run_id }}-${{ github.run_attempt }}
         run: |
-          node evaluation/datasets/collection.mjs fetch
           node scripts/release/ci.mjs
       - name: Write the release evaluation summary
         if: success()

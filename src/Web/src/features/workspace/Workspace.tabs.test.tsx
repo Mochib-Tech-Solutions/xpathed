@@ -19,6 +19,7 @@ function browserApi() {
     pageId: "page-1",
     viewPath: "/view/session-1",
     browserType: "chromium" as const,
+    resolution: "1280x800",
   };
   let pages: PageState[] = [
     {
@@ -40,6 +41,7 @@ function browserApi() {
     activationVersion,
     viewPath: session.viewPath,
     browserType: "chromium" as const,
+    resolution: "1280x800",
     pages,
   });
   const addPage = (url = "about:blank", title = "") => {
@@ -100,7 +102,15 @@ function browserApi() {
     const path = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
     if (path === "/api/sessions/options")
       return Promise.resolve(
-        Response.json({ defaultBrowserType: "chromium", browserTypes: ["chromium", "firefox"] }),
+        Response.json({
+          defaultBrowserType: "chromium",
+          browserTypes: ["chromium", "firefox"],
+          defaultResolution: "1280x800",
+          resolutions: [
+            { id: "1280x800", width: 1280, height: 800 },
+            { id: "1920x1080", width: 1920, height: 1080 },
+          ],
+        }),
       );
     if (path === "/api/sessions") return Response.json(session);
     if (path === "/api/sessions/session-1" && snapshotFailure)

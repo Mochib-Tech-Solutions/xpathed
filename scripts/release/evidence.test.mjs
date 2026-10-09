@@ -14,7 +14,6 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { gzipSync } from "node:zlib";
 import { pathToFileURL } from "node:url";
 import test from "node:test";
 import { gradeTrial } from "../../evaluation/grader.mjs";
@@ -43,6 +42,7 @@ async function workspace(t, { qualificationPolicy = "current", bootstrapBaseline
     split: "regression",
     instruction: "Click the labelled buttons",
     fixture: "synthetic",
+    ...(i === 30 ? { deterministicOnly: true } : {}),
     review: { status: "reviewed", reviewer: "synthetic", reviewedAt: time(-5000) },
     category: "target",
     viewport: { width: 1280, height: 800 },
@@ -63,84 +63,6 @@ async function workspace(t, { qualificationPolicy = "current", bootstrapBaseline
     ? "evaluation/cases/index.json"
     : "evaluation/cases/index.json";
   write(suitePath, suite);
-  mkdirSync(join(cwd, ".artifacts/datasets"), { recursive: true });
-  const input = {
-    instruction: "Click Save",
-    candidates: [
-      { id: "c1", label: "Save" },
-      { id: "c2", label: "Cancel" },
-    ],
-  };
-  const offline = {
-    id: "offline-save",
-    dataset: "synthetic",
-    family: "synthetic/form",
-    split: "regression",
-    track: "offline-selection",
-    category: "external-target",
-    instruction: input.instruction,
-    input,
-    review: {
-      status: "reviewed",
-      reviewer: "independent-fixture-label",
-      reviewedAt: time(-5000),
-      providerSubmission: true,
-      inputHash: hash(input),
-    },
-    expected: {
-      outcome: "found",
-      actions: [{ step: 1, action: "click", outcome: "found", target: { candidateId: "c1" } }],
-    },
-  };
-  offline.labelReview = {
-    caseId: offline.id,
-    inputHash: hash(input),
-    labelHash: hash(offline.expected),
-    preparedInputHash: hash(offline.input),
-    disposition: "validated",
-    reason: "Unique named source target verified.",
-    reviewer: "fixture-source-review",
-    reviewedAt: time(-5000),
-  };
-  const secondOffline = structuredClone(offline);
-  secondOffline.id = "offline-save-second";
-  secondOffline.labelReview.caseId = secondOffline.id;
-  const offlineCases = [offline, secondOffline];
-  const dataset = gzipSync(JSON.stringify({ version: 1, cases: offlineCases }));
-  const source = {
-    sha256: hash("immutable original archive"),
-    cases: offlineCases.length + 1,
-    repository: "owner/repo",
-    tag: "data",
-    asset: "original.json.gz",
-  };
-  const excludedReview = {
-    ...offline.labelReview,
-    caseId: "excluded-source",
-    disposition: "ambiguous",
-    reason: "Two controls match.",
-  };
-  const sourceExclusions = [
-    { caseId: excludedReview.caseId, reason: "label ambiguous: Two controls match." },
-  ];
-  const audit = {
-    version: 1,
-    archiveSha256: source.sha256,
-    cases: [...offlineCases.map((spec) => spec.labelReview), excludedReview],
-  };
-  write("evaluation/datasets/labels.json", audit);
-  writeFileSync(join(cwd, ".artifacts/datasets/reviewed.json.gz"), dataset);
-  write("evaluation/datasets/collection.json", {
-    path: ".artifacts/datasets/reviewed.json.gz",
-    sha256: hash(dataset),
-    cases: offlineCases.length,
-    source,
-    labelReview: {
-      path: "evaluation/datasets/labels.json",
-      sha256: hash(readFileSync(join(cwd, "evaluation/datasets/labels.json"))),
-    },
-  });
-  cases.push(...offlineCases);
   const git = (...args) => execFileSync("git", args, { cwd, encoding: "utf8" }).trim();
   git("init", "--quiet");
   git("add", ".");
@@ -163,17 +85,13 @@ async function workspace(t, { qualificationPolicy = "current", bootstrapBaseline
     `file://${cwd}/evaluation/policy.mjs`
   );
   const defaultPolicy = policyForSuite(suite);
-  const profile = profiles.find((item) => item.id === "gemini");
+  const profile = profiles.find((item) => item.id === "configured");
   const code = await fingerprints(cwd);
   const build = (phase, pilot) => {
-    const selected = selectQualificationCases(
-      cases,
-      {
-        mode: "live",
-        splits: phase === "pilot" ? ["development"] : defaultPolicy.requiredSplits,
-      },
-      sourceExclusions,
-    );
+    const selected = selectQualificationCases(cases, {
+      mode: "live",
+      splits: phase === "pilot" ? ["development"] : defaultPolicy.requiredSplits,
+    });
     const path = `.artifacts/${phase}`;
     mkdirSync(join(cwd, path, "trials"), { recursive: true });
     const manifest = {
@@ -230,7 +148,7 @@ async function workspace(t, { qualificationPolicy = "current", bootstrapBaseline
           },
         ],
         result: {
-          configurationId: (spec.track === "offline-selection" ? "e" : "c").repeat(64),
+          configurationId: "c".repeat(64),
           action: "click",
           outcome: spec.expected.outcome,
           summary: { processingComplete: true },
@@ -244,20 +162,18 @@ async function workspace(t, { qualificationPolicy = "current", bootstrapBaseline
               ? {
                   target: {
                     candidateId: `c${step}`,
-                    ...(spec.track === "offline-selection"
-                      ? {}
-                      : {
-                          xpaths: [`//button[@id='button-${step}']`],
-                          state: {
-                            rendered: true,
-                            inViewport: true,
-                            enabled: true,
-                            editable: false,
-                            accessibilityExposed: true,
-                            readonly: false,
-                          },
-                          interactability: { action: "click" },
-                        }),
+                    ...{
+                      xpaths: [`//button[@id='button-${step}']`],
+                      state: {
+                        rendered: true,
+                        inViewport: true,
+                        enabled: true,
+                        editable: false,
+                        accessibilityExposed: true,
+                        readonly: false,
+                      },
+                      interactability: { action: "click" },
+                    },
                   },
                 }
               : {}),
@@ -267,15 +183,14 @@ async function workspace(t, { qualificationPolicy = "current", bootstrapBaseline
           actions: spec.expected.actions.map(() => ({ matches: [{ count: 1, intended: true }] })),
         },
         evidence: {
-          ...(spec.track === "offline-selection" ? { modelInput: JSON.stringify(spec.input) } : {}),
           systemPrompt: "Synthetic fixture prompt",
-          outputSchema: spec.track === "offline-selection" ? "{ }" : "{}",
+          outputSchema: "{}",
           configurationJson: JSON.stringify({
             Model: profile.model,
             Provider: profile.provider,
             Strategy: "candidate-selection",
             effective: {
-              scope: spec.track === "offline-selection" ? "offline" : "current_view",
+              scope: "current_view",
               responseCache: false,
               request: {
                 model: profile.model,
@@ -432,7 +347,7 @@ async function workspace(t, { qualificationPolicy = "current", bootstrapBaseline
   return { cwd, write, run, seal, sha, evaluation, bindArtifact };
 }
 
-test("seal, replay and archive bind distinct category configurations to exact tested artifacts", async (t) => {
+test("seal, replay and archive bind browser configurations to exact tested artifacts", async (t) => {
   const work = await workspace(t);
   const bound = work.bindArtifact();
   const sealed = bound.seal();
@@ -445,10 +360,8 @@ test("seal, replay and archive bind distinct category configurations to exact te
   assert.equal(candidate.pilot, undefined);
   assert.equal(candidate.evaluation, work.evaluation.path);
   assert.deepEqual(Object.keys(candidate.configurations).sort(), [
-    "gemini:browser",
-    "gemini:offline-selection",
+    "configured:browser",
     "release-baseline:browser",
-    "release-baseline:offline-selection",
   ]);
   assert.equal(work.run("verify", path, "--sha256", hash(bytes)).status, 0);
   const archive = ".artifacts/evidence.json.gz";
@@ -474,11 +387,8 @@ test("sealing rejects missing results, changed policy, lost passes, artifacts an
   for (const mutation of [
     "missing",
     "regression",
-    "offline-regression",
     "browser-configuration",
-    "offline-configuration",
     "baseline-browser-configuration",
-    "baseline-offline-configuration",
     "receipt",
     "bundle",
     "policy",
@@ -507,17 +417,8 @@ test("sealing rejects missing results, changed policy, lost passes, artifacts an
         trial.observation.actions[0].matches[0].intended = false;
         work.write(`${work.evaluation.path}/trials/${trial.id}.json`, trial);
       }
-      if (mutation === "offline-regression") {
-        const offlineTrial = work.evaluation.trials.find(
-          (trial) => trial.caseId === "offline-save",
-        );
-        offlineTrial.result.actions[0].target.candidateId = "c2";
-        work.write(`${work.evaluation.path}/trials/${offlineTrial.id}.json`, offlineTrial);
-      }
       if (mutation.endsWith("-configuration")) {
-        const selected = mutation.includes("offline")
-          ? work.evaluation.trials.find((item) => item.caseId === "offline-save")
-          : trial;
+        const selected = trial;
         const arm = mutation.startsWith("baseline-") ? selected.baseline : selected;
         arm.evidence.outputSchema = '{"changed":true}';
         const { configurationRecord } = await import(`file://${work.cwd}/evaluation/run.mjs`);

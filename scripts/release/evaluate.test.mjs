@@ -80,7 +80,7 @@ else if(args[0]==='compose'){
  const operation=args.find(a=>['config','down','run','up','exec'].includes(a));
  if(operation==='config'){}
  else if(operation==='down'){try{fs.unlinkSync(process.env.TEST_STATE);}catch{}if(process.env.TEST_FAIL==='cleanup'&&fs.existsSync(process.env.TEST_STATE+'.executed'))process.exit(9);}
- else if(operation==='run'){fs.accessSync('.artifacts/datasets',fs.constants.W_OK);const path=process.env.XPATHED_EVALUATION_OUTPUT+'/.mount-check';fs.writeFileSync(path,fs.readFileSync(path,'utf8')+'-ok');}
+ else if(operation==='run'){fs.accessSync('.artifacts/accounting',fs.constants.W_OK);const path=process.env.XPATHED_EVALUATION_OUTPUT+'/.mount-check';fs.writeFileSync(path,fs.readFileSync(path,'utf8')+'-ok');}
  else if(operation==='up'){if(args.includes('--build')||!args.includes('--no-build'))process.exit(91);const overlay=args.filter((a,i)=>args[i-1]==='-f').at(-1);const text=fs.readFileSync(overlay,'utf8');if(args.includes('browser-baseline')&&!text.includes('extends: {file:'))process.exit(95);if(!text.includes(ids.browser)||!text.includes(ids.resolver)||!text.includes('!reset null'))process.exit(92);fs.writeFileSync(process.env.TEST_STATE,'running');}
  else if(operation==='exec') {if(args.includes('/evaluation/compare.mjs')){fs.writeFileSync(process.env.TEST_STATE+'.executed','yes');if(process.env.TEST_FAIL==='runner')process.exit(8);}else if(args.some(a=>a.includes('sha256sum')))console.log('c'.repeat(64));}
  else process.exit(93);

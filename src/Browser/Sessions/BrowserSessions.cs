@@ -13,16 +13,28 @@ public sealed class BrowserSessions(IConfiguration configuration, ILogger<Browse
 
     private readonly string defaultBrowserType = ValidateBrowserType(configuration["DefaultBrowserType"] ?? "chromium");
 
-    public BrowserSessionOptions Options => new(defaultBrowserType, ["chromium", "firefox"]);
+    private static readonly BrowserResolution[] Resolutions =
+    [
+        new("1024x768", 1024, 768),
+        new("1280x800", 1280, 800),
+        new("1366x768", 1366, 768),
+        new("1440x900", 1440, 900),
+        new("1920x1080", 1920, 1080),
+    ];
+
+    public BrowserSessionOptions Options => new(defaultBrowserType, ["chromium", "firefox"], "1280x800", Resolutions);
 
     private static string ValidateBrowserType(string browserType) =>
         browserType is "chromium" or "firefox"
             ? browserType
             : throw new ApiException(400, "invalid_browser_type", "Choose Chromium or Firefox.");
 
-    public async Task<BrowserSession> CreateAsync(string? browserType, CancellationToken token)
+    public async Task<BrowserSession> CreateAsync(string? browserType, string? resolutionId, CancellationToken token)
     {
         browserType = ValidateBrowserType(browserType ?? defaultBrowserType);
+        var resolution =
+            Resolutions.FirstOrDefault(choice => choice.Id == (resolutionId ?? "1280x800"))
+            ?? throw new ApiException(400, "invalid_resolution", "Choose a supported browser resolution.");
         await creation.WaitAsync(token);
         BrowserSessionRuntime? session = null;
         try
@@ -37,13 +49,19 @@ public sealed class BrowserSessions(IConfiguration configuration, ILogger<Browse
                 );
             }
 
-            session = new BrowserSessionRuntime(slot, browserType, logger);
+            session = new BrowserSessionRuntime(slot, browserType, resolution, logger);
             sessions[session.Id] = session;
             await session.Gate.WaitAsync(token);
             try
             {
                 await session.StartAsync(token);
-                return new(session.Id, session.ActivePageId, session.ViewPath, session.BrowserType);
+                return new(
+                    session.Id,
+                    session.ActivePageId,
+                    session.ViewPath,
+                    session.BrowserType,
+                    session.Resolution.Id
+                );
             }
             finally
             {
@@ -277,10 +295,22 @@ public sealed class BrowserSessions(IConfiguration configuration, ILogger<Browse
                 var captureId = page.CaptureId;
                 page.Capture = new BrowserPageCapture(page);
                 var result = await page.Capture.CaptureAsync(s.Id, request.DocumentId, captureId);
+                if (request.IncludeImage)
+                {
+                    result = result with { Image = await page.Capture.CaptureImageAsync() };
+                }
                 await RequireFocusedDocumentAsync(s, page, request.DocumentId);
                 if (page.CaptureId != captureId)
                 {
                     throw new ApiException(409, "stale_capture", "This capture is no longer current.");
+                }
+                if (!await page.Capture.PrivacyUnchangedAsync())
+                {
+                    throw new ApiException(
+                        409,
+                        "stale_capture",
+                        "Private content changed while the page was captured."
+                    );
                 }
 
                 return result;
@@ -433,6 +463,89 @@ public sealed class BrowserSessions(IConfiguration configuration, ILogger<Browse
                 await page.Capture!.SpotlightAsync(candidateId);
                 await RequireCaptureAsync(session, page, request.DocumentId, request.CaptureId);
                 return true;
+            },
+            token
+        );
+
+    public Task<ActionExecutionResult> ExecuteActionAsync(
+        string pageId,
+        ExecuteActionRequest request,
+        CancellationToken token
+    ) =>
+        OnPageAsync(
+            pageId,
+            async (session, page) =>
+            {
+                if (session.Id != request.SessionId)
+                {
+                    throw new ApiException(409, "stale_session", "This action belongs to a different browser session.");
+                }
+                await RequireCaptureAsync(session, page, request.DocumentId, request.CaptureId);
+                try
+                {
+                    if (
+                        page.ActionSelections is null
+                        || !page.ActionSelections.TryGetValue(request.ActionId, out var action)
+                        || action.CandidateId is null
+                    )
+                    {
+                        throw new ApiException(
+                            409,
+                            "unknown_action",
+                            "This action has no verified target in the current capture."
+                        );
+                    }
+                    BrowserActionExecution.Validate(action.Action, request.Value);
+                    await page.ClearHighlightAsync();
+                    var validation = await ValidateActionsAsync(
+                        session,
+                        page,
+                        request.DocumentId,
+                        request.CaptureId,
+                        [action]
+                    );
+                    var target = validation.Actions[0].Target;
+                    if (
+                        target is not { State.Rendered: true, State.InViewport: true, Interactability: { } readiness }
+                        || readiness.Status is "blocked" or "unsupported"
+                        || readiness.Checks.CompatibleControl != "pass"
+                        || (action.Action is "fill" or "type" or "clear" && readiness.Checks.Keyboard != "pass")
+                    )
+                    {
+                        throw new ApiException(
+                            409,
+                            "action_not_ready",
+                            "The target is no longer ready for this action. Resolve it again."
+                        );
+                    }
+                    await using var element = await page.Capture!.RetainedTargetAsync(action.CandidateId);
+                    await RequireCaptureAsync(session, page, request.DocumentId, request.CaptureId);
+                    // Consume the capture before dispatch so an uncertain result cannot be replayed.
+                    page.InvalidateCapture();
+                    try
+                    {
+                        await BrowserActionExecution.ExecuteAsync(element, action.Action, request.Value);
+                        return new ActionExecutionResult(
+                            request.ActionId,
+                            action.Action,
+                            "completed",
+                            "Browser action completed. Check the page for the result."
+                        );
+                    }
+                    catch (Exception error) when (error is PlaywrightException or TimeoutException)
+                    {
+                        return new ActionExecutionResult(
+                            request.ActionId,
+                            action.Action,
+                            "uncertain",
+                            "The browser could not confirm completion. Check the page before resolving again."
+                        );
+                    }
+                }
+                finally
+                {
+                    await page.ClearCaptureAsync();
+                }
             },
             token
         );

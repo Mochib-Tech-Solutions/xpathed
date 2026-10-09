@@ -26,7 +26,7 @@ const releaseArtifact = (sourceSha) => ({
   version: 1,
   bundleManifestSha256: "b".repeat(64),
   sourceSha,
-  profileId: "gemini",
+  profileId: "configured",
   platform: { os: "linux", architecture: "amd64" },
   images: ["browser", "resolver"].map((component, index) => ({
     component,
@@ -81,10 +81,16 @@ test("replay preserves absent planned attempts and rejects swapped trial identit
   ])
     files[path] = digest(await readFile(new URL(`../${path}`, import.meta.url), "utf8"));
   const spec = loadCases().cases[0];
-  const planned = { id: "test", caseId: spec.id, profileId: "gemini", repetition: 1, attempt: 1 };
+  const planned = {
+    id: "test",
+    caseId: spec.id,
+    profileId: "configured",
+    repetition: 1,
+    attempt: 1,
+  };
   const manifest = {
     kind: "model-qualification",
-    profiles: [{ id: "gemini" }],
+    profiles: [{ id: "configured" }],
     cases: [spec],
     plan: { trials: [planned] },
     code: { files },
@@ -100,7 +106,7 @@ test("replay preserves absent planned attempts and rejects swapped trial identit
   await writeFile(join(directory, "trials", "test.json"), JSON.stringify(planned));
   assert.equal((await readRun(directory)).trials.length, 1);
   manifest.code.revision = "a".repeat(40);
-  manifest.profiles = [{ id: "gemini" }];
+  manifest.profiles = [{ id: "configured" }];
   const artifact = releaseArtifact(manifest.code.revision);
   manifest.qualification = { artifact };
   delete manifest.contentHash;
@@ -151,7 +157,7 @@ test("a changed prepared input is retained without starting the paired baseline"
 
 test("release selection reuses every reviewed current case without a phase or split gate", () => {
   const options = parseQualificationOptions([]);
-  assert.deepEqual(options.profileIds, ["gemini"]);
+  assert.deepEqual(options.profileIds, ["configured"]);
   for (const args of [
     ["--phase", "pilot"],
     ["--pilot", "previous"],
@@ -162,78 +168,40 @@ test("release selection reuses every reviewed current case without a phase or sp
   const cases = [
     { id: "new", split: "held-out" },
     { id: "regression", split: "regression" },
-    {
-      id: "offline",
-      track: "offline-selection",
-      instruction: "Find Save",
-      input: { instruction: "Find Save", candidates: [{ id: "c1" }] },
-      expected: { actions: [{ outcome: "found", target: { candidateId: "c1" } }] },
-    },
     { id: "mutation", mutation: {} },
     { id: "fault", provider: { fault: "timeout" } },
   ];
-  const offline = cases.find((item) => item.id === "offline");
-  offline.labelReview = {
-    caseId: offline.id,
-    inputHash: createHash("sha256").update(JSON.stringify(offline.input)).digest("hex"),
-    labelHash: createHash("sha256").update(JSON.stringify(offline.expected)).digest("hex"),
-    preparedInputHash: createHash("sha256").update(JSON.stringify(offline.input)).digest("hex"),
-    disposition: "validated",
-    reason: "Source target verified.",
-    reviewer: "fixture-review",
-    reviewedAt: "2026-10-03T00:00:00Z",
-  };
-  const quarantined = {
-    ...offline,
-    labelReview: {
-      ...offline.labelReview,
-      disposition: "ambiguous",
-      reason: "Two equally matching targets.",
-    },
-  };
-  assert.match(
-    selectQualificationCases([cases[0], quarantined]).exclusions[0].reason,
-    /label ambiguous/,
-  );
-  assert.throws(
-    () => selectQualificationCases([{ ...offline, labelReview: undefined }]),
-    /label review/,
-  );
   const selected = selectQualificationCases(cases, options);
   assert.deepEqual(
     selected.cases.map((c) => c.id),
-    ["new", "regression", "offline"],
+    ["new", "regression"],
   );
   assert.equal(selected.exclusions.length, 2);
   const sourceExclusions = [
     { caseId: "removed-source", reason: "label incorrect: Contradicts the instruction." },
   ];
-  const filtered = selectQualificationCases(
-    cases,
-    { ...options, caseId: "offline" },
-    sourceExclusions,
-  );
-  assert.equal(filtered.sourceCases, 6);
+  const filtered = selectQualificationCases(cases, { ...options, caseId: "new" }, sourceExclusions);
+  assert.equal(filtered.sourceCases, 5);
   assert.equal(filtered.cases.length, 1);
-  assert.equal(filtered.exclusions.length, 5);
+  assert.equal(filtered.exclusions.length, 4);
   assert.deepEqual(filtered.exclusions[0], sourceExclusions[0]);
   assert.deepEqual(sourceExclusions, [
     { caseId: "removed-source", reason: "label incorrect: Contradicts the instruction." },
   ]);
   const plan = buildMatrixPlan(selected.cases, [{ id: "candidate" }], options);
-  assert.equal(plan.trials.length, 3);
+  assert.equal(plan.trials.length, 2);
   assert.equal(plan.retries, 0);
 });
 test("artifact identities must bind both components to the tested source and profile", () => {
   const sha = "a".repeat(40),
     artifact = releaseArtifact(sha);
-  assert.equal(validateReleaseArtifact(artifact, sha, ["gemini"]), artifact);
+  assert.equal(validateReleaseArtifact(artifact, sha, ["configured"]), artifact);
   for (const broken of [
     { ...artifact, sourceSha: "b".repeat(40) },
     { ...artifact, images: artifact.images.slice(0, 1) },
     { ...artifact, profileId: "unknown" },
   ])
-    assert.throws(() => validateReleaseArtifact(broken, sha, ["gemini"]));
+    assert.throws(() => validateReleaseArtifact(broken, sha, ["configured"]));
 });
 
 test("nightly requires independent live generation IDs without matching the saved reference IDs", () => {

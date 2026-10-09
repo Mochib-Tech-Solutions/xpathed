@@ -1,15 +1,20 @@
 using Microsoft.Playwright;
+using Xpathed.Common.Contracts;
 
 namespace Xpathed.Browser.Sessions;
 
-internal sealed class FirefoxPageDisplay(IPage page) : IBrowserPageDisplay
+internal sealed class FirefoxPageDisplay(IPage page, BrowserResolution resolution) : IBrowserPageDisplay
 {
     public Task InitializeAsync(IBrowserContext context, Action focused) => Task.CompletedTask;
 
     public async Task ShowAsync()
     {
         await page.BringToFrontAsync();
-        await page.WaitForFunctionAsync("innerWidth === 1280 && innerHeight === 800", null, new() { Timeout = 5000 });
+        await page.WaitForFunctionAsync(
+            "size => innerWidth === size.width && innerHeight === size.height",
+            new { width = resolution.Width, height = resolution.Height },
+            new() { Timeout = 5000 }
+        );
         if (!await HasNativeFocusAsync())
         {
             throw new PlaywrightException("The Firefox page lost focus.");

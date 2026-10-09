@@ -106,7 +106,7 @@ export function releaseNotes({
   }
   lines.push(
     "",
-    "Live-browser Resolver cases grade the complete Resolver response, including independently labelled targets, actions and verified XPath. Saved-page selection cases grade selection from saved candidates; they cannot establish browser or XPath correctness. Live-browser Resolver latency covers the complete Resolver HTTP response; Saved-page selection latency covers the inference process. Setup, preparation and independent grading are excluded. These regression results are not an unseen-data accuracy estimate.",
+    "Live-browser Resolver cases grade the complete response, including independently labelled targets, actions and verified XPath. Latency covers the complete Resolver HTTP response; setup and independent grading are excluded. These regression results are not an unseen-data accuracy estimate.",
     "",
     "## Changelog",
     "",
@@ -118,7 +118,7 @@ export function releaseNotes({
     `- Source: \`${sourceSha}\``,
     `- Bundle SHA-256: \`${bundleSha}\``,
     "- Browser and Resolver images are pinned in `manifest.json`; credentials are excluded.",
-    "- Restore instructions: [release runbook](https://github.com/Mochib-Tech-Solutions/xpathed/blob/main/docs/releases.md).",
+    "- Restore a verified bundle with `pnpm release:bundle:restore DIRECTORY --sha256 DIGEST`.",
     "",
   );
   return lines.join("\n");
@@ -151,7 +151,7 @@ export async function phaseNotes(directory, name, profileId) {
   const calls = [...records.values()].filter((record) => record.forwarded);
   const comparison = summary?.profiles?.[profileId]?.qualification?.comparison;
   const groups = Object.entries(comparison?.groups ?? {}).map(([track, comparison]) => ({
-    name: track === "browser" ? "Live-browser Resolver" : "Saved-page selection",
+    name: track === "browser" ? "Live-browser Resolver" : track,
     comparison,
   }));
   return {

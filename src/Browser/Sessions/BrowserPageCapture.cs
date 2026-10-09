@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using System.Diagnostics;
 using System.Text.Json;
 using Microsoft.Playwright;
@@ -14,6 +15,48 @@ internal sealed class BrowserPageCapture(BrowserPageRuntime page) : IAsyncDispos
     private readonly HashSet<BrowserFrameCapture> selectedFrames = [];
 
     public bool UsesFrame(IFrame frame) => selectedFrames.Any(captured => captured.Frame == frame);
+
+    public async Task<CaptureImage> CaptureImageAsync()
+    {
+        const string privateElements =
+            "input,textarea,select,[contenteditable]:not([contenteditable=false]),[role=textbox],[role=combobox],[data-private],[data-sensitive]";
+        var currentFrames = page.Page.Frames.ToArray();
+        try
+        {
+            var png = await page.Page.ScreenshotAsync(
+                new PageScreenshotOptions
+                {
+                    Type = ScreenshotType.Png,
+                    FullPage = false,
+                    Scale = ScreenshotScale.Css,
+                    Caret = ScreenshotCaret.Hide,
+                    Timeout = 0,
+                    Mask = currentFrames.Select(frame => frame.Locator(privateElements)),
+                    MaskColor = "#777777",
+                    // Hide overflowing descendants and generated content as well as the control's rectangle.
+                    Style =
+                        $":is({privateElements}), :is({privateElements}) * {{ opacity: 0 !important; color: transparent !important; -webkit-text-fill-color: transparent !important; text-shadow: none !important; transition: none !important; }}",
+                }
+            );
+            if (!currentFrames.SequenceEqual(page.Page.Frames))
+            {
+                throw new ApiException(409, "stale_capture", "The page frames changed during screenshot capture.");
+            }
+            return new CaptureImage(
+                png,
+                BinaryPrimitives.ReadInt32BigEndian(png.AsSpan(16, 4)),
+                BinaryPrimitives.ReadInt32BigEndian(png.AsSpan(20, 4))
+            );
+        }
+        catch (PlaywrightException)
+        {
+            throw new ApiException(
+                409,
+                "capture_image_unavailable",
+                "The browser could not capture a masked screenshot."
+            );
+        }
+    }
 
     public async Task<CandidateCapture> CaptureAsync(string sessionId, string documentId, string captureId)
     {
@@ -138,6 +181,28 @@ internal sealed class BrowserPageCapture(BrowserPageRuntime page) : IAsyncDispos
                     }
                 }
             }
+        }
+    }
+
+    public async Task<bool> PrivacyUnchangedAsync()
+    {
+        try
+        {
+            foreach (var frame in frames)
+            {
+                if (
+                    frame.Frame.IsDetached
+                    || !await frame.Handle.EvaluateAsync<bool>("capture => capture.privacyUnchanged()")
+                )
+                {
+                    return false;
+                }
+            }
+            return true;
+        }
+        catch (PlaywrightException)
+        {
+            return false;
         }
     }
 
@@ -299,6 +364,19 @@ internal sealed class BrowserPageCapture(BrowserPageRuntime page) : IAsyncDispos
                 );
             }
         }
+    }
+
+    public async Task<IElementHandle> RetainedTargetAsync(string candidateId)
+    {
+        var frame =
+            frames.FirstOrDefault(frame => frame.CandidateIds.Contains(candidateId))
+            ?? throw new ApiException(409, "unknown_candidate", "The target is outside this capture.");
+        var handle = await frame.Handle.EvaluateHandleAsync(
+            "(capture, id) => capture.highlightNodes([id])[0]",
+            candidateId
+        );
+        return handle.AsElement()
+            ?? throw new ApiException(409, "stale_capture", "The retained target is no longer available.");
     }
 
     public async Task ClearHighlightAsync()

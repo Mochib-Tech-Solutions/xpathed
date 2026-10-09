@@ -750,7 +750,7 @@ test("proxy reserves before payment, pins the effective route, accounts actual c
   assert.equal(JSON.parse(await readFile(ledgerPath, "utf8")).entries[0].reportedUsd, 0.001);
   assert.deepEqual(await (await fetch(`${base}/models/${model}/endpoints`)).json(), pricing);
   await proxy.awaitIdle();
-  proxy.beginAttempt("case:stagehand");
+  proxy.beginAttempt("case:caller");
   assert.equal((await post()).status, 200);
   assert.equal(calls.length, 2);
 });
@@ -1039,7 +1039,7 @@ test("Azure requires its advertised cap and rejects route, tier, reasoning and c
   assert.equal(proxy.budget.spentUsd, 0);
 });
 
-test("the explicit Saved-page selection DeepInfra profile pins only its declared standard endpoint", async (t) => {
+test("an explicit DeepInfra profile pins only its declared standard endpoint", async (t) => {
   const profile = {
     id: "deepseek-deepinfra",
     model,

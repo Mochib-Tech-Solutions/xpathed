@@ -307,7 +307,7 @@ export function validateBudgetLedger(ledger) {
 export async function createBudgetProxy({
   apiKey,
   profiles,
-  ledgerPath = resolve(".artifacts/datasets/experiment-budget.json"),
+  ledgerPath = resolve(".artifacts/accounting/charges.json"),
   budgetPolicy = "provider-limit",
   fetchImpl = fetch,
   onRecord = async () => {},

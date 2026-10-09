@@ -9,9 +9,7 @@ export function measuredEntry(spec, trial, profile, policy) {
   return {
     caseId: spec.id,
     // Offline labels establish target selection only; browser completeness is unavailable.
-    passed:
-      grade.passed &&
-      (spec.track === "offline-selection" || grade.metrics.processingComplete === true),
+    passed: grade.passed && grade.metrics.processingComplete === true,
     elapsedMs: trial?.elapsedMs ?? null,
     hardFailure: grade.failures.some((failure) =>
       policy.hardFailureCategories.includes(failure.category),
@@ -125,7 +123,7 @@ export function compareTrials(manifest, trials, policy) {
       report.reasons.push("initial_inventory_invalid");
     }
     report.groups = {};
-    for (const track of ["browser", "offline-selection"]) {
+    for (const track of ["browser"]) {
       const ids = new Set(
         manifest.cases.filter((spec) => (spec.track ?? "browser") === track).map((spec) => spec.id),
       );
@@ -166,7 +164,7 @@ export function compareTrials(manifest, trials, policy) {
     return { status: "infrastructure_failure", reasons: ["comparison_inventory_invalid"] };
   const report = compareMeasurements(candidate, baseline);
   report.groups = {};
-  for (const track of ["browser", "offline-selection"]) {
+  for (const track of ["browser"]) {
     const ids = new Set(
       manifest.cases.filter((spec) => (spec.track ?? "browser") === track).map((spec) => spec.id),
     );

@@ -1,3 +1,3 @@
 namespace Xpathed.Common.Contracts;
 
-public sealed record CreateBrowserSessionRequest(string? BrowserType);
+public sealed record CreateBrowserSessionRequest(string? BrowserType, string? Resolution = null);

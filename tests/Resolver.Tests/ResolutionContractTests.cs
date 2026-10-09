@@ -211,6 +211,87 @@ public sealed class ResolutionContractTests
     }
 
     [Fact]
+    public async Task PendingPricingDoesNotDelayResolutionOrRepeatTheLookup()
+    {
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var pricingCalls = 0;
+        var handler = new DeterministicServicesHandler
+        {
+            BeforeRespondAsync = async (path, token) =>
+            {
+                if (path.EndsWith("/endpoints", StringComparison.Ordinal))
+                {
+                    Interlocked.Increment(ref pricingCalls);
+                    started.TrySetResult();
+                    await release.Task.WaitAsync(token);
+                }
+            },
+        };
+        await using var application = CreateApplication(handler);
+        using var client = application.CreateClient();
+        try
+        {
+            var pending = client.PostAsJsonAsync(
+                "/pages/page-1/resolve",
+                new { instruction = "Click Save", documentId = "document-1" }
+            );
+            await started.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            using var first = await pending.WaitAsync(TimeSpan.FromSeconds(1));
+            using var second = await client
+                .PostAsJsonAsync("/pages/page-1/resolve", new { instruction = "Click Save", documentId = "document-1" })
+                .WaitAsync(TimeSpan.FromSeconds(1));
+            foreach (var response in new[] { first, second })
+            {
+                var result = await response.Content.ReadFromJsonAsync<JsonElement>();
+                Assert.Equal("found", result.GetProperty("outcome").GetString());
+                var diagnostics = result.GetProperty("diagnostics");
+                Assert.Equal(JsonValueKind.Null, diagnostics.GetProperty("costEstimate").ValueKind);
+                Assert.Equal(0.0000215m, diagnostics.GetProperty("usage").GetProperty("cost").GetDecimal());
+            }
+            Assert.Equal(1, pricingCalls);
+            Assert.Equal(2, handler.SelectionRequestCount);
+        }
+        finally
+        {
+            release.TrySetResult();
+        }
+    }
+
+    [Fact]
+    public async Task UnavailablePricingIsCachedWithoutLosingReportedCharges()
+    {
+        var pricingCalls = 0;
+        var handler = new DeterministicServicesHandler
+        {
+            PricingStatus = HttpStatusCode.ServiceUnavailable,
+            BeforeRespondAsync = (path, _) =>
+            {
+                if (path.EndsWith("/endpoints", StringComparison.Ordinal))
+                {
+                    Interlocked.Increment(ref pricingCalls);
+                }
+                return Task.CompletedTask;
+            },
+        };
+        await using var application = CreateApplication(handler);
+        using var client = application.CreateClient();
+        for (var attempt = 0; attempt < 2; attempt++)
+        {
+            using var response = await client.PostAsJsonAsync(
+                "/pages/page-1/resolve",
+                new { instruction = "Click Save", documentId = "document-1" }
+            );
+            var result = await response.Content.ReadFromJsonAsync<JsonElement>();
+            Assert.Equal("found", result.GetProperty("outcome").GetString());
+            var diagnostics = result.GetProperty("diagnostics");
+            Assert.Equal(JsonValueKind.Null, diagnostics.GetProperty("costEstimate").ValueKind);
+            Assert.Equal(0.0000215m, diagnostics.GetProperty("usage").GetProperty("cost").GetDecimal());
+        }
+        Assert.Equal(1, pricingCalls);
+    }
+
+    [Fact]
     public async Task PricingCacheSeparatesModelsAndProviders()
     {
         var pricingCalls = 0;
@@ -288,7 +369,7 @@ public sealed class ResolutionContractTests
         {
             Assert.Equal("appearance_unavailable", result.GetProperty("actions")[0].GetProperty("code").GetString());
             Assert.Equal(
-                "The requested appearance cannot be established from the captured CSS evidence.",
+                "The requested appearance cannot be established from the captured view.",
                 result.GetProperty("actions")[0].GetProperty("message").GetString()
             );
         }
@@ -2330,7 +2411,7 @@ public sealed class ResolutionContractTests
     }
 
     [Fact]
-    public async Task DefaultGeminiRequestUsesLowReasoningAndRecordsTheEffectiveSettings()
+    public async Task DefaultDeepSeekRequestDisablesReasoningAndRecordsTheEffectiveSettings()
     {
         var handler = new DeterministicServicesHandler();
         await using var application = CreateApplication(
@@ -2347,11 +2428,10 @@ public sealed class ResolutionContractTests
         var envelope = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal("found", envelope.GetProperty("result").GetProperty("outcome").GetString());
         var request = handler.ModelRequest;
-        Assert.Equal("google/gemini-3.8-flash", request.GetProperty("model").GetString());
-        Assert.Equal("google-ai-studio", request.GetProperty("provider").GetProperty("only")[0].GetString());
-        Assert.True(request.GetProperty("reasoning").GetProperty("enabled").GetBoolean());
-        Assert.Equal("low", request.GetProperty("reasoning").GetProperty("effort").GetString());
-        Assert.True(request.GetProperty("reasoning").GetProperty("exclude").GetBoolean());
+        Assert.Equal("deepseek/deepseek-v4.1-flash", request.GetProperty("model").GetString());
+        Assert.Equal("wafer", request.GetProperty("provider").GetProperty("only")[0].GetString());
+        Assert.False(request.GetProperty("reasoning").GetProperty("enabled").GetBoolean());
+        Assert.False(handler.CaptureRequest.GetProperty("includeImage").GetBoolean());
         Assert.False(request.GetProperty("provider").GetProperty("allow_fallbacks").GetBoolean());
         Assert.Equal(4096, request.GetProperty("max_tokens").GetInt32());
         Assert.True(
@@ -2372,6 +2452,91 @@ public sealed class ResolutionContractTests
             )
         );
         Assert.Equal(1, handler.ProviderRequestCount);
+    }
+
+    [Fact]
+    public async Task ScreenshotOptInSendsOneMaskedImageWithoutRetainingPixelsInEvidence()
+    {
+        const string png =
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jPz8AAAAASUVORK5CYII=";
+        var capture = JsonNode.Parse(new DeterministicServicesHandler().CaptureBody)!;
+        capture["image"] = JsonSerializer.SerializeToNode(
+            new
+            {
+                png,
+                width = 1,
+                height = 1,
+            }
+        );
+        var handler = new DeterministicServicesHandler { CaptureBody = capture.ToJsonString() };
+        await using var application = CreateApplication(handler);
+        using var client = application.CreateClient();
+        client.DefaultRequestHeaders.Add("X-Xpathed-Attempt-Id", Guid.NewGuid().ToString("N"));
+        using var response = await client.PostAsJsonAsync(
+            "/internal/pages/page-1/resolve",
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                includeImage = true,
+            }
+        );
+        var responseText = await response.Content.ReadAsStringAsync();
+        using var envelope = JsonDocument.Parse(responseText);
+        Assert.Equal("found", envelope.RootElement.GetProperty("result").GetProperty("outcome").GetString());
+        Assert.True(handler.CaptureRequest.GetProperty("includeImage").GetBoolean());
+        var content = handler.ModelRequest.GetProperty("messages")[1].GetProperty("content");
+        Assert.Equal(2, content.GetArrayLength());
+        Assert.Equal("text", content[0].GetProperty("type").GetString());
+        Assert.Equal("image_url", content[1].GetProperty("type").GetString());
+        Assert.Equal(
+            "data:image/png;base64," + png,
+            content[1].GetProperty("image_url").GetProperty("url").GetString()
+        );
+        Assert.DoesNotContain(png, responseText, StringComparison.Ordinal);
+        Assert.DoesNotContain("data:image", responseText, StringComparison.Ordinal);
+        Assert.Equal(1, handler.ProviderRequestCount);
+        Assert.Equal(1, handler.SelectionRequestCount);
+    }
+
+    [Theory]
+    [InlineData("missing")]
+    [InlineData("malformed")]
+    [InlineData("dimensions")]
+    [InlineData("unexpected")]
+    public async Task InvalidOrUnrequestedScreenshotMakesNoProviderCall(string scenario)
+    {
+        const string png =
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jPz8AAAAASUVORK5CYII=";
+        var capture = JsonNode.Parse(new DeterministicServicesHandler().CaptureBody)!;
+        if (scenario != "missing")
+        {
+            capture["image"] = JsonSerializer.SerializeToNode(
+                new
+                {
+                    png = scenario == "malformed" ? Convert.ToBase64String(new byte[24]) : png,
+                    width = scenario == "dimensions" ? 2 : 1,
+                    height = 1,
+                }
+            );
+        }
+        var handler = new DeterministicServicesHandler { CaptureBody = capture.ToJsonString() };
+        await using var application = CreateApplication(handler);
+        using var client = application.CreateClient();
+        using var response = await client.PostAsJsonAsync(
+            "/pages/page-1/resolve",
+            new
+            {
+                instruction = "Click Save",
+                documentId = "document-1",
+                includeImage = scenario != "unexpected",
+            }
+        );
+        var result = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("error", result.GetProperty("outcome").GetString());
+        Assert.Equal("invalid_browser_capture", result.GetProperty("diagnostics").GetProperty("code").GetString());
+        Assert.Equal(0, handler.ProviderRequestCount);
+        Assert.Equal(0, handler.SelectionRequestCount);
     }
 
     [Theory]
@@ -2520,6 +2685,42 @@ public sealed class ResolutionContractTests
             var result = await response.Content.ReadFromJsonAsync<JsonElement>();
             Assert.Equal("found", result.GetProperty("outcome").GetString());
             Assert.Equal(JsonValueKind.Null, result.GetProperty("diagnostics").GetProperty("costEstimate").ValueKind);
+        }
+    }
+
+    [Fact]
+    public async Task DifferentInstructionsPreserveTheExactPageEvidencePrefix()
+    {
+        var handler = new DeterministicServicesHandler { CaptureBody = CurrentViewCapture() };
+        await using var application = CreateApplication(handler);
+        using var client = application.CreateClient();
+        string? prefix = null;
+        foreach (var instruction in new[] { "Click Save", "Click the Save button" })
+        {
+            using var response = await client.PostAsJsonAsync(
+                "/pages/page-1/resolve",
+                new { instruction, documentId = "document-1" }
+            );
+            var result = await response.Content.ReadFromJsonAsync<JsonElement>();
+            Assert.Equal("found", result.GetProperty("outcome").GetString());
+            var input = handler.ModelRequest.GetProperty("messages")[1].GetProperty("content").GetString()!;
+            using var parsed = JsonDocument.Parse(input);
+            Assert.Equal(instruction, parsed.RootElement.GetProperty("instruction").GetString());
+            Assert.Equal("instruction", parsed.RootElement.EnumerateObject().Last().Name);
+            Assert.Equal(1, parsed.RootElement.GetProperty("candidates").GetArrayLength());
+            var instructionStart = input.LastIndexOf(",\"instruction\":", StringComparison.Ordinal);
+            Assert.True(instructionStart > 0);
+            prefix ??= input[..instructionStart];
+            Assert.Equal(prefix, input[..instructionStart]);
+            var timings = result.GetProperty("diagnostics").GetProperty("timingsMs");
+            var model = timings.GetProperty("model").GetDouble();
+            Assert.InRange(timings.GetProperty("provider").GetDouble(), 0, model);
+            var measured =
+                timings.GetProperty("capture").GetDouble()
+                + timings.GetProperty("preparation").GetDouble()
+                + model
+                + timings.GetProperty("validation").GetDouble();
+            Assert.InRange(measured, 0, timings.GetProperty("total").GetDouble());
         }
     }
 

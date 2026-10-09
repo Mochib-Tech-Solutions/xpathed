@@ -17,6 +17,7 @@ const session = {
   pageId: "page-1",
   viewPath: "/view/page-1",
   browserType: "chromium" as const,
+  resolution: "1280x800",
 };
 const page = {
   ...session,
@@ -76,7 +77,15 @@ function mockApi(resolve = () => Promise.resolve(Response.json(found)), currentP
       if (options?.method === "DELETE") return Promise.resolve(new Response(null, { status: 204 }));
       if (path === "/api/sessions/options")
         return Promise.resolve(
-          Response.json({ defaultBrowserType: "chromium", browserTypes: ["chromium", "firefox"] }),
+          Response.json({
+            defaultBrowserType: "chromium",
+            browserTypes: ["chromium", "firefox"],
+            defaultResolution: "1280x800",
+            resolutions: [
+              { id: "1280x800", width: 1280, height: 800 },
+              { id: "1920x1080", width: 1920, height: 1080 },
+            ],
+          }),
         );
       if (path === "/api/sessions") return Promise.resolve(Response.json(session));
       if (path === "/api/sessions/session-1")
@@ -87,6 +96,7 @@ function mockApi(resolve = () => Promise.resolve(Response.json(found)), currentP
             activationVersion: 1,
             viewPath: session.viewPath,
             browserType: "chromium" as const,
+            resolution: "1280x800",
             pages: [currentPage()],
           }),
         );
@@ -112,6 +122,39 @@ async function submitInstruction(user: ReturnType<typeof userEvent.setup>) {
 }
 
 describe("Workspace resolution", () => {
+  it("shares a screenshot only for the opted-in request and resets the choice before retry", async () => {
+    mockApi();
+    const user = await openWorkspace();
+    const screenshot = screen.getByRole("checkbox", {
+      name: "Include screenshot with this request",
+    });
+    expect(screenshot).not.toBeChecked();
+    await submitInstruction(user);
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Resolve instruction" })).toBeDisabled(),
+    );
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Retry instruction" })).toBeEnabled(),
+    );
+    const requests = () =>
+      vi
+        .mocked(fetch)
+        .mock.calls.filter(([path]) => typeof path === "string" && path.endsWith("/resolve"))
+        .map(([, options]) => JSON.parse(options?.body as string) as { includeImage?: boolean });
+    expect(requests()).toEqual([expect.not.objectContaining({ includeImage: true })]);
+    await user.click(screenshot);
+    await submitInstruction(user);
+    await waitFor(() =>
+      expect(screen.getAllByRole("button", { name: "Retry instruction" })[1]).toBeEnabled(),
+    );
+    expect(requests()[1]?.includeImage).toBe(true);
+    expect(screenshot).not.toBeChecked();
+    expect(screen.getByText("Screenshot included")).toBeInTheDocument();
+    await user.click(screen.getAllByRole("button", { name: "Retry instruction" })[1]!);
+    await waitFor(() => expect(requests()).toHaveLength(3));
+    expect(requests()[2]?.includeImage).not.toBe(true);
+  });
+
   it("keeps a covered target in its numbered card beside the ready target", async () => {
     mockApi(() =>
       Promise.resolve(
@@ -1514,6 +1557,7 @@ describe("Workspace resolution", () => {
       pageId: "page-2",
       viewPath: "/view/session-2",
       browserType: "chromium" as const,
+      resolution: "1280x800",
     };
     const freshPage = {
       ...page,
@@ -1556,6 +1600,11 @@ describe("Workspace resolution", () => {
             Response.json({
               defaultBrowserType: "chromium",
               browserTypes: ["chromium", "firefox"],
+              defaultResolution: "1280x800",
+              resolutions: [
+                { id: "1280x800", width: 1280, height: 800 },
+                { id: "1920x1080", width: 1920, height: 1080 },
+              ],
             }),
           );
         if (input === "/api/sessions") return Promise.resolve(Response.json(freshSession));
@@ -2040,7 +2089,15 @@ describe("Workspace resolution", () => {
         typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
       if (path === "/api/sessions/options")
         return Promise.resolve(
-          Response.json({ defaultBrowserType: "chromium", browserTypes: ["chromium", "firefox"] }),
+          Response.json({
+            defaultBrowserType: "chromium",
+            browserTypes: ["chromium", "firefox"],
+            defaultResolution: "1280x800",
+            resolutions: [
+              { id: "1280x800", width: 1280, height: 800 },
+              { id: "1920x1080", width: 1920, height: 1080 },
+            ],
+          }),
         );
       if (path === "/api/sessions") return Promise.resolve(Response.json(session));
       if (path === "/api/sessions/session-1")
@@ -2051,6 +2108,7 @@ describe("Workspace resolution", () => {
             activationVersion: 1,
             viewPath: session.viewPath,
             browserType: "chromium" as const,
+            resolution: "1280x800",
             pages: [page],
           }),
         );
