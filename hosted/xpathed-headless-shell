@@ -1,0 +1,8 @@
+abi <abi/4.0>,
+include <tunables/global>
+
+# Ubuntu's packaged Chrome has this same userns allowance. Deployment substitutes
+# the exact root-owned release executable here; no wildcard or global userns change.
+profile xpathed-headless-shell /opt/xpathed/current/chromium/chrome-headless-shell flags=(unconfined) {
+  userns,
+}

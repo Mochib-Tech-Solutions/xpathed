@@ -319,6 +319,42 @@ public sealed class CdpConnectionTests
         Assert.Null(page.MainFrame.Context);
     }
 
+    [Fact]
+    public async Task ConsoleCleanupCoalescesBurstsAndReleasesEntriesArrivingDuringCleanup()
+    {
+        await using var pipe = new PipeFixture();
+        var page = await pipe.InitializePageAsync();
+        for (var index = 0; index < 100; index++)
+        {
+            await pipe.SendAsync(
+                new
+                {
+                    sessionId = "session",
+                    method = "Runtime.consoleAPICalled",
+                    @params = new { },
+                }
+            );
+        }
+        var first = await pipe.ReceiveAsync();
+        Assert.Equal("Runtime.discardConsoleEntries", first.GetProperty("method").GetString());
+        Assert.Equal("session", first.GetProperty("sessionId").GetString());
+
+        await pipe.EventAsync("Runtime.exceptionThrown", new { });
+        await pipe.SendAsync(new { id = first.GetProperty("id").GetInt64(), result = new { } });
+        var second = await pipe.ReceiveAsync();
+        Assert.Equal("Runtime.discardConsoleEntries", second.GetProperty("method").GetString());
+        Assert.Equal("session", second.GetProperty("sessionId").GetString());
+        await pipe.SendAsync(new { id = second.GetProperty("id").GetInt64(), result = new { } });
+
+        page.MarkClosed();
+        await pipe.EventAsync("Runtime.consoleAPICalled", new { });
+        var next = pipe.Connection.SendAsync("Runtime.getIsolateId");
+        var request = await pipe.ReceiveAsync();
+        Assert.Equal("Runtime.getIsolateId", request.GetProperty("method").GetString());
+        await pipe.SendAsync(new { id = request.GetProperty("id").GetInt64(), result = new { } });
+        await next;
+    }
+
     private sealed class DelayedCancellationStream : Stream
     {
         public TaskCompletionSource Started { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);

@@ -63,6 +63,10 @@ internal sealed partial class CdpPage
         }
         switch (method)
         {
+            case "Runtime.consoleAPICalled":
+            case "Runtime.exceptionThrown":
+                DiscardConsoleEntries(id);
+                break;
             case "Target.attachedToTarget":
                 if (data.GetProperty("targetInfo").GetProperty("type").GetString() == "iframe")
                 {

@@ -16,6 +16,8 @@ internal sealed partial class CdpPage(
     private readonly ConcurrentDictionary<string, byte> sessions = new();
     private readonly ConcurrentDictionary<string, byte> loaded = new();
     private readonly ConcurrentDictionary<(string Session, int Context), string> contexts = new();
+    private readonly ConcurrentDictionary<string, byte> consoleCleanup = new();
+    private int cleaningConsole;
     private string? mainFrameId;
     private long documentGeneration;
     private double minimumFrameTimestamp;
@@ -199,6 +201,47 @@ internal sealed partial class CdpPage(
         foreach (var frame in frames.Values)
         {
             frame.IsDetached = true;
+        }
+    }
+
+    private void DiscardConsoleEntries(string id)
+    {
+        consoleCleanup[id] = 0;
+        if (Interlocked.CompareExchange(ref cleaningConsole, 1, 0) == 0)
+        {
+            _ = DiscardConsoleEntriesAsync();
+        }
+    }
+
+    private async Task DiscardConsoleEntriesAsync()
+    {
+        try
+        {
+            while (!consoleCleanup.IsEmpty && !IsClosed)
+            {
+                // DevTools retains logged objects; coalesce bursts without retaining page console history.
+                await Task.Delay(100);
+                foreach (var id in consoleCleanup.Keys)
+                {
+                    if (consoleCleanup.TryRemove(id, out _))
+                    {
+                        try
+                        {
+                            await Connection.SendAsync("Runtime.discardConsoleEntries", sessionId: id);
+                        }
+                        catch (CdpException) { }
+                        catch (OperationCanceledException) { }
+                    }
+                }
+            }
+        }
+        finally
+        {
+            Interlocked.Exchange(ref cleaningConsole, 0);
+            if (!consoleCleanup.IsEmpty && !IsClosed && Interlocked.CompareExchange(ref cleaningConsole, 1, 0) == 0)
+            {
+                _ = DiscardConsoleEntriesAsync();
+            }
         }
     }
 }

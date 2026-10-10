@@ -179,7 +179,7 @@ jobs:
       - name: Install native configuration validators
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y caddy nftables
+          sudo apt-get install -y apparmor caddy nftables
       - name: Validate Caddy, systemd and the firewall without starting application services
         run: scripts/ci-hosted.sh
       - uses: ./.github/actions/ci-receipt

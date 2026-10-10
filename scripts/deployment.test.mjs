@@ -114,6 +114,7 @@ test("deployment fingerprint skips docs and tests, and detects missed runtime ch
 
 test("host deployment builds first, skips unchanged inputs, and rolls back failures", () => {
   execFileSync("python3", ["-B", "scripts/deployment-host.test.py"], { stdio: "pipe" });
+  execFileSync("python3", ["-B", "scripts/deployment-chromium.test.py"], { stdio: "pipe" });
 });
 
 test("hosted network isolation fails closed during failures and policy tampering", () => {
