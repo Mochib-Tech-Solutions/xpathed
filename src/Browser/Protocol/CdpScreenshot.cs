@@ -46,7 +46,10 @@ internal static class CdpScreenshot
             if (width <= 0 || height <= 0) continue;
             const mask = document.createElement('div');
             capture?.imageMaskNode(mask);
-            mask.style.cssText = `all: initial !important; position: fixed !important; left:${x}px !important; top:${y}px !important; width:${width}px !important; height:${height}px !important; background:rgb(119,119,119) !important; opacity:1 !important; z-index:2147483647 !important; pointer-events:none !important;`;
+            // LCD text filtering can leave a raster fringe outside the element's layout bounds.
+            const left = Math.floor(x) - 1, top = Math.floor(y) - 1;
+            const right = Math.ceil(x + width) + 1, bottom = Math.ceil(y + height) + 1;
+            mask.style.cssText = `all: initial !important; position: fixed !important; left:${left}px !important; top:${top}px !important; width:${right-left}px !important; height:${bottom-top}px !important; background:rgb(119,119,119) !important; opacity:1 !important; z-index:2147483647 !important; pointer-events:none !important;`;
             document.documentElement.append(mask);
             masks.push(mask);
           }

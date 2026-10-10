@@ -89,12 +89,13 @@ internal static class BrowserCaptureScript
           let rectCache = new WeakMap();
           let textCache = new WeakMap();
           let labelCache = new WeakMap();
+          let headingCache = new WeakMap();
           let exposureCache = new WeakMap();
           let intersections = new WeakMap();
           let siblingShapes = new WeakMap();
           const clearDerivedCaches = () => {
             closestCache = new Map(); styleCache = new WeakMap(); rectCache = new WeakMap(); textCache = new WeakMap();
-            labelCache = new WeakMap(); exposureCache = new WeakMap(); siblingShapes = new WeakMap();
+            labelCache = new WeakMap(); headingCache = new WeakMap(); exposureCache = new WeakMap(); siblingShapes = new WeakMap();
           };
           let modalityUnknown = false, modalityBudgetExceeded = false;
           const currentModal = () => {
@@ -199,12 +200,35 @@ internal static class BrowserCaptureScript
             privacySource(element, result);
             return result;
           };
+          const headingScopeRoles = new Set('article complementary navigation main region group form dialog alertdialog listitem figure table grid treegrid row cell columnheader rowheader gridcell treeitem tabpanel'.split(' '));
+          const headingFor = element => {
+            if (element === document.body || element === document.documentElement) return null;
+            if (headingCache.has(element)) return headingCache.get(element);
+            const pending = [{element, next:element.firstElementChild}];
+            while (pending.length) {
+              checkBudget();
+              const current = pending.at(-1), node = current.next;
+              if (!node) { headingCache.set(current.element, null); pending.pop(); continue; }
+              current.next = node.nextElementSibling;
+              if (closest(node, `${valueContainer},${ignored}`) || !exposed(node) ||
+                node.matches('section,article,aside,nav,main,fieldset,form,dialog,li,figure,table,tr,td,th') ||
+                headingScopeRoles.has(role(node)) || repeatedItem(node)) continue;
+              const heading = node.matches('legend,h1,h2,h3,h4,h5,h6') && accessibilityExposed(node) && text(node)
+                ? node : headingCache.get(node);
+              if (heading) {
+                for (const entry of pending) headingCache.set(entry.element, heading);
+                return heading;
+              }
+              if (!headingCache.has(node)) pending.push({element:node, next:node.firstElementChild});
+            }
+            return null;
+          };
           const scope = element => {
             const scopes = [];
             const row = closest(element, 'tr,[role=row]');
             for (let ancestor = parent(element); ancestor && ancestor !== document.body; ancestor = parent(ancestor)) {
               checkBudget();
-              const context = label(ancestor) || (ancestor === row ? text(ancestor) : '') || (ancestor.matches('header,footer,nav,main,aside') ? ancestor.localName : '') || text(ancestor.querySelector(':scope > legend,:scope > h1,:scope > h2,:scope > h3,:scope > h4,:scope > h5,:scope > h6'));
+              const context = label(ancestor) || (ancestor === row ? text(ancestor) : '') || (ancestor.matches('header,footer,nav,main,aside') ? ancestor.localName : '') || text(headingFor(ancestor));
               if (context && !scopes.includes(context)) scopes.push(context);
             }
             return scopes;
@@ -366,13 +390,28 @@ internal static class BrowserCaptureScript
               if (name) names.add(name);
               if (names.size >= 2) return true;
             }
+            // A picture and its separate control can identify an item without a text title.
+            let graphic;
+            for (const child of element.querySelectorAll('img,svg,canvas,video')) {
+              checkBudget();
+              if (!rendered(child) || closest(child, `${valueContainer},button,[role=button]`) ||
+                closest(child.parentElement, 'img,svg,canvas,video')) continue;
+              if (graphic) return false;
+              graphic = child;
+            }
+            if (!graphic) return false;
+            for (const control of element.querySelectorAll('a[href],button,[role=button],[role=link]')) {
+              checkBudget();
+              if (accessibilityExposed(control) && !closest(control, valueContainer) &&
+                !control.contains(graphic) && !graphic.contains(control)) return true;
+            }
             return false;
           };
           const eligible = element => {
             if (!accessibilityExposed(element)) return false;
             const container = closest(element, valueContainer);
             if (container && container !== element) return false;
-            return element.matches('a[href],button,input,select,textarea,summary,img[alt],[aria-label],[aria-labelledby],[role],[tabindex],[contenteditable]:not([contenteditable="false"])') ||
+            return element.matches('a[href],button,input,select,textarea,summary,img,svg,canvas,video,[aria-label],[aria-labelledby],[role],[tabindex],[contenteditable]:not([contenteditable="false"])') ||
               (!closest(element, 'button,a,textarea,select,[contenteditable]:not([contenteditable="false"])') &&
                 ([...element.childNodes].some(node => node.nodeType === Node.TEXT_NODE && normalize(node.textContent)) || repeatedItem(element)));
           };
@@ -587,8 +626,8 @@ internal static class BrowserCaptureScript
                 if (withContext && !describedContext.has(id)) {
                   describedContext.add(id);
                   if (element.parentElement) schedule(element.parentElement, false, true);
-                  const heading = element.querySelector(':scope > legend,:scope > h1,:scope > h2,:scope > h3,:scope > h4,:scope > h5,:scope > h6');
-                  if (heading && !closest(heading, ignored)) record.headingId = schedule(heading, true);
+                  const heading = headingFor(element);
+                  if (heading) record.headingId = schedule(heading, true);
                   if (element.matches('tr,[role=row]')) record.cellIds = [...element.children]
                     .filter(cell => cell.matches('td,th,[role=cell],[role=rowheader],[role=gridcell]') && !closest(cell, ignored)).map(cell => schedule(cell, true));
                   record.labelIds = [...(element.labels ?? [])].filter(reference => !closest(reference, ignored)).map(reference => schedule(reference, true));

@@ -56,9 +56,50 @@ public sealed class XPathGeneratorTests
         };
         var expressions = Generate(target, parent, heading).Select(proposal => proposal.Expression).ToArray();
         Assert.True(
-            Array.IndexOf(expressions, "//section[h2[normalize-space(.)='Billing']]//button[normalize-space(.)='Save']")
-                < Array.IndexOf(expressions, "//button[@id='save']")
+            Array.IndexOf(
+                expressions,
+                "//section[.//h2[normalize-space(.)='Billing']]//button[normalize-space(.)='Save']"
+            ) < Array.IndexOf(expressions, "//button[@id='save']")
         );
+    }
+
+    [Fact]
+    public void WrappingNativeLabelPrecedesOrdinaryIdentifiersButNotTestContracts()
+    {
+        var label = TextNode("label", "label", "Country");
+        var wrapper = Node("wrapper", "span") with { ParentId = label.NodeId };
+        var target = Node("target", "input") with
+        {
+            CandidateId = "selected",
+            ParentId = wrapper.NodeId,
+            LabelIds = [label.NodeId],
+            Attributes = new() { ["id"] = "ordinary", ["data-testid"] = "country" },
+        };
+        var expressions = Generate(target, wrapper, label).Select(proposal => proposal.Expression).ToArray();
+        Assert.Equal("//*[@data-testid='country']", expressions[0]);
+        var labelled = Array.IndexOf(expressions, "//label[normalize-space(.)='Country']//input");
+        Assert.True(labelled > 0);
+        Assert.True(labelled < Array.IndexOf(expressions, "//input[@id='ordinary']"));
+    }
+
+    [Theory]
+    [InlineData("x:control")]
+    [InlineData("x$control")]
+    [InlineData("é-control")]
+    public void UnusualHtmlNamesUseNamespaceQualifiedNodeTests(string tag)
+    {
+        var target = TextNode("target", tag, "Save") with { CandidateId = "selected" };
+        Assert.Equal(
+            $"//*[local-name()='{tag}' and namespace-uri()='http://www.w3.org/1999/xhtml'][normalize-space(.)='Save']",
+            Generate(target)[0].Expression
+        );
+    }
+
+    [Fact]
+    public void OrdinaryCustomElementsKeepConciseNodeTests()
+    {
+        var target = TextNode("target", "save-button", "Save") with { CandidateId = "selected" };
+        Assert.Equal("//save-button[normalize-space(.)='Save']", Generate(target)[0].Expression);
     }
 
     [Fact]

@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { on, once } from "node:events";
+import { mkdir, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import test from "node:test";
 import jpeg from "jpeg-js";
 import { networkInterfaces } from "node:os";
@@ -527,6 +529,56 @@ test("targeting-descriptions-preserve-roles-and-accessible-image-names", async (
   );
 });
 
+test("targeting-unnamed-visible-graphics-retain-verifiable-dom-targets", async () => {
+  await withFixture(
+    `<img id="picture" width="60" height="60" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60'%3E%3Ccircle fill='red' cx='30' cy='30' r='25'/%3E%3C/svg%3E">
+     <svg id="drawing" width="60" height="60"><circle cx="30" cy="30" r="25" fill="blue"/></svg>
+     <canvas id="chart" width="60" height="60"></canvas>
+     <video id="clip" width="60" height="60"></video>
+     <img id="hidden-image" hidden width="60" height="60">
+     <svg id="decorative" aria-hidden="true" width="60" height="60"><circle r="20"/></svg>
+     <script>document.querySelector('canvas').getContext('2d').fillRect(5,5,40,40)</script>`,
+    async (session, page) => {
+      const before = await observe();
+      const capture = await request(`/pages/${page.pageId}/capture`, {
+        documentId: page.documentId,
+      });
+      assert.equal(capture.coverage.complete, true);
+      assert.deepEqual(
+        capture.candidates.map((candidate) => candidate.tag),
+        ["img", "svg", "canvas", "video"],
+      );
+      const image = await request(`/pages/${page.pageId}/capture-image`, {
+        documentId: page.documentId,
+        captureId: capture.captureId,
+      });
+      assert.equal(image.captureId, capture.captureId);
+      for (const [tag, expectedId] of [
+        ["img", "picture"],
+        ["svg", "drawing"],
+        ["canvas", "chart"],
+        ["video", "clip"],
+      ]) {
+        const candidate = capture.candidates.find((entry) => entry.tag === tag);
+        assert.equal(candidate.label, "", "Pixels must not invent an accessible name");
+        assert.equal(candidate.text, "");
+        const { target } = await request(`/pages/${page.pageId}/selection`, {
+          documentId: page.documentId,
+          captureId: capture.captureId,
+          candidateId: candidate.id,
+          action: "inspect",
+        });
+        assert.deepEqual((await verify(target.xpaths)).matches, [[expectedId]]);
+        assert.equal(target.accessibleName, "");
+      }
+      const after = await observe();
+      assert.equal(after.activeElement, before.activeElement);
+      assert.equal(after.scrollY, before.scrollY);
+      assert.deepEqual(after.events, before.events);
+    },
+  );
+});
+
 test("capture-opt-in-image-masks-private-values-across-frames-and-shadow-roots", async () => {
   await withFixture(
     `${targetMarkup}<style>input,textarea,select,[contenteditable],[data-private],[data-sensitive]{display:block;width:200px;height:30px;margin:4px;border:1px solid black}iframe{width:250px;height:80px}</style>
@@ -566,16 +618,54 @@ test("capture-opt-in-image-masks-private-values-across-frames-and-shadow-roots",
         documentId: page.documentId,
         includeImage: true,
       });
-      assert.equal(
+      await assertSameMaskedImage(
         changed.image.png,
         capture.image.png,
-        "Changing only private values must not change exported pixels",
+        "capture-opt-in-image-masks-private-values-across-frames-and-shadow-roots",
       );
       assert.ok(!JSON.stringify(changed.candidates).includes("PRIVATE_"));
       const withoutImage = await request(`/pages/${page.pageId}/capture`, {
         documentId: page.documentId,
       });
       assert.equal(withoutImage.image, null);
+    },
+  );
+});
+
+test("capture-opt-in-image-masks-fractional-private-text-edges", async () => {
+  await withFixture(
+    `${targetMarkup}<input id="focused" aria-label="Email" value="PRIVATE_FIRST" data-observe-value><div id="shadow"></div>
+    <script>
+      const root=document.querySelector('#shadow').attachShadow({mode:'open'});
+      root.innerHTML='<div contenteditable style="position:absolute;left:20.25px;top:100.5px;width:200.5px;height:30.5px;opacity:.75!important">PRIVATE_FIRST</div>';
+      const editable=root.querySelector('[contenteditable]');
+      window.observedEvents={get editableStyle(){return editable.style.cssText}};
+      window.mutateXpathFixture=()=>{editable.textContent='PRIVATE_OTHER'};
+      document.querySelector('#focused').focus();
+    </script>`,
+    async (_session, page) => {
+      const before = await observe();
+      const capture = await request(`/pages/${page.pageId}/capture`, {
+        documentId: page.documentId,
+        includeImage: true,
+      });
+      await observe({ mutateXpath: true });
+      const changed = await request(`/pages/${page.pageId}/capture`, {
+        documentId: page.documentId,
+        includeImage: true,
+      });
+      await assertSameMaskedImage(
+        changed.image.png,
+        capture.image.png,
+        "capture-opt-in-image-masks-fractional-private-text-edges",
+      );
+      assert.ok(!JSON.stringify(capture.candidates).includes("PRIVATE_"));
+      assert.ok(!JSON.stringify(changed.candidates).includes("PRIVATE_"));
+      const after = await observe();
+      assert.equal(after.activeElement, before.activeElement);
+      assert.equal(after.scrollY, before.scrollY);
+      assert.deepEqual(after.values, before.values);
+      assert.deepEqual(after.events, before.events);
     },
   );
 });
@@ -614,10 +704,10 @@ test("capture-lazy-image-reuses-identities-and-masks-frames-and-shadow-values", 
       assert.deepEqual(after.values, before.values);
       await observe({ mutateXpath: true });
       const second = await request(`/pages/${page.pageId}/capture-image`, identity);
-      assert.equal(
+      await assertSameMaskedImage(
         second.image.png,
         first.image.png,
-        "Private values must not alter exported pixels",
+        "capture-lazy-image-reuses-identities-and-masks-frames-and-shadow-values",
       );
       const target = capture.candidates.find((candidate) => candidate.label === "About us");
       const selected = await request(`/pages/${page.pageId}/selection`, {
@@ -1059,6 +1149,25 @@ async function observe(command = {}, pagePath = "/fixture") {
 
 function verify(xpaths, replaceTarget = false, reload = false) {
   return observe({ xpaths, replaceTarget, reload });
+}
+
+async function assertSameMaskedImage(actual, expected, caseName) {
+  if (actual === expected) return;
+  const artifactPath = join(".artifacts/ci/browser-contract-images", caseName);
+  const directory = join(process.env.XPATHED_WORKSPACE ?? process.cwd(), artifactPath);
+  let artifactError;
+  try {
+    await mkdir(directory, { recursive: true });
+    await Promise.all([
+      writeFile(join(directory, "expected.png"), Buffer.from(expected, "base64")),
+      writeFile(join(directory, "actual.png"), Buffer.from(actual, "base64")),
+    ]);
+  } catch (error) {
+    artifactError = error.message;
+  }
+  assert.fail(
+    `Changing only private values must not change exported PNG data. Evidence: ${artifactPath}${artifactError ? `; artifact capture failed: ${artifactError}` : ""}`,
+  );
 }
 
 async function waitForSession(sessionId, expected) {
@@ -5324,6 +5433,325 @@ test("xpath-evidence-rejects-interleaved-capture-batches", async () => {
       });
       assert.equal(execution.status, "completed");
       assert.equal((await observe()).events.second, 1);
+    },
+  );
+});
+
+for (const tag of ["x:control", "x$control"]) {
+  test(`xpath-unusual-html-tag-${tag.includes(":") ? "colon" : "dollar"}`, async () => {
+    await withFixture(
+      `<${tag} role="button" aria-label="Save" data-oracle="expected" style="display:block;width:120px;height:40px">Save</${tag}>`,
+      async (session, page) => {
+        const before = await observe();
+        const capture = await request(`/pages/${page.pageId}/capture`, {
+          documentId: page.documentId,
+        });
+        const candidate = capture.candidates.find((item) => item.tag === tag);
+        assert.ok(candidate);
+        const { target } = await request(`/pages/${page.pageId}/selection`, {
+          documentId: page.documentId,
+          captureId: capture.captureId,
+          candidateId: candidate.id,
+          action: "inspect",
+        });
+        const after = await verify(target.xpaths);
+        assert.deepEqual(after.matches, [["expected"]]);
+        assert.equal(after.scrollY, before.scrollY);
+        assert.equal(after.activeElement, before.activeElement);
+      },
+    );
+  });
+}
+
+test("xpath-wrapping-native-label-survives-unrelated-insertion-and-wrapper", async () => {
+  const secret = "PRIVATE_WRAPPING_LABEL_VALUE";
+  await withFixture(
+    `<label>Country <input data-oracle="expected" data-observe-value value="${secret}"></label>
+    <label>Language <input></label>
+    <script>window.mutateXpathFixture = () => {
+      const unrelated = document.createElement('label');
+      unrelated.innerHTML = 'Unrelated <input>';
+      document.body.prepend(unrelated);
+      const input = document.querySelector('[data-oracle="expected"]');
+      const wrapper = document.createElement('span');
+      input.before(wrapper); wrapper.append(input);
+    };</script>`,
+    async (session, page) => {
+      const before = await observe();
+      const capture = await request(`/pages/${page.pageId}/capture`, {
+        documentId: page.documentId,
+      });
+      const candidate = capture.candidates.find(
+        (item) => item.tag === "input" && item.label === "Country",
+      );
+      assert.ok(candidate);
+      const identity = { documentId: page.documentId, captureId: capture.captureId };
+      const evidence = await request(`/pages/${page.pageId}/xpath-evidence`, {
+        ...identity,
+        candidateIds: [candidate.id],
+      });
+      const { target } = await request(`/pages/${page.pageId}/selection`, {
+        ...identity,
+        candidateId: candidate.id,
+        action: "fill",
+      });
+      assert.ok(!JSON.stringify({ capture, evidence, target }).includes(secret));
+      const selected = await verify(target.xpaths);
+      assert.deepEqual(selected.matches, [["expected"]]);
+      assert.equal(selected.scrollY, before.scrollY);
+      assert.equal(selected.activeElement, before.activeElement);
+      assert.deepEqual(selected.values, before.values);
+      const changed = await observe({ xpaths: target.xpaths, mutateXpath: true });
+      assert.deepEqual(changed.matches, [["expected"]]);
+      assert.deepEqual(changed.values, [secret]);
+    },
+  );
+});
+
+for (const nested of [false, true]) {
+  test(`xpath-${nested ? "nested" : "direct"}-heading-survives-wrapper-and-section-insertion`, async () => {
+    const heading = (text) => (nested ? `<div><h2>${text}</h2></div>` : `<h2>${text}</h2>`);
+    await withFixture(
+      `<section>${heading("Billing")}<button data-oracle="expected">Save</button></section>
+      <section>${heading("Shipping")}<button>Save</button></section>
+      <script>window.mutateXpathFixture = () => {
+        const heading = document.querySelector('h2');
+        const wrapper = document.createElement('div');
+        heading.before(wrapper); wrapper.append(heading);
+        const unrelated = document.createElement('section');
+        unrelated.innerHTML = '<h2>Unrelated</h2><button>Save</button>';
+        document.body.prepend(unrelated);
+      };</script>`,
+      async (session, page) => {
+        const before = await observe();
+        const capture = await request(`/pages/${page.pageId}/capture`, {
+          documentId: page.documentId,
+        });
+        const candidates = capture.candidates.filter(
+          (item) => item.tag === "button" && item.scope.includes("Billing"),
+        );
+        assert.equal(candidates.length, 1);
+        const { target } = await request(`/pages/${page.pageId}/selection`, {
+          documentId: page.documentId,
+          captureId: capture.captureId,
+          candidateId: candidates[0].id,
+          action: "click",
+        });
+        const selected = await verify(target.xpaths);
+        assert.deepEqual(selected.matches, [["expected"]]);
+        assert.equal(selected.scrollY, before.scrollY);
+        assert.equal(selected.activeElement, before.activeElement);
+        assert.deepEqual((await observe({ xpaths: target.xpaths, mutateXpath: true })).matches, [
+          ["expected"],
+        ]);
+      },
+    );
+  });
+}
+
+test("xpath-heading-scope-excludes-nested-items-and-private-editable-hidden-content", async () => {
+  await withFixture(
+    `<section>
+      <section><h2>Nested section</h2></section>
+      <article><h2>Nested article</h2></article>
+      <div role="group"><h2>Nested group</h2></div>
+      <ul><li><h2>Nested item</h2></li></ul>
+      <div><h2>Repeated item one</h2><button>First item action</button></div>
+      <div><h2>Repeated item two</h2><button>Second item action</button></div>
+      <div hidden><h2>HIDDEN_HEADING_SECRET</h2></div>
+      <div data-private><h2>PRIVATE_HEADING_SECRET</h2></div>
+      <div contenteditable><h2>EDITABLE_HEADING_SECRET</h2></div>
+      <div><h2>Billing</h2></div>
+      <button data-oracle="expected">Save</button>
+    </section>
+    <section><div><h2>Shipping</h2></div><button>Save</button></section>`,
+    async (session, page) => {
+      const capture = await request(`/pages/${page.pageId}/capture`, {
+        documentId: page.documentId,
+      });
+      const candidate = capture.candidates.find(
+        (item) => item.tag === "button" && item.label === "Save" && item.scope.includes("Billing"),
+      );
+      assert.ok(candidate);
+      assert.deepEqual(candidate.scope, ["Billing"]);
+      const identity = { documentId: page.documentId, captureId: capture.captureId };
+      const evidence = await request(`/pages/${page.pageId}/xpath-evidence`, {
+        ...identity,
+        candidateIds: [candidate.id],
+      });
+      assert.ok(evidence.nodes.some((node) => node.tag === "h2" && node.text === "Billing"));
+      const { target } = await request(`/pages/${page.pageId}/selection`, {
+        ...identity,
+        candidateId: candidate.id,
+        action: "inspect",
+      });
+      assert.deepEqual((await verify(target.xpaths)).matches, [["expected"]]);
+      for (const secret of [
+        "HIDDEN_HEADING_SECRET",
+        "PRIVATE_HEADING_SECRET",
+        "EDITABLE_HEADING_SECRET",
+      ])
+        assert.ok(!JSON.stringify({ capture, evidence, target }).includes(secret), secret);
+      for (const borrowed of [
+        "Nested section",
+        "Nested article",
+        "Nested group",
+        "Nested item",
+        "Repeated item one",
+        "Repeated item two",
+      ])
+        assert.ok(!JSON.stringify(evidence).includes(borrowed), borrowed);
+    },
+  );
+});
+
+test("context-unnamed-graphic-cards-retain-item-and-child-identity-without-layout-wrappers", async () => {
+  const graphics = {
+    img: `<img width="60" height="40" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='40'%3E%3Crect width='60' height='40' fill='red'/%3E%3C/svg%3E">`,
+    svg: `<svg width="60" height="40"><circle cx="20" cy="20" r="15" fill="blue"/></svg>`,
+    canvas: `<canvas width="60" height="40"></canvas>`,
+    video: `<video width="60" height="40"></video>`,
+  };
+  const cards = Object.entries(graphics).map(
+    ([tag, graphic]) =>
+      `<div class="layout">${[1, 2]
+        .map(
+          (number) =>
+            `<div class="card" id="${tag}-${number}"><div>${graphic.replace(
+              `<${tag} `,
+              `<${tag} id="${tag}-${number}-graphic" `,
+            )}</div><div><button id="${tag}-${number}-cart">Add to cart</button></div></div>`,
+        )
+        .join("")}</div>`,
+  );
+  await withFixture(
+    `<style>.layout{display:flex;gap:20px}.card{width:180px;height:105px;border:1px solid}.noncard{display:inline-block}</style>
+     <main>${cards.join("")}</main>
+     <div><div class="noncard"><button aria-label="Icon button"><svg width="20" height="20"><circle r="10"/></svg></button><span hidden>PRIVATE_LAYOUT_TEXT</span></div>
+     <div class="noncard"><button aria-label="Icon button"><svg width="20" height="20"><circle r="10"/></svg></button><span hidden>PRIVATE_LAYOUT_TEXT</span></div></div>
+     <div><div class="noncard"><img data-private width="20" height="20"><button>Add to cart</button></div>
+     <div class="noncard"><img data-private width="20" height="20"><button>Add to cart</button></div></div>
+     <input data-observe-value value="PRIVATE_CARD_FORM_VALUE">`,
+    async (session, page) => {
+      const before = await observe();
+      const capture = await request(`/pages/${page.pageId}/capture`, {
+        documentId: page.documentId,
+      });
+      assert.equal(capture.coverage.complete, true);
+      assert.doesNotMatch(JSON.stringify(capture), /PRIVATE_/);
+      const items = capture.candidates.filter((candidate) => candidate.isRepeatedItem);
+      assert.equal(
+        items.length,
+        8,
+        "Retain each graphic card, but not rows or icon-control wrappers",
+      );
+      const expected = Object.keys(graphics).flatMap((tag) => [`${tag}-1`, `${tag}-2`]);
+      for (const [index, item] of items.entries()) {
+        const children = capture.candidates.filter((candidate) => candidate.parentId === item.id);
+        const graphic = children.find((candidate) => Object.hasOwn(graphics, candidate.tag));
+        const button = children.find((candidate) => candidate.tag === "button");
+        assert.ok(
+          graphic && button,
+          "Each unnamed graphic and button must retain their own card association",
+        );
+        assert.equal(graphic.label, "");
+        assert.equal(graphic.text, "");
+        assert.equal(button.label, "Add to cart");
+        for (const [candidate, expectedId] of [
+          [item, expected[index]],
+          [graphic, `${expected[index]}-graphic`],
+          [button, `${expected[index]}-cart`],
+        ]) {
+          const { target } = await request(`/pages/${page.pageId}/selection`, {
+            documentId: page.documentId,
+            captureId: capture.captureId,
+            candidateId: candidate.id,
+            action: "inspect",
+          });
+          assert.deepEqual((await verify(target.xpaths)).matches, [[expectedId]]);
+        }
+      }
+      const after = await observe();
+      assert.equal(after.scrollY, before.scrollY);
+      assert.equal(after.activeElement, before.activeElement);
+      assert.deepEqual(after.values, before.values);
+      assert.deepEqual(after.events, before.events);
+    },
+  );
+});
+
+for (const role of ["article", "unknown region"]) {
+  test(`xpath-heading-scope-respects-${role.replaceAll(" ", "-")}-boundary`, async () => {
+    await withFixture(
+      `<section>
+        <div role="${role}"><h2>Nested context</h2><button>Nested action</button></div>
+        <div><h2>Billing</h2></div><button data-oracle="expected">Save</button>
+      </section>`,
+      async (session, page) => {
+        const capture = await request(`/pages/${page.pageId}/capture`, {
+          documentId: page.documentId,
+        });
+        const candidate = capture.candidates.find(
+          (item) => item.tag === "button" && item.label === "Save",
+        );
+        assert.ok(candidate);
+        assert.deepEqual(candidate.scope, ["Billing"]);
+        const evidence = await request(`/pages/${page.pageId}/xpath-evidence`, {
+          documentId: page.documentId,
+          captureId: capture.captureId,
+          candidateIds: [candidate.id],
+        });
+        assert.ok(evidence.nodes.some((node) => node.tag === "h2" && node.text === "Billing"));
+        assert.ok(!JSON.stringify(evidence).includes("Nested context"));
+        const { target } = await request(`/pages/${page.pageId}/selection`, {
+          documentId: page.documentId,
+          captureId: capture.captureId,
+          candidateId: candidate.id,
+          action: "inspect",
+        });
+        assert.deepEqual((await verify(target.xpaths)).matches, [["expected"]]);
+      },
+    );
+  });
+}
+
+test("xpath-heading-scope-survives-deep-neutral-wrappers", async () => {
+  await withFixture(
+    `<script>
+      let container = document.body;
+      for (let index = 0; index < 1200; index++) {
+        const wrapper = document.createElement('div');
+        container.append(wrapper); container = wrapper;
+      }
+      container.innerHTML = '<h2>Billing</h2><button data-oracle="expected">Save</button>';
+      window.mutateXpathFixture = () => {
+        const unrelated = document.createElement('section');
+        unrelated.innerHTML = '<h2>Unrelated</h2><button>Save</button>';
+        document.body.prepend(unrelated);
+      };
+    </script>`,
+    async (session, page) => {
+      const before = await observe();
+      const capture = await request(`/pages/${page.pageId}/capture`, {
+        documentId: page.documentId,
+      });
+      assert.equal(capture.coverage.complete, true);
+      const candidate = capture.candidates.find((item) => item.tag === "button");
+      assert.ok(candidate);
+      assert.deepEqual(candidate.scope, ["Billing"]);
+      const { target } = await request(`/pages/${page.pageId}/selection`, {
+        documentId: page.documentId,
+        captureId: capture.captureId,
+        candidateId: candidate.id,
+        action: "inspect",
+      });
+      const selected = await verify(target.xpaths);
+      assert.deepEqual(selected.matches, [["expected"]]);
+      assert.equal(selected.scrollY, before.scrollY);
+      assert.equal(selected.activeElement, before.activeElement);
+      assert.deepEqual((await observe({ xpaths: target.xpaths, mutateXpath: true })).matches, [
+        ["expected"],
+      ]);
     },
   );
 });

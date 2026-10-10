@@ -260,9 +260,13 @@ public sealed partial class ResolutionService(
                             : item.Limitation switch
                             {
                                 "current_state_dependency" =>
-                                    "This step depends on a future page state. No earlier action was executed.",
+                                    "This command requires separate steps or a page change. No action was executed.",
                                 "appearance_unavailable" =>
                                     "The requested appearance cannot be established from the captured view.",
+                                "state_unavailable" =>
+                                    "The checked, selected or form-value distinction is not available. Identify the target by its name, section or position.",
+                                "target_not_addressable" =>
+                                    "The requested detail has no separate captured element. Choose the whole graphic or a separately exposed control.",
                                 "ambiguous" => "The instruction does not identify one intended target.",
                                 "unsupported_action" =>
                                     "Use one supported interaction type per command. It may target several elements in the current view; mixed interactions are unsupported.",

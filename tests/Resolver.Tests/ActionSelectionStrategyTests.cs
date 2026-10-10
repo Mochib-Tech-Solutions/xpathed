@@ -12,13 +12,21 @@ public sealed class ActionSelectionStrategyTests
     [InlineData(
         """{"complete":true,"actions":[{"step":1,"instruction":"Click the button showing a blue triangle in Secondary controls.","outcome":"unsupported","action":"click","candidateId":null,"limitation":"appearance_unavailable"}]}"""
     )]
-    public void ValidAppearanceAbstentionPreservesItsReasonWithoutAnExecutableAction(string content)
+    public void ValidEvidenceAbstentionPreservesItsReasonWithoutAnExecutableAction(string content)
     {
-        var selection = Assert.Single(ActionSelectionStrategy.Select(content, ["main:c4", "main:c8"]));
-        Assert.Equal("unsupported", selection.Outcome);
-        Assert.Equal("unsupported", selection.Action);
-        Assert.Equal("appearance_unavailable", selection.Limitation);
-        Assert.Null(selection.CandidateId);
+        foreach (var limitation in new[] { "appearance_unavailable", "state_unavailable", "target_not_addressable" })
+        {
+            var selection = Assert.Single(
+                ActionSelectionStrategy.Select(
+                    content.Replace("appearance_unavailable", limitation, StringComparison.Ordinal),
+                    ["main:c4", "main:c8"]
+                )
+            );
+            Assert.Equal("unsupported", selection.Outcome);
+            Assert.Equal("unsupported", selection.Action);
+            Assert.Equal(limitation, selection.Limitation);
+            Assert.Null(selection.CandidateId);
+        }
     }
 
     [Theory]
@@ -40,9 +48,17 @@ public sealed class ActionSelectionStrategyTests
     [InlineData(
         """{"complete":true,"actions":[{"step":1,"instruction":"Click the first triangle","outcome":"unsupported","action":"click","candidateId":null,"limitation":"appearance_unavailable"},{"step":2,"instruction":"Click the second triangle","outcome":"unsupported","action":"click","candidateId":null,"limitation":"appearance_unavailable"}]}"""
     )]
-    public void AppearanceAbstentionDoesNotRepairInvalidOrMixedSelections(string content)
+    public void EvidenceAbstentionDoesNotRepairInvalidOrMixedSelections(string content)
     {
-        var error = Assert.Throws<ApiException>(() => ActionSelectionStrategy.Select(content, ["main:c4"]));
-        Assert.Equal("provider_malformed_response", error.Code);
+        foreach (var limitation in new[] { "appearance_unavailable", "state_unavailable", "target_not_addressable" })
+        {
+            var error = Assert.Throws<ApiException>(() =>
+                ActionSelectionStrategy.Select(
+                    content.Replace("appearance_unavailable", limitation, StringComparison.Ordinal),
+                    ["main:c4"]
+                )
+            );
+            Assert.Equal("provider_malformed_response", error.Code);
+        }
     }
 }

@@ -205,6 +205,131 @@ describe("Workspace resolution", () => {
     },
   );
 
+  it.each([
+    [
+      "text_only",
+      "text_only_requested",
+      "That visual detail could not be established from page text and structure. Choose Auto screenshots, or specify a label, section, or position.",
+    ],
+    [
+      "unavailable",
+      "image_unavailable",
+      "A screenshot was unavailable for this request. Identify the element by its label, section, or position.",
+    ],
+    [
+      "included",
+      "visual_evidence",
+      "That visual detail could not be established from the current view. Specify a label, section, or position.",
+    ],
+    [
+      "text_only",
+      "semantic_evidence",
+      "That visual detail could not be established from the current view. Specify a label, section, or position.",
+    ],
+  ])(
+    "explains unavailable appearance using actual image status %s / %s",
+    async (status, reason, message) => {
+      mockApi(() =>
+        Promise.resolve(
+          Response.json({
+            ...found,
+            outcome: "unsupported",
+            action: "unsupported",
+            actions: [
+              {
+                ...found.actions[0],
+                outcome: "unsupported",
+                action: "unsupported",
+                code: "appearance_unavailable",
+                message: "The requested appearance cannot be established from the captured view.",
+                target: null,
+              },
+            ],
+            diagnostics: {
+              ...found.diagnostics,
+              imageRouting: {
+                mode: reason === "text_only_requested" ? "text_only" : "auto",
+                status,
+                reason,
+                score: null,
+                cached: false,
+              },
+            },
+          }),
+        ),
+      );
+      const user = await openWorkspace();
+      await submitInstruction(user);
+      expect(await screen.findByText(message)).toBeVisible();
+      expect(screen.getByRole("combobox", { name: "Screenshots" })).toHaveValue("auto");
+      if (reason !== "text_only_requested")
+        expect(screen.queryByText(/Choose Auto screenshots/)).not.toBeInTheDocument();
+      const response = screen.getByLabelText("Response message");
+      expect(response).not.toHaveTextContent(/masked|blurry|low.quality/i);
+      expect(
+        within(response).queryByRole("heading", { name: "Target not found" }),
+      ).not.toBeInTheDocument();
+    },
+  );
+
+  it("labels visual target phrases as requests without replacing accessible names", async () => {
+    mockApi(() =>
+      Promise.resolve(
+        Response.json({
+          ...found,
+          actions: [
+            {
+              ...found.actions[0],
+              instruction: "Click the blue triangle in Primary controls",
+              target: { ...target, accessibleName: "Option B", label: "Legacy label" },
+            },
+            {
+              ...found.actions[0],
+              actionId: "a2",
+              order: 2,
+              instruction: "Click the blue triangle in Secondary controls",
+              target: { ...target, candidateId: "candidate-2", accessibleName: "Option B" },
+            },
+          ],
+        }),
+      ),
+    );
+    const user = await openWorkspace();
+    await submitInstruction(user);
+    const first = await screen.findByRole("region", { name: "Target 1" });
+    const second = screen.getByRole("region", { name: "Target 2" });
+    expect(within(first).getByText("Option B", { selector: "bdi" })).toBeVisible();
+    expect(within(second).getByText("Option B", { selector: "bdi" })).toBeVisible();
+    expect(first).toHaveTextContent("Requested: Click the blue triangle in Primary controls");
+    expect(second).toHaveTextContent("Requested: Click the blue triangle in Secondary controls");
+    expect(first).not.toHaveTextContent("Secondary controls");
+    expect(second).not.toHaveTextContent("Primary controls");
+    expect(screen.queryByText("Legacy label")).not.toBeInTheDocument();
+  });
+
+  it("keeps an unnamed graphic unnamed while showing the requested visual detail", async () => {
+    mockApi(() =>
+      Promise.resolve(
+        Response.json({
+          ...found,
+          actions: [
+            {
+              ...found.actions[0],
+              instruction: "Click the picture of a mountain",
+              target: { ...target, tag: "img", label: "", accessibleName: "" },
+            },
+          ],
+        }),
+      ),
+    );
+    const user = await openWorkspace();
+    await submitInstruction(user);
+    const response = await screen.findByRole("region", { name: "Target 1" });
+    expect(within(response).getByRole("heading", { name: "Image" })).toBeVisible();
+    expect(within(response).getByText("No accessible name")).toBeVisible();
+    expect(response).toHaveTextContent("Requested: Click the picture of a mountain");
+  });
+
   it("keeps a covered target in its numbered card beside the ready target", async () => {
     mockApi(() =>
       Promise.resolve(
@@ -242,7 +367,7 @@ describe("Workspace resolution", () => {
     expect(blocked).toHaveTextContent(
       "Cannot click “Log in”. Another element or clipping blocks the inspected pointer point.",
     );
-    expect(blocked).not.toHaveTextContent(/XPath|Verification/);
+    expect(blocked).not.toHaveTextContent(/XPath|Verification|Requested:/);
     expect(
       within(screen.getByRole("region", { name: "Target 2" })).getByText("XPath"),
     ).toBeVisible();
@@ -689,7 +814,10 @@ describe("Workspace resolution", () => {
         expect(within(target).queryByText(/Action:/)).not.toBeInTheDocument();
         if (missing && target === targets[1])
           expect(within(target).getByText(/Click the second confirmation button/)).toBeVisible();
-        else expect(within(target).queryByText(/Click the/)).not.toBeInTheDocument();
+        else
+          expect(target).toHaveTextContent(
+            /Requested: Click the (first|second) confirmation button/,
+          );
       }
       expect(within(targets[0]!).getByText(target.xpaths[0]!)).toBeVisible();
       expect(within(targets[0]!).getByText("Disabled")).toBeVisible();
@@ -1866,14 +1994,26 @@ describe("Workspace resolution", () => {
     [
       "unsupported",
       "current_state_dependency",
-      "Page change required",
-      "This element depends on a page change. Make that change, then try again.",
+      "Separate steps required",
+      "This command needs separate steps. Resolve one interaction in the current view, then request the next step after any required page change. No action was executed.",
     ],
     [
       "unsupported",
       "appearance_unavailable",
       "Appearance unavailable",
-      "The requested appearance cannot be established from the captured CSS evidence.",
+      "That visual detail could not be established from the current view. Specify a label, section, or position.",
+    ],
+    [
+      "unsupported",
+      "state_unavailable",
+      "State unavailable",
+      "That form state is withheld from target selection. Identify the element by its label or position instead.",
+    ],
+    [
+      "unsupported",
+      "target_not_addressable",
+      "Graphic detail unavailable",
+      "That part of the graphic is not a separate page element. Request the whole graphic or a separately exposed element.",
     ],
     [
       "unsupported",

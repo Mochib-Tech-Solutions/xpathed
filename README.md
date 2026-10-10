@@ -24,6 +24,8 @@ The launcher starts the three APIs and Vite with hot reload. Browser uses an iso
 
 **Screenshots: Auto** lets Jev decide whether a screenshot adds missing visual evidence. Named controls usually need only text; shapes and graphics may need pixels. Choose **Text only** to prevent image sharing. Auto may include an image when routing is uncertain or unavailable. Detected form fields and marked private content are masked; when masking cannot be verified, resolution uses text and reports the limitation. Other visible content is sent to the provider. Images are never stored in chat or diagnostics.
 
+Describe a whole image by what it shows, or use a visual reference such as “the button beside the star.” Details painted inside an image or canvas need a separate page element to have their own XPath. Requests that depend on withheld form values or checked/selected states report that limitation.
+
 Use **Execute** on a current result to perform its action. Enter text, an option value, or a key when needed; these values go directly to Browser. Execution rechecks the target and consumes the result, so resolve again for another action. Completion describes the browser interaction; check the page for its effect.
 
 `XPATHED_PORT` sets the workspace port; the APIs use the next three loopback ports. Give separate checkouts four free, nonoverlapping ports.

@@ -1,4 +1,5 @@
 import { createServer } from "node:http";
+import { visualFixtureMarkup } from "./visual-fixtures.mjs";
 
 const runs = new Map();
 let providerRequest;
@@ -18,7 +19,7 @@ const fixture = `<!doctype html><html lang="en"><meta charset="utf-8"><title>Res
 <script>
 let clicks = 0;
 const runQuery = '?run=' + encodeURIComponent(new URL(location.href).searchParams.get('run') ?? 'manual');
-document.querySelector('button').addEventListener('click', () => clicks++);
+document.addEventListener('click', () => clicks++, true);
 const events = {};
 let mutationApplied = null;
 for (const name of ['click','input','change','focusin','mouseover','pointerover','scroll']) document.addEventListener(name, () => events[name] = (events[name] ?? 0) + 1, true);
@@ -57,7 +58,8 @@ setInterval(async () => {
    const result = doc.evaluate(xpath, scope === doc ? doc : scope.firstElementChild, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE);
    return Array.from({length:result.snapshotLength}, (_,i) => result.snapshotItem(i).getAttribute('data-oracle') ?? result.snapshotItem(i).id ?? 'wrong-target');
  });
- await fetch('/observation' + runQuery,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({matches,clicks,scrollY,events,mutationApplied})});
+ const elements = Array.from(document.querySelectorAll('[data-oracle]'), element => ({id:element.getAttribute('data-oracle'),tag:element.localName,role:element.getAttribute('role'),checked:element.getAttribute('aria-checked'),geometry:{x:element.getBoundingClientRect().x,y:element.getBoundingClientRect().y,width:element.getBoundingClientRect().width,height:element.getBoundingClientRect().height},color:getComputedStyle(element).color,background:getComputedStyle(element).backgroundColor,fontWeight:getComputedStyle(element).fontWeight}));
+ await fetch('/observation' + runQuery,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({matches,clicks,scrollY,events,mutationApplied,elements,imagesReady:Array.from(document.images).every(image=>image.complete && image.naturalWidth>0)})});
 }, 50);
 </script></body></html>`;
 
@@ -70,7 +72,11 @@ const server = createServer(async (request, response) => {
     const state = runs.get(run);
     const body = request.method === "POST" ? JSON.parse(await readBody(request)) : null;
     let output;
+    const visualMarkup = path.startsWith("/visual-quality/")
+      ? visualFixtureMarkup(path.slice("/visual-quality/".length))
+      : null;
     if (
+      visualMarkup ||
       [
         "/fixture",
         "/login",
@@ -90,6 +96,7 @@ const server = createServer(async (request, response) => {
       ].includes(path)
     ) {
       let html = fixture;
+      if (visualMarkup) html = html.replace(/<nav.*?<\/nav>/s, visualMarkup);
       if (path === "/visual") {
         const triangle =
           '<svg aria-hidden="true" width="64" height="64" viewBox="0 0 64 64"><path fill="#2563eb" d="M32 6 60 58H4Z"/></svg>';

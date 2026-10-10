@@ -203,6 +203,13 @@ internal static partial class XPathGenerator
         foreach (var labelId in target.LabelIds)
         {
             var label = nodes[labelId];
+            if (ancestors.Any(ancestor => ancestor.NodeId == labelId))
+            {
+                foreach (var predicate in TextPredicates(label))
+                {
+                    Add($"//{Tag(label)}[{predicate}]//{Tag(target)}");
+                }
+            }
             if (target.Attributes.TryGetValue("id", out var id) && label.Attributes.GetValueOrDefault("for") == id)
             {
                 foreach (var predicate in TextPredicates(label))
@@ -271,7 +278,9 @@ internal static partial class XPathGenerator
         if (node.HeadingId is { } headingId)
         {
             var heading = nodes[headingId];
-            predicates = predicates.Concat(TextPredicates(heading).Select(predicate => $"{Tag(heading)}[{predicate}]"));
+            predicates = predicates.Concat(
+                TextPredicates(heading).Select(predicate => $".//{Tag(heading)}[{predicate}]")
+            );
         }
         foreach (var cellId in node.CellIds)
         {
@@ -355,7 +364,7 @@ internal static partial class XPathGenerator
         : "concat(" + string.Join(",\"'\",", value.Split('\'').Select(part => $"'{part}'")) + ")";
 
     private static string Tag(XPathNodeEvidence node) =>
-        node.NamespaceUri == "http://www.w3.org/1999/xhtml"
+        node.NamespaceUri == "http://www.w3.org/1999/xhtml" && SimpleTag().IsMatch(node.Tag)
             ? node.Tag
             : $"*[local-name()={Literal(node.Tag)} and namespace-uri()={Literal(node.NamespaceUri)}]";
 
@@ -369,6 +378,9 @@ internal static partial class XPathGenerator
 
     private static ApiException InvalidEvidence() =>
         new(502, "invalid_xpath_evidence", "The browser returned inconsistent XPath evidence.");
+
+    [GeneratedRegex("\\A[A-Za-z_][A-Za-z0-9_.-]*\\z", RegexOptions.CultureInvariant)]
+    private static partial Regex SimpleTag();
 
     [GeneratedRegex("https?://", RegexOptions.CultureInvariant)]
     private static partial Regex Url();
