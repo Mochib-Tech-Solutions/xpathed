@@ -42,7 +42,7 @@ function workspace(t) {
     solution: "false",
     web: "false",
     tooling: "false",
-    docker: "false",
+    hosted: "false",
   };
   const needs = Object.fromEntries(Object.keys(outputs).map((key) => [key, { result: "skipped" }]));
   needs.changes = { result: "success", outputs };
@@ -92,7 +92,7 @@ test("selected matrix and ordinary jobs require successful results, while unsele
     }
     needs[job].result = "success";
   }
-  needs.docker.result = "success";
+  needs.hosted.result = "success";
   assert.equal(run("verify").status, 1, "an unselected job unexpectedly ran");
 });
 

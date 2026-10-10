@@ -6,28 +6,23 @@ import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-// Only Docker COPY inputs and hosted orchestration affect deployed images.
+// Runtime source and native host configuration determine a deployed release.
 export const inputs = [
   "src/Common",
   "src/Browser",
   "src/Resolver",
   "src/ClientApi",
   "src/Web",
-  "docker/browser",
-  "docker/resolver",
-  "docker/client-api",
-  "docker/web",
-  "docker/hosted",
-  "docker/compose.yaml",
+  "hosted",
   "scripts/deployment.mjs",
   "scripts/deployment-host.py",
+  "scripts/deployment-setup.py",
   "scripts/deployment-network.py",
   "scripts/deployment-receiver.py",
   "global.json",
   "Directory.Build.props",
   "Directory.Build.targets",
   ".editorconfig",
-  ".dockerignore",
   "package.json",
   "pnpm-lock.yaml",
   "pnpm-workspace.yaml",

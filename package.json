@@ -21,7 +21,7 @@
     "lint": "pnpm lint:dotnet && pnpm lint:web && pnpm lint:scripts",
     "lint:dotnet": "pnpm build:dotnet",
     "lint:web": "pnpm --filter xpathed lint",
-    "lint:scripts": "for script in scripts/*.sh docker/*.sh docker/hosted/*.sh .githooks/*; do sh -n \"$script\" || exit; done; node scripts/check-syntax.mjs",
+    "lint:scripts": "for script in scripts/*.sh .githooks/*; do sh -n \"$script\" || exit; done; node scripts/check-syntax.mjs",
     "format": "scripts/format.sh",
     "format:dotnet": "scripts/format.sh --write dotnet",
     "format:web": "pnpm --filter xpathed format",

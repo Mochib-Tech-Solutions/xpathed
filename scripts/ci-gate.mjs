@@ -5,7 +5,7 @@ import { isDeepStrictEqual } from "node:util";
 import { projects } from "./ci-changes.mjs";
 
 const directory = ".artifacts/ci";
-const flags = ["solution", "web", "tooling", "docker"];
+const flags = ["solution", "web", "tooling", "hosted"];
 const keys = ["changes", "dotnet", ...flags];
 const jobs = ["changes", ...projects.map((project) => `dotnet-${project}`), ...flags];
 const hash = (value) => createHash("sha256").update(value).digest("hex");

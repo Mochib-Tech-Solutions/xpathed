@@ -116,7 +116,7 @@ test("host deployment builds first, skips unchanged inputs, and rolls back failu
   execFileSync("python3", ["-B", "scripts/deployment-host.test.py"], { stdio: "pipe" });
 });
 
-test("hosted network isolation fails closed during failures and container restarts", () => {
+test("hosted network isolation fails closed during failures and policy tampering", () => {
   execFileSync("python3", ["-B", "scripts/deployment-network.test.py"], { stdio: "pipe" });
   execFileSync("python3", ["-B", "scripts/hosted-security.test.py"], { stdio: "pipe" });
 });

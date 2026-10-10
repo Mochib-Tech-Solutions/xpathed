@@ -11,14 +11,14 @@ const none = {
   dotnet: [],
   web: false,
   tooling: false,
-  docker: false,
+  hosted: false,
   solution: false,
 };
 const all = {
   dotnet: projects,
   web: true,
   tooling: true,
-  docker: true,
+  hosted: true,
   solution: true,
 };
 const sharedDotnet = { ...none, dotnet: projects };
@@ -63,18 +63,14 @@ for (const [path, expected] of [
   ["scripts/ci-dotnet-tests.mjs", { ...sharedDotnet, tooling: true }],
   ["package.json", all],
   ["scripts/format.sh", { ...sharedDotnet, web: true, tooling: true }],
-  ["scripts/ci-docker.sh", { ...none, tooling: true, docker: true }],
+  ["scripts/ci-hosted.sh", { ...none, tooling: true, hosted: true }],
   ["scripts/clean.mjs", { ...none, tooling: true }],
   ["scripts/dev.mjs", { ...none, tooling: true }],
-  ["docker/compose.yaml", { ...none, tooling: true, docker: true }],
-  ["docker/compose.sh", { ...none, tooling: true, docker: true }],
-  ["docker/browser/seccomp.json", { ...none, tooling: true, docker: true }],
-  ["docker/client-api/Dockerfile", { ...none, tooling: true, docker: true }],
-  ["docker/resolver/Dockerfile", { ...none, tooling: true, docker: true }],
-  ["docker/web/nginx.conf", { ...none, tooling: true, docker: true }],
-  ["docker/web/Dockerfile", { ...none, tooling: true, docker: true }],
-  ["docker/browser/Dockerfile", { ...none, tooling: true, docker: true }],
-  [".dockerignore", { ...none, tooling: true, docker: true }],
+  ["hosted/Caddyfile", { ...none, tooling: true, hosted: true }],
+  ["hosted/xpathed-browser.service", { ...none, tooling: true, hosted: true }],
+  ["scripts/deployment-host.py", { ...none, tooling: true, hosted: true }],
+  ["scripts/deployment-network.py", { ...none, tooling: true, hosted: true }],
+  [".env.example", { ...none, tooling: true, hosted: true }],
 ]) {
   test(`selects relevant jobs for ${path}`, () =>
     assert.deepEqual(classifyChanges([path]), expected));

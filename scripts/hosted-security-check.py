@@ -107,7 +107,7 @@ def check(base):
     )
     try:
         page = "/api/pages/" + session["pageId"]
-        result = request(page + "/navigate", "POST", {"url": "http://resolver:8080/health"})
+        result = request(page + "/navigate", "POST", {"url": "http://127.0.0.1:18082/health"})
         if not private_navigation_rejected(result):
             raise RuntimeError(
                 "Private navigation did not produce the expected Browser network rejection"

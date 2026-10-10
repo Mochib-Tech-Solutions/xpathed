@@ -7,7 +7,7 @@ export function classifyChanges(paths) {
   const affected = new Set();
   let web = false;
   let tooling = false;
-  let docker = false;
+  let hosted = false;
   let solution = false;
   for (const path of paths) {
     if (
@@ -16,7 +16,7 @@ export function classifyChanges(paths) {
       )
     ) {
       projects.forEach((project) => affected.add(project));
-      web = tooling = docker = solution = true;
+      web = tooling = hosted = solution = true;
     }
     if (path === "Xpathed.slnx") solution = true;
     if (
@@ -55,10 +55,11 @@ export function classifyChanges(paths) {
     )
       tooling = true;
     if (
-      /^(docker\/|\.dockerignore$|\.env\.example$)/.test(path) ||
-      path === "scripts/ci-docker.sh"
+      /^(hosted\/|\.env\.example$)/.test(path) ||
+      /^scripts\/deployment/.test(path) ||
+      path === "scripts/ci-hosted.sh"
     ) {
-      docker = tooling = true;
+      hosted = tooling = true;
     }
     for (const project of projects) {
       if (path.startsWith(`src/${project}/`) || path.startsWith(`tests/${project}.`)) {
@@ -73,7 +74,7 @@ export function classifyChanges(paths) {
     dotnet: projects.filter((project) => affected.has(project)),
     web,
     tooling,
-    docker,
+    hosted,
     solution,
   };
 }
