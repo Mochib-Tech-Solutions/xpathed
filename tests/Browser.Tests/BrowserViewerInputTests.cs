@@ -8,6 +8,38 @@ public sealed class BrowserViewerInputTests
     [Theory]
     [InlineData("pageId", "\"other\"")]
     [InlineData("documentId", "\"other\"")]
+    [InlineData("modifiers", "2")]
+    [InlineData("buttons", "1")]
+    [InlineData("button", "\"left\"")]
+    [InlineData("event", "\"down\"")]
+    [InlineData("type", "7")]
+    [InlineData("x", "-1")]
+    [InlineData("y", "\"invalid\"")]
+    [InlineData("x", "1e400")]
+    public void DifferentContextOrInvalidPointerCannotMerge(string property, string value)
+    {
+        var original = Move();
+        var input = new BrowserViewerInput(original);
+        var next = Move(property, value);
+        Assert.False(input.MergeMove(next));
+        Assert.True(JsonElement.DeepEquals(original, input.Message));
+        Assert.False(new BrowserViewerInput(next).MergeMove(original));
+    }
+
+    [Fact]
+    public void PointerMovesKeepTheLatestPositionWithoutCombiningDragPaths()
+    {
+        var input = new BrowserViewerInput(Move());
+        var next = Move("x", "200");
+        Assert.True(input.MergeMove(next));
+        Assert.True(JsonElement.DeepEquals(next, input.Message));
+        var drag = Move("buttons", "1");
+        Assert.False(new BrowserViewerInput(drag).MergeMove(drag));
+    }
+
+    [Theory]
+    [InlineData("pageId", "\"other\"")]
+    [InlineData("documentId", "\"other\"")]
     [InlineData("x", "200")]
     [InlineData("y", "200")]
     [InlineData("modifiers", "2")]
@@ -47,7 +79,11 @@ public sealed class BrowserViewerInputTests
         Assert.True(JsonElement.DeepEquals(original, input.Message));
     }
 
-    private static JsonElement Wheel(string? property = null, string? value = null)
+    private static JsonElement Wheel(string? property = null, string? value = null) => Mouse("wheel", property, value);
+
+    private static JsonElement Move(string? property = null, string? value = null) => Mouse("move", property, value);
+
+    private static JsonElement Mouse(string action, string? property, string? value)
     {
         var fields = new Dictionary<string, JsonElement>();
         using var document = JsonDocument.Parse(
@@ -59,6 +95,12 @@ public sealed class BrowserViewerInputTests
         foreach (var field in document.RootElement.EnumerateObject())
         {
             fields[field.Name] = field.Value;
+        }
+        fields["event"] = JsonSerializer.SerializeToElement(action);
+        if (action == "move")
+        {
+            fields.Remove("deltaX");
+            fields.Remove("deltaY");
         }
         if (property is not null)
         {

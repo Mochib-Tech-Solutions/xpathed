@@ -1,6 +1,7 @@
 import type { Dispatch, SetStateAction } from "react";
 import type {
   Frame,
+  PageCursor,
   PageDialog,
   PageSelect,
   ViewerStatus,
@@ -8,6 +9,12 @@ import type {
   SelectState,
 } from "./viewerProtocol";
 import bindViewerInput from "./bindViewerInput";
+
+const cursors = new Set(
+  "auto default none context-menu help pointer progress wait cell crosshair text vertical-text alias copy move no-drop not-allowed grab grabbing all-scroll col-resize row-resize n-resize e-resize s-resize w-resize ne-resize nw-resize se-resize sw-resize ew-resize ns-resize nesw-resize nwse-resize zoom-in zoom-out".split(
+    " ",
+  ),
+);
 
 export default function connectViewer(
   viewPath: string,
@@ -21,7 +28,15 @@ export default function connectViewer(
   let active = true;
   let ended = false;
   let controlSequence = 0;
-  const state: { frame?: Frame } = {};
+  const state: { frame?: Frame; cursor?: PageCursor } = {};
+  surface.style.cursor = "default";
+  const updateCursor = () => {
+    surface.style.cursor =
+      state.cursor?.pageId === state.frame?.pageId &&
+      state.cursor?.documentId === state.frame?.documentId
+        ? (state.cursor?.cursor ?? "default")
+        : "default";
+  };
   const url = new URL(viewPath, location.href);
   url.protocol = location.protocol === "https:" ? "wss:" : "ws:";
   const socket = new WebSocket(url);
@@ -38,6 +53,7 @@ export default function connectViewer(
     if (!active || ended) return;
     let next:
       | Frame
+      | PageCursor
       | PageDialog
       | PageSelect
       | { type: "dialogClosed"; dialogId: string }
@@ -51,6 +67,18 @@ export default function connectViewer(
     }
     if (!next || typeof next !== "object") {
       socket.close();
+      return;
+    }
+    if (next.type === "cursor") {
+      if (
+        typeof next.pageId === "string" &&
+        typeof next.documentId === "string" &&
+        cursors.has(next.cursor)
+      ) {
+        state.cursor = next;
+        if (next.pageId === state.frame?.pageId && next.documentId === state.frame.documentId)
+          updateCursor();
+      }
       return;
     }
     if (next.type === "error") {
@@ -169,7 +197,9 @@ export default function connectViewer(
     const picture = new Image();
     picture.onload = () => {
       if (!active || ended || socket.readyState !== WebSocket.OPEN) return;
-      if (state.frame?.pageId !== next.pageId || state.frame?.documentId !== next.documentId) {
+      const documentChanged =
+        state.frame?.pageId !== next.pageId || state.frame?.documentId !== next.documentId;
+      if (documentChanged) {
         binding.reset();
         if (controlSequence === controlAtReceipt) {
           setDialog((current) =>
@@ -188,6 +218,7 @@ export default function connectViewer(
       if (surface.height !== next.height) surface.height = next.height;
       surface.getContext("2d")?.drawImage(picture, 0, 0, next.width, next.height);
       state.frame = next;
+      if (documentChanged) updateCursor();
       setStatus("Connected");
       send({ type: "ack", frameId: next.frameId });
     };
@@ -195,9 +226,12 @@ export default function connectViewer(
     picture.src = `data:image/jpeg;base64,${next.data}`;
   };
   socket.onclose = socket.onerror = () => {
+    if (!active || ended) return;
     ended = true;
     socket.close();
     state.frame = undefined;
+    state.cursor = undefined;
+    updateCursor();
     binding.clearHeld();
     if (active) {
       setStatus("Disconnected");

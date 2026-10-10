@@ -157,6 +157,21 @@ internal sealed partial class CdpPage
                 break;
             case "Runtime.bindingCalled":
                 if (
+                    data.GetProperty("name").GetString() == "xpathedCursor"
+                    && contexts.TryGetValue(
+                        (id, data.GetProperty("executionContextId").GetInt32()),
+                        out var cursorFrame
+                    )
+                    && frames.TryGetValue(cursorFrame, out var currentFrame)
+                    && !currentFrame.IsDetached
+                    && currentFrame.Context?.SessionId == id
+                    && currentFrame.Context.Id == data.GetProperty("executionContextId").GetInt32()
+                    && data.GetProperty("payload").GetString() is { Length: <= 32 } cursor
+                )
+                {
+                    CursorChanged?.Invoke(cursor);
+                }
+                if (
                     data.GetProperty("name").GetString() == "xpathedFocus"
                     && contexts.TryGetValue(
                         (id, data.GetProperty("executionContextId").GetInt32()),
@@ -188,6 +203,7 @@ internal sealed partial class CdpPage
             case "Page.screencastFrame":
                 if (
                     id == SessionId
+                    && !Volatile.Read(ref screenshotInProgress)
                     && data.GetProperty("metadata").TryGetProperty("timestamp", out var frameTimestamp)
                     && frameTimestamp.GetDouble() >= Volatile.Read(ref minimumFrameTimestamp)
                 )

@@ -31,6 +31,15 @@ export default function BrowserViewer({ session }: { session: Session }) {
     );
   }, [session.viewPath, connection]);
 
+  useEffect(() => {
+    if (status !== "Disconnected") return;
+    const retry = window.setTimeout(() => {
+      setStatus("Connecting");
+      setConnection((previous) => previous + 1);
+    }, 1000);
+    return () => window.clearTimeout(retry);
+  }, [status, session.viewPath]);
+
   return (
     <>
       <div

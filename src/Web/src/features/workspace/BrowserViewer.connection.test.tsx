@@ -1,9 +1,64 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import BrowserViewer from "./BrowserViewer";
-import { Socket, Picture, session, frame, socket, sent } from "./viewerTestUtils";
+import { Socket, Picture, session, frame, socket, sent, draw } from "./viewerTestUtils";
 
 describe("BrowserViewer connection", () => {
+  it("automatically reconnects without replaying input and cancels retries on unmount", () => {
+    vi.useFakeTimers();
+    try {
+      const view = render(<BrowserViewer session={session} />);
+      draw();
+      const oldSocket = socket();
+      const connections = Socket.instances.length;
+      act(() => oldSocket.onclose?.());
+      act(() => {
+        vi.advanceTimersByTime(1000);
+      });
+      expect(Socket.instances).toHaveLength(connections + 1);
+      expect(socket().url.pathname).toBe(session.viewPath);
+      expect(sent()).toEqual([]);
+      draw();
+      act(() => oldSocket.onclose?.());
+      expect(screen.queryByText("Browser disconnected.")).not.toBeInTheDocument();
+      act(() => socket().onclose?.());
+      view.unmount();
+      act(() => {
+        vi.advanceTimersByTime(1000);
+      });
+      expect(Socket.instances).toHaveLength(connections + 1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("applies cursor feedback only to its displayed document and rejects cursor URLs", () => {
+    const view = render(<BrowserViewer session={session} />);
+    const surface = view.container.querySelector("canvas")!;
+    const cursor = (pageId: string, documentId: string, value: string) =>
+      act(() =>
+        socket().onmessage?.({
+          data: JSON.stringify({ type: "cursor", pageId, documentId, cursor: value }),
+        }),
+      );
+    draw();
+    cursor("p1", "d1", "pointer");
+    expect(surface.style.cursor).toBe("pointer");
+    cursor("other", "d1", "text");
+    cursor("p1", "old", "text");
+    cursor("p1", "d1", "url(https://example.test/cursor.png), pointer");
+    expect(surface.style.cursor).toBe("pointer");
+    cursor("p1", "d2", "text");
+    draw({ ...frame, frameId: 2, documentId: "d2" });
+    expect(surface.style.cursor).toBe("text");
+    draw({ ...frame, frameId: 3, documentId: "d3" });
+    expect(surface.style.cursor).toBe("default");
+    cursor("p1", "d3", "not-allowed");
+    expect(surface.style.cursor).toBe("not-allowed");
+    act(() => socket().onclose?.());
+    expect(surface.style.cursor).toBe("default");
+  });
+
   it("does not revive a disconnected viewer when an old image finishes decoding", () => {
     render(<BrowserViewer session={session} />);
     act(() => socket().onmessage?.({ data: JSON.stringify(frame) }));

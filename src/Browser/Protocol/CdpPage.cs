@@ -42,6 +42,7 @@ internal sealed partial class CdpPage(
     public event Action<CdpFrame>? FrameDetached;
     public event Action<double>? Input;
     public event Action? Focused;
+    public event Action<string>? CursorChanged;
     public event Action<JsonElement>? ScreencastFrame;
     public event Action<CdpDialog?>? DialogChanged;
     public CdpDialog? CurrentDialog { get; private set; }
@@ -95,6 +96,7 @@ internal sealed partial class CdpPage(
         await Connection.SendAsync("Page.setLifecycleEventsEnabled", new { enabled = true }, id);
         await Connection.SendAsync("Runtime.addBinding", new { name = "xpathedInput" }, id);
         await Connection.SendAsync("Runtime.addBinding", new { name = "xpathedFocus" }, id);
+        await Connection.SendAsync("Runtime.addBinding", new { name = "xpathedCursor" }, id);
         await Connection.SendAsync("Page.addScriptToEvaluateOnNewDocument", new { source = BrowserScripts.Input }, id);
         var tree = await Connection.SendAsync("Page.getFrameTree", sessionId: id);
         AddTree(tree.GetProperty("frameTree"), id);

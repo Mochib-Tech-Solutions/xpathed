@@ -1,4 +1,10 @@
 export type ViewerStatus = "Connecting" | "Connected" | "Disconnected";
+export type PageCursor = {
+  type: "cursor";
+  pageId: string;
+  documentId: string;
+  cursor: string;
+};
 export type Frame = {
   type: "frame";
   frameId: number;

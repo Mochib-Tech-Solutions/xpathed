@@ -6,6 +6,61 @@ internal sealed class BrowserViewerInput(JsonElement message)
 {
     public JsonElement Message { get; private set; } = message;
 
+    public bool MergeMove(JsonElement next)
+    {
+        static bool IsMove(JsonElement value) =>
+            value.TryGetProperty("type", out var type)
+            && type.ValueKind == JsonValueKind.String
+            && type.ValueEquals("mouse")
+            && value.TryGetProperty("event", out var action)
+            && action.ValueKind == JsonValueKind.String
+            && action.ValueEquals("move")
+            && value.TryGetProperty("buttons", out var buttons)
+            && buttons.ValueKind == JsonValueKind.Number
+            && buttons.TryGetInt32(out var pressed)
+            && pressed == 0;
+        static bool Coordinate(JsonElement value, string name) =>
+            value.TryGetProperty(name, out var coordinate)
+            && coordinate.ValueKind == JsonValueKind.Number
+            && coordinate.TryGetDouble(out var number)
+            && double.IsFinite(number)
+            && number >= 0;
+        if (
+            !IsMove(Message)
+            || !IsMove(next)
+            || !Coordinate(Message, "x")
+            || !Coordinate(Message, "y")
+            || !Coordinate(next, "x")
+            || !Coordinate(next, "y")
+        )
+        {
+            return false;
+        }
+        HashSet<string> fields = [];
+        foreach (var property in Message.EnumerateObject())
+        {
+            if (
+                !fields.Add(property.Name)
+                || (
+                    property.Name is not ("x" or "y")
+                    && (
+                        !next.TryGetProperty(property.Name, out var value)
+                        || !JsonElement.DeepEquals(property.Value, value)
+                    )
+                )
+            )
+            {
+                return false;
+            }
+        }
+        if (next.EnumerateObject().Count() != fields.Count)
+        {
+            return false;
+        }
+        Message = next.Clone();
+        return true;
+    }
+
     public bool MergeWheel(JsonElement next)
     {
         static bool IsWheel(JsonElement value) =>

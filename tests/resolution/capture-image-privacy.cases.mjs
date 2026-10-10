@@ -1,7 +1,120 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { targetMarkup, request, observe, verify, expectError, withFixture } from "./fixture.mjs";
+import { once } from "node:events";
+import jpeg from "jpeg-js";
+import {
+  browserUrl,
+  targetMarkup,
+  request,
+  observe,
+  verify,
+  expectError,
+  withFixture,
+} from "./fixture.mjs";
 import { assertSameMaskedImage } from "./viewer.mjs";
+
+test("capture-image-does-not-wait-for-page-font-readiness", async () => {
+  await withFixture(
+    `${targetMarkup}<input value="PRIVATE_VALUE"><script>
+      Object.defineProperty(document.fonts, 'ready', {get() {throw new Error('Unrelated font loading');}});
+      window.observedEvents={get inputOpacity(){return getComputedStyle(document.querySelector('input')).opacity}};
+    </script>`,
+    async (_session, page) => {
+      const capture = await request(`/pages/${page.pageId}/capture`, {
+        documentId: page.documentId,
+        includeImage: true,
+      });
+      assert.ok(capture.image.png);
+      assert.equal((await observe()).events.inputOpacity, "1");
+    },
+  );
+});
+
+test("capture-image-restores-controls-when-mask-preparation-throws", async () => {
+  await withFixture(
+    `${targetMarkup}<input value="PRIVATE_VALUE" data-observe-value><script>
+      const append=document.documentElement.append.bind(document.documentElement);
+      let fail=true;
+      document.documentElement.append=(...nodes)=>{
+        if(fail && nodes.some(node=>node.nodeName==='STYLE')) {fail=false;throw new Error('Mask preparation failed');}
+        return append(...nodes);
+      };
+      window.observedEvents={get inputOpacity(){return getComputedStyle(document.querySelector('input')).opacity}};
+    </script>`,
+    async (_session, page) => {
+      await expectError(
+        `/pages/${page.pageId}/capture`,
+        {
+          documentId: page.documentId,
+          includeImage: true,
+        },
+        409,
+        "capture_image_unavailable",
+      );
+      const after = await observe();
+      assert.equal(after.events.inputOpacity, "1");
+      assert.deepEqual(after.values, ["PRIVATE_VALUE"]);
+    },
+  );
+});
+
+test("capture-image-keeps-privacy-masks-out-of-viewer-on-success-and-failure", async () => {
+  await withFixture(
+    `${targetMarkup}<div contenteditable style="position:fixed;left:100px;top:100px;width:100px;height:100px;background:rgb(240,10,10)"></div><div id="closed-host"></div><script>
+      let armed=false;
+      window.mutateXpathFixture=()=>{armed=true};
+      new MutationObserver(records=>{
+        if(armed && records.some(record=>[...record.addedNodes].some(node=>node.nodeName==='STYLE'))) {
+          armed=false;document.querySelector('#closed-host').attachShadow({mode:'closed'}).innerHTML='<input value="PRIVATE_VALUE">';
+        }
+      }).observe(document.documentElement,{childList:true});
+    </script>`,
+    async (session, page) => {
+      const socket = new WebSocket(`${browserUrl.replace("http", "ws")}${session.viewPath}`, {
+        headers: { Origin: process.env.XPATHED_VIEWER_ORIGIN ?? "http://localhost:8081" },
+      });
+      const colors = [];
+      socket.addEventListener("message", ({ data }) => {
+        const frame = JSON.parse(data);
+        if (frame.type !== "frame") return;
+        const image = jpeg.decode(Buffer.from(frame.data, "base64"));
+        const offset = (130 * image.width + 130) * 4;
+        colors.push([...image.data.subarray(offset, offset + 3)]);
+        socket.send(JSON.stringify({ type: "ack", frameId: frame.frameId }));
+      });
+      try {
+        await once(socket, "message", { signal: AbortSignal.timeout(5000) });
+        const first = await request(`/pages/${page.pageId}/capture`, {
+          documentId: page.documentId,
+          includeImage: true,
+        });
+        assert.ok(first.image.png);
+        await observe({ mutateXpath: true });
+        await expectError(
+          `/pages/${page.pageId}/capture`,
+          {
+            documentId: page.documentId,
+            includeImage: true,
+          },
+          409,
+          "stale_capture",
+        );
+        await once(socket, "message", { signal: AbortSignal.timeout(5000) });
+        assert.ok(colors.length >= 2, "The viewer resumes after failed image capture");
+        assert.ok(
+          colors.every((color) =>
+            color.every((channel, index) => Math.abs(channel - [240, 10, 10][index]) <= 15),
+          ),
+          `The live viewer must preserve the control's actual appearance: ${JSON.stringify(colors)}`,
+        );
+      } finally {
+        const closed = once(socket, "close", { signal: AbortSignal.timeout(5000) });
+        socket.close();
+        await closed;
+      }
+    },
+  );
+});
 
 test("capture-opt-in-image-masks-private-values-across-frames-and-shadow-roots", async () => {
   await withFixture(

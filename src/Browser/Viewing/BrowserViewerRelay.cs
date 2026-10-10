@@ -14,6 +14,9 @@ internal sealed class BrowserViewerRelay : IDisposable
     private readonly Channel<object> controls = Channel.CreateBounded<object>(
         new BoundedChannelOptions(16) { FullMode = BoundedChannelFullMode.Wait }
     );
+    private readonly Channel<object> cursors = Channel.CreateBounded<object>(
+        new BoundedChannelOptions(1) { FullMode = BoundedChannelFullMode.DropOldest }
+    );
     private readonly CancellationTokenSource overflow = new();
     private readonly SemaphoreSlim sending = new(1);
     private long frameId;
@@ -21,6 +24,8 @@ internal sealed class BrowserViewerRelay : IDisposable
     private TaskCompletionSource? acknowledgment;
 
     public void Publish(BrowserVideoFrame frame) => frames.Writer.TryWrite(frame);
+
+    public void PublishCursor(object message) => cursors.Writer.TryWrite(message);
 
     public void PublishControl(object message)
     {
@@ -88,12 +93,13 @@ internal sealed class BrowserViewerRelay : IDisposable
                         frame.Data,
                     }
                 );
-                await ack.Task.WaitAsync(TimeSpan.FromSeconds(15), lifetime.Token);
+                // Background tabs can pause image decoding; keep only the latest pending frame.
+                await ack.Task.WaitAsync(lifetime.Token);
             }
         }
-        async Task SendControlsAsync()
+        async Task SendControlsAsync(Channel<object> channel)
         {
-            await foreach (var control in controls.Reader.ReadAllAsync(lifetime.Token))
+            await foreach (var control in channel.Reader.ReadAllAsync(lifetime.Token))
             {
                 await SendAsync(control);
             }
@@ -160,8 +166,8 @@ internal sealed class BrowserViewerRelay : IDisposable
                     }
                     lock (inputs)
                     {
-                        // Only adjacent pending scrolls can share a dispatch; clicks and keys remain barriers.
-                        if (pendingInput?.MergeWheel(root) == true)
+                        // Coalesce adjacent hovers and scrolls; clicks, drags and keys remain barriers.
+                        if (pendingInput is not null && (pendingInput.MergeMove(root) || pendingInput.MergeWheel(root)))
                         {
                             continue;
                         }
@@ -236,7 +242,14 @@ internal sealed class BrowserViewerRelay : IDisposable
                     pickerId,
                 }
             );
-        var tasks = new[] { SendFramesAsync(), SendControlsAsync(), ReceiveAsync(), ProcessInputsAsync() };
+        var tasks = new[]
+        {
+            SendFramesAsync(),
+            SendControlsAsync(controls),
+            SendControlsAsync(cursors),
+            ReceiveAsync(),
+            ProcessInputsAsync(),
+        };
         await Task.WhenAny(tasks);
         await lifetime.CancelAsync();
         if (socket.State != WebSocketState.Closed)
