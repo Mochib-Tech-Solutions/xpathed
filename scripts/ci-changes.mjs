@@ -39,7 +39,7 @@ export function classifyChanges(paths) {
       projects.forEach((project) => affected.add(project));
     }
     if (/^src\/Web\//.test(path)) web = true;
-    if (path.startsWith("tests/resolution/") || path.startsWith("evaluation/")) tooling = true;
+    if (path.startsWith("tests/resolution/")) tooling = true;
     if (
       /^(\.editorconfig|\.prettier(ignore|rc.*)|pnpm-(lock|workspace)\.yaml|\.npmrc|\.node-version|\.nvmrc)$/.test(
         path,
@@ -67,7 +67,7 @@ export function classifyChanges(paths) {
       projects.forEach((project) => affected.add(project));
     if (path.startsWith("tests/Common.")) projects.forEach((project) => affected.add(project));
     if (
-      /^(evaluation\/|scripts\/(evaluate[.-]|native[.-]|service-process[.])|tests\/resolution\/(ready\.mjs|browser\.test\.mjs|server\.mjs)$|scripts\/resolution-check\.sh$|docker\/(browser\/|resolver\/|compose\.(yaml|sh)$)|\.dockerignore$|pnpm-(lock|workspace)\.yaml$|\.npmrc$|\.node-version$|\.nvmrc$)/.test(
+      /^(scripts\/(native[.-]|service-process[.])|tests\/resolution\/.*\.mjs$|scripts\/resolution-check\.sh$|docker\/(browser\/|resolver\/|compose\.(yaml|sh)$)|\.dockerignore$|pnpm-(lock|workspace)\.yaml$|\.npmrc$|\.node-version$|\.nvmrc$)/.test(
         path,
       )
     )
@@ -79,7 +79,8 @@ export function classifyChanges(paths) {
     tooling,
     docker,
     solution,
-    browser: browser || affected.has("Browser") || affected.has("Resolver"),
+    browser:
+      browser || ["Browser", "Resolver", "ClientApi"].some((project) => affected.has(project)),
   };
 }
 

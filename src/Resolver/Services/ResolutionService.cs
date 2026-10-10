@@ -1,7 +1,6 @@
 using System.Diagnostics;
 using System.Text.Json;
 using Xpathed.Common.Contracts;
-using Xpathed.Common.Diagnostics;
 using Xpathed.Common.Http;
 
 namespace Xpathed.Resolver.Services;
@@ -15,71 +14,16 @@ public sealed partial class ResolutionService(
     ImageRoutingCache routingCache
 )
 {
-    public Task<ResolutionResult> ResolveAsync(
+    public async Task<ResolutionResult> ResolveAsync(
         string pageId,
         ResolutionRequest request,
         string traceId,
         CancellationToken cancellationToken
-    ) => ResolveCoreAsync(pageId, request, traceId, cancellationToken);
-
-    public async Task<DiagnosticResolution> ResolveWithEvidenceAsync(
-        string pageId,
-        ResolutionRequest request,
-        string traceId,
-        string? attemptId,
-        CancellationToken cancellationToken
-    )
-    {
-        string? input = null;
-        var result = await ResolveCoreAsync(
-            pageId,
-            request,
-            traceId,
-            cancellationToken,
-            attemptId,
-            value => input = value
-        );
-        var sensitive =
-            DiagnosticSanitizer.IsSensitiveInstruction(request.Instruction)
-            || DiagnosticSanitizer.IsSensitiveAction(result.Action)
-            || result.Actions?.Any(action => DiagnosticSanitizer.IsSensitiveAction(action.Action)) == true;
-        var evidenceConfiguration = JsonSerializer.SerializeToNode(
-            new
-            {
-                gateway.Model,
-                gateway.Provider,
-                result.ConfigurationId,
-                result.Diagnostics.Strategy,
-                result.Diagnostics.ModelInputBudgetBytes,
-                outputTokens = ActionSelectionStrategy.OutputTokens,
-                effective = gateway.DescribeConfiguration(),
-            }
-        )!;
-        var evidence = new ResolutionEvidence(
-            sensitive ? "withheld_sensitive_instruction"
-                : input is null ? "model_input_unavailable"
-                : "sanitized",
-            sensitive ? DiagnosticSanitizer.Redacted : DiagnosticSanitizer.RedactInstruction(request.Instruction),
-            sensitive || input is null ? null : DiagnosticSanitizer.SanitizeJson(input),
-            ActionSelectionStrategy.Prompt,
-            ActionSelectionStrategy.Schema.GetRawText(),
-            DiagnosticSanitizer.SanitizeJson(evidenceConfiguration.ToJsonString())
-        );
-        return new DiagnosticResolution(result, evidence);
-    }
-
-    private async Task<ResolutionResult> ResolveCoreAsync(
-        string pageId,
-        ResolutionRequest request,
-        string traceId,
-        CancellationToken cancellationToken,
-        string? suppliedAttemptId = null,
-        Action<string>? observeInput = null
     )
     {
         var timer = Stopwatch.StartNew();
         var requestCancellation = cancellationToken;
-        var attemptId = suppliedAttemptId ?? Guid.NewGuid().ToString("N");
+        var attemptId = Guid.NewGuid().ToString("N");
         CandidateCapture? capture = null;
         var completedCalls = new List<ResolutionDiagnostics>();
         var stageTimer = Stopwatch.StartNew();
@@ -201,7 +145,6 @@ public sealed partial class ResolutionService(
                 ModelInputComplete = capture.Coverage.Complete,
                 ModelInputBytes = System.Text.Encoding.UTF8.GetByteCount(input),
             };
-            observeInput?.Invoke(input);
             FinishStage();
             cancellationToken.ThrowIfCancellationRequested();
             Stage("model");

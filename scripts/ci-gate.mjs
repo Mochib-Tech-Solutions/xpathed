@@ -1,10 +1,8 @@
-import { loadCases } from "../evaluation/cases/load.mjs";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { appendFile, mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { isDeepStrictEqual } from "node:util";
 import { projects } from "./ci-changes.mjs";
-import { replay } from "../evaluation/run.mjs";
 
 const directory = ".artifacts/ci";
 const flags = ["solution", "web", "tooling", "docker", "browser"];
@@ -36,101 +34,6 @@ async function identity() {
   return { version: 1, sha, runId, runAttempt, configuration };
 }
 
-async function browserEvidence(sha) {
-  const path = `${directory}/browser`;
-  const manifest = await json(`${path}/manifest.json`);
-  const suite = loadCases("evaluation/cases/index.json");
-  ensure(
-    manifest.mode === "deterministic" && manifest.code?.revision === sha,
-    "Live-browser Resolver mode or source SHA mismatch",
-  );
-  ensure(
-    manifest.sourceManifestHash === hash(JSON.stringify(suite)) &&
-      isDeepStrictEqual(manifest.cases, suite.cases),
-    "Live-browser Resolver evidence does not cover the original full suite",
-  );
-  for (const file of ["package.json", "global.json", "evaluation/cases/index.json"])
-    ensure(
-      manifest.code.files?.[file] === hash(await readFile(file)),
-      `Live-browser Resolver configuration fingerprint mismatch: ${file}`,
-    );
-  const ids = suite.cases.map((item) => item.id).sort();
-  const plan = manifest.plan;
-  ensure(
-    plan?.repetitions === 1 &&
-      Number.isInteger(plan.concurrency) &&
-      plan.concurrency >= 1 &&
-      plan.concurrency <= 4 &&
-      plan.retries === 0 &&
-      isDeepStrictEqual([...plan.caseOrder].sort(), ids) &&
-      plan.trials?.length === ids.length,
-    "Live-browser Resolver plan must run every case once without retries",
-  );
-  ensure(
-    isDeepStrictEqual(plan.trials.map((trial) => trial.caseId).sort(), ids),
-    "Live-browser Resolver plan is missing or duplicating cases",
-  );
-  const trialIds = new Set();
-  for (const planned of plan.trials) {
-    ensure(
-      /^[a-f\d]{32}$/.test(planned.id) &&
-        !trialIds.has(planned.id) &&
-        planned.repetition === 1 &&
-        planned.attempt === 1,
-      "Invalid Live-browser Resolver first-attempt identity",
-    );
-    trialIds.add(planned.id);
-    const trial = await json(`${path}/trials/${planned.id}.json`);
-    for (const key of ["id", "caseId", "repetition", "attempt"])
-      ensure(
-        trial[key] === planned[key],
-        `Live-browser Resolver trial identity mismatch: ${planned.id}`,
-      );
-  }
-  ensure(
-    isDeepStrictEqual(
-      (await readdir(`${path}/trials`)).sort(),
-      [...trialIds].map((id) => `${id}.json`).sort(),
-    ),
-    "Missing or extra Live-browser Resolver trials",
-  );
-  ensure(
-    /^http:\/\/127\.0\.0\.1:[1-9]\d{0,4}$/u.test(manifest.fixture ?? ""),
-    "Controlled fixture must use native loopback",
-  );
-  const configurations = Object.entries(manifest.configurations ?? {});
-  ensure(
-    configurations.length > 0 &&
-      configurations.every(
-        ([id, value]) =>
-          value.configurationId === id &&
-          value.effective?.endpoint === `${manifest.fixture}/api/v1/` &&
-          value.effective.responseCache === false,
-      ),
-    "Live-browser Resolver configuration must use the controlled provider-free fixture without response reuse",
-  );
-  const summary = await replay(path);
-  ensure(
-    isDeepStrictEqual(await json(`${path}/summary.json`), summary),
-    "Saved Live-browser Resolver summary differs from replay",
-  );
-  ensure(
-    summary.passed === true &&
-      summary.completedTrials === ids.length &&
-      summary.missingTrials === 0 &&
-      summary.diagnosticReruns.trials === 0 &&
-      summary.modelQualityMeasured === false,
-    "Controlled provider-free Live-browser Resolver checks failed or are incomplete",
-  );
-  return {
-    trials: ids.length,
-    suiteHash: manifest.sourceManifestHash,
-    manifestHash: manifest.contentHash,
-    summaryHash: hash(JSON.stringify(summary)),
-    configurationHash: hash(JSON.stringify(manifest.configurations)),
-  };
-}
-
 async function main() {
   const [command, job, ...extra] = process.argv.slice(2);
   const result = { passed: false, sha: process.env.GITHUB_SHA ?? null };
@@ -148,7 +51,6 @@ async function main() {
         {
           ...(await identity()),
           job,
-          ...(job === "browser" ? { browser: await browserEvidence(result.sha) } : {}),
         },
         { flag: "wx" },
       );
@@ -194,7 +96,6 @@ async function main() {
         isDeepStrictEqual(await json(`${directory}/receipts/${key}.json`), {
           ...current,
           job: key,
-          ...(key === "browser" ? { browser: await browserEvidence(result.sha) } : {}),
         }),
         `Receipt identity mismatch: ${key}`,
       );

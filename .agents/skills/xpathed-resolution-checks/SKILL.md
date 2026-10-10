@@ -13,6 +13,4 @@ Read `README.md`, the affected Common/service contracts and `tests/AGENTS.md`. W
 4. For presentation, use colocated Web tests and `pnpm check:web`. jsdom cannot establish live hit-testing or frame geometry.
 5. Run affected gates from `package.json`; verify CI selection for added paths/projects. Report exercised boundaries and remaining gaps.
 
-`pnpm test:resolution:live` is a separate paid check when authorized. Read its route/output limits in `scripts/native-check.mjs` and `tests/resolution/live.test.mjs`; disclose request count and estimated cost before inference, then report measured cost and unknown charges separately. Use deterministic fixtures otherwise.
-
 Read `scripts/native-check.mjs` before concurrent/alternate-checkout runs; its temporary build outputs, loopback ports and owned process groups must not replace unrelated services. Execution scenarios act only on controlled fixture pages. Docker checks validate VPS deployment separately.

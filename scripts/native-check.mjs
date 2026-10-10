@@ -1,10 +1,8 @@
 import { createServer } from "node:net";
-import { mkdtemp, realpath, rm, stat } from "node:fs/promises";
+import { mkdtemp, realpath, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { isAbsolute, join, relative, resolve } from "node:path";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { parseOptions } from "../evaluation/run.mjs";
-import { readEvaluationKey } from "../evaluation/environment.mjs";
 import {
   browserExecutable,
   developmentConfig,
@@ -15,76 +13,19 @@ import {
 
 export function checkOptions(args) {
   const [kind, ...input] = args.filter((value) => value !== "--");
-  if (kind === "resolution") {
-    if (
-      input.length > 1 ||
-      (input[0] && !["--deterministic", "--browser-only", "--live"].includes(input[0]))
-    )
-      throw new Error("Use --deterministic, --browser-only or --live.");
-    return {
-      kind,
-      mode: input[0] === "--live" ? "live" : "deterministic",
-      browserOnly: input[0] === "--browser-only",
-    };
-  }
-  if (kind !== "evaluation") throw new Error("Choose resolution or evaluation checks.");
-  let xpath = false,
-    suite;
-  const forwarded = [];
-  for (let index = 0; index < input.length; index++) {
-    if (input[index] === "--xpath" && !xpath) xpath = true;
-    else if (
-      input[index] === "--suite" &&
-      !suite &&
-      input[index + 1] &&
-      !input[index + 1].startsWith("--")
-    )
-      suite = input[++index];
-    else forwarded.push(input[index]);
-  }
-  const options = parseOptions(forwarded);
-  if (options.replay || options.prune) throw new Error("Use evaluate:replay for saved results.");
-  if (xpath && options.mode !== "deterministic")
-    throw new Error("XPath checks use controlled provider-free selections.");
-  if (suite && options.mode !== "deterministic")
-    throw new Error("Custom suites support controlled provider-free evaluation only.");
-  return { kind, mode: options.mode, xpath, suite, args: forwarded };
+  if (kind !== "resolution" || input.length > 1 || (input[0] && input[0] !== "--browser-only"))
+    throw new Error("Use resolution [--browser-only] for provider-free checks.");
+  return { browserOnly: input[0] === "--browser-only" };
 }
 
-export async function checkEnvironment(root, options, inherited = process.env) {
+export async function checkEnvironment(root, inherited = process.env) {
   const env = await loadEnvironment(root, inherited);
-  if (options.suite) {
-    const path = await realpath(resolve(root, options.suite));
-    const rel = relative(await realpath(root), path);
-    const info = await stat(path);
-    if (!rel || rel.startsWith("..") || isAbsolute(rel) || !info.isFile() || info.size > 10000000)
-      throw new Error("Suite must be a JSON file under this checkout, at most 10 MB.");
-    env.XPATHED_EVALUATION_SUITE = path;
-  } else delete env.XPATHED_EVALUATION_SUITE;
-  if (options.mode === "live") {
-    const key =
-      options.kind === "evaluation"
-        ? await readEvaluationKey({
-            ...env,
-            XPATHED_ENV_FILE: resolve(root, inherited.XPATHED_ENV_FILE || ".env"),
-          })
-        : env.OPENROUTER_API_KEY;
-    if (!key?.trim())
-      throw new Error(
-        `Set ${options.kind === "evaluation" ? "OPENROUTER_EVAL_API_KEY" : "OPENROUTER_API_KEY"} for live checks.`,
-      );
-    env.OPENROUTER_API_KEY = key.trim();
-    if (options.kind === "resolution") {
-      env.OPENROUTER_MODEL = "deepseek/deepseek-v4.1-flash";
-      env.OPENROUTER_PROVIDER = "wafer";
-    }
-    env.OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1/";
-  } else {
-    env.OPENROUTER_API_KEY = "deterministic-fixture-only";
-    env.OPENROUTER_MODEL = "deepseek/deepseek-v4.1-flash";
-    env.OPENROUTER_PROVIDER = "wafer";
-  }
+  for (const key of Object.keys(env))
+    if (/^(OPENROUTER_|OpenRouter__)/iu.test(key)) delete env[key];
   Object.assign(env, {
+    OPENROUTER_API_KEY: "deterministic-fixture-only",
+    OPENROUTER_MODEL: "deepseek/deepseek-v4.1-flash",
+    OPENROUTER_PROVIDER: "wafer",
     API_REQUESTS_PER_MINUTE: "100000",
     API_CONCURRENT_REQUESTS: "32",
     MODEL_CALLS_PER_MINUTE: "100000",
@@ -97,7 +38,7 @@ export async function checkEnvironment(root, options, inherited = process.env) {
 export async function main(args = process.argv.slice(2)) {
   const root = await realpath(fileURLToPath(new URL("..", import.meta.url)));
   const options = checkOptions(args);
-  const env = await checkEnvironment(root, options);
+  const env = await checkEnvironment(root);
   env.BROWSER_EXECUTABLE_PATH = await browserExecutable(env);
   const abort = new AbortController();
   let failure;
@@ -130,7 +71,7 @@ export async function main(args = process.argv.slice(2)) {
     }
     const ports = reservations.map((server) => server.address().port);
     const fixture = `http://127.0.0.1:${ports[4]}`;
-    if (options.mode !== "live") env.OPENROUTER_BASE_URL = `${fixture}/api/v1/`;
+    env.OPENROUTER_BASE_URL = `${fixture}/api/v1/`;
     const config = developmentConfig(root, env, ports.slice(0, 4));
     const publicEnv = {
       ...config.services[0].env,
@@ -148,9 +89,7 @@ export async function main(args = process.argv.slice(2)) {
     };
     const services = config.services.filter(
       (service) =>
-        service.name !== "web" &&
-        (service.name !== "client-api" ||
-          (options.kind === "resolution" && !options.browserOnly && options.mode !== "live")),
+        service.name !== "web" && (service.name !== "client-api" || !options.browserOnly),
     );
     const artifacts = join(temporary, "build");
     publicEnv.XPATHED_RUNTIME_ARTIFACTS = artifacts;
@@ -183,11 +122,7 @@ export async function main(args = process.argv.slice(2)) {
     processes.start({
       name: "fixture",
       command: process.execPath,
-      args: [
-        options.kind === "evaluation"
-          ? "evaluation/fixtures/server.mjs"
-          : "tests/resolution/server.mjs",
-      ],
+      args: ["tests/resolution/server.mjs"],
       env: publicEnv,
     });
     await waitForHealth(`${fixture}/health`, abort.signal);
@@ -199,26 +134,16 @@ export async function main(args = process.argv.slice(2)) {
       await waitForHealth(service.health, abort.signal);
     }
     await new Promise((done) => reservations[5].close(done));
-    const run = (name, args, environment = publicEnv) =>
-      processes.run({ name, command: process.execPath, args, env: environment });
-    if (options.kind === "evaluation") {
-      await run("Evaluation", [
-        options.xpath ? "evaluation/xpath.mjs" : "evaluation/run.mjs",
-        ...options.args,
-      ]);
-    } else if (options.mode === "live") {
-      await run("Live checks", [
+    await processes.run({
+      name: "Chromium browser checks",
+      command: process.execPath,
+      args: [
         "--test",
-        "tests/resolution/live.test.mjs",
-        "tests/resolution/cardinality.live.test.mjs",
-      ]);
-    } else {
-      const files = [
         "tests/resolution/browser.test.mjs",
         ...(!options.browserOnly ? ["tests/resolution/pipeline.test.mjs"] : []),
-      ];
-      await run("Chromium browser checks", ["--test", ...files], publicEnv);
-    }
+      ],
+      env: publicEnv,
+    });
   } catch (error) {
     if (!abort.signal.aborted) failure = error;
   } finally {

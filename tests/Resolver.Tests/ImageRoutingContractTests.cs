@@ -137,7 +137,7 @@ public sealed class ImageRoutingContractTests
     }
 
     [Fact]
-    public async Task AutoImageUsesTheSameCaptureAndRetainsNoPixelsInResponseEvidence()
+    public async Task AutoImageUsesTheSameCaptureAndRetainsNoPixelsInResponse()
     {
         var handler = new DeterministicServicesHandler
         {
@@ -145,13 +145,11 @@ public sealed class ImageRoutingContractTests
         };
         await using var application = ResolutionContractTests.CreateApplication(handler);
         using var client = application.CreateClient();
-        client.DefaultRequestHeaders.Add("X-Xpathed-Attempt-Id", Guid.NewGuid().ToString("N"));
         using var response = await client.PostAsJsonAsync(
-            "/internal/pages/page-1/resolve",
+            "/pages/page-1/resolve",
             new { instruction = "Click the triangle", documentId = "document-1" }
         );
-        var envelope = await response.Content.ReadFromJsonAsync<JsonElement>();
-        var result = envelope.GetProperty("result");
+        var result = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal("found", result.GetProperty("outcome").GetString());
         Assert.Equal(
             "included",
@@ -165,8 +163,8 @@ public sealed class ImageRoutingContractTests
         Assert.Equal("text", content[0].GetProperty("type").GetString());
         Assert.Equal("image_url", content[1].GetProperty("type").GetString());
         Assert.StartsWith("data:image/png;base64,", content[1].GetProperty("image_url").GetProperty("url").GetString());
-        Assert.DoesNotContain("data:image", envelope.GetRawText(), StringComparison.Ordinal);
-        Assert.DoesNotContain("iVBOR", envelope.GetRawText(), StringComparison.Ordinal);
+        Assert.DoesNotContain("data:image", result.GetRawText(), StringComparison.Ordinal);
+        Assert.DoesNotContain("iVBOR", result.GetRawText(), StringComparison.Ordinal);
         Assert.Equal(1, handler.RouterRequestCount);
         Assert.Equal(1, handler.ImageRequestCount);
         Assert.Equal(1, handler.ProviderRequestCount);

@@ -25,22 +25,18 @@ const all = {
 };
 const sharedDotnet = { ...none, dotnet: projects, browser: true };
 
-test("Browser source changes require controlled provider-free Live-browser Resolver evaluation", () => {
+test("Browser source changes require controlled browser and resolution checks", () => {
   assert.equal(classifyChanges(["src/Browser/Sessions/BrowserSessions.cs"]).browser, true);
 });
 
-test("controlled provider-free Live-browser Resolver evaluation selects its runtime, fixture, and runner dependencies", () => {
+test("controlled browser and resolution checks selects its runtime, fixture, and runner dependencies", () => {
   for (const path of [
-    "evaluation/run.mjs",
-    "evaluation/cases/index.json",
-    "evaluation/fixtures/pages.mjs",
-    "scripts/evaluate.sh",
-    "scripts/evaluate.test.mjs",
     "scripts/native-check.mjs",
     "scripts/native.mjs",
     "scripts/service-process.mjs",
-    "tests/resolution/ready.mjs",
     "tests/resolution/browser.test.mjs",
+    "tests/resolution/pipeline.test.mjs",
+    "tests/resolution/visual-fixtures.mjs",
     "tests/resolution/server.mjs",
     "scripts/resolution-check.sh",
     "docker/compose.yaml",
@@ -59,10 +55,7 @@ test("controlled provider-free Live-browser Resolver evaluation selects its runt
 
 for (const [path, expected] of [
   ["README.md", none],
-  ["evaluation/run.mjs", { ...none, tooling: true, browser: true }],
-  ["evaluation/grader.test.mjs", { ...none, tooling: true, browser: true }],
-  ["evaluation/cases/index.json", { ...none, tooling: true, browser: true }],
-  ["tests/resolution/pipeline.test.mjs", { ...none, tooling: true }],
+  ["tests/resolution/pipeline.test.mjs", { ...none, tooling: true, browser: true }],
   [
     "tests/Resolver.Tests/ResolutionContractTests.cs",
     { ...none, dotnet: ["Resolver"], browser: true },
@@ -75,8 +68,11 @@ for (const [path, expected] of [
   [".npmrc", { ...none, web: true, tooling: true, browser: true }],
   ["src/Browser/Sessions/BrowserSessions.cs", { ...none, dotnet: ["Browser"], browser: true }],
   ["src/Resolver/Resolver.csproj", { ...none, dotnet: ["Resolver"], browser: true }],
-  ["tests/ClientApi.Tests/SessionTests.cs", { ...none, dotnet: ["ClientApi"] }],
-  ["src/ClientApi/Controllers/PagesController.cs", { ...none, dotnet: ["ClientApi"] }],
+  ["tests/ClientApi.Tests/SessionTests.cs", { ...none, dotnet: ["ClientApi"], browser: true }],
+  [
+    "src/ClientApi/Controllers/PagesController.cs",
+    { ...none, dotnet: ["ClientApi"], browser: true },
+  ],
   ["src/Common/Contracts/Session.cs", sharedDotnet],
   ["tests/Common.Tests/ContractTests.cs", sharedDotnet],
   ["Directory.Build.props", sharedDotnet],
