@@ -58,7 +58,7 @@ test("local command selection reuses CI ownership without requiring Docker or in
   }
   const all = checkCommands(["package.json"]);
   assert.ok(all.some((cmd) => cmd[1] === "build:dotnet"));
-  assert.ok(!JSON.stringify(all).match(/docker|test:resolution|--live/));
+  assert.ok(!JSON.stringify(all).match(/docker|test:browser|--live/));
   assert.deepEqual(checkCommands(["docker/compose.yaml"]), [["pnpm", "check:tooling"]]);
   assert.equal(classifyChanges(["docker/compose.yaml"]).docker, true);
 });

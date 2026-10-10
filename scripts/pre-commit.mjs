@@ -83,7 +83,9 @@ export async function checkStaged(cwd = process.cwd()) {
     )
   )
     throw new Error("Source or index changed during checks; review, stage and retry the commit.");
-  console.log("Staged checks passed. Browser integration and Docker validation run in CI.");
+  console.log(
+    "Staged checks passed. Docker validation runs in CI; real-browser checks are manual.",
+  );
 }
 
 if (import.meta.main) {

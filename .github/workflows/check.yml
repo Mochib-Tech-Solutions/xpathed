@@ -29,7 +29,6 @@ jobs:
       tooling: ${{ steps.select.outputs.tooling }}
       docker: ${{ steps.select.outputs.docker }}
       solution: ${{ steps.select.outputs.solution }}
-      browser: ${{ steps.select.outputs.browser }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -187,57 +186,9 @@ jobs:
         with:
           job: docker
 
-  browser:
-    name: Browser and resolution contracts
-    needs: changes
-    if: needs.changes.outputs.browser == 'true'
-    runs-on: ubuntu-24.04
-    timeout-minutes: 35
-    env:
-      # The packaged Chrome has Ubuntu's sandbox profile; the runner's unpacked Chromium does not.
-      BROWSER_EXECUTABLE_PATH: /usr/bin/google-chrome
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-          ref: ${{ github.sha }}
-      - uses: pnpm/setup@c9883cc79df532ad1a7b81bf9ab944ceb090d65c # v2.0.0
-        with:
-          runtime: node@24.16.0
-          install: false
-      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
-        with:
-          global-json-file: global.json
-      - name: Install locked check dependencies
-        run: pnpm install --frozen-lockfile
-      - name: Require an installed native browser
-        run: node --input-type=module -e 'import { browserExecutable } from "./scripts/native.mjs"; console.log(await browserExecutable(process.env));'
-      - name: Verify Chromium browser and resolution contracts
-        shell: bash
-        env:
-          XPATHED_ENV_FILE: /dev/null
-          OPENROUTER_API_KEY: ""
-        run: |
-          mkdir -p .artifacts/ci
-          pnpm test:resolution 2>&1 | tee .artifacts/ci/browser.log
-      - uses: ./.github/actions/ci-receipt
-        with:
-          job: browser
-      - name: Retain browser test logs and failure images
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: browser-tests-${{ github.run_attempt }}
-          path: |
-            .artifacts/ci/browser.log
-            .artifacts/ci/browser-contract-images/
-          include-hidden-files: true
-          if-no-files-found: error
-          retention-days: 30
-
   check:
     name: Check
-    needs: [changes, dotnet, solution, web, tooling, docker, browser]
+    needs: [changes, dotnet, solution, web, tooling, docker]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 5

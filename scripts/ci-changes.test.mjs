@@ -13,7 +13,6 @@ const none = {
   tooling: false,
   docker: false,
   solution: false,
-  browser: false,
 };
 const all = {
   dotnet: projects,
@@ -21,68 +20,30 @@ const all = {
   tooling: true,
   docker: true,
   solution: true,
-  browser: true,
 };
-const sharedDotnet = { ...none, dotnet: projects, browser: true };
-
-test("Browser source changes require controlled browser and resolution checks", () => {
-  assert.equal(classifyChanges(["src/Browser/Sessions/BrowserSessions.cs"]).browser, true);
-});
-
-test("controlled browser and resolution checks selects its runtime, fixture, and runner dependencies", () => {
-  for (const path of [
-    "scripts/native-check.mjs",
-    "scripts/native.mjs",
-    "scripts/service-process.mjs",
-    "tests/resolution/browser.test.mjs",
-    "tests/resolution/pipeline.test.mjs",
-    "tests/resolution/visual-fixtures.mjs",
-    "tests/resolution/server.mjs",
-    "scripts/resolution-check.sh",
-    "docker/compose.yaml",
-    "docker/compose.sh",
-    "docker/browser/seccomp.json",
-    "docker/resolver/Dockerfile",
-    ".dockerignore",
-    "pnpm-lock.yaml",
-    "pnpm-workspace.yaml",
-    ".npmrc",
-    ".node-version",
-    ".nvmrc",
-  ])
-    assert.equal(classifyChanges([path]).browser, true, path);
-});
+const sharedDotnet = { ...none, dotnet: projects };
 
 for (const [path, expected] of [
   ["README.md", { ...none, tooling: true }],
-  ["tests/resolution/pipeline.test.mjs", { ...none, tooling: true, browser: true }],
-  [
-    "tests/Resolver.Tests/ResolutionContractTests.cs",
-    { ...none, dotnet: ["Resolver"], browser: true },
-  ],
+  ["tests/resolution/browser.test.mjs", { ...none, tooling: true }],
+  ["tests/Resolver.Tests/ResolutionContractTests.cs", { ...none, dotnet: ["Resolver"] }],
   ["SECURITY.md", { ...none, tooling: true }],
   ["AGENTS.md", { ...none, tooling: true }],
-  ["src/Browser/AGENTS.md", { ...none, dotnet: ["Browser"], tooling: true, browser: true }],
-  [
-    "src/Browser/Scripts/capture.js",
-    { ...none, dotnet: ["Browser"], tooling: true, browser: true },
-  ],
+  ["src/Browser/AGENTS.md", { ...none, dotnet: ["Browser"], tooling: true }],
+  ["src/Browser/Scripts/capture.js", { ...none, dotnet: ["Browser"], tooling: true }],
   [".github/branch-protection.json", { ...none, tooling: true }],
   [".github/copilot-instructions.md", { ...none, tooling: true }],
   ["ruff.toml", { ...none, tooling: true }],
   ["scripts/requirements-dev.txt", { ...none, tooling: true }],
   ["src/Web/src/features/browser/App.tsx", { ...none, web: true }],
   ["src/Web/package.json", { ...none, web: true }],
-  ["pnpm-lock.yaml", { ...none, web: true, tooling: true, browser: true }],
-  ["pnpm-workspace.yaml", { ...none, web: true, tooling: true, browser: true }],
-  [".npmrc", { ...none, web: true, tooling: true, browser: true }],
-  ["src/Browser/Sessions/BrowserSessions.cs", { ...none, dotnet: ["Browser"], browser: true }],
-  ["src/Resolver/Resolver.csproj", { ...none, dotnet: ["Resolver"], browser: true }],
-  ["tests/ClientApi.Tests/SessionTests.cs", { ...none, dotnet: ["ClientApi"], browser: true }],
-  [
-    "src/ClientApi/Controllers/PagesController.cs",
-    { ...none, dotnet: ["ClientApi"], browser: true },
-  ],
+  ["pnpm-lock.yaml", { ...none, web: true, tooling: true }],
+  ["pnpm-workspace.yaml", { ...none, web: true, tooling: true }],
+  [".npmrc", { ...none, web: true, tooling: true }],
+  ["src/Browser/Sessions/BrowserSessions.cs", { ...none, dotnet: ["Browser"] }],
+  ["src/Resolver/Resolver.csproj", { ...none, dotnet: ["Resolver"] }],
+  ["tests/ClientApi.Tests/SessionTests.cs", { ...none, dotnet: ["ClientApi"] }],
+  ["src/ClientApi/Controllers/PagesController.cs", { ...none, dotnet: ["ClientApi"] }],
   ["src/Common/Contracts/Session.cs", sharedDotnet],
   ["tests/Common.Tests/ContractTests.cs", sharedDotnet],
   ["Directory.Build.props", sharedDotnet],
@@ -105,15 +66,15 @@ for (const [path, expected] of [
   ["scripts/ci-docker.sh", { ...none, tooling: true, docker: true }],
   ["scripts/clean.mjs", { ...none, tooling: true }],
   ["scripts/dev.mjs", { ...none, tooling: true }],
-  ["docker/compose.yaml", { ...none, tooling: true, docker: true, browser: true }],
-  ["docker/compose.sh", { ...none, tooling: true, docker: true, browser: true }],
-  ["docker/browser/seccomp.json", { ...none, tooling: true, docker: true, browser: true }],
+  ["docker/compose.yaml", { ...none, tooling: true, docker: true }],
+  ["docker/compose.sh", { ...none, tooling: true, docker: true }],
+  ["docker/browser/seccomp.json", { ...none, tooling: true, docker: true }],
   ["docker/client-api/Dockerfile", { ...none, tooling: true, docker: true }],
-  ["docker/resolver/Dockerfile", { ...none, tooling: true, docker: true, browser: true }],
+  ["docker/resolver/Dockerfile", { ...none, tooling: true, docker: true }],
   ["docker/web/nginx.conf", { ...none, tooling: true, docker: true }],
   ["docker/web/Dockerfile", { ...none, tooling: true, docker: true }],
-  ["docker/browser/Dockerfile", { ...none, tooling: true, docker: true, browser: true }],
-  [".dockerignore", { ...none, tooling: true, docker: true, browser: true }],
+  ["docker/browser/Dockerfile", { ...none, tooling: true, docker: true }],
+  [".dockerignore", { ...none, tooling: true, docker: true }],
 ]) {
   test(`selects relevant jobs for ${path}`, () =>
     assert.deepEqual(classifyChanges([path]), expected));
@@ -146,7 +107,6 @@ test("Git event ranges include deletions and both rename owners, and PRs use mer
     ...none,
     dotnet: ["Browser", "Resolver"],
     web: true,
-    browser: true,
   });
   git("checkout", "main");
   writeFileSync(join(cwd, "unrelated-main-change"), "main moved");

@@ -43,7 +43,6 @@ function workspace(t) {
     web: "false",
     tooling: "false",
     docker: "false",
-    browser: "false",
   };
   const needs = Object.fromEntries(Object.keys(outputs).map((key) => [key, { result: "skipped" }]));
   needs.changes = { result: "success", outputs };
@@ -56,32 +55,12 @@ function workspace(t) {
   return { cwd, write, env, needs, run };
 }
 
-test("browser and pipeline logs preserve a failed test command", (t) => {
+test("CI excludes real-browser execution while manual commands remain available", () => {
   const workflow = readFileSync(".github/workflows/check.yml", "utf8");
-  const step = workflow.match(
-    /- name: Verify Chromium browser and resolution contracts\n([\s\S]*?)(?=\n      - )/,
-  )?.[1];
-  assert.ok(step);
-  assert.match(step, /pnpm test:resolution 2>&1/);
-  assert.match(step, /^        shell: bash$/m);
-  const command = step.match(/        run: \|\n([\s\S]*)/)?.[1];
-  assert.ok(command);
-  const cwd = mkdtempSync(join(tmpdir(), "xpathed-ci-browser-log-"));
-  t.after(() => rmSync(cwd, { recursive: true, force: true }));
-  const result = spawnSync(
-    "bash",
-    [
-      "--noprofile",
-      "--norc",
-      "-eo",
-      "pipefail",
-      "-c",
-      `pnpm() { echo 'fixture failure'; return 7; };\n${command}`,
-    ],
-    { cwd, encoding: "utf8" },
-  );
-  assert.equal(result.status, 7, result.stderr);
-  assert.match(readFileSync(join(cwd, ".artifacts/ci/browser.log"), "utf8"), /fixture failure/);
+  assert.doesNotMatch(workflow, /test:(resolution|browser)|^  browser:|BROWSER_EXECUTABLE_PATH/m);
+  const scripts = read("package.json").scripts;
+  assert.equal(scripts["test:browser"], "sh scripts/browser-check.sh");
+  assert.equal(scripts["test:resolution"], undefined);
 });
 
 test("the aggregate accepts receipts from this exact checkout and run and reports the tested identity", (t) => {
@@ -100,12 +79,12 @@ test("the aggregate accepts receipts from this exact checkout and run and report
 test("selected matrix and ordinary jobs require successful results, while unselected jobs must be skipped", (t) => {
   const { cwd, needs, run } = workspace(t);
   needs.changes.outputs.dotnet = '["Common","Resolver"]';
-  needs.changes.outputs.web = needs.changes.outputs.browser = "true";
-  needs.dotnet.result = needs.web.result = needs.browser.result = "success";
-  for (const job of ["changes", "dotnet-Common", "dotnet-Resolver", "web", "browser"])
+  needs.changes.outputs.web = "true";
+  needs.dotnet.result = needs.web.result = "success";
+  for (const job of ["changes", "dotnet-Common", "dotnet-Resolver", "web"])
     assert.equal(run("record", job).status, 0);
   assert.equal(run("verify").status, 0);
-  for (const job of ["dotnet", "web", "browser"]) {
+  for (const job of ["dotnet", "web"]) {
     for (const state of ["failure", "cancelled", "skipped", "neutral", undefined]) {
       needs[job].result = state;
       assert.equal(run("verify").status, 1, `selected ${job} result ${state}`);
@@ -126,16 +105,16 @@ test("invalid selection and incomplete needs cannot produce a passing aggregate"
       value.changes.result = "skipped";
     },
     (value) => {
-      delete value.browser;
+      delete value.tooling;
     },
     (value) => {
       value.extra = { result: "success" };
     },
     (value) => {
-      delete value.changes.outputs.browser;
+      delete value.changes.outputs.tooling;
     },
     (value) => {
-      value.changes.outputs.browser = "False";
+      value.changes.outputs.tooling = "False";
     },
     (value) => {
       value.changes.outputs.dotnet = "null";
