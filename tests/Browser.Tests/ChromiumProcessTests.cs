@@ -34,6 +34,8 @@ public sealed class ChromiumProcessTests
                         : ""
                 )
                 + """
+                # Wait until the client has registered and started its first request.
+                dd bs=1 count=1 <&3 >/dev/null 2>&1
                 printf '{"id":1,"result":{}}\000' >&4
                 exec sleep 600
                 """
