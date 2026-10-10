@@ -25,7 +25,7 @@ services:
       OpenRouter__TimeoutSeconds: ${OPENROUTER_TIMEOUT_SECONDS:-30}
       OpenRouter__ApiKey: ${OPENROUTER_API_KEY:-}
       OpenRouter__Model: ${OPENROUTER_MODEL:-deepseek/deepseek-v4.1-flash}
-      OpenRouter__Provider: ${OPENROUTER_PROVIDER:-wafer}
+      OpenRouter__Provider: ${OPENROUTER_PROVIDER:-inference-net/fp8}
       RateLimits__RequestsPerMinute: ${API_REQUESTS_PER_MINUTE:-120}
       RateLimits__ConcurrentRequests: ${API_CONCURRENT_REQUESTS:-8}
       ModelUsage__CallsPerMinute: ${MODEL_CALLS_PER_MINUTE:-20}

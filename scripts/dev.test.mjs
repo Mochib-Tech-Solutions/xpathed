@@ -208,6 +208,13 @@ test("configuration maps isolated loopback services and only Resolver receives t
     "http://127.0.0.1:12000,http://localhost:12000,http://127.0.0.1:12001",
   );
   assert.equal(resolver.env.OpenRouter__ApiKey, "private");
+  assert.equal(resolver.env.OpenRouter__Model, "deepseek/deepseek-v4.1-flash");
+  assert.equal(resolver.env.OpenRouter__Provider, "inference-net/fp8");
+  assert.equal(
+    developmentConfig("/checkout", { OPENROUTER_PROVIDER: "wafer" }).services[1].env
+      .OpenRouter__Provider,
+    "wafer",
+  );
   assert.equal(client.env.ResolverUrl, "http://127.0.0.1:12002");
   assert.equal(web.env.XPATHED_URL, "http://127.0.0.1:12003");
   assert.equal(web.env.XPATHED_BROWSER_URL, "http://127.0.0.1:12001");

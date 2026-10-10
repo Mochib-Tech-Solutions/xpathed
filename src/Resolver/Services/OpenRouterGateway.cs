@@ -22,7 +22,7 @@ public sealed partial class OpenRouterGateway(
     private static readonly object PricingSync = new();
 
     public string Model { get; } = configuration["OpenRouter:Model"] ?? "deepseek/deepseek-v4.1-flash";
-    public string Provider { get; } = configuration["OpenRouter:Provider"] ?? "wafer";
+    public string Provider { get; } = configuration["OpenRouter:Provider"] ?? "inference-net/fp8";
 
     private readonly string? apiKey = configuration["OpenRouter:ApiKey"];
     private readonly string endpoint =
