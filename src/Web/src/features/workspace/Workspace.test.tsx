@@ -117,7 +117,16 @@ async function submitInstruction(user: ReturnType<typeof userEvent.setup>) {
 }
 
 describe("Workspace resolution", () => {
-  it("defaults to automatic screenshots and preserves text only through retry", async () => {
+  const resolutionRequests = () =>
+    vi
+      .mocked(fetch)
+      .mock.calls.filter(([path]) => typeof path === "string" && path.endsWith("/resolve"))
+      .map(
+        ([, options]) =>
+          JSON.parse(options?.body as string) as { imageMode: string; includeImage?: boolean },
+      );
+
+  it("defaults to automatic screenshots without guessing whether an image was used", async () => {
     mockApi();
     const user = await openWorkspace();
     const mode = screen.getByRole("combobox", { name: "Screenshots" });
@@ -129,35 +138,53 @@ describe("Workspace resolution", () => {
     await waitFor(() =>
       expect(screen.getByRole("button", { name: "Retry instruction" })).toBeEnabled(),
     );
-    const requests = () =>
-      vi
-        .mocked(fetch)
-        .mock.calls.filter(([path]) => typeof path === "string" && path.endsWith("/resolve"))
-        .map(
-          ([, options]) =>
-            JSON.parse(options?.body as string) as { imageMode: string; includeImage?: boolean },
-        );
-    expect(requests()[0]).toEqual(expect.objectContaining({ imageMode: "auto" }));
-    expect(requests()[0]).not.toHaveProperty("includeImage");
+    expect(resolutionRequests()).toEqual([expect.objectContaining({ imageMode: "auto" })]);
+    expect(resolutionRequests()[0]).not.toHaveProperty("includeImage");
     expect(screen.queryByText("Image used")).not.toBeInTheDocument();
+  });
+
+  it("switches automatic screenshots to text only and preserves the choice through retry", async () => {
+    mockApi();
+    const user = await openWorkspace();
+    const mode = screen.getByRole("combobox", { name: "Screenshots" });
     await user.selectOptions(mode, "text_only");
     expect(mode).toHaveAccessibleDescription(
       "Text only sends page text and structure, without screenshots.",
     );
     await submitInstruction(user);
     await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Retry instruction" })).toBeEnabled(),
+    );
+    expect(mode).toHaveValue("text_only");
+    await user.click(screen.getByRole("button", { name: "Retry instruction" }));
+    await waitFor(() =>
       expect(screen.getAllByRole("button", { name: "Retry instruction" })[1]).toBeEnabled(),
     );
-    expect(requests()[1]?.imageMode).toBe("text_only");
+    expect(resolutionRequests().map((request) => request.imageMode)).toEqual([
+      "text_only",
+      "text_only",
+    ]);
     expect(mode).toHaveValue("text_only");
-    await user.click(screen.getAllByRole("button", { name: "Retry instruction" })[1]!);
-    await waitFor(() => expect(requests()).toHaveLength(3));
-    expect(requests()[2]?.imageMode).toBe("text_only");
-    await waitFor(() => expect(mode).toBeEnabled());
+    expect(mode).toBeEnabled();
+  });
+
+  it("switches text only back to automatic screenshots for the next instruction", async () => {
+    mockApi();
+    const user = await openWorkspace();
+    const mode = screen.getByRole("combobox", { name: "Screenshots" });
+    await user.selectOptions(mode, "text_only");
+    await submitInstruction(user);
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Retry instruction" })).toBeEnabled(),
+    );
     await user.selectOptions(mode, "auto");
     await submitInstruction(user);
-    await waitFor(() => expect(requests()).toHaveLength(4));
-    expect(requests()[3]?.imageMode).toBe("auto");
+    await waitFor(() =>
+      expect(screen.getAllByRole("button", { name: "Retry instruction" })[1]).toBeEnabled(),
+    );
+    expect(resolutionRequests().map((request) => request.imageMode)).toEqual(["text_only", "auto"]);
+    expect(mode).toHaveValue("auto");
+    expect(mode).toBeEnabled();
   });
 
   it.each([
