@@ -7,6 +7,7 @@ XPATHED_HOST=configuration-check.invalid caddy validate --config hosted/Caddyfil
 sudo install -d /opt/dotnet
 sudo ln -sf /usr/bin/true /opt/dotnet/dotnet
 systemd-analyze verify hosted/xpathed-*.service
+apparmor_parser --skip-kernel-load --skip-cache hosted/xpathed-headless-shell
 python3 -B scripts/deployment-network.test.py
 policy=$(mktemp)
 trap 'rm -f "$policy"' EXIT HUP INT TERM

@@ -10,7 +10,7 @@ Type=simple
 User=xpathed-browser
 Group=xpathed-browser
 WorkingDirectory=/opt/xpathed/current/browser
-ExecStart=/opt/dotnet/dotnet /opt/xpathed/current/browser/Browser.dll
+ExecStart=/opt/dotnet/dotnet /opt/xpathed/current/browser/Browser.dll --BrowserExecutablePath=/opt/xpathed/current/chromium/chrome-headless-shell
 Environment=ASPNETCORE_URLS=http://127.0.0.1:18081
 Environment=HOME=/tmp XDG_CONFIG_HOME=/tmp/.config XDG_CACHE_HOME=/tmp/.cache
 EnvironmentFile=/etc/xpathed/browser.env

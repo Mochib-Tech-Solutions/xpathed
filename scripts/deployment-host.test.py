@@ -124,6 +124,34 @@ class DeploymentTests(unittest.TestCase):
         self.assertEqual(removed, [str(runtime / "releases" / ("d" * 40))])
         self.assertEqual([p.name for p in (self.base / "deployments").iterdir()], ["unrelated"])
 
+    def test_switch_allows_only_the_exact_release_binary_and_supports_legacy_rollback(self):
+        runtime = self.base / "runtime"
+        release = runtime / "releases" / ("c" * 40)
+        (release / "hosted").mkdir(parents=True)
+        template = Path(__file__).parent.parent / "hosted/xpathed-headless-shell"
+        (release / "hosted/xpathed-headless-shell").write_text(template.read_text())
+        commands = []
+        profiles = []
+
+        def command(*args, **kwargs):
+            commands.append(args)
+            if args[-1] == "/etc/apparmor.d/xpathed-headless-shell" and "install" in args:
+                profiles.append(Path(args[-2]).read_text())
+
+        with (
+            patch.object(host, "RUNTIME", runtime),
+            patch.object(host, "command", side_effect=command),
+        ):
+            host.native(self.base, {"revision": "c" * 40}, "switch")
+            host.native(self.base, self.old, "switch")
+        self.assertEqual(len(profiles), 1)
+        self.assertIn(str(release / "chromium/chrome-headless-shell"), profiles[0])
+        self.assertNotIn("/opt/xpathed/current", profiles[0])
+        self.assertNotIn("*", profiles[0])
+        load = next(index for index, args in enumerate(commands) if "apparmor_parser" in args)
+        restart = next(index for index, args in enumerate(commands) if "restart" in args)
+        self.assertLess(load, restart)
+
     def test_receiver_rejects_commands_without_consuming_input(self):
         for command in (
             "",

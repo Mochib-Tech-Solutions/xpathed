@@ -16,6 +16,7 @@ export const inputs = [
   "hosted",
   "scripts/deployment.mjs",
   "scripts/deployment-host.py",
+  "scripts/deployment-chromium.py",
   "scripts/deployment-setup.py",
   "scripts/deployment-network.py",
   "scripts/deployment-receiver.py",

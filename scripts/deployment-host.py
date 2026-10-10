@@ -8,6 +8,7 @@ import shutil
 import signal
 import subprocess
 import sys
+import tempfile
 import time
 import urllib.request
 from pathlib import Path
@@ -62,6 +63,7 @@ def build(base, state):
     command("pnpm", "build:web", cwd=source)
     shutil.copytree(source / "src/Web/dist", output / "web")
     shutil.copytree(source / "hosted", output / "hosted")
+    command("python3", str(source / "scripts/deployment-chromium.py"), str(output / "chromium"))
     command(
         "sudo",
         "-n",
@@ -109,6 +111,24 @@ def native(base, state, action):
                 str(destination / f"hosted/xpathed-{name}.service"),
                 f"/etc/systemd/system/xpathed-{name}.service",
             )
+        profile = destination / "hosted/xpathed-headless-shell"
+        if profile.is_file():
+            # AppArmor sees the resolved executable, so allow only this immutable release.
+            with tempfile.NamedTemporaryFile(mode="w", prefix="xpathed-apparmor-") as temporary:
+                temporary.write(
+                    profile.read_text().replace("/opt/xpathed/current", str(destination))
+                )
+                temporary.flush()
+                command(
+                    "sudo",
+                    "-n",
+                    "install",
+                    "-m",
+                    "644",
+                    temporary.name,
+                    "/etc/apparmor.d/xpathed-headless-shell",
+                )
+            command("sudo", "-n", "apparmor_parser", "-r", "/etc/apparmor.d/xpathed-headless-shell")
         command("sudo", "-n", "systemctl", "daemon-reload")
         command("sudo", "-n", "systemctl", "restart", *("xpathed-" + name for name in SERVICES))
         command("sudo", "-n", "systemctl", "reload-or-restart", "caddy")
