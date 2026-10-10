@@ -1,7 +1,6 @@
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import { mockSystemTheme } from "@/test/systemTheme";
 import { ThemeProvider } from "../theme/ThemeProvider";
 import Workspace from "./Workspace";
 import type { PageState } from "./api";
@@ -169,7 +168,6 @@ function browserApi() {
   };
 }
 function renderWorkspace() {
-  mockSystemTheme();
   render(
     <ThemeProvider>
       <Workspace />

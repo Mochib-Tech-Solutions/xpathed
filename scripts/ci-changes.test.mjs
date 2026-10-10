@@ -54,13 +54,23 @@ test("controlled browser and resolution checks selects its runtime, fixture, and
 });
 
 for (const [path, expected] of [
-  ["README.md", none],
+  ["README.md", { ...none, tooling: true }],
   ["tests/resolution/pipeline.test.mjs", { ...none, tooling: true, browser: true }],
   [
     "tests/Resolver.Tests/ResolutionContractTests.cs",
     { ...none, dotnet: ["Resolver"], browser: true },
   ],
-  ["README.md", none],
+  ["SECURITY.md", { ...none, tooling: true }],
+  ["AGENTS.md", { ...none, tooling: true }],
+  ["src/Browser/AGENTS.md", { ...none, dotnet: ["Browser"], tooling: true, browser: true }],
+  [
+    "src/Browser/Scripts/capture.js",
+    { ...none, dotnet: ["Browser"], tooling: true, browser: true },
+  ],
+  [".github/branch-protection.json", { ...none, tooling: true }],
+  [".github/copilot-instructions.md", { ...none, tooling: true }],
+  ["ruff.toml", { ...none, tooling: true }],
+  ["scripts/requirements-dev.txt", { ...none, tooling: true }],
   ["src/Web/src/features/browser/App.tsx", { ...none, web: true }],
   ["src/Web/package.json", { ...none, web: true }],
   ["pnpm-lock.yaml", { ...none, web: true, tooling: true, browser: true }],

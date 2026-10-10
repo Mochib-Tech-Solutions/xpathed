@@ -3,6 +3,7 @@
     <RootNamespace>Xpathed.Browser</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
+    <EmbeddedResource Include="Scripts/*.js" />
     <ProjectReference Include="../Common/Common.csproj" />
   </ItemGroup>
 </Project>

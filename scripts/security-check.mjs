@@ -40,6 +40,7 @@ try {
     "docs/assets/evaluation/probe.json": `ApiError.cs": "${"a".repeat(64)}"`,
     "docs/evaluation.md": "API contracts, missing/duplicate ",
     "tests/Resolver.Tests/ResolutionContractTests.cs": 'API_KEY=violet-cactus-782"',
+    "tests/Resolver.Tests/ProviderContractTests.cs": 'API_KEY=violet-cactus-782"',
     "scripts/security-check.mjs": "API contracts, missing/duplicate ",
     "scripts/deployment-network.test.py": 'TOKEN = "aabbccdd-0011-2233-4455-66778899aabb"',
   };

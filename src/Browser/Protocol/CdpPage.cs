@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
+using Xpathed.Browser.Scripts;
 using Xpathed.Common.Contracts;
 
 namespace Xpathed.Browser.Protocol;
@@ -17,8 +18,6 @@ internal sealed class CdpPage(CdpConnection connection, string targetId, string 
     private string lastTitle = "";
     private long titleRevision;
     private TaskCompletionSource dialogOpened = new(TaskCreationOptions.RunContinuationsAsynchronously);
-    private const string InputScript =
-        "(() => { if (globalThis.__xpathedInputInstalled) return; globalThis.__xpathedInputInstalled=true; const send=globalThis.xpathedInput; globalThis.xpathedInput=value=>send(String(value)); const focus=globalThis.focus; globalThis.focus=function(...args){const result=Reflect.apply(focus,this,args);if(this===globalThis)globalThis.xpathedFocus('');return result;}; const notify=e=>{if(e.isTrusted)globalThis.xpathedInput(performance.timeOrigin+performance.now());}; addEventListener('pointerdown',notify,true); addEventListener('keydown',notify,true); addEventListener('focus',()=>{if(document.hasFocus())globalThis.xpathedFocus('');}); })();";
 
     public CdpConnection Connection { get; } = connection;
     public string TargetId { get; } = targetId;
@@ -33,6 +32,7 @@ internal sealed class CdpPage(CdpConnection connection, string targetId, string 
             : throw new CdpException("The main document is not available.");
     public CdpFrame[] Frames => frames.Values.Where(frame => !frame.IsDetached).ToArray();
     public string Url => MainFrame.Url;
+    public string Title => lastTitle;
     public event Action<CdpFrame>? FrameNavigated;
     public event Action<CdpFrame>? FrameDetached;
     public event Action<double>? Input;
@@ -90,7 +90,7 @@ internal sealed class CdpPage(CdpConnection connection, string targetId, string 
         await Connection.SendAsync("Page.setLifecycleEventsEnabled", new { enabled = true }, id);
         await Connection.SendAsync("Runtime.addBinding", new { name = "xpathedInput" }, id);
         await Connection.SendAsync("Runtime.addBinding", new { name = "xpathedFocus" }, id);
-        await Connection.SendAsync("Page.addScriptToEvaluateOnNewDocument", new { source = InputScript }, id);
+        await Connection.SendAsync("Page.addScriptToEvaluateOnNewDocument", new { source = BrowserScripts.Input }, id);
         var tree = await Connection.SendAsync("Page.getFrameTree", sessionId: id);
         AddTree(tree.GetProperty("frameTree"), id);
         await Connection.SendAsync("Runtime.enable", sessionId: id);
@@ -110,7 +110,7 @@ internal sealed class CdpPage(CdpConnection connection, string targetId, string 
         {
             try
             {
-                await frame.EvaluateAsync<JsonElement>("() => {" + InputScript + "}");
+                await frame.EvaluateAsync<JsonElement>("() => {" + BrowserScripts.Input + "}");
             }
             catch (CdpException) { }
         }
@@ -467,8 +467,6 @@ internal sealed class CdpPage(CdpConnection connection, string targetId, string 
 
     public Task<T> EvaluateAsync<T>(string expression, object? argument = null) =>
         MainFrame.EvaluateAsync<T>(expression, argument);
-
-    public Task<string> TitleAsync() => Task.FromResult(lastTitle);
 
     public async Task<CdpFrame?> FindFrameAsync(string id)
     {

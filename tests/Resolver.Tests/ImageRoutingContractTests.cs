@@ -16,7 +16,7 @@ public sealed class ImageRoutingContractTests
         {
             RouterBody = DeterministicServicesHandler.RouterResponse(1, 0),
         };
-        await using var application = ResolutionContractTests.CreateApplication(handler);
+        await using var application = ResolverTestApplication.CreateApplication(handler);
         using var client = application.CreateClient();
         for (var index = 0; index < 2; index++)
         {
@@ -54,7 +54,7 @@ public sealed class ImageRoutingContractTests
                 }
             },
         };
-        await using var application = ResolutionContractTests.CreateApplication(
+        await using var application = ResolverTestApplication.CreateApplication(
             handler,
             new Dictionary<string, string?> { ["ModelUsage:ConcurrentCalls"] = "1" },
             logs
@@ -143,7 +143,7 @@ public sealed class ImageRoutingContractTests
         {
             RouterBody = DeterministicServicesHandler.RouterResponse(0.99, 0.01),
         };
-        await using var application = ResolutionContractTests.CreateApplication(handler);
+        await using var application = ResolverTestApplication.CreateApplication(handler);
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
@@ -268,7 +268,7 @@ public sealed class ImageRoutingContractTests
     public async Task BothCallsShareTheSameAdmissionAllowance()
     {
         var handler = new DeterministicServicesHandler();
-        await using var application = ResolutionContractTests.CreateApplication(
+        await using var application = ResolverTestApplication.CreateApplication(
             handler,
             new Dictionary<string, string?> { ["ModelUsage:CallsPerDay"] = "1" }
         );
@@ -300,7 +300,7 @@ public sealed class ImageRoutingContractTests
     public async Task UnknownImagePolicyIsRejectedBeforeCapture(string mode)
     {
         var handler = new DeterministicServicesHandler();
-        await using var application = ResolutionContractTests.CreateApplication(handler);
+        await using var application = ResolverTestApplication.CreateApplication(handler);
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
@@ -317,7 +317,7 @@ public sealed class ImageRoutingContractTests
 
     private static async Task<JsonElement> Resolve(DeterministicServicesHandler handler, string? mode = null)
     {
-        await using var application = ResolutionContractTests.CreateApplication(handler);
+        await using var application = ResolverTestApplication.CreateApplication(handler);
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",

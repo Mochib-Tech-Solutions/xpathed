@@ -1,7 +1,6 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
-import { mockSystemTheme } from "@/test/systemTheme";
 import { ThemeProvider } from "../theme/ThemeProvider";
 import Workspace from "./Workspace";
 
@@ -23,7 +22,6 @@ const page = {
 };
 
 function renderWorkspace() {
-  mockSystemTheme();
   render(
     <ThemeProvider>
       <Workspace />

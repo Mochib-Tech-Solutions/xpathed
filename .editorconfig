@@ -29,3 +29,6 @@ dotnet_diagnostic.IDE0161.severity = warning
 
 [*.md]
 trim_trailing_whitespace = false
+
+[*.py]
+indent_size = 4

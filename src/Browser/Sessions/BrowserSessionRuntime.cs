@@ -287,9 +287,7 @@ internal sealed class BrowserSessionRuntime(
         {
             if (!page.Page.IsClosed)
             {
-                pages.Add(
-                    new(Id, page.Id, page.Page.Url, await page.Page.TitleAsync(), BlockedPopups, page.DocumentId)
-                );
+                pages.Add(new(Id, page.Id, page.Page.Url, page.Page.Title, BlockedPopups, page.DocumentId));
             }
         }
         return new(Id, ActivePageId, ViewPath, pages.ToArray(), ActivationVersion, BrowserType, Resolution.Id);

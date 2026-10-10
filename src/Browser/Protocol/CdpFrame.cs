@@ -13,9 +13,6 @@ internal sealed class CdpFrame(CdpPage page, string id, string sessionId)
     public string? ParentId { get; set; }
     public string Url { get; set; } = "about:blank";
 
-    public Task<JsonElement> SendAsync(string method, object? parameters = null) =>
-        Page.Connection.SendAsync(method, parameters, SessionId);
-
     public async Task<T> EvaluateAsync<T>(string expression, object? argument = null)
     {
         var (response, _) = await EvaluateCoreAsync(expression, argument, true);

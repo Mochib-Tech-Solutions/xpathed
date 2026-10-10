@@ -1,12 +1,14 @@
 import contextlib
 import importlib.util
 import io
-from pathlib import Path
 import sys
 import tempfile
 import unittest
+from pathlib import Path
 
-spec = importlib.util.spec_from_file_location("receiver", Path(__file__).with_name("deployment-receiver.py"))
+spec = importlib.util.spec_from_file_location(
+    "receiver", Path(__file__).with_name("deployment-receiver.py")
+)
 receiver = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(receiver)
 
@@ -20,11 +22,15 @@ class ReceiverTests(unittest.TestCase):
             (base / "deploy/private-log-values").write_text("192.0.2.8\nserver.example.invalid\n")
             for status in (0, 1):
                 output = io.StringIO()
-                command = [sys.executable, "-c", "import sys,time; "
-                           "sys.stdout.write('https://work'); sys.stdout.flush(); time.sleep(.02); "
-                           "print('space.example.invalid/health ready'); "
-                           "print('192.0.2.8 SERVER.EXAMPLE.INVALID failed',file=sys.stderr); "
-                           f"sys.exit({status})"]
+                command = [
+                    sys.executable,
+                    "-c",
+                    "import sys,time; "
+                    "sys.stdout.write('https://work'); sys.stdout.flush(); time.sleep(.02); "
+                    "print('space.example.invalid/health ready'); "
+                    "print('192.0.2.8 SERVER.EXAMPLE.INVALID failed',file=sys.stderr); "
+                    f"sys.exit({status})",
+                ]
                 with contextlib.redirect_stdout(output):
                     if status:
                         with self.assertRaisesRegex(RuntimeError, "Deployment worker failed"):

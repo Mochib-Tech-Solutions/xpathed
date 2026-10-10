@@ -39,7 +39,10 @@ export function classifyChanges(paths) {
       projects.forEach((project) => affected.add(project));
     }
     if (/^src\/Web\//.test(path)) web = true;
+    if (/^src\/Browser\/Scripts\/.*\.js$/.test(path)) tooling = true;
     if (path.startsWith("tests/resolution/")) tooling = true;
+    if (path.endsWith(".md") && !path.startsWith(".agents/")) tooling = true;
+    if (path === "ruff.toml" || /^\.github\/[^/]+\.json$/.test(path)) tooling = true;
     if (
       /^(\.editorconfig|\.prettier(ignore|rc.*)|pnpm-(lock|workspace)\.yaml|\.npmrc|\.node-version|\.nvmrc)$/.test(
         path,
