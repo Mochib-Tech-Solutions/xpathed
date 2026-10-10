@@ -127,6 +127,21 @@ internal sealed class BrowserSessionRuntime(
             }
         };
         page.Page.DialogChanged += dialog => Interaction?.DialogChanged(page, dialog);
+        page.Page.CursorChanged += cursor =>
+        {
+            if (ActivePageId == page.Id)
+            {
+                Viewer?.PublishCursor(
+                    new
+                    {
+                        type = "cursor",
+                        pageId = page.Id,
+                        documentId = page.DocumentId,
+                        cursor,
+                    }
+                );
+            }
+        };
         page.Page.Focused += () =>
         {
             if (!Ready || Stop.IsCancellationRequested || ActivePageId == page.Id)

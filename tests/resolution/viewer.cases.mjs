@@ -30,6 +30,32 @@ test("viewer-disconnect-completes-close-handshake-and-allows-reconnect", async (
   });
 });
 
+test("viewer-cursor-follows-links-inputs-shadow-elements-and-frames", async () => {
+  await withFixture(
+    `<style>body{margin:0}a,input,#shadow,iframe{position:absolute;left:20px;width:220px;height:40px}a{top:20px}input{top:80px}#shadow{top:140px}iframe{top:200px;border:0}</style>
+     <a href="#">A link</a><input><div id="shadow"></div>
+     <iframe srcdoc='<style>body{margin:0}button{width:220px;height:40px;cursor:crosshair}</style><button>Frame control</button>'></iframe>
+     <script>document.querySelector('#shadow').attachShadow({mode:'open'}).innerHTML='<button style="width:220px;height:40px;cursor:ew-resize">Resize</button>';</script>`,
+    async (session, page) => {
+      await withFramebuffer(session, async (readFrame, viewer) => {
+        await readFrame();
+        for (const [x, y, expected] of [
+          [40, 30, "pointer"],
+          [40, 100, "text"],
+          [40, 160, "ew-resize"],
+          [40, 220, "crosshair"],
+          [400, 300, "default"],
+        ]) {
+          viewer.pointer(x, y);
+          const cursor = await viewer.control("cursor", (value) => value.cursor === expected);
+          assert.equal(cursor.pageId, page.pageId);
+          assert.equal(cursor.documentId, page.documentId);
+        }
+      });
+    },
+  );
+});
+
 test("viewer-scroll-bursts-preserve-distance-and-subsequent-clicks", async () => {
   await withFixture(
     `<style>body { margin: 0; width: 10000px; height: 10000px; background: linear-gradient(white, black); }
