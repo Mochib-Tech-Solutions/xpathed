@@ -17,6 +17,8 @@ test("clean removes only build outputs and rejects parent symlinks outside the r
     "repo/src/ClientApi/bin",
     "repo/tests/Browser.Tests/obj",
     "repo/node_modules",
+    "repo/.ruff_cache",
+    "repo/.artifacts/dev",
     "repo/.artifacts/python-tools",
     "outside/dist",
   ]) {
@@ -38,7 +40,9 @@ test("clean removes only build outputs and rejects parent symlinks outside the r
   assert.equal(await readFile(join(root, "repo/src/Web/source.ts"), "utf8"), "keep");
   assert.equal(await readFile(join(root, "repo/node_modules/result"), "utf8"), "output");
   await run(process.execPath, [script, "--cache"]);
-  await assert.rejects(readFile(join(root, "repo/node_modules/result")), { code: "ENOENT" });
+  for (const directory of ["node_modules", ".ruff_cache", ".artifacts/dev"]) {
+    await assert.rejects(readFile(join(root, "repo", directory, "result")), { code: "ENOENT" });
+  }
   await assert.rejects(readFile(join(root, "repo/.artifacts/python-tools/result")), {
     code: "ENOENT",
   });

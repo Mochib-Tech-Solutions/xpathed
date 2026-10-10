@@ -27,6 +27,8 @@ const outputs = [
         "src/Web/node_modules",
         "src/Web/.vitest",
         ".pnpm-store",
+        ".ruff_cache",
+        ".artifacts/dev",
         ".artifacts/python-tools",
         "scripts/__pycache__",
       ]
