@@ -26,6 +26,8 @@ export default function Workspace() {
     instruction,
     imageMode,
     setImageMode,
+    autoExecute,
+    setAutoExecute,
     history,
     busy,
     error,
@@ -96,6 +98,9 @@ export default function Workspace() {
           instruction={instruction}
           imageMode={imageMode}
           onImageModeChange={setImageMode}
+          autoExecute={autoExecute}
+          onAutoExecuteChange={setAutoExecute}
+          settingsDisabled={!!busy}
           history={history}
           ready={!!page && /^https?:\/\//i.test(page.url)}
           disabled={!page || !/^https?:\/\//i.test(page.url) || !!busy}

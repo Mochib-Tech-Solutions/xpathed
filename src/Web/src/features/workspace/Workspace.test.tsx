@@ -129,11 +129,14 @@ describe("Workspace resolution", () => {
   it("defaults to automatic screenshots without guessing whether an image was used", async () => {
     mockApi();
     const user = await openWorkspace();
+    expect(screen.queryByRole("combobox", { name: "Screenshots" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Settings" }));
     const mode = screen.getByRole("combobox", { name: "Screenshots" });
     expect(mode).toHaveValue("auto");
     expect(mode).toHaveAccessibleDescription(
       "Auto sends a masked screenshot to the model provider when visual details may help. Other visible content can be shared.",
     );
+    await user.click(screen.getByRole("button", { name: "Done" }));
     await submitInstruction(user);
     await waitFor(() =>
       expect(screen.getByRole("button", { name: "Retry instruction" })).toBeEnabled(),
@@ -146,16 +149,17 @@ describe("Workspace resolution", () => {
   it("switches automatic screenshots to text only and preserves the choice through retry", async () => {
     mockApi();
     const user = await openWorkspace();
+    await user.click(screen.getByRole("button", { name: "Settings" }));
     const mode = screen.getByRole("combobox", { name: "Screenshots" });
     await user.selectOptions(mode, "text_only");
     expect(mode).toHaveAccessibleDescription(
       "Text only sends page text and structure, without screenshots.",
     );
+    await user.click(screen.getByRole("button", { name: "Done" }));
     await submitInstruction(user);
     await waitFor(() =>
       expect(screen.getByRole("button", { name: "Retry instruction" })).toBeEnabled(),
     );
-    expect(mode).toHaveValue("text_only");
     await user.click(screen.getByRole("button", { name: "Retry instruction" }));
     await waitFor(() =>
       expect(screen.getAllByRole("button", { name: "Retry instruction" })[1]).toBeEnabled(),
@@ -164,27 +168,53 @@ describe("Workspace resolution", () => {
       "text_only",
       "text_only",
     ]);
-    expect(mode).toHaveValue("text_only");
-    expect(mode).toBeEnabled();
+    await user.click(screen.getByRole("button", { name: "Settings" }));
+    expect(screen.getByRole("combobox", { name: "Screenshots" })).toHaveValue("text_only");
+    expect(screen.getByRole("combobox", { name: "Screenshots" })).toBeEnabled();
+    await user.click(screen.getByRole("button", { name: "Done" }));
   });
 
   it("switches text only back to automatic screenshots for the next instruction", async () => {
     mockApi();
     const user = await openWorkspace();
-    const mode = screen.getByRole("combobox", { name: "Screenshots" });
-    await user.selectOptions(mode, "text_only");
+    await user.click(screen.getByRole("button", { name: "Settings" }));
+    await user.selectOptions(screen.getByRole("combobox", { name: "Screenshots" }), "text_only");
+    await user.click(screen.getByRole("button", { name: "Done" }));
     await submitInstruction(user);
     await waitFor(() =>
       expect(screen.getByRole("button", { name: "Retry instruction" })).toBeEnabled(),
     );
-    await user.selectOptions(mode, "auto");
+    await user.click(screen.getByRole("button", { name: "Settings" }));
+    await user.selectOptions(screen.getByRole("combobox", { name: "Screenshots" }), "auto");
+    await user.click(screen.getByRole("button", { name: "Done" }));
     await submitInstruction(user);
     await waitFor(() =>
       expect(screen.getAllByRole("button", { name: "Retry instruction" })[1]).toBeEnabled(),
     );
     expect(resolutionRequests().map((request) => request.imageMode)).toEqual(["text_only", "auto"]);
-    expect(mode).toHaveValue("auto");
+  });
+
+  it("applies initial settings to the first page and displays automatic execution when enabled", async () => {
+    mockApi();
+    const user = userEvent.setup();
+    renderWorkspace();
+    await user.click(screen.getByRole("button", { name: "Settings" }));
+    const mode = screen.getByRole("combobox", { name: "Screenshots" });
+    const automatic = screen.getByRole("checkbox", { name: "Execute automatically" });
     expect(mode).toBeEnabled();
+    expect(automatic).not.toBeChecked();
+    await user.selectOptions(mode, "text_only");
+    await user.click(automatic);
+    await user.click(screen.getByRole("button", { name: "Done" }));
+    expect(screen.getByText("Auto execute on")).toBeVisible();
+    await user.type(screen.getByRole("textbox", { name: "Page address" }), `${page.url}{Enter}`);
+    await waitFor(() =>
+      expect(screen.getByRole("textbox", { name: "Describe an element" })).toBeEnabled(),
+    );
+    await user.click(screen.getByRole("button", { name: "Settings" }));
+    expect(screen.getByRole("combobox", { name: "Screenshots" })).toHaveValue("text_only");
+    expect(screen.getByRole("checkbox", { name: "Execute automatically" })).toBeChecked();
+    await user.click(screen.getByRole("button", { name: "Done" }));
   });
 
   it.each([
@@ -214,7 +244,10 @@ describe("Workspace resolution", () => {
       const user = await openWorkspace();
       await submitInstruction(user);
       expect(screen.queryByText("Image used")).not.toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Settings" }));
       expect(screen.getByRole("combobox", { name: "Screenshots" })).toBeDisabled();
+      expect(screen.getByRole("checkbox", { name: "Execute automatically" })).toBeDisabled();
+      await user.click(screen.getByRole("button", { name: "Done" }));
       complete(
         Response.json({
           ...found,
@@ -288,7 +321,6 @@ describe("Workspace resolution", () => {
       const user = await openWorkspace();
       await submitInstruction(user);
       expect(await screen.findByText(message)).toBeVisible();
-      expect(screen.getByRole("combobox", { name: "Screenshots" })).toHaveValue("auto");
       if (reason !== "text_only_requested")
         expect(screen.queryByText(/Choose Auto screenshots/)).not.toBeInTheDocument();
       const response = screen.getByLabelText("Response message");
@@ -394,7 +426,10 @@ describe("Workspace resolution", () => {
     expect(blocked).toHaveTextContent(
       "Cannot click “Log in”. Another element or clipping blocks the inspected pointer point.",
     );
-    expect(blocked).not.toHaveTextContent(/XPath|Verification|Requested:/);
+    expect(within(blocked).getByText(target.xpaths[0]!)).toBeVisible();
+    expect(within(blocked).getByRole("button", { name: "Copy XPath 1" })).toBeEnabled();
+    expect(within(blocked).queryByRole("button", { name: /Execute/ })).not.toBeInTheDocument();
+    expect(blocked).not.toHaveTextContent(/Verification|Requested:/);
     expect(
       within(screen.getByRole("region", { name: "Target 2" })).getByText("XPath"),
     ).toBeVisible();
@@ -923,54 +958,87 @@ describe("Workspace resolution", () => {
     expect(screen.getByText(target.xpaths[0]!)).toBeVisible();
   });
 
-  it("shows frame and shadow context separately from the target XPath and selected state", async () => {
-    mockApi(() =>
-      Promise.resolve(
-        Response.json({
-          ...found,
-          target: null,
-          actions: [
-            {
-              actionId: "a1",
-              order: 1,
-              instruction: "Click Pay now",
-              action: "click",
-              outcome: "found",
-              target: {
-                ...target,
-                shadowChain: [{ xpath: "//consent-panel", label: "Consent panel" }],
-                frame: {
-                  id: "f2",
-                  documentId: "child-document",
-                  chain: [
-                    { frameId: "f1", label: "Employee", xpath: "//iframe[@id='employee']" },
-                    {
-                      frameId: "f2",
-                      label: "Payroll",
-                      xpath: "//iframe[@id='payroll']",
-                      shadowChain: [{ xpath: "//payroll-panel", label: "Payroll panel" }],
-                    },
-                  ],
+  it.each([false, true])(
+    "shows frame and shadow context with a copyable XPath when blocked=%s",
+    async (blocked) => {
+      mockApi(() =>
+        Promise.resolve(
+          Response.json({
+            ...found,
+            target: null,
+            actions: [
+              {
+                actionId: "a1",
+                order: 1,
+                instruction: "Click Pay now",
+                action: "click",
+                outcome: "found",
+                target: {
+                  ...target,
+                  interactability: blocked
+                    ? { status: "blocked", reasons: ["disabled"], checks: {} }
+                    : null,
+                  shadowChain: [{ xpath: "//consent-panel", label: "Consent panel" }],
+                  frame: {
+                    id: "f2",
+                    documentId: "child-document",
+                    chain: [
+                      { frameId: "f1", label: "Employee", xpath: "//iframe[@id='employee']" },
+                      {
+                        frameId: "f2",
+                        label: "Payroll",
+                        xpath: "//iframe[@id='payroll']",
+                        shadowChain: [{ xpath: "//payroll-panel", label: "Payroll panel" }],
+                      },
+                    ],
+                  },
+                  state: { ...target.state, selected: true, selectedOptionCount: 2 },
                 },
-                state: { ...target.state, selected: true, selectedOptionCount: 2 },
               },
-            },
-          ],
-        }),
-      ),
-    );
-    const user = await openWorkspace();
-    await submitInstruction(user);
-    expect(await screen.findByText("Frame: Employee → Payroll")).toBeInTheDocument();
-    expect(screen.getByText("Shadow roots: Payroll panel")).toBeInTheDocument();
-    expect(screen.getByText("Shadow roots: Consent panel")).toBeInTheDocument();
-    expect(screen.getByText("//consent-panel")).toBeInTheDocument();
-    expect(screen.getByText("//iframe[@id='employee']")).toBeInTheDocument();
-    expect(screen.getByText("//iframe[@id='payroll']")).toBeInTheDocument();
-    expect(screen.getByText("//*[@data-testid='pay']")).toBeInTheDocument();
-    expect(screen.getByText("Selected")).toBeInTheDocument();
-    expect(screen.getByText("2 options selected")).toBeInTheDocument();
-  });
+            ],
+          }),
+        ),
+      );
+      const user = await openWorkspace();
+      await submitInstruction(user);
+      expect(await screen.findByText("Frame: Employee → Payroll")).toBeInTheDocument();
+      expect(screen.getByText("Shadow roots: Payroll panel")).toBeInTheDocument();
+      expect(screen.getByText("Shadow roots: Consent panel")).toBeInTheDocument();
+      expect(screen.getByText("//consent-panel")).toBeInTheDocument();
+      expect(screen.getByText("//iframe[@id='employee']")).toBeInTheDocument();
+      expect(screen.getByText("//iframe[@id='payroll']")).toBeInTheDocument();
+      expect(screen.getByText("//*[@data-testid='pay']")).toBeInTheDocument();
+      if (blocked) {
+        await waitFor(() =>
+          expect(screen.getByRole("button", { name: "Retry instruction" })).toBeEnabled(),
+        );
+        const xpath = screen.getByText(target.xpaths[0]!);
+        await user.hover(xpath);
+        await waitFor(() =>
+          expect(vi.mocked(fetch)).toHaveBeenCalledWith(
+            "/api/pages/page-1/spotlight",
+            expect.objectContaining({
+              body: JSON.stringify({
+                documentId: "document-1",
+                captureId: "capture-1",
+                actionId: "a1",
+              }),
+            }),
+          ),
+        );
+        await user.unhover(xpath);
+        act(() => xpath.focus());
+        expect(xpath).toHaveFocus();
+        await user.click(screen.getByRole("button", { name: "Copy XPath 1" }));
+        expect(await navigator.clipboard.readText()).toBe(target.xpaths[0]);
+        expect(screen.getByText("Copied")).toBeVisible();
+        expect(screen.queryByText("Verification")).not.toBeInTheDocument();
+      } else {
+        expect(screen.getByText("Selected")).toBeInTheDocument();
+        expect(screen.getByText("2 options selected")).toBeInTheDocument();
+      }
+    },
+  );
 
   it("shows a direct single-target reply without repeated instructions or technical boilerplate", async () => {
     mockApi(() =>
@@ -1188,13 +1256,14 @@ describe("Workspace resolution", () => {
     await submitInstruction(user);
     const response = await screen.findByRole("region", { name: "Target 1" });
     expect(response).toHaveTextContent(`Cannot ${action} “Pay now”. ${explanation}`);
-    expect(response.querySelector("p")).toHaveClass("text-destructive");
-    expect(response.querySelectorAll("p")).toHaveLength(1);
-    expect(within(response).queryByRole("heading")).not.toBeInTheDocument();
-    expect(within(response).queryByRole("button")).not.toBeInTheDocument();
-    expect(response).not.toHaveTextContent(
-      /XPath|Verification|Verified:|Interaction blocked|Disabled/,
-    );
+    expect(response.querySelectorAll("p.text-destructive")).toHaveLength(1);
+    expect(response.querySelector("p.text-destructive")).toHaveTextContent(explanation);
+    expect(within(response).getByRole("heading", { name: "Button" })).toBeVisible();
+    expect(within(response).getByText(`Action: ${action}`)).toBeVisible();
+    expect(within(response).getByText(target.xpaths[0]!)).toBeVisible();
+    expect(within(response).getByRole("button", { name: "Copy XPath 1" })).toBeEnabled();
+    expect(within(response).queryByRole("button", { name: /Execute/ })).not.toBeInTheDocument();
+    expect(response).not.toHaveTextContent(/Verification|Verified:|Interaction blocked|Disabled/);
   });
 
   it.each([

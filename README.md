@@ -18,9 +18,9 @@ Set `OPENROUTER_API_KEY` in the generated `.env`, then start the services:
 pnpm dev
 ```
 
-Open [localhost:8080](http://localhost:8080), choose a resolution, enter a website address, and describe your target. Use **Execute** on a current result to perform its action. Resolution itself does not execute actions.
+Open [localhost:8080](http://localhost:8080), choose a resolution, enter a website address, and describe your target. Use **Execute** on a current result, or enable **Execute automatically** in **Settings** to run a single ready action after each new result. Actions needing a value and results with multiple targets remain manual. The Resolver API itself does not execute actions.
 
-**Auto screenshots** includes a masked image when visual details may help. **Text only** prevents image sharing. Detected private fields are masked; other visible content may be sent to the model provider. Requests make paid calls, so use a dedicated key with a provider spending limit.
+Each tab keeps its own settings. **Auto screenshots** includes a masked image when visual details may help; **Text only** prevents image sharing. Detected private fields are masked; other visible content may be sent to the model provider. Requests make paid calls, so use a dedicated key with a provider spending limit.
 
 Stop with Ctrl+C or `pnpm dev:stop`. Set `XPATHED_PORT` for a different workspace port; the three APIs use the next three ports. Set `BROWSER_EXECUTABLE_PATH` if Chrome is installed in a custom location.
 

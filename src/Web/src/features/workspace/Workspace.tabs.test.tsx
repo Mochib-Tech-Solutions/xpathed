@@ -185,25 +185,37 @@ async function openFirst(user: ReturnType<typeof userEvent.setup>) {
 }
 
 describe("Browser tabs and chat", () => {
-  it("preserves text only across tab revisits and navigation without changing another tab", async () => {
+  it("preserves tab settings across navigation and keeps new tabs independent", async () => {
     browserApi();
     const user = renderWorkspace();
     await openFirst(user);
-    const mode = () => screen.getByRole("combobox", { name: "Screenshots" });
-    await user.selectOptions(mode(), "text_only");
+    await user.click(screen.getByRole("button", { name: "Settings" }));
+    await user.selectOptions(screen.getByRole("combobox", { name: "Screenshots" }), "text_only");
+    await user.click(screen.getByRole("checkbox", { name: "Execute automatically" }));
+    await user.click(screen.getByRole("button", { name: "Done" }));
     await user.click(screen.getByRole("button", { name: "New tab" }));
-    expect(mode()).toHaveValue("auto");
+    await user.click(screen.getByRole("button", { name: "Settings" }));
+    expect(screen.getByRole("combobox", { name: "Screenshots" })).toHaveValue("auto");
+    expect(screen.getByRole("checkbox", { name: "Execute automatically" })).not.toBeChecked();
+    await user.click(screen.getByRole("button", { name: "Done" }));
     await user.type(screen.getByRole("textbox", { name: "Page address" }), "second.test{Enter}");
-    await waitFor(() => expect(mode()).toBeEnabled());
+    await waitFor(() =>
+      expect(screen.getByRole("textbox", { name: "Describe an element" })).toBeEnabled(),
+    );
     await user.click(screen.getByRole("tab", { name: "First" }));
-    await waitFor(() => expect(mode()).toHaveValue("text_only"));
+    await waitFor(() => expect(screen.getByText("Auto execute on")).toBeVisible());
     const address = screen.getByRole("textbox", { name: "Page address" });
     await user.clear(address);
     await user.type(address, "first.test/changed{Enter}");
-    await waitFor(() => expect(mode()).toBeEnabled());
-    expect(mode()).toHaveValue("text_only");
+    await waitFor(() =>
+      expect(screen.getByRole("textbox", { name: "Describe an element" })).toBeEnabled(),
+    );
+    await user.click(screen.getByRole("button", { name: "Settings" }));
+    expect(screen.getByRole("combobox", { name: "Screenshots" })).toHaveValue("text_only");
+    expect(screen.getByRole("checkbox", { name: "Execute automatically" })).toBeChecked();
+    await user.click(screen.getByRole("button", { name: "Done" }));
     await user.click(screen.getByRole("tab", { name: "Second" }));
-    await waitFor(() => expect(mode()).toHaveValue("auto"));
+    await waitFor(() => expect(screen.queryByText("Auto execute on")).not.toBeInTheDocument());
   });
 
   it("retries a historical prompt on its active tab's current document without clearing drafts", async () => {
