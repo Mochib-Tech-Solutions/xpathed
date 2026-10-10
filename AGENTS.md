@@ -11,7 +11,7 @@ Read [README.md](README.md) for setup and scope, [SECURITY.md](SECURITY.md) for 
 - Use the configured human Git identity and Conventional Commit titles. Keep branch, commit and PR wording focused on the change.
 - Use `package.json`, `global.json` and lockfiles as command/version sources. Run the affected `check:dotnet`, `check:web` or `check:tooling` gate. Use `$xpathed-resolution-checks` for capture, XPath, readiness or execution changes; report actual checks and limitations.
 - Keep focused unit, UI and real-browser service tests beside their owners. CI checks use controlled responses without provider calls and retain exact-revision job receipts. Update `scripts/ci-changes.mjs` and the solution when project paths change.
-- Keep `.env` and unrelated processes/stacks intact. Local development uses managed native processes and four loopback ports per checkout; Docker is for deployment validation and VPS hosting.
+- Keep `.env` and unrelated processes/stacks intact. Local development and Git hooks use native tools, with managed processes and four loopback ports per checkout. GitHub CI owns Docker validation; VPS hosting uses Docker.
 
 ## Ownership
 

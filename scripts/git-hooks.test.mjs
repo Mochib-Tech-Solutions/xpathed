@@ -36,7 +36,7 @@ function repository(t) {
   return { cwd, git, write };
 }
 
-test("local command selection reuses CI ownership and excludes integration/paid runs", () => {
+test("local command selection reuses CI ownership without requiring Docker or integration runs", () => {
   assert.deepEqual(checkCommands(["README.md"]), []);
   assert.deepEqual(checkCommands(["src/Web/src/App.tsx"]), [["pnpm", "check:web"]]);
   assert.deepEqual(checkCommands([".githooks/commit-msg"]), [["pnpm", "check:tooling"]]);
@@ -58,8 +58,9 @@ test("local command selection reuses CI ownership and excludes integration/paid 
   }
   const all = checkCommands(["package.json"]);
   assert.ok(all.some((cmd) => cmd[1] === "build:dotnet"));
-  assert.ok(all.some((cmd) => cmd[1] === "docker:check"));
-  assert.ok(!JSON.stringify(all).match(/evaluate|test:resolution|--live/));
+  assert.ok(!JSON.stringify(all).match(/docker|test:resolution|--live/));
+  assert.deepEqual(checkCommands(["docker/compose.yaml"]), [["pnpm", "check:tooling"]]);
+  assert.equal(classifyChanges(["docker/compose.yaml"]).docker, true);
 });
 
 test("Conventional Commits covers optional scopes, breaking changes and rejects malformed headers", () => {

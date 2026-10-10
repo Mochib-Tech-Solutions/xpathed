@@ -50,6 +50,6 @@ pnpm check             # .NET, Web and tooling
 pnpm test:resolution   # real-browser service tests; no paid calls
 ```
 
-VPS deployment uses the production images in `docker/`. Successful `main` checks trigger the hosted deployment. Run `pnpm docker:check` to validate its configuration and read [SECURITY.md](SECURITY.md) before hosting.
+VPS deployment uses the production images in `docker/`. GitHub CI validates Docker configuration and build definitions before successful `main` checks trigger the hosted deployment. Local commands and Git hooks use native tools only. Read [SECURITY.md](SECURITY.md) before hosting.
 
 Report bugs through [GitHub Issues](https://github.com/Mochib-Tech-Solutions/xpathed/issues).
