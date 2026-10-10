@@ -97,7 +97,7 @@ export function developmentConfig(root, env, assignedPorts) {
         BrowserUrl: urls.browser,
         OpenRouter__ApiKey: env.OPENROUTER_API_KEY || "",
         OpenRouter__Model: env.OPENROUTER_MODEL || "deepseek/deepseek-v4.1-flash",
-        OpenRouter__Provider: env.OPENROUTER_PROVIDER || "wafer",
+        OpenRouter__Provider: env.OPENROUTER_PROVIDER || "inference-net/fp8",
         OpenRouter__BaseUrl: env.OPENROUTER_BASE_URL || "https://openrouter.ai/api/v1/",
         OpenRouter__TimeoutSeconds: env.OPENROUTER_TIMEOUT_SECONDS || "30",
         ModelUsage__CallsPerMinute: env.MODEL_CALLS_PER_MINUTE || "20",

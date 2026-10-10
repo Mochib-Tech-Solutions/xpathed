@@ -408,12 +408,13 @@ internal static class BrowserCaptureScript
             return false;
           };
           const eligible = element => {
+            const explicit = element.matches('a[href],button,input,select,textarea,summary,img,svg,canvas,video,[aria-label],[aria-labelledby],[role],[tabindex],[contenteditable]:not([contenteditable="false"])');
+            if (!explicit && !element.hasChildNodes()) return false;
             if (!accessibilityExposed(element)) return false;
             const container = closest(element, valueContainer);
             if (container && container !== element) return false;
-            return element.matches('a[href],button,input,select,textarea,summary,img,svg,canvas,video,[aria-label],[aria-labelledby],[role],[tabindex],[contenteditable]:not([contenteditable="false"])') ||
-              (!closest(element, 'button,a,textarea,select,[contenteditable]:not([contenteditable="false"])') &&
-                ([...element.childNodes].some(node => node.nodeType === Node.TEXT_NODE && normalize(node.textContent)) || repeatedItem(element)));
+            return explicit || (!closest(element, 'button,a,textarea,select,[contenteditable]:not([contenteditable="false"])') &&
+              ([...element.childNodes].some(node => node.nodeType === Node.TEXT_NODE && normalize(node.textContent)) || repeatedItem(element)));
           };
           const complexEffects = element => {
             if (environment.complexEffects) return true;

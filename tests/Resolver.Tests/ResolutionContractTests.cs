@@ -2848,7 +2848,7 @@ public sealed class ResolutionContractTests
         Assert.Equal("found", result.GetProperty("outcome").GetString());
         var request = handler.ModelRequest;
         Assert.Equal("deepseek/deepseek-v4.1-flash", request.GetProperty("model").GetString());
-        Assert.Equal("wafer", request.GetProperty("provider").GetProperty("only")[0].GetString());
+        Assert.Equal("inference-net/fp8", request.GetProperty("provider").GetProperty("only")[0].GetString());
         Assert.False(request.GetProperty("reasoning").GetProperty("enabled").GetBoolean());
         Assert.False(handler.CaptureRequest.GetProperty("includeImage").GetBoolean());
         Assert.False(request.GetProperty("provider").GetProperty("allow_fallbacks").GetBoolean());
