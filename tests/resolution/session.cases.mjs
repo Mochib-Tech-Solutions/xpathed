@@ -13,6 +13,29 @@ import {
 } from "./fixture.mjs";
 import { withFramebuffer } from "./viewer.mjs";
 
+test("session-disconnected-viewer-expires-despite-polling", { timeout: 100000 }, async () => {
+  const session = await request("/sessions");
+  try {
+    await withFramebuffer(session, async (readFrame) => {
+      await readFrame();
+    });
+    const deadline = Date.now() + 95000;
+    let status;
+    do {
+      status = (await fetch(`${browserUrl}/sessions/${session.sessionId}`)).status;
+      if (status === 404) break;
+      assert.equal(status, 200);
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+    } while (Date.now() < deadline);
+    assert.equal(status, 404, "Polling must not extend a disconnected viewer's grace period");
+    const replacement = await request("/sessions");
+    await request(`/sessions/${replacement.sessionId}`, undefined, "DELETE");
+    assert.equal((await fetch(`${browserUrl}/health`)).status, 200);
+  } finally {
+    await request(`/sessions/${session.sessionId}`, undefined, "DELETE");
+  }
+});
+
 test("session-teardown-releases-runtime-before-slot-reuse", { timeout: 600000 }, async () => {
   // Allow the hosted runner to finish all 128 launches and cleanups.
   for (let index = 0; index < 128; index++) {

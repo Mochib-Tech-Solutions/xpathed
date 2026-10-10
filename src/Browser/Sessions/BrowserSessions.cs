@@ -101,7 +101,6 @@ public sealed partial class BrowserSessions(IConfiguration configuration) : IAsy
             );
         }
 
-        session.LastSeen = DateTimeOffset.UtcNow;
         return session;
     }
 
@@ -138,10 +137,14 @@ public sealed partial class BrowserSessions(IConfiguration configuration) : IAsy
     private async Task<T> OnSessionAsync<T>(
         BrowserSessionRuntime session,
         Func<BrowserSessionRuntime, Task<T>> operation,
-        CancellationToken token
+        CancellationToken token,
+        bool recordActivity = true
     )
     {
-        session.LastSeen = DateTimeOffset.UtcNow;
+        if (recordActivity)
+        {
+            session.LastSeen = DateTimeOffset.UtcNow;
+        }
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(token, session.Stop.Token);
         await session.Gate.WaitAsync(linked.Token);
         try
@@ -192,7 +195,7 @@ public sealed partial class BrowserSessions(IConfiguration configuration) : IAsy
     }
 
     public Task<BrowserSessionState> SessionStateAsync(string sessionId, CancellationToken token) =>
-        OnSessionAsync(FindSession(sessionId), s => s.StateAsync(), token);
+        OnSessionAsync(FindSession(sessionId), s => s.StateAsync(), token, recordActivity: false);
 
     public Task<BrowserSessionState> NewPageAsync(string sessionId, CancellationToken token) =>
         OnSessionAsync(
@@ -351,13 +354,22 @@ public sealed partial class BrowserSessions(IConfiguration configuration) : IAsy
         using var timer = new PeriodicTimer(TimeSpan.FromSeconds(30));
         while (await timer.WaitForNextTickAsync(token))
         {
-            foreach (
-                var session in sessions.Values.Where(s =>
-                    s.Stop.IsCancellationRequested || s.LastSeen < DateTimeOffset.UtcNow.AddMinutes(-15)
-                )
-            )
+            foreach (var session in sessions.Values.Where(s => s.IsExpired(DateTimeOffset.UtcNow)))
             {
-                await CloseAsync(session.Id);
+                await session.Gate.WaitAsync(token);
+                try
+                {
+                    // Recheck under the viewer's gate so a successful reconnect wins.
+                    if (session.IsExpired(DateTimeOffset.UtcNow))
+                    {
+                        await session.DisposeAsync();
+                        sessions.TryRemove(session.Id, out _);
+                    }
+                }
+                finally
+                {
+                    session.Gate.Release();
+                }
             }
         }
     }

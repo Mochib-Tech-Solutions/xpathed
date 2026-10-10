@@ -9,6 +9,8 @@ builder.Services.AddHostedService<BrowserSessionReaper>();
 var app = builder.Build();
 app.UseApiErrors();
 app.UseMiddleware<BrowserOriginMiddleware>();
-app.UseWebSockets();
+app.UseWebSockets(
+    new WebSocketOptions { KeepAliveInterval = TimeSpan.FromSeconds(20), KeepAliveTimeout = TimeSpan.FromSeconds(20) }
+);
 app.MapControllers();
 await app.RunAsync();

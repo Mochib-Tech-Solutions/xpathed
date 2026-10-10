@@ -90,7 +90,10 @@ export default function useWorkspace() {
       );
     };
     window.addEventListener("pagehide", close);
-    return () => window.removeEventListener("pagehide", close);
+    return () => {
+      window.removeEventListener("pagehide", close);
+      close();
+    };
   }, [session]);
 
   useEffect(() => {
@@ -175,7 +178,10 @@ export default function useWorkspace() {
       const currentSession =
         session ??
         (await request<Session>("/sessions", "POST", { browserType: "chromium", resolution }));
-      if (!isCurrent()) return;
+      if (!isCurrent()) {
+        if (!session) await request(`/sessions/${currentSession.sessionId}`, "DELETE");
+        return;
+      }
       const pageId = page?.pageId ?? currentSession.pageId;
       setWorkspace((previous) => ({
         ...previous,

@@ -1,4 +1,5 @@
-import { act, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import {
   session,
@@ -6,6 +7,7 @@ import {
   target,
   found,
   mockApi,
+  renderWorkspace,
   openWorkspace,
   submitInstruction,
 } from "./workspaceTestUtils";
@@ -13,6 +15,50 @@ import {
 vi.mock("./BrowserViewer", () => ({ default: () => <div aria-label="Managed browser" /> }));
 
 describe("Workspace lifecycle", () => {
+  it("releases the browser session when the workspace unmounts", async () => {
+    mockApi();
+    await openWorkspace();
+    cleanup();
+
+    expect(globalThis.fetch).toHaveBeenCalledWith(`/api/sessions/${session.sessionId}`, {
+      method: "DELETE",
+      keepalive: true,
+    });
+  });
+
+  it("closes a session whose creation completes after the workspace unmounts", async () => {
+    mockApi();
+    const originalFetch = globalThis.fetch;
+    let finish!: (response: Response) => void;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn<typeof globalThis.fetch>((input, options) =>
+        input === "/api/sessions"
+          ? new Promise<Response>((resolve) => {
+              finish = resolve;
+            })
+          : originalFetch(input, options),
+      ),
+    );
+    const { unmount } = renderWorkspace();
+    const user = userEvent.setup();
+    await user.type(screen.getByRole("textbox", { name: "Page address" }), `${page.url}{Enter}`);
+    await waitFor(() => expect(finish).toBeTypeOf("function"));
+    unmount();
+    await act(() => Promise.resolve(finish(Response.json(session))));
+
+    await waitFor(() =>
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        `/api/sessions/${session.sessionId}`,
+        expect.objectContaining({ method: "DELETE" }),
+      ),
+    );
+    expect(globalThis.fetch).not.toHaveBeenCalledWith(
+      `/api/pages/${session.pageId}/navigate`,
+      expect.anything(),
+    );
+  });
+
   it("preserves a result as historical when polling detects a same-URL document change", async () => {
     let current = page;
     mockApi(undefined, () => current);

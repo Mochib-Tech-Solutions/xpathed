@@ -19,11 +19,14 @@ public sealed partial class BrowserSessions
             await session.Gate.WaitAsync(lifetime.Token);
             try
             {
+                lifetime.Token.ThrowIfCancellationRequested();
                 if (session.Viewer is not null)
                 {
                     throw new ApiException(409, "viewer_connected", "This session already has an active viewer.");
                 }
                 session.Viewer = relay;
+                session.ViewerDisconnectedAt = null;
+                session.LastSeen = DateTimeOffset.UtcNow;
                 session.Interaction ??= new BrowserViewerInteraction(session, relay);
                 session.Interaction.Attach(relay);
                 var page = session.Pages[session.ActivePageId];
@@ -44,6 +47,8 @@ public sealed partial class BrowserSessions
                 if (session.Viewer == relay)
                 {
                     session.Viewer = null;
+                    // Polling must not keep a browser alive after its viewer disappears.
+                    session.ViewerDisconnectedAt = DateTimeOffset.UtcNow;
                     foreach (var page in session.Pages.Values)
                     {
                         if (session.Interaction is { } interaction)
