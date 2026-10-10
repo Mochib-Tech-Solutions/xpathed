@@ -1378,7 +1378,7 @@ describe("Workspace resolution", () => {
     },
   );
 
-  it("shows structured cost details on hover and keyboard focus without mixing estimates and charges", async () => {
+  it("shows minimal model usage on hover and keyboard focus, preferring reported charges", async () => {
     mockApi(() =>
       Promise.resolve(
         Response.json({
@@ -1424,15 +1424,16 @@ describe("Workspace resolution", () => {
     );
     const user = await openWorkspace();
     await submitInstruction(user);
-    const cost = await screen.findByRole("button", { name: "Estimated cost: $0.00001709" });
+    const cost = await screen.findByRole("button", { name: "Reported cost: $0.0000215" });
+    expect(screen.queryByText(`Session ${session.sessionId}`)).not.toBeInTheDocument();
+    expect(screen.queryByTitle(`Browser session: ${session.sessionId}`)).not.toBeInTheDocument();
     expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
     await user.hover(cost);
     const tooltip = screen.getByRole("tooltip");
-    expect(within(tooltip).getByText("$0.0749")).toBeInTheDocument();
-    expect(within(tooltip).getByText("$0.44")).toBeInTheDocument();
+    expect(within(tooltip).getByText("deepseek/deepseek-v4.1-flash")).toBeInTheDocument();
     expect(within(tooltip).getByText("$0.0000215")).toBeInTheDocument();
-    expect(within(tooltip).getByText("140")).toBeInTheDocument();
-    expect(within(tooltip).getByText("Unavailable")).toBeInTheDocument();
+    expect(within(tooltip).getByText("155")).toBeInTheDocument();
+    expect(tooltip).not.toHaveTextContent(/Wafer|Estimated|Rates|Reasoning|Cached/);
     await user.unhover(cost);
     expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
     act(() => cost.focus());
@@ -1483,7 +1484,7 @@ describe("Workspace resolution", () => {
     await submitInstruction(user);
     const cost = await screen.findByRole("button", { name: "Reported cost: $0.00" });
     await user.hover(cost);
-    expect(within(screen.getByRole("tooltip")).getAllByText("Unavailable")).toHaveLength(12);
+    expect(within(screen.getByRole("tooltip")).getAllByText("Unavailable")).toHaveLength(2);
     await user.unhover(cost);
     await submitInstruction(user);
     expect(await screen.findByRole("button", { name: "Cost unavailable" })).toBeInTheDocument();
@@ -1512,9 +1513,9 @@ describe("Workspace resolution", () => {
     );
     const cost = screen.getByRole("button", { name: "Cost pending" });
     await user.hover(cost);
-    expect(screen.getByRole("tooltip")).toHaveTextContent(
-      "The provider may still charge this timed-out request.",
-    );
+    expect(
+      screen.getByRole("row", { name: "Unavailable Pending Unavailable" }),
+    ).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Copy XPath 1" })).not.toBeInTheDocument();
   });
 
