@@ -48,7 +48,7 @@ async function fixture(t) {
   await mkdir(join(root, "bin"));
   for (const name of ["dev.mjs", "native.mjs", "service-process.mjs"])
     await cp(new URL(name, import.meta.url), join(root, "scripts", name));
-  const envFile = `OPENROUTER_API_KEY=keep-this\nOPENROUTER_EVAL_API_KEY=eval-private\nXPATHED_PORT=${base}\nBROWSER_EXECUTABLE_PATH=${process.execPath}\n`;
+  const envFile = `OPENROUTER_API_KEY=keep-this\nDEPLOY_SSH_KEY=deploy-private\nXPATHED_PORT=${base}\nBROWSER_EXECUTABLE_PATH=${process.execPath}\n`;
   await writeFile(join(root, ".env"), envFile);
   await writeFile(join(root, "scripts/setup.sh"), "#!/bin/sh\nprintf 'setup\\n' >> events\n");
   const executable = String.raw`#!${process.execPath}
@@ -112,7 +112,7 @@ test("native dev replaces only its previous owner and preserves configuration", 
   await waitFor(() => exited(second) && exited(stop));
   assert.equal(stop.exitCode, 0);
   assert.equal(await readFile(join(root, ".env"), "utf8"), envFile);
-  assert.doesNotMatch(first.output() + second.output(), /keep-this|eval-private/);
+  assert.doesNotMatch(first.output() + second.output(), /keep-this|deploy-private/);
   const log = await events();
   assert.ok(log.indexOf("ready browser") < log.indexOf("start resolver"));
   assert.ok(log.indexOf("ready resolver") < log.indexOf("start clientapi"));
@@ -199,7 +199,7 @@ test("configuration maps isolated loopback services and only Resolver receives t
   const config = developmentConfig("/checkout", {
     XPATHED_PORT: "12000",
     OPENROUTER_API_KEY: "private",
-    OPENROUTER_EVAL_API_KEY: "evaluation-private",
+    DEPLOY_SSH_KEY: "deployment-private",
   });
   assert.deepEqual(config.ports, [12000, 12001, 12002, 12003]);
   const [browser, resolver, client, web] = config.services;
@@ -213,7 +213,7 @@ test("configuration maps isolated loopback services and only Resolver receives t
   assert.equal(web.env.XPATHED_BROWSER_URL, "http://127.0.0.1:12001");
   for (const service of [browser, client, web])
     assert.doesNotMatch(JSON.stringify(service), /private/);
-  assert.doesNotMatch(JSON.stringify(resolver), /evaluation-private/);
+  assert.doesNotMatch(JSON.stringify(resolver), /deployment-private/);
   assert.equal(new Set(config.services.slice(0, 3).map((service) => service.args[5])).size, 3);
   for (const value of ["0", "-1", "65533", "x", "1234.5"])
     assert.throws(
@@ -226,7 +226,7 @@ test("native environment overrides files without rewriting them and validates ex
   const { root, envFile } = await fixture(t);
   const env = await loadEnvironment(root, { OPENROUTER_API_KEY: "override" });
   assert.equal(env.OPENROUTER_API_KEY, "override");
-  assert.equal(env.OPENROUTER_EVAL_API_KEY, "eval-private");
+  assert.equal(env.DEPLOY_SSH_KEY, "deploy-private");
   assert.equal(await readFile(join(root, ".env"), "utf8"), envFile);
   assert.equal(
     await browserExecutable({ BROWSER_EXECUTABLE_PATH: process.execPath }),

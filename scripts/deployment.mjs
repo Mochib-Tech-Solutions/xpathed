@@ -6,7 +6,7 @@ import { mkdtempSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-// Docker COPY inputs and hosted orchestration. Evaluation, tests and docs are excluded.
+// Only Docker COPY inputs and hosted orchestration affect deployed images.
 export const inputs = [
   "src/Common",
   "src/Browser",

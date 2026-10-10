@@ -8,7 +8,7 @@ Preserve the redacted, checksum-pinned history scan in `scripts/security-check.m
 
 Keep independent approvals and required checks in [.github/branch-protection.json](.github/branch-protection.json). Administrators remain exempt from classic protection by owner choice (`enforce_admins: false`), but verify successful checks before administrative merges. Preserve the separate default-branch ruleset and verify GitHub enforcement after policy or visibility changes; a local policy file is not enforcement.
 
-Treat session IDs as capabilities. Origin/Fetch Metadata checks, security headers and HTTP/model quotas do not authenticate visitors or impose a dollar budget. Use a dedicated provider-limited application key, separate from evaluation credentials; preserve accounting for disconnected calls.
+Treat session IDs as capabilities. Origin/Fetch Metadata checks, security headers and HTTP/model quotas do not authenticate visitors or impose a dollar budget. Use a dedicated provider-limited application key; preserve accounting for disconnected calls.
 
 Native development binds services to loopback. Browser communicates with Chromium through private inherited pipes, with no debugging listener. Use fresh managed browser profiles; never attach to a personal browser. Viewer input must name the active page and document, and may not forward arbitrary protocol commands.
 

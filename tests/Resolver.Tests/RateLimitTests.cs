@@ -22,7 +22,7 @@ public sealed class RateLimitTests
             (await first.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("outcome").GetString()
         );
         client.DefaultRequestHeaders.Add("X-Forwarded-For", "198.51.100.44");
-        using var rejected = await Resolve(client, diagnostic: true);
+        using var rejected = await Resolve(client);
         Assert.Equal(HttpStatusCode.TooManyRequests, rejected.StatusCode);
         Assert.Equal(
             "request_rate_limited",
@@ -37,7 +37,7 @@ public sealed class RateLimitTests
     [Theory]
     [InlineData("ModelUsage:CallsPerMinute")]
     [InlineData("ModelUsage:CallsPerDay")]
-    public async Task ModelQuotaIsSharedByPublicAndDiagnosticRequestsAndCountsFailedAttempts(string setting)
+    public async Task ModelQuotaIsSharedAcrossRequestsAndCountsFailedAttempts(string setting)
     {
         var handler = new DeterministicServicesHandler { ProviderStatus = HttpStatusCode.ServiceUnavailable };
         await using var app = Application(handler, setting, "1");
@@ -47,8 +47,8 @@ public sealed class RateLimitTests
         Assert.Equal("error", attempted.GetProperty("outcome").GetString());
         Assert.Equal(1, attempted.GetProperty("diagnostics").GetProperty("modelCalls").GetInt32());
         client.DefaultRequestHeaders.Add("X-Forwarded-For", "198.51.100.99");
-        using var rejected = await Resolve(client, diagnostic: true);
-        var result = (await rejected.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("result");
+        using var rejected = await Resolve(client);
+        var result = await rejected.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal("error", result.GetProperty("outcome").GetString());
         var diagnostics = result.GetProperty("diagnostics");
         Assert.Equal("model_usage_limited", diagnostics.GetProperty("code").GetString());
@@ -150,16 +150,9 @@ public sealed class RateLimitTests
         Assert.Equal(1, handler.SelectionRequestCount);
     }
 
-    private static Task<HttpResponseMessage> Resolve(
-        HttpClient client,
-        bool diagnostic = false,
-        CancellationToken token = default
-    )
-    {
-        client.DefaultRequestHeaders.Remove("X-Xpathed-Attempt-Id");
-        client.DefaultRequestHeaders.Add("X-Xpathed-Attempt-Id", Guid.NewGuid().ToString("N"));
-        return client.PostAsJsonAsync(
-            (diagnostic ? "/internal" : "") + "/pages/page-1/resolve",
+    private static Task<HttpResponseMessage> Resolve(HttpClient client, CancellationToken token = default) =>
+        client.PostAsJsonAsync(
+            "/pages/page-1/resolve",
             new
             {
                 instruction = "Click Save",
@@ -168,7 +161,6 @@ public sealed class RateLimitTests
             },
             token
         );
-    }
 
     private static WebApplicationFactory<HealthController> Application(
         DeterministicServicesHandler handler,

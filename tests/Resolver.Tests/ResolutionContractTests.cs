@@ -8,6 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Xpathed.Common.Contracts;
 using Xpathed.Resolver.Controllers;
+using Xpathed.Resolver.Services;
 
 namespace Xpathed.Resolver.Tests;
 
@@ -253,10 +254,10 @@ public sealed class ResolutionContractTests
     }
 
     [Theory]
-    [InlineData("/pages/page-1/capture", false)]
-    [InlineData("/api/v1/chat/completions", false)]
-    [InlineData("/pages/page-1/selections", false)]
-    public async Task CurrentViewResolutionCompletesBeyondTheTwoSecondLatencyTarget(string slowPath, bool evidence)
+    [InlineData("/pages/page-1/capture")]
+    [InlineData("/api/v1/chat/completions")]
+    [InlineData("/pages/page-1/selections")]
+    public async Task CurrentViewResolutionCompletesBeyondTheTwoSecondLatencyTarget(string slowPath)
     {
         var handler = new DeterministicServicesHandler
         {
@@ -270,8 +271,7 @@ public sealed class ResolutionContractTests
                 }
             },
         };
-        var envelope = await ResolveContextAsync(handler, "Click Save", evidence);
-        var result = evidence ? envelope.GetProperty("result") : envelope;
+        var result = await ResolveContextAsync(handler, "Click Save");
         Assert.Equal("found", result.GetProperty("outcome").GetString());
         Assert.True(
             result.GetProperty("diagnostics").GetProperty("timingsMs").GetProperty("total").GetDouble() >= 2000
@@ -282,29 +282,14 @@ public sealed class ResolutionContractTests
             0.0000215m,
             result.GetProperty("diagnostics").GetProperty("usage").GetProperty("cost").GetDecimal()
         );
-        if (evidence)
-        {
-            using var config = JsonDocument.Parse(
-                envelope.GetProperty("evidence").GetProperty("configurationJson").GetString()!
-            );
-            Assert.Equal(
-                JsonValueKind.Null,
-                config.RootElement.GetProperty("effective").GetProperty("serverDeadlineMs").ValueKind
-            );
-        }
     }
 
-    private static async Task<JsonElement> ResolveContextAsync(
-        DeterministicServicesHandler handler,
-        string instruction,
-        bool diagnostic = true
-    )
+    private static async Task<JsonElement> ResolveContextAsync(DeterministicServicesHandler handler, string instruction)
     {
         await using var application = CreateApplication(handler);
         using var client = application.CreateClient();
-        client.DefaultRequestHeaders.Add("X-Xpathed-Attempt-Id", Guid.NewGuid().ToString("N"));
         using var response = await client.PostAsJsonAsync(
-            (diagnostic ? "/internal" : "") + "/pages/page-1/resolve",
+            "/pages/page-1/resolve",
             new
             {
                 instruction,
@@ -629,7 +614,7 @@ public sealed class ResolutionContractTests
     [InlineData("state_unavailable", "click")]
     [InlineData("target_not_addressable", "unsupported")]
     [InlineData("target_not_addressable", "click")]
-    public async Task EvidenceLimitationIsPresentInSentAndRetainedSchema(string limitation, string modelAction)
+    public async Task EvidenceLimitationIsPresentInProviderSchemaAndPublicResult(string limitation, string modelAction)
     {
         var handler = new DeterministicServicesHandler
         {
@@ -640,9 +625,8 @@ public sealed class ResolutionContractTests
         };
         await using var application = CreateApplication(handler);
         using var client = application.CreateClient();
-        client.DefaultRequestHeaders.Add("X-Xpathed-Attempt-Id", Guid.NewGuid().ToString("N"));
         using var response = await client.PostAsJsonAsync(
-            "/internal/pages/page-1/resolve",
+            "/pages/page-1/resolve",
             new
             {
                 instruction = "Click the red image",
@@ -650,8 +634,7 @@ public sealed class ResolutionContractTests
                 imageMode = "text_only",
             }
         );
-        var envelope = await response.Content.ReadFromJsonAsync<JsonElement>();
-        var result = envelope.GetProperty("result");
+        var result = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal("unsupported", result.GetProperty("outcome").GetString());
         Assert.Equal("unsupported", result.GetProperty("action").GetString());
         Assert.Equal("unsupported", result.GetProperty("actions")[0].GetProperty("action").GetString());
@@ -660,24 +643,6 @@ public sealed class ResolutionContractTests
         Assert.Equal(limitation, result.GetProperty("actions")[0].GetProperty("code").GetString());
         Assert.False(string.IsNullOrWhiteSpace(result.GetProperty("actions")[0].GetProperty("message").GetString()));
         var sent = handler.ModelRequest.GetProperty("response_format").GetProperty("json_schema").GetProperty("schema");
-        using var retained = JsonDocument.Parse(
-            envelope.GetProperty("evidence").GetProperty("outputSchema").GetString()!
-        );
-        Assert.True(JsonElement.DeepEquals(sent, retained.RootElement));
-        using var configuration = JsonDocument.Parse(
-            envelope.GetProperty("evidence").GetProperty("configurationJson").GetString()!
-        );
-        Assert.True(
-            JsonElement.DeepEquals(
-                sent,
-                configuration
-                    .RootElement.GetProperty("effective")
-                    .GetProperty("request")
-                    .GetProperty("response_format")
-                    .GetProperty("json_schema")
-                    .GetProperty("schema")
-            )
-        );
         Assert.Contains(
             sent.GetProperty("properties")
                 .GetProperty("actions")
@@ -1142,7 +1107,7 @@ public sealed class ResolutionContractTests
     }
 
     [Fact]
-    public async Task DiagnosticConfigurationDescribesEffectiveSettingsWithoutCredentialsOrPageInput()
+    public async Task ConfigurationIdentityDescribesEffectiveSettingsWithoutCredentialsOrPageInput()
     {
         var handler = new DeterministicServicesHandler { ProviderBody = BilledSelection() };
         await using var application = CreateApplication(
@@ -1157,9 +1122,8 @@ public sealed class ResolutionContractTests
             }
         );
         using var client = application.CreateClient();
-        client.DefaultRequestHeaders.Add("X-Xpathed-Attempt-Id", Guid.NewGuid().ToString("N"));
         using var response = await client.PostAsJsonAsync(
-            "/internal/pages/page-1/resolve",
+            "/pages/page-1/resolve",
             new
             {
                 instruction = "Click the unique instruction-canary",
@@ -1168,19 +1132,14 @@ public sealed class ResolutionContractTests
             }
         );
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var envelope = await response.Content.ReadFromJsonAsync<JsonElement>();
-        Assert.Equal("found", envelope.GetProperty("result").GetProperty("outcome").GetString());
-        using var configuration = JsonDocument.Parse(
-            envelope.GetProperty("evidence").GetProperty("configurationJson").GetString()!
+        var result = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("found", result.GetProperty("outcome").GetString());
+        var effective = JsonSerializer.SerializeToElement(
+            application.Services.GetRequiredService<OpenRouterGateway>().DescribeConfiguration()
         );
-        var effective = configuration.RootElement.GetProperty("effective");
         Assert.Equal("http://configured-provider.test/api/v1/", effective.GetProperty("endpoint").GetString());
         Assert.Equal("47", effective.GetProperty("timeoutSeconds").GetString());
         Assert.Equal(16, effective.GetProperty("maximumActions").GetInt32());
-        Assert.Equal(
-            handler.ModelRequest.GetProperty("messages")[0].GetProperty("content").GetString(),
-            envelope.GetProperty("evidence").GetProperty("systemPrompt").GetString()
-        );
         Assert.False(effective.GetProperty("responseCache").GetBoolean());
         var request = effective.GetProperty("request");
         Assert.Equal("configured/model", request.GetProperty("model").GetString());
@@ -1189,18 +1148,14 @@ public sealed class ResolutionContractTests
         Assert.False(request.GetProperty("reasoning").GetProperty("enabled").GetBoolean());
         Assert.Equal(string.Empty, request.GetProperty("messages")[1].GetProperty("content").GetString());
         Assert.Equal(
-            envelope.GetProperty("evidence").GetProperty("systemPrompt").GetString(),
+            handler.ModelRequest.GetProperty("messages")[0].GetProperty("content").GetString(),
             request.GetProperty("messages")[0].GetProperty("content").GetString()
         );
-        Assert.DoesNotContain(
-            "configuration-secret-canary",
-            configuration.RootElement.GetRawText(),
-            StringComparison.Ordinal
-        );
-        Assert.DoesNotContain("instruction-canary", configuration.RootElement.GetRawText(), StringComparison.Ordinal);
-        Assert.DoesNotContain("button-save", configuration.RootElement.GetRawText(), StringComparison.Ordinal);
+        Assert.DoesNotContain("configuration-secret-canary", effective.GetRawText(), StringComparison.Ordinal);
+        Assert.DoesNotContain("instruction-canary", effective.GetRawText(), StringComparison.Ordinal);
+        Assert.DoesNotContain("button-save", effective.GetRawText(), StringComparison.Ordinal);
         Assert.Equal(
-            envelope.GetProperty("result").GetProperty("configurationId").GetString(),
+            result.GetProperty("configurationId").GetString(),
             Convert.ToHexStringLower(
                 System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(effective.GetRawText()))
             )
@@ -1376,55 +1331,46 @@ public sealed class ResolutionContractTests
     }
 
     [Theory]
-    [InlineData("API_KEY=violet-cactus-782")]
-    [InlineData("Bearer violet-cactus-782")]
-    [InlineData("https://alice:violet-cactus-782@example.org/settings?auth=violet-cactus-782#violet-cactus-782")]
-    public async Task InternalEvidenceSanitizesCredentialBearingPageLabels(string label)
+    [InlineData("API_KEY=violet-cactus-782", "[redacted]")]
+    [InlineData("Bearer violet-cactus-782", "[redacted]")]
+    [InlineData(
+        "https://alice:violet-cactus-782@example.org/settings?auth=violet-cactus-782#violet-cactus-782",
+        "https://example.org/settings"
+    )]
+    public async Task LateAccountingSanitizesCredentialBearingProviderMetadata(string metadata, string expected)
     {
-        var capture = JsonNode.Parse(new DeterministicServicesHandler().CaptureBody)!;
-        capture["candidates"]![0]!["label"] = label;
-        await using var application = CreateApplication(
-            new DeterministicServicesHandler { CaptureBody = capture.ToJsonString() }
-        );
-        using var client = application.CreateClient();
-        client.DefaultRequestHeaders.Add("X-Xpathed-Attempt-Id", Guid.NewGuid().ToString("N"));
-        using var response = await client.PostAsJsonAsync(
-            "/internal/pages/page-1/resolve",
-            new
+        var logs = new AccountingLogProvider();
+        await using var application = CreateApplication(new DeterministicServicesHandler(), logs: logs);
+        var accounting = application.Services.GetRequiredService<ProviderAccounting>();
+        accounting.Record(
+            new ResolutionDiagnostics
             {
-                instruction = "Click Save",
-                documentId = "document-1",
-                imageMode = "text_only",
-            }
+                GenerationId = metadata,
+                Model = metadata,
+                Provider = metadata,
+            },
+            "trace-1",
+            "attempt-1",
+            "configuration-1"
         );
-        var envelope = await response.Content.ReadFromJsonAsync<JsonElement>();
-        Assert.DoesNotContain(
-            "violet-cactus-782",
-            envelope.GetProperty("evidence").GetRawText(),
-            StringComparison.Ordinal
-        );
-        Assert.Contains(
-            "button-save",
-            envelope.GetProperty("evidence").GetProperty("modelInput").GetString(),
-            StringComparison.Ordinal
-        );
+        var entry = Assert.Single(logs.Entries).ToDictionary(pair => pair.Key, pair => pair.Value);
+        Assert.Equal(expected, entry["GenerationId"]);
+        Assert.Equal(expected, entry["Model"]);
+        Assert.Equal(expected, entry["Provider"]);
+        Assert.DoesNotContain("violet-cactus-782", JsonSerializer.Serialize(entry), StringComparison.Ordinal);
     }
 
-    [Theory]
-    [InlineData(null)]
-    [InlineData("invalid")]
-    [InlineData("0123456789abcdef0123456789abcdef,0123456789abcdef0123456789abcdef")]
-    public async Task InternalResolutionRejectsInvalidAttemptIdentity(string? attempt)
+    [Fact]
+    public async Task ConfigurationFailureDoesNotCaptureOrCallProvider()
     {
         var handler = new DeterministicServicesHandler();
-        await using var application = CreateApplication(handler);
+        await using var application = CreateApplication(
+            handler,
+            new Dictionary<string, string?> { ["OpenRouter:ApiKey"] = null }
+        );
         using var client = application.CreateClient();
-        if (attempt is not null)
-        {
-            client.DefaultRequestHeaders.Add("X-Xpathed-Attempt-Id", attempt);
-        }
         using var response = await client.PostAsJsonAsync(
-            "/internal/pages/page-1/resolve",
+            "/pages/page-1/resolve",
             new
             {
                 instruction = "Click Save",
@@ -1432,45 +1378,18 @@ public sealed class ResolutionContractTests
                 imageMode = "text_only",
             }
         );
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var result = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("error", result.GetProperty("outcome").GetString());
+        Assert.Equal("provider_not_configured", result.GetProperty("diagnostics").GetProperty("code").GetString());
+        Assert.Equal(0, handler.CaptureRequestCount);
         Assert.Equal(0, handler.ProviderRequestCount);
     }
 
     [Fact]
-    public async Task EvidenceMarksMissingInputWhenConfigurationFailsBeforeCapture()
+    public async Task PublicResolutionDoesNotExposeModelInputAndRejectsBrowserOrigins()
     {
-        await using var application = CreateApplication(
-            new DeterministicServicesHandler(),
-            new Dictionary<string, string?> { ["OpenRouter:ApiKey"] = null }
-        );
-        using var client = application.CreateClient();
-        client.DefaultRequestHeaders.Add("X-Xpathed-Attempt-Id", Guid.NewGuid().ToString("N"));
-        using var response = await client.PostAsJsonAsync(
-            "/internal/pages/page-1/resolve",
-            new
-            {
-                instruction = "Click Save",
-                documentId = "document-1",
-                imageMode = "text_only",
-            }
-        );
-        var envelope = await response.Content.ReadFromJsonAsync<JsonElement>();
-        Assert.Equal("error", envelope.GetProperty("result").GetProperty("outcome").GetString());
-        Assert.Equal(
-            "provider_not_configured",
-            envelope.GetProperty("result").GetProperty("diagnostics").GetProperty("code").GetString()
-        );
-        Assert.Equal(
-            "model_input_unavailable",
-            envelope.GetProperty("evidence").GetProperty("availability").GetString()
-        );
-        Assert.Equal(JsonValueKind.Null, envelope.GetProperty("evidence").GetProperty("modelInput").ValueKind);
-    }
-
-    [Fact]
-    public async Task PublicResolutionDoesNotExposeEvidenceAndInternalRouteRejectsBrowserOrigins()
-    {
-        await using var application = CreateApplication(new DeterministicServicesHandler());
+        var handler = new DeterministicServicesHandler();
+        await using var application = CreateApplication(handler);
         using var client = application.CreateClient();
         using var response = await client.PostAsJsonAsync(
             "/pages/page-1/resolve",
@@ -1484,10 +1403,12 @@ public sealed class ResolutionContractTests
         var result = await response.Content.ReadFromJsonAsync<JsonElement>();
         Assert.Equal("found", result.GetProperty("outcome").GetString());
         Assert.False(result.TryGetProperty("evidence", out _));
+        Assert.False(result.TryGetProperty("modelInput", out _));
+        Assert.False(result.TryGetProperty("systemPrompt", out _));
+        Assert.DoesNotContain("test-token", result.GetRawText(), StringComparison.Ordinal);
         client.DefaultRequestHeaders.Add("Origin", "http://localhost:8080");
-        client.DefaultRequestHeaders.Add("X-Xpathed-Attempt-Id", Guid.NewGuid().ToString("N"));
         using var blocked = await client.PostAsJsonAsync(
-            "/internal/pages/page-1/resolve",
+            "/pages/page-1/resolve",
             new
             {
                 instruction = "Click Save",
@@ -1496,98 +1417,53 @@ public sealed class ResolutionContractTests
             }
         );
         Assert.Equal(HttpStatusCode.Forbidden, blocked.StatusCode);
+        Assert.Equal(1, handler.ProviderRequestCount);
     }
 
     [Fact]
-    public async Task InterpretedDataEntryAlsoWithholdsEvidenceForUnrecognizedWording()
-    {
-        var handler = new DeterministicServicesHandler
-        {
-            ProviderBody = ProviderSelection(
-                """{"complete":true,"actions":[{"step":1,"instruction":"Fill control","outcome":"not_found","action":"fill","candidateId":null,"limitation":"none"}]}"""
-            ),
-        };
-        await using var application = CreateApplication(handler);
-        using var client = application.CreateClient();
-        client.DefaultRequestHeaders.Add("X-Xpathed-Attempt-Id", Guid.NewGuid().ToString("N"));
-        using var response = await client.PostAsJsonAsync(
-            "/internal/pages/page-1/resolve",
-            new
-            {
-                instruction = "Put violet-cactus-782 there",
-                documentId = "document-1",
-                imageMode = "text_only",
-            }
-        );
-        var envelope = await response.Content.ReadFromJsonAsync<JsonElement>();
-        Assert.Equal("fill", envelope.GetProperty("result").GetProperty("action").GetString());
-        Assert.Equal(
-            "withheld_sensitive_instruction",
-            envelope.GetProperty("evidence").GetProperty("availability").GetString()
-        );
-        Assert.DoesNotContain(
-            "violet-cactus-782",
-            envelope.GetProperty("evidence").GetRawText(),
-            StringComparison.Ordinal
-        );
-    }
-
-    [Theory]
-    [InlineData("Set input to violet-cactus-782")]
-    [InlineData("Paste violet-cactus-782 into the field")]
-    [InlineData("Fill email with violet-cactus-782")]
-    [InlineData("Type violet-cactus-782")]
-    [InlineData("Upload violet-cactus-782")]
-    public async Task InternalEvidenceWithholdsEnteredValues(string instruction)
-    {
-        await using var application = CreateApplication(new DeterministicServicesHandler());
-        using var client = application.CreateClient();
-        client.DefaultRequestHeaders.Add("X-Xpathed-Attempt-Id", Guid.NewGuid().ToString("N"));
-        using var response = await client.PostAsJsonAsync(
-            "/internal/pages/page-1/resolve",
-            new
-            {
-                instruction,
-                documentId = "document-1",
-                imageMode = "text_only",
-            }
-        );
-        var envelope = await response.Content.ReadFromJsonAsync<JsonElement>();
-        var evidence = envelope.GetProperty("evidence");
-        Assert.Equal("withheld_sensitive_instruction", evidence.GetProperty("availability").GetString());
-        Assert.Equal("[redacted]", evidence.GetProperty("instruction").GetString());
-        Assert.Equal(JsonValueKind.Null, evidence.GetProperty("modelInput").ValueKind);
-        Assert.DoesNotContain("violet-cactus-782", evidence.GetRawText(), StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public async Task InternalResolutionReturnsBoundedEvidenceAndCallerAttemptIdentity()
+    public async Task RemovedEvidenceRouteDoesNotCallProvider()
     {
         var handler = new DeterministicServicesHandler();
         await using var application = CreateApplication(handler);
         using var client = application.CreateClient();
-        client.DefaultRequestHeaders.Add("X-Xpathed-Attempt-Id", "0123456789abcdef0123456789abcdef");
         using var response = await client.PostAsJsonAsync(
             "/internal/pages/page-1/resolve",
-            new
-            {
-                instruction = "Click Save",
-                documentId = "document-1",
-                imageMode = "text_only",
-            }
+            new { instruction = "Click Save", documentId = "document-1" }
         );
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var envelope = await response.Content.ReadFromJsonAsync<JsonElement>();
-        Assert.Equal("found", envelope.GetProperty("result").GetProperty("outcome").GetString());
-        Assert.Equal(
-            "0123456789abcdef0123456789abcdef",
-            envelope.GetProperty("result").GetProperty("attemptId").GetString()
-        );
-        var evidence = envelope.GetProperty("evidence");
-        Assert.Equal("sanitized", evidence.GetProperty("availability").GetString());
-        Assert.Contains("button-save", evidence.GetProperty("modelInput").GetString(), StringComparison.Ordinal);
-        Assert.DoesNotContain("test-token", envelope.GetRawText(), StringComparison.Ordinal);
-        Assert.Equal(1, handler.ProviderRequestCount);
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal(0, handler.CaptureRequestCount);
+        Assert.Equal(0, handler.ProviderRequestCount);
+    }
+
+    [Fact]
+    public async Task PublicResolutionGeneratesFreshAttemptIdentities()
+    {
+        var handler = new DeterministicServicesHandler();
+        await using var application = CreateApplication(handler);
+        using var client = application.CreateClient();
+        const string supplied = "0123456789abcdef0123456789abcdef";
+        client.DefaultRequestHeaders.Add("X-Xpathed-Attempt-Id", supplied);
+        var identities = new HashSet<string>();
+        for (var attempt = 0; attempt < 2; attempt++)
+        {
+            using var response = await client.PostAsJsonAsync(
+                "/pages/page-1/resolve",
+                new
+                {
+                    instruction = "Click Save",
+                    documentId = "document-1",
+                    imageMode = "text_only",
+                }
+            );
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            var result = await response.Content.ReadFromJsonAsync<JsonElement>();
+            Assert.Equal("found", result.GetProperty("outcome").GetString());
+            var identity = result.GetProperty("attemptId").GetString()!;
+            Assert.True(Guid.TryParseExact(identity, "N", out _));
+            Assert.NotEqual(supplied, identity);
+            Assert.True(identities.Add(identity));
+        }
+        Assert.Equal(2, handler.ProviderRequestCount);
     }
 
     [Fact]
@@ -2958,9 +2834,8 @@ public sealed class ResolutionContractTests
             new Dictionary<string, string?> { ["OpenRouter:Model"] = null, ["OpenRouter:Provider"] = null }
         );
         using var client = application.CreateClient();
-        client.DefaultRequestHeaders.Add("X-Xpathed-Attempt-Id", Guid.NewGuid().ToString("N"));
         using var response = await client.PostAsJsonAsync(
-            "/internal/pages/page-1/resolve",
+            "/pages/page-1/resolve",
             new
             {
                 instruction = "Click Save",
@@ -2969,8 +2844,8 @@ public sealed class ResolutionContractTests
             }
         );
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var envelope = await response.Content.ReadFromJsonAsync<JsonElement>();
-        Assert.Equal("found", envelope.GetProperty("result").GetProperty("outcome").GetString());
+        var result = await response.Content.ReadFromJsonAsync<JsonElement>();
+        Assert.Equal("found", result.GetProperty("outcome").GetString());
         var request = handler.ModelRequest;
         Assert.Equal("deepseek/deepseek-v4.1-flash", request.GetProperty("model").GetString());
         Assert.Equal("wafer", request.GetProperty("provider").GetProperty("only")[0].GetString());
@@ -2981,16 +2856,15 @@ public sealed class ResolutionContractTests
         Assert.True(
             request.GetProperty("response_format").GetProperty("json_schema").GetProperty("strict").GetBoolean()
         );
-        using var configuration = JsonDocument.Parse(
-            envelope.GetProperty("evidence").GetProperty("configurationJson").GetString()!
+        var effective = JsonSerializer.SerializeToElement(
+            application.Services.GetRequiredService<OpenRouterGateway>().DescribeConfiguration()
         );
-        var effective = configuration.RootElement.GetProperty("effective");
         Assert.Equal(
             request.GetProperty("reasoning").GetRawText(),
             effective.GetProperty("request").GetProperty("reasoning").GetRawText()
         );
         Assert.Equal(
-            envelope.GetProperty("result").GetProperty("configurationId").GetString(),
+            result.GetProperty("configurationId").GetString(),
             Convert.ToHexStringLower(
                 System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(effective.GetRawText()))
             )
