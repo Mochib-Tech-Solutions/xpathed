@@ -3,6 +3,7 @@ import { Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { ActionResolution, Resolution } from "./api";
+import { canExecute, needsExecutionValue } from "./actionExecution";
 
 const keys = [
   "Enter",
@@ -20,21 +21,6 @@ const keys = [
   "Delete",
   "Space",
 ];
-const actions = [
-  "click",
-  "double_click",
-  "right_click",
-  "hover",
-  "fill",
-  "type",
-  "clear",
-  "select",
-  "check",
-  "uncheck",
-  "press",
-  "focus",
-  "blur",
-];
 
 export default function ExecuteAction({
   entry,
@@ -48,8 +34,6 @@ export default function ExecuteAction({
   onExecute: (entry: Resolution, actionId: string, value?: string) => void;
 }) {
   const [value, setValue] = useState("");
-  const target = action.target;
-  const readiness = target?.interactability;
   const execution = entry.execution?.actionId === action.actionId ? entry.execution : null;
   if (execution)
     return (
@@ -66,22 +50,8 @@ export default function ExecuteAction({
         {execution.message}
       </p>
     );
-  if (
-    entry.historical ||
-    !entry.result?.captureId ||
-    !entry.result.sessionId ||
-    action.outcome !== "found" ||
-    !actions.includes(action.action) ||
-    !target?.state.rendered ||
-    !target.state.inViewport ||
-    !readiness ||
-    readiness.status === "blocked" ||
-    readiness.status === "unsupported" ||
-    readiness.checks.compatibleControl !== "pass" ||
-    (["fill", "type", "clear"].includes(action.action) && readiness.checks.keyboard !== "pass")
-  )
-    return null;
-  const needsValue = ["fill", "type", "select", "press"].includes(action.action);
+  if (!canExecute(entry, action)) return null;
+  const needsValue = needsExecutionValue(action.action);
   const label = action.action === "select" ? "Option value" : "Value to enter";
   return (
     <form

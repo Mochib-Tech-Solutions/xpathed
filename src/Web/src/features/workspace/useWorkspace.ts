@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError, request } from "./api";
+import { canExecute, needsExecutionValue } from "./actionExecution";
 import type {
   ActionExecutionResult,
   BrowserSessionOptions,
@@ -11,10 +12,10 @@ import type {
   SessionState,
 } from "./api";
 
-type TabChat = {
+type Settings = { imageMode: ImageMode; autoExecute: boolean };
+type TabChat = Settings & {
   address: string;
   instruction: string;
-  imageMode: ImageMode;
   history: Resolution[];
 };
 type WorkspaceState = {
@@ -22,14 +23,17 @@ type WorkspaceState = {
   snapshot: SessionState | null;
   tabs: Record<string, TabChat>;
   initialAddress: string;
+  initialSettings: Settings;
 };
+const defaultSettings: Settings = { imageMode: "auto", autoExecute: false };
 const emptyWorkspace: WorkspaceState = {
   session: null,
   snapshot: null,
   tabs: {},
   initialAddress: "",
+  initialSettings: defaultSettings,
 };
-const emptyChat: TabChat = { address: "", instruction: "", imageMode: "auto", history: [] };
+const emptyChat: TabChat = { address: "", instruction: "", ...defaultSettings, history: [] };
 const pageAddress = (page: PageState) => (page.url === "about:blank" ? "" : page.url);
 const historical = (entries: Resolution[]) =>
   entries.map((entry) => (entry.historical ? entry : { ...entry, historical: true }));
@@ -67,7 +71,9 @@ export default function useWorkspace() {
   const [workspace, setWorkspace] = useState(emptyWorkspace);
   const { session, snapshot, tabs } = workspace;
   const page = snapshot?.pages.find((entry) => entry.pageId === snapshot.activePageId) ?? null;
-  const chat = page ? (tabs[page.pageId] ?? emptyChat) : emptyChat;
+  const chat = page
+    ? (tabs[page.pageId] ?? emptyChat)
+    : { ...emptyChat, ...workspace.initialSettings };
   const [busy, setBusy] = useState("");
   const [addressFocus, setAddressFocus] = useState(0);
   const closing = busy === "Closing tabs…";
@@ -77,6 +83,23 @@ export default function useWorkspace() {
   const revision = useRef(0);
   const snapshotRevision = useRef(0);
   const spotlightQueue = useRef(Promise.resolve());
+  const observedSnapshot = useRef<SessionState | null>(null);
+  const executionRevision = useRef(0);
+  const applySnapshot = useCallback((next: SessionState) => {
+    const previous = observedSnapshot.current;
+    if (
+      previous &&
+      (previous.sessionId !== next.sessionId ||
+        previous.activePageId !== next.activePageId ||
+        previous.activationVersion !== next.activationVersion ||
+        previous.pages.find((item) => item.pageId === previous.activePageId)?.documentId !==
+          next.pages.find((item) => item.pageId === next.activePageId)?.documentId)
+    )
+      executionRevision.current += 1;
+    observedSnapshot.current = next;
+    snapshotRevision.current += 1;
+    setWorkspace((previous) => updateSession(previous, next));
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -125,10 +148,11 @@ export default function useWorkspace() {
       try {
         const next = await request<SessionState>(`/sessions/${session!.sessionId}`);
         if (!isCurrent()) return;
-        setWorkspace((previous) => updateSession(previous, next));
+        applySnapshot(next);
         setPollError("");
       } catch (failure) {
         if (!isCurrent()) return;
+        executionRevision.current += 1;
         if (failure instanceof ApiError && failure.status === 404) {
           active = false;
           revision.current += 1;
@@ -150,7 +174,7 @@ export default function useWorkspace() {
       active = false;
       clearTimeout(timer);
     };
-  }, [session, closing]);
+  }, [session, closing, applySnapshot]);
 
   async function perform(label: string, action: (isCurrent: () => boolean) => Promise<void>) {
     if (pending.current) return;
@@ -176,10 +200,6 @@ export default function useWorkspace() {
     }
   }
 
-  function applySnapshot(next: SessionState) {
-    snapshotRevision.current += 1;
-    setWorkspace((previous) => updateSession(previous, next));
-  }
   async function readSession(id: string, isCurrent: () => boolean) {
     const next = await request<SessionState>(`/sessions/${id}`);
     if (isCurrent()) applySnapshot(next);
@@ -206,7 +226,7 @@ export default function useWorkspace() {
         tabs: {
           ...previous.tabs,
           [pageId]: {
-            ...(previous.tabs[pageId] ?? emptyChat),
+            ...(previous.tabs[pageId] ?? { ...emptyChat, ...previous.initialSettings }),
             address: previous.tabs[pageId]?.address ?? previous.initialAddress,
             history: historical(previous.tabs[pageId]?.history ?? []),
           },
@@ -258,6 +278,7 @@ export default function useWorkspace() {
       error: null,
     };
     void perform("Resolving…", async (isCurrent) => {
+      const executionAt = executionRevision.current;
       setWorkspace((previous) => ({
         ...previous,
         tabs: {
@@ -271,6 +292,7 @@ export default function useWorkspace() {
       }));
       let result: ResolutionResult | null = null;
       let failure: string | null = null;
+      let freshSession: SessionState | null = null;
       try {
         result = await request<ResolutionResult>(`/pages/${page.pageId}/resolve`, "POST", {
           instruction: text,
@@ -278,7 +300,7 @@ export default function useWorkspace() {
           imageMode: chat.imageMode,
         });
         if (!isCurrent()) return;
-        await readSession(session.sessionId, isCurrent);
+        freshSession = await readSession(session.sessionId, isCurrent);
         if (
           result.pageId !== page.pageId ||
           result.documentId !== page.documentId ||
@@ -324,6 +346,34 @@ export default function useWorkspace() {
           },
         };
       });
+      const action = result?.actions?.[0];
+      const resolvedEntry = { ...entry, result, respondedAt };
+      if (
+        chat.autoExecute &&
+        !failure &&
+        result?.outcome === "found" &&
+        result.sessionId === session.sessionId &&
+        result.actions?.length === 1 &&
+        result.summary?.processingComplete === true &&
+        result.summary.total === 1 &&
+        result.summary.found === 1 &&
+        action &&
+        result.action === action.action &&
+        action.target?.interactability?.status === "ready" &&
+        canExecute(resolvedEntry, action) &&
+        !needsExecutionValue(action.action) &&
+        freshSession?.sessionId === session.sessionId &&
+        freshSession.activePageId === page.pageId &&
+        freshSession.activationVersion === snapshot?.activationVersion &&
+        freshSession.pages.some(
+          (current) => current.pageId === page.pageId && current.documentId === page.documentId,
+        ) &&
+        executionRevision.current === executionAt &&
+        isCurrent()
+      ) {
+        setBusy("Executing…");
+        await executeResolved(resolvedEntry, action.actionId, isCurrent);
+      }
     });
   }
   function spotlight(entry: Resolution, actionId: string | null) {
@@ -360,73 +410,78 @@ export default function useWorkspace() {
   }
   function execute(entry: Resolution, actionId: string, value?: string) {
     const result = entry.result;
+    const action = result?.actions?.find((action) => action.actionId === actionId);
     if (
-      entry.historical ||
-      !result?.captureId ||
+      !action ||
+      !canExecute(entry, action) ||
+      !result ||
       !session ||
       !page ||
       result.pageId !== page.pageId ||
       result.documentId !== page.documentId ||
-      result.sessionId !== session.sessionId ||
-      !result.actions?.some((action) => action.actionId === actionId && action.outcome === "found")
+      result.sessionId !== session.sessionId
     )
       return;
-    void perform("Executing…", async (isCurrent) => {
-      function updateExecution(execution: NonNullable<Resolution["execution"]>) {
-        setWorkspace((previous) => {
-          const origin = previous.tabs[page!.pageId];
-          if (!origin || previous.session?.sessionId !== session!.sessionId) return previous;
-          return {
-            ...previous,
-            tabs: {
-              ...previous.tabs,
-              [page!.pageId]: {
-                ...origin,
-                history: historical(origin.history).map((old) =>
-                  old.id === entry.id ? { ...old, execution } : old,
-                ),
-              },
+    void perform("Executing…", (isCurrent) => executeResolved(entry, actionId, isCurrent, value));
+  }
+  async function executeResolved(
+    entry: Resolution,
+    actionId: string,
+    isCurrent: () => boolean,
+    value?: string,
+  ) {
+    const result = entry.result;
+    if (!session || !page || !result?.captureId || !isCurrent()) return;
+    function updateExecution(execution: NonNullable<Resolution["execution"]>) {
+      setWorkspace((previous) => {
+        const origin = previous.tabs[page!.pageId];
+        if (!origin || previous.session?.sessionId !== session!.sessionId) return previous;
+        return {
+          ...previous,
+          tabs: {
+            ...previous.tabs,
+            [page!.pageId]: {
+              ...origin,
+              history: historical(origin.history).map((old) =>
+                old.id === entry.id ? { ...old, execution } : old,
+              ),
             },
-          };
-        });
-      }
-      updateExecution({ actionId, status: "pending", message: "Executing…" });
-      try {
-        const execution = await request<ActionExecutionResult>(
-          `/pages/${page.pageId}/execute`,
-          "POST",
-          {
-            sessionId: session.sessionId,
-            documentId: result.documentId,
-            captureId: result.captureId,
-            actionId,
-            ...(value === undefined ? {} : { value }),
           },
-        );
-        if (!isCurrent()) return;
-        if (
-          execution.actionId !== actionId ||
-          !["completed", "uncertain"].includes(execution.status)
-        )
-          throw new Error(
-            "The browser could not confirm completion. Check the page before resolving again.",
-          );
-        updateExecution(execution);
-      } catch (failure) {
-        if (!isCurrent()) return;
-        const rejected =
-          failure instanceof ApiError && failure.status >= 400 && failure.status < 500;
-        updateExecution({
+        };
+      });
+    }
+    updateExecution({ actionId, status: "pending", message: "Executing…" });
+    try {
+      const execution = await request<ActionExecutionResult>(
+        `/pages/${page.pageId}/execute`,
+        "POST",
+        {
+          sessionId: session.sessionId,
+          documentId: result.documentId,
+          captureId: result.captureId,
           actionId,
-          status: rejected ? "failed" : "uncertain",
-          message: rejected
-            ? failure.message
-            : "The browser could not confirm completion. Check the page before resolving again.",
-        });
-      } finally {
-        if (isCurrent()) await readSession(session.sessionId, isCurrent);
-      }
-    });
+          ...(value === undefined ? {} : { value }),
+        },
+      );
+      if (!isCurrent()) return;
+      if (execution.actionId !== actionId || !["completed", "uncertain"].includes(execution.status))
+        throw new Error(
+          "The browser could not confirm completion. Check the page before resolving again.",
+        );
+      updateExecution(execution);
+    } catch (failure) {
+      if (!isCurrent()) return;
+      const rejected = failure instanceof ApiError && failure.status >= 400 && failure.status < 500;
+      updateExecution({
+        actionId,
+        status: rejected ? "failed" : "uncertain",
+        message: rejected
+          ? failure.message
+          : "The browser could not confirm completion. Check the page before resolving again.",
+      });
+    } finally {
+      if (isCurrent()) await readSession(session.sessionId, isCurrent);
+    }
   }
   function setInstruction(instruction: string) {
     if (page)
@@ -461,6 +516,20 @@ export default function useWorkspace() {
         : { ...previous, initialAddress: address },
     );
   }
+  function setSettings(settings: Partial<Settings>) {
+    if (pending.current) return;
+    setWorkspace((previous) =>
+      page
+        ? {
+            ...previous,
+            tabs: {
+              ...previous.tabs,
+              [page.pageId]: { ...previous.tabs[page.pageId]!, ...settings },
+            },
+          }
+        : { ...previous, initialSettings: { ...previous.initialSettings, ...settings } },
+    );
+  }
   return {
     session,
     resolution: session?.resolution ?? resolution,
@@ -479,13 +548,9 @@ export default function useWorkspace() {
     addressFocus,
     instruction: chat.instruction,
     imageMode: chat.imageMode,
-    setImageMode: (imageMode: ImageMode) => {
-      if (!page || pending.current) return;
-      setWorkspace((previous) => ({
-        ...previous,
-        tabs: { ...previous.tabs, [page.pageId]: { ...previous.tabs[page.pageId]!, imageMode } },
-      }));
-    },
+    setImageMode: (imageMode: ImageMode) => setSettings({ imageMode }),
+    autoExecute: chat.autoExecute,
+    setAutoExecute: (autoExecute: boolean) => setSettings({ autoExecute }),
     history: chat.history,
     busy,
     error,

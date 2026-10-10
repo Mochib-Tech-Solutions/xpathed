@@ -13,6 +13,7 @@ import {
 import type { ActionResolution, ImageMode, Resolution, ResolutionResult, ShadowHost } from "./api";
 import ResolutionCost from "./ResolutionCost";
 import ExecuteAction from "./ExecuteAction";
+import WorkspaceSettings from "./WorkspaceSettings";
 
 function MessageTime({ value, label }: { value: string; label: string }) {
   const date = new Date(value);
@@ -147,6 +148,9 @@ type Props = {
   instruction: string;
   imageMode: ImageMode;
   onImageModeChange: (imageMode: ImageMode) => void;
+  autoExecute: boolean;
+  onAutoExecuteChange: (enabled: boolean) => void;
+  settingsDisabled: boolean;
   history: Resolution[];
   ready: boolean;
   disabled: boolean;
@@ -163,6 +167,9 @@ export default function ChatPanel({
   instruction,
   imageMode,
   onImageModeChange,
+  autoExecute,
+  onAutoExecuteChange,
+  settingsDisabled,
   history,
   ready,
   disabled,
@@ -258,6 +265,16 @@ export default function ChatPanel({
             </div>
           </AlertDialogContent>
         </AlertDialog>
+        <div className="ml-auto flex items-center gap-2">
+          {autoExecute && <span className="text-xs text-muted-foreground">Auto execute on</span>}
+          <WorkspaceSettings
+            imageMode={imageMode}
+            onImageModeChange={onImageModeChange}
+            autoExecute={autoExecute}
+            onAutoExecuteChange={onAutoExecuteChange}
+            disabled={settingsDisabled}
+          />
+        </div>
       </div>
       <div
         ref={transcript}
@@ -430,40 +447,10 @@ export default function ChatPanel({
                   )}
                   {actions.map((action) => {
                     const target = action.target;
-                    if (target?.interactability?.status === "blocked") {
-                      const reason = target.interactability.reasons.find(
-                        (reason) => interactionReasons[reason],
-                      );
-                      return (
-                        <section
-                          key={action.actionId}
-                          aria-label={`Target ${action.order}`}
-                          className={
-                            actions.length > 1
-                              ? "space-y-3 rounded-xl border border-border bg-muted/20 p-3"
-                              : "space-y-3"
-                          }
-                        >
-                          {actions.length > 1 && (
-                            <p className="text-xs font-medium text-muted-foreground">
-                              Target {action.order}
-                            </p>
-                          )}
-                          <p className="text-destructive">
-                            Cannot {action.action?.replaceAll("_", "-") ?? "interact with"}{" "}
-                            <bdi>
-                              {(target.accessibleName ?? target.label)
-                                ? `“${target.accessibleName ?? target.label}”`
-                                : `the unnamed ${elementType(target).toLowerCase()}`}
-                            </bdi>
-                            .{" "}
-                            {reason
-                              ? interactionReasons[reason]
-                              : "The requested action is blocked."}
-                          </p>
-                        </section>
-                      );
-                    }
+                    const blocked = target?.interactability?.status === "blocked";
+                    const blockingReason = target?.interactability?.reasons.find(
+                      (reason) => interactionReasons[reason],
+                    );
                     const checks = target?.interactability?.checks;
                     const verified = [
                       checks?.compatibleControl === "pass" &&
@@ -510,7 +497,8 @@ export default function ChatPanel({
                             ) : (
                               <p className="text-xs text-muted-foreground">No accessible name</p>
                             )}
-                            {action.instruction &&
+                            {!blocked &&
+                              action.instruction &&
                               (actions.length > 1 ||
                                 (!(target.accessibleName ?? target.label) &&
                                   (target.role === "img" ||
@@ -579,68 +567,91 @@ export default function ChatPanel({
                                 {copyError.message}
                               </p>
                             )}
-                            <ExecuteAction
-                              entry={resolution}
-                              action={action}
-                              disabled={disabled}
-                              onExecute={onExecute}
-                            />
-                            <div className="space-y-2 border-t border-border/70 pt-3">
-                              <h3 className="text-xs font-medium">Verification</h3>
-                              {target.interactability?.reasons.map((reason) => (
-                                <p key={reason} className="text-muted-foreground">
-                                  {interactionReasons[reason] ??
-                                    "An interaction limitation was observed."}
-                                </p>
-                              ))}
-                              <div className="space-y-2 text-xs text-muted-foreground">
-                                {verified && <p>Verified: {verified}.</p>}
-                                {(target.interactability?.status !== "ready" ||
-                                  (!verified && action.action !== "inspect")) && (
-                                  <p>
-                                    {target.interactability?.status === "ready"
-                                      ? "Detailed interaction checks are unavailable."
-                                      : target.interactability?.status === "unsupported"
-                                        ? "Interaction assessment unsupported."
-                                        : target.interactability?.status === "unknown"
-                                          ? checks?.keyboard === "unknown"
-                                            ? "Keyboard readiness unknown."
-                                            : "Interaction readiness unknown."
-                                          : "Interaction readiness unavailable."}
-                                  </p>
-                                )}
-                                <div className="flex flex-wrap gap-x-3 gap-y-1">
-                                  {checks?.viewport !== "pass" && (
-                                    <span>
-                                      {target.state.inViewport ? "In viewport" : "Off-screen"}
-                                    </span>
-                                  )}
-                                  {checks?.enabled !== "pass" &&
-                                    (checks?.enabled !== "not_applicable" ||
-                                      !target.state.enabled) && (
-                                      <span>{target.state.enabled ? "Enabled" : "Disabled"}</span>
+                            {blocked ? (
+                              <p className="text-destructive">
+                                Cannot {action.action?.replaceAll("_", "-") ?? "interact with"}{" "}
+                                <bdi>
+                                  {(target.accessibleName ?? target.label)
+                                    ? `“${target.accessibleName ?? target.label}”`
+                                    : `the unnamed ${elementType(target).toLowerCase()}`}
+                                </bdi>
+                                .{" "}
+                                {blockingReason
+                                  ? interactionReasons[blockingReason]
+                                  : "The requested action is blocked."}
+                              </p>
+                            ) : (
+                              <>
+                                <ExecuteAction
+                                  entry={resolution}
+                                  action={action}
+                                  disabled={disabled}
+                                  onExecute={onExecute}
+                                />
+                                <div className="space-y-2 border-t border-border/70 pt-3">
+                                  <h3 className="text-xs font-medium">Verification</h3>
+                                  {target.interactability?.reasons.map((reason) => (
+                                    <p key={reason} className="text-muted-foreground">
+                                      {interactionReasons[reason] ??
+                                        "An interaction limitation was observed."}
+                                    </p>
+                                  ))}
+                                  <div className="space-y-2 text-xs text-muted-foreground">
+                                    {verified && <p>Verified: {verified}.</p>}
+                                    {(target.interactability?.status !== "ready" ||
+                                      (!verified && action.action !== "inspect")) && (
+                                      <p>
+                                        {target.interactability?.status === "ready"
+                                          ? "Detailed interaction checks are unavailable."
+                                          : target.interactability?.status === "unsupported"
+                                            ? "Interaction assessment unsupported."
+                                            : target.interactability?.status === "unknown"
+                                              ? checks?.keyboard === "unknown"
+                                                ? "Keyboard readiness unknown."
+                                                : "Interaction readiness unknown."
+                                              : "Interaction readiness unavailable."}
+                                      </p>
                                     )}
-                                  {(target.state.editable ||
-                                    action.action === "fill" ||
-                                    action.action === "type") && (
-                                    <span>
-                                      {target.state.editable ? "Editable" : "Not editable"}
-                                    </span>
-                                  )}
-                                  {target.state.checked !== null && (
-                                    <span>{target.state.checked ? "Checked" : "Unchecked"}</span>
-                                  )}
-                                  {target.state.selected != null && (
-                                    <span>
-                                      {target.state.selected ? "Selected" : "Not selected"}
-                                    </span>
-                                  )}
-                                  {target.state.selectedOptionCount != null && (
-                                    <span>{target.state.selectedOptionCount} options selected</span>
-                                  )}
+                                    <div className="flex flex-wrap gap-x-3 gap-y-1">
+                                      {checks?.viewport !== "pass" && (
+                                        <span>
+                                          {target.state.inViewport ? "In viewport" : "Off-screen"}
+                                        </span>
+                                      )}
+                                      {checks?.enabled !== "pass" &&
+                                        (checks?.enabled !== "not_applicable" ||
+                                          !target.state.enabled) && (
+                                          <span>
+                                            {target.state.enabled ? "Enabled" : "Disabled"}
+                                          </span>
+                                        )}
+                                      {(target.state.editable ||
+                                        action.action === "fill" ||
+                                        action.action === "type") && (
+                                        <span>
+                                          {target.state.editable ? "Editable" : "Not editable"}
+                                        </span>
+                                      )}
+                                      {target.state.checked !== null && (
+                                        <span>
+                                          {target.state.checked ? "Checked" : "Unchecked"}
+                                        </span>
+                                      )}
+                                      {target.state.selected != null && (
+                                        <span>
+                                          {target.state.selected ? "Selected" : "Not selected"}
+                                        </span>
+                                      )}
+                                      {target.state.selectedOptionCount != null && (
+                                        <span>
+                                          {target.state.selectedOptionCount} options selected
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
                                 </div>
-                              </div>
-                            </div>
+                              </>
+                            )}
                           </>
                         )}
                       </section>
@@ -686,27 +697,6 @@ export default function ChatPanel({
       >
         <p id="instruction-scope" className="px-3 pt-2 text-xs text-muted-foreground">
           Current view only
-        </p>
-        <label className="mx-3 mt-2 flex items-center gap-2 text-xs text-muted-foreground">
-          Screenshots
-          <select
-            value={imageMode}
-            onChange={(event) => {
-              const value = event.currentTarget.value;
-              if (value === "auto" || value === "text_only") onImageModeChange(value);
-            }}
-            disabled={disabled || resolving}
-            aria-describedby="screenshot-sharing"
-            className="rounded-md border border-input bg-background px-2 py-1 text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            <option value="auto">Auto</option>
-            <option value="text_only">Text only</option>
-          </select>
-        </label>
-        <p id="screenshot-sharing" className="px-3 pt-1 text-xs text-muted-foreground">
-          {imageMode === "auto"
-            ? "Auto sends a masked screenshot to the model provider when visual details may help. Other visible content can be shared."
-            : "Text only sends page text and structure, without screenshots."}
         </p>
         <textarea
           ref={composer}
