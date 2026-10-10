@@ -52,9 +52,10 @@ internal sealed class BrowserViewerRelay : IDisposable
     )
     {
         using var lifetime = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, overflow.Token);
-        var inputs = Channel.CreateBounded<JsonElement>(
+        var inputs = Channel.CreateBounded<BrowserViewerInput>(
             new BoundedChannelOptions(64) { FullMode = BoundedChannelFullMode.Wait }
         );
+        BrowserViewerInput? pendingInput = null;
         async Task SendAsync(object message)
         {
             var bytes = JsonSerializer.SerializeToUtf8Bytes(message, JsonSerializerOptions.Web);
@@ -157,9 +158,18 @@ internal sealed class BrowserViewerRelay : IDisposable
                         }
                         continue;
                     }
-                    if (!inputs.Writer.TryWrite(root.Clone()))
+                    lock (inputs)
                     {
-                        throw new IOException("The viewer input queue is full.");
+                        // Only adjacent pending scrolls can share a dispatch; clicks and keys remain barriers.
+                        if (pendingInput?.MergeWheel(root) == true)
+                        {
+                            continue;
+                        }
+                        pendingInput = new BrowserViewerInput(root.Clone());
+                        if (!inputs.Writer.TryWrite(pendingInput))
+                        {
+                            throw new IOException("The viewer input queue is full.");
+                        }
                     }
                 }
                 catch (Exception error)
@@ -178,8 +188,17 @@ internal sealed class BrowserViewerRelay : IDisposable
         }
         async Task ProcessInputsAsync()
         {
-            await foreach (var input in inputs.Reader.ReadAllAsync(lifetime.Token))
+            await foreach (var queued in inputs.Reader.ReadAllAsync(lifetime.Token))
             {
+                JsonElement input;
+                lock (inputs)
+                {
+                    input = queued.Message;
+                    if (ReferenceEquals(pendingInput, queued))
+                    {
+                        pendingInput = null;
+                    }
+                }
                 try
                 {
                     await handleInput(input, lifetime.Token);
