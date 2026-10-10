@@ -19,20 +19,30 @@ internal sealed class CdpFrame(CdpPage page, string id, string sessionId)
         return Value<T>(response);
     }
 
-    public async Task<CdpRemoteObject> EvaluateHandleAsync(string expression, object? argument = null)
+    public async Task<CdpRemoteObject> EvaluateHandleAsync(
+        string expression,
+        object? argument = null,
+        bool waitForContext = true
+    )
     {
-        var (response, context) = await EvaluateCoreAsync(expression, argument, false);
+        var (response, context) = await EvaluateCoreAsync(expression, argument, false, waitForContext);
         return new(this, ObjectId(response), context);
     }
 
     private async Task<(JsonElement Response, CdpContext Context)> EvaluateCoreAsync(
         string expression,
         object? argument,
-        bool returnByValue
+        bool returnByValue,
+        bool waitForContext = true
     )
     {
         var timer = System.Diagnostics.Stopwatch.StartNew();
-        while ((Context is null || Context.SessionId != SessionId) && !IsDetached && timer.ElapsedMilliseconds < 10000)
+        while (
+            waitForContext
+            && (Context is null || Context.SessionId != SessionId)
+            && !IsDetached
+            && timer.ElapsedMilliseconds < 10000
+        )
         {
             await Task.Delay(10);
         }

@@ -244,6 +244,38 @@ public sealed class CdpConnectionTests
     }
 
     [Fact]
+    public async Task ScreenshotRejectsAnUninitializedFrameBeforeMaskingThePage()
+    {
+        await using var pipe = new PipeFixture();
+        var page = await pipe.InitializePageAsync();
+        await pipe.EventAsync("Page.frameAttached", new { frameId = "loading", parentFrameId = "main" });
+
+        await Assert.ThrowsAsync<CdpException>(() =>
+            CdpScreenshot
+                .CaptureAsync(page, new Dictionary<CdpFrame, CdpRemoteObject>())
+                .WaitAsync(TimeSpan.FromSeconds(1))
+        );
+
+        var next = pipe.Connection.SendAsync("Runtime.getIsolateId");
+        var request = await pipe.ReceiveAsync();
+        Assert.Equal("Runtime.getIsolateId", request.GetProperty("method").GetString());
+        await pipe.SendAsync(new { id = request.GetProperty("id").GetInt64(), result = new { } });
+        await next;
+    }
+
+    [Fact]
+    public async Task ScreenshotPreparationDoesNotWaitForALostFrameContext()
+    {
+        await using var pipe = new PipeFixture();
+        var page = await pipe.InitializePageAsync();
+        page.MainFrame.Context = null;
+
+        await Assert.ThrowsAsync<CdpException>(() =>
+            page.MainFrame.EvaluateHandleAsync("() => ({})", waitForContext: false).WaitAsync(TimeSpan.FromSeconds(1))
+        );
+    }
+
+    [Fact]
     public async Task RuntimeLifecycleInvalidatesOldHandlesWithoutErasingAReplacementContext()
     {
         await using var pipe = new PipeFixture();

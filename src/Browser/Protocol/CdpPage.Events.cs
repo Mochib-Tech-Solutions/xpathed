@@ -188,6 +188,7 @@ internal sealed partial class CdpPage
             case "Page.screencastFrame":
                 if (
                     id == SessionId
+                    && !Volatile.Read(ref screenshotInProgress)
                     && data.GetProperty("metadata").TryGetProperty("timestamp", out var frameTimestamp)
                     && frameTimestamp.GetDouble() >= Volatile.Read(ref minimumFrameTimestamp)
                 )

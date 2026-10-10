@@ -7,6 +7,24 @@ namespace Xpathed.Browser.Protocol;
 
 internal sealed partial class CdpPage
 {
+    private bool screenshotInProgress;
+    private long screencastRevision;
+
+    public void SuspendScreencastFrames()
+    {
+        Volatile.Write(ref screenshotInProgress, true);
+        Interlocked.Increment(ref screencastRevision);
+        Volatile.Write(ref minimumFrameTimestamp, double.PositiveInfinity);
+    }
+
+    public async Task ResumeScreencastFramesAsync()
+    {
+        Interlocked.Increment(ref screencastRevision);
+        Volatile.Write(ref minimumFrameTimestamp, double.PositiveInfinity);
+        Volatile.Write(ref screenshotInProgress, false);
+        await RefreshFrameGenerationAsync(Interlocked.Read(ref documentGeneration));
+    }
+
     private void BeginFrameGeneration()
     {
         var generation = Interlocked.Increment(ref documentGeneration);
@@ -18,10 +36,16 @@ internal sealed partial class CdpPage
     {
         try
         {
+            var revision = Interlocked.Read(ref screencastRevision);
             var timestamp = await EvaluateAsync<double>(
                 "() => new Promise(resolve => requestAnimationFrame(() => resolve((performance.timeOrigin + performance.now()) / 1000)))"
             );
-            if (generation != Interlocked.Read(ref documentGeneration) || IsClosed)
+            if (
+                generation != Interlocked.Read(ref documentGeneration)
+                || revision != Interlocked.Read(ref screencastRevision)
+                || Volatile.Read(ref screenshotInProgress)
+                || IsClosed
+            )
             {
                 return;
             }

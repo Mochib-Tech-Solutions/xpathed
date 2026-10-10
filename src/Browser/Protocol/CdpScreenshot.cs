@@ -9,7 +9,12 @@ internal static class CdpScreenshot
     public static async Task<byte[]> CaptureAsync(CdpPage page, IReadOnlyDictionary<CdpFrame, CdpRemoteObject> captures)
     {
         var frames = page.Frames;
+        if (frames.Any(frame => frame.Context is null || frame.Context.SessionId != frame.SessionId))
+        {
+            throw new CdpException("A page frame is not ready for screenshot capture.");
+        }
         var prepared = new List<CdpRemoteObject>();
+        page.SuspendScreencastFrames();
         try
         {
             await RejectClosedAuthorRootsAsync(page);
@@ -18,7 +23,7 @@ internal static class CdpScreenshot
                 prepared.Add(
                     captures.TryGetValue(frame, out var capture)
                         ? await capture.EvaluateHandleAsync($"capture => ({BrowserScripts.PrepareScreenshot})(capture)")
-                        : await frame.EvaluateHandleAsync(BrowserScripts.PrepareScreenshot)
+                        : await frame.EvaluateHandleAsync(BrowserScripts.PrepareScreenshot, waitForContext: false)
                 );
             }
             var screenshot = await page.SendAsync(
@@ -46,17 +51,24 @@ internal static class CdpScreenshot
         }
         finally
         {
-            foreach (var mask in prepared)
+            try
             {
-                try
+                foreach (var mask in prepared)
                 {
-                    await mask.EvaluateAsync("mask => mask.clear()");
+                    try
+                    {
+                        await mask.EvaluateAsync("mask => mask.clear()");
+                    }
+                    catch (CdpException) { }
+                    finally
+                    {
+                        await mask.DisposeAsync();
+                    }
                 }
-                catch (CdpException) { }
-                finally
-                {
-                    await mask.DisposeAsync();
-                }
+            }
+            finally
+            {
+                await page.ResumeScreencastFramesAsync();
             }
         }
     }
