@@ -16,42 +16,33 @@ function total(calls: ProviderCall[], amount: (call: ProviderCall) => number | n
   return values.every(validCost) ? values.reduce((sum, value) => sum + value, 0) : null;
 }
 
-function CostRows({ call }: { call: ProviderCall }) {
-  const { usage, costEstimate: estimate } = call;
-  const rows = [
-    ["Model", call.model ?? "Unavailable"],
-    ["Provider", call.provider ?? "Unavailable"],
-    ["Input tokens", usage?.inputTokens?.toLocaleString() ?? "Unavailable"],
-    ["Output tokens", usage?.outputTokens?.toLocaleString() ?? "Unavailable"],
-    [
-      "Reasoning tokens (included in output)",
-      usage?.reasoningTokens?.toLocaleString() ?? "Unavailable",
-    ],
-    ["Cached input tokens", usage?.cachedTokens?.toLocaleString() ?? "Unavailable"],
-    ["Input / 1M tokens", usd(estimate?.inputPricePerMillion)],
-    ["Output / 1M tokens", usd(estimate?.outputPricePerMillion)],
-    ["Estimated input", usd(estimate?.inputCost)],
-    ["Estimated output", usd(estimate?.outputCost)],
-    ["Per-request fee", usd(estimate?.requestCost)],
-    ["Estimated total", usd(estimate?.totalCost)],
-    ["Reported cost", usd(usage?.cost)],
-  ];
+function ModelCostRow({ model, calls }: { model: string; calls: ProviderCall[] }) {
+  const reported = total(calls, (call) => call.usage?.cost);
+  const estimated = total(calls, (call) => call.costEstimate?.totalCost);
+  const tokens = total(calls, (call) => call.usage?.totalTokens);
+  const pending = calls.some((call) => call.accounting === "pending");
   return (
-    <>
-      <dl className="space-y-1.5">
-        {rows.map(([label, value]) => (
-          <div key={label} className="flex justify-between gap-3">
-            <dt>{label}</dt>
-            <dd className="min-w-0 text-right break-words tabular-nums">{value}</dd>
-          </div>
-        ))}
-      </dl>
-      {estimate && (
-        <p className="mt-1 text-muted-foreground">
-          Rates fetched {new Date(estimate.pricingFetchedAt).toLocaleString()}.
-        </p>
-      )}
-    </>
+    <tr className="border-t border-border align-top">
+      <th scope="row" className="w-full max-w-0 py-2 pr-3 text-left font-normal break-words">
+        {model}
+      </th>
+      <td className="py-2 pr-3 text-right whitespace-nowrap tabular-nums">
+        {reported != null ? (
+          usd(reported)
+        ) : estimated != null ? (
+          <>
+            {usd(estimated)} <span className="block text-muted-foreground">Estimated</span>
+          </>
+        ) : pending ? (
+          "Pending"
+        ) : (
+          "Unavailable"
+        )}
+      </td>
+      <td className="py-2 text-right whitespace-nowrap tabular-nums">
+        {tokens?.toLocaleString("en-US") ?? "Unavailable"}
+      </td>
+    </tr>
   );
 }
 
@@ -67,7 +58,6 @@ export default function ResolutionCost({
   useLayoutEffect(() => {
     if (open) tooltip.current?.showPopover?.();
   }, [open]);
-  const detailed = diagnostics.providerCalls != null;
   const calls: ProviderCall[] = diagnostics.providerCalls ?? [
     {
       purpose: "selection",
@@ -78,21 +68,26 @@ export default function ResolutionCost({
       accounting: diagnostics.providerAccounting,
     },
   ];
+  const models = new Map<string, ProviderCall[]>();
+  for (const call of calls) {
+    const model = call.model ?? "Unavailable";
+    const group = models.get(model);
+    if (group) group.push(call);
+    else models.set(model, [call]);
+  }
   const reported = total(calls, (call) => call.usage?.cost);
   const estimated = total(calls, (call) => call.costEstimate?.totalCost);
   const pending = calls.some((call) => call.accounting === "pending");
   const label =
     calls.length === 0
       ? "No model calls"
-      : detailed && reported != null
+      : reported != null
         ? `Reported cost: ${usd(reported)}`
         : estimated != null
           ? `Estimated cost: ${usd(estimated)}`
-          : reported != null
-            ? `Reported cost: ${usd(reported)}`
-            : pending
-              ? "Cost pending"
-              : "Cost unavailable";
+          : pending
+            ? "Cost pending"
+            : "Cost unavailable";
 
   return (
     <div
@@ -119,7 +114,7 @@ export default function ResolutionCost({
           id={id}
           role="tooltip"
           popover="manual"
-          className="fixed inset-auto m-0 w-72 max-w-[calc(100vw-2rem)] border-0 bg-transparent pt-2"
+          className="fixed inset-auto m-0 w-80 max-w-[calc(100vw-2rem)] border-0 bg-transparent pt-2"
           style={{
             positionAnchor: anchor,
             positionArea: "bottom span-right",
@@ -128,57 +123,29 @@ export default function ResolutionCost({
           }}
         >
           <div className="max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-lg border border-border bg-popover p-3 text-popover-foreground shadow-md">
-            <p className="mb-2 font-medium">Cost breakdown · USD</p>
-            {pending && (
-              <p className="mb-2">
-                {detailed
-                  ? "A provider call is still being accounted for. Its charge may arrive later."
-                  : "The provider may still charge this timed-out request."}
-              </p>
-            )}
-            {detailed && calls.length > 0 && (
-              <dl className="mb-3 space-y-1.5 border-b border-border pb-3">
-                <div className="flex justify-between gap-3">
-                  <dt>Reported request total</dt>
-                  <dd>{usd(reported)}</dd>
-                </div>
-                <div className="flex justify-between gap-3">
-                  <dt>Estimated request total</dt>
-                  <dd>{usd(estimated)}</dd>
-                </div>
-              </dl>
-            )}
-            {detailed && reported == null && (
-              <p className="mb-3">
-                Some calls have no reported charge. Known charges below are not a complete total.
-              </p>
-            )}
-            {calls.map((call, index) => (
-              <section
-                key={index}
-                className={index > 0 ? "mt-3 border-t border-border pt-3" : undefined}
-                aria-label={
-                  call.purpose === "image_routing"
-                    ? "Image decision cost"
-                    : "Element selection cost"
-                }
-              >
-                {detailed && (
-                  <p className="mb-2 font-medium">
-                    {call.purpose === "image_routing" ? "Image decision" : "Element selection"}
-                    {call.accounting === "pending" ? " · Pending" : ""}
-                  </p>
-                )}
-                <CostRows call={call} />
-              </section>
-            ))}
             {calls.length === 0 ? (
-              <p>No provider calls were made for this request.</p>
+              <p>No model calls</p>
             ) : (
-              <p className="mt-3 text-muted-foreground">
-                Estimates use listed rates before cache discounts. Reported costs are provider
-                charges.
-              </p>
+              <table className="w-full text-xs">
+                <thead className="text-muted-foreground">
+                  <tr>
+                    <th scope="col" className="pb-2 text-left font-medium">
+                      Model
+                    </th>
+                    <th scope="col" className="pr-3 pb-2 text-right font-medium whitespace-nowrap">
+                      Cost (USD)
+                    </th>
+                    <th scope="col" className="pb-2 text-right font-medium">
+                      Tokens
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {Array.from(models, ([model, calls]) => (
+                    <ModelCostRow key={model} model={model} calls={calls} />
+                  ))}
+                </tbody>
+              </table>
             )}
           </div>
         </div>
