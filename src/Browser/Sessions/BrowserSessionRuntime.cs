@@ -34,10 +34,16 @@ internal sealed class BrowserSessionRuntime(
     public bool Ready { get; private set; }
     public int BlockedPopups => Volatile.Read(ref blockedPopups);
     public DateTimeOffset LastSeen { get; set; } = DateTimeOffset.UtcNow;
+    public DateTimeOffset? ViewerDisconnectedAt { get; set; }
     public SemaphoreSlim Gate { get; } = new(1);
     public CancellationTokenSource Stop { get; } = new();
     public BrowserViewerRelay? Viewer { get; set; }
     public BrowserViewerInteraction? Interaction { get; set; }
+
+    public bool IsExpired(DateTimeOffset now) =>
+        Stop.IsCancellationRequested
+        || (ViewerDisconnectedAt is { } disconnected && disconnected <= now.AddMinutes(-1))
+        || (Viewer is null && LastSeen <= now.AddMinutes(-15));
 
     public async Task StartAsync(CancellationToken token)
     {

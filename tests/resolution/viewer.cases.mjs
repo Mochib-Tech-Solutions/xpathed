@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import { once } from "node:events";
+import { randomBytes } from "node:crypto";
+import { createConnection } from "node:net";
 import test from "node:test";
 
 import {
@@ -12,6 +14,40 @@ import {
   withFixture,
 } from "./fixture.mjs";
 import { withFramebuffer, viewerKey, viewerClick } from "./viewer.mjs";
+
+test("viewer-unresponsive-connection-is-aborted-by-heartbeat", { timeout: 60000 }, async () => {
+  const session = await request("/sessions");
+  const url = new URL(browserUrl);
+  const socket = createConnection({ host: url.hostname, port: Number(url.port || 80) });
+  const closed = new Promise((resolve) => socket.once("close", resolve));
+  const timeout = setTimeout(
+    () => socket.destroy(new Error("Viewer heartbeat did not abort")),
+    55000,
+  );
+  let socketError;
+  socket.on("error", (error) => {
+    socketError = error;
+  });
+  let headers = "";
+  socket.on("data", (data) => {
+    if (!headers.includes("\r\n\r\n")) headers += data.toString("latin1");
+    // A vanished client never answers WebSocket ping frames.
+  });
+  try {
+    await once(socket, "connect");
+    socket.write(
+      `GET ${session.viewPath} HTTP/1.1\r\nHost: ${url.host}\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Key: ${randomBytes(16).toString("base64")}\r\nOrigin: ${process.env.XPATHED_VIEWER_ORIGIN ?? "http://localhost:8081"}\r\n\r\n`,
+    );
+    await closed;
+    if (socketError) assert.equal(socketError.code, "ECONNRESET");
+    assert.match(headers, /^HTTP\/1\.1 101 /u);
+    assert.equal((await fetch(`${browserUrl}/sessions/${session.sessionId}`)).status, 200);
+  } finally {
+    clearTimeout(timeout);
+    socket.destroy();
+    await request(`/sessions/${session.sessionId}`, undefined, "DELETE");
+  }
+});
 
 test("viewer-disconnect-completes-close-handshake-and-allows-reconnect", async () => {
   await withFixture(targetMarkup, async (session) => {
