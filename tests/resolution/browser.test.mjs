@@ -632,6 +632,44 @@ test("capture-opt-in-image-masks-private-values-across-frames-and-shadow-roots",
   );
 });
 
+test("capture-opt-in-image-masks-fractional-private-text-edges", async () => {
+  await withFixture(
+    `${targetMarkup}<input id="focused" aria-label="Email" value="PRIVATE_FIRST" data-observe-value><div id="shadow"></div>
+    <script>
+      const root=document.querySelector('#shadow').attachShadow({mode:'open'});
+      root.innerHTML='<div contenteditable style="position:absolute;left:20.25px;top:100.5px;width:200.5px;height:30.5px;opacity:.75!important">PRIVATE_FIRST</div>';
+      const editable=root.querySelector('[contenteditable]');
+      window.observedEvents={get editableStyle(){return editable.style.cssText}};
+      window.mutateXpathFixture=()=>{editable.textContent='PRIVATE_OTHER'};
+      document.querySelector('#focused').focus();
+    </script>`,
+    async (_session, page) => {
+      const before = await observe();
+      const capture = await request(`/pages/${page.pageId}/capture`, {
+        documentId: page.documentId,
+        includeImage: true,
+      });
+      await observe({ mutateXpath: true });
+      const changed = await request(`/pages/${page.pageId}/capture`, {
+        documentId: page.documentId,
+        includeImage: true,
+      });
+      await assertSameMaskedImage(
+        changed.image.png,
+        capture.image.png,
+        "capture-opt-in-image-masks-fractional-private-text-edges",
+      );
+      assert.ok(!JSON.stringify(capture.candidates).includes("PRIVATE_"));
+      assert.ok(!JSON.stringify(changed.candidates).includes("PRIVATE_"));
+      const after = await observe();
+      assert.equal(after.activeElement, before.activeElement);
+      assert.equal(after.scrollY, before.scrollY);
+      assert.deepEqual(after.values, before.values);
+      assert.deepEqual(after.events, before.events);
+    },
+  );
+});
+
 test("capture-lazy-image-reuses-identities-and-masks-frames-and-shadow-values", async () => {
   await withFixture(
     `${targetMarkup}<input aria-label="Email" value="PRIVATE_FIRST" data-observe-value>
