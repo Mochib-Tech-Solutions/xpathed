@@ -21,5 +21,15 @@ if [ "$scope" = all ] || [ "$scope" = web ]; then
   if [ "$action" = --check ]; then pnpm --filter xpathed format:check; else pnpm --filter xpathed format; fi
 fi
 if [ "$scope" = all ] || [ "$scope" = tooling ]; then
-  pnpm exec prettier "$action" package.json .prettierrc.json global.json '.config/*.json' pnpm-workspace.yaml 'docker/*.yaml' 'docker/**/*.json' '.github/{workflows,actions}/**/*.yml' 'scripts/**/*.mjs' 'tests/resolution/*.mjs'
+  pnpm exec prettier "$action" . --ignore-unknown
+  python_tools=.artifacts/python-tools
+  if [ ! -x "$python_tools/bin/python" ]; then python3 -m venv "$python_tools"; fi
+  "$python_tools/bin/python" -m pip install --quiet --disable-pip-version-check -r scripts/requirements-dev.txt
+  if [ "$action" = --check ]; then
+    "$python_tools/bin/python" -m ruff check scripts
+    "$python_tools/bin/python" -m ruff format --check scripts
+  else
+    "$python_tools/bin/python" -m ruff check --fix scripts
+    "$python_tools/bin/python" -m ruff format scripts
+  fi
 fi

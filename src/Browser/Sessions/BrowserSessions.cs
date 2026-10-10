@@ -232,14 +232,9 @@ public sealed class BrowserSessions(IConfiguration configuration) : IAsyncDispos
     public Task<PageState> StateAsync(string pageId, CancellationToken token) =>
         OnPageAsync(
             pageId,
-            async (s, page) =>
-                new PageState(
-                    s.Id,
-                    page.Id,
-                    page.Page.Url,
-                    await page.Page.TitleAsync(),
-                    s.BlockedPopups,
-                    page.DocumentId
+            (s, page) =>
+                Task.FromResult(
+                    new PageState(s.Id, page.Id, page.Page.Url, page.Page.Title, s.BlockedPopups, page.DocumentId)
                 ),
             token,
             requireActive: false
@@ -262,14 +257,7 @@ public sealed class BrowserSessions(IConfiguration configuration) : IAsyncDispos
             async (s, page) =>
             {
                 await page.Page.NavigateAsync(url);
-                return new PageState(
-                    s.Id,
-                    page.Id,
-                    page.Page.Url,
-                    await page.Page.TitleAsync(),
-                    s.BlockedPopups,
-                    page.DocumentId
-                );
+                return new PageState(s.Id, page.Id, page.Page.Url, page.Page.Title, s.BlockedPopups, page.DocumentId);
             },
             token
         );
@@ -286,7 +274,7 @@ public sealed class BrowserSessions(IConfiguration configuration) : IAsyncDispos
                     s.Id,
                     page.Id,
                     page.Page.Url,
-                    await page.Page.TitleAsync(),
+                    page.Page.Title,
                     scrollY,
                     DateTimeOffset.UtcNow
                 );

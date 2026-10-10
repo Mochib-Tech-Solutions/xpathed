@@ -1,7 +1,6 @@
 import { act, render, renderHook, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, it, vi } from "vitest";
-import { mockSystemTheme } from "@/test/systemTheme";
 import { ThemeProvider } from "../theme/ThemeProvider";
 import Workspace from "./Workspace";
 import useWorkspace from "./useWorkspace";
@@ -128,7 +127,6 @@ async function setup(
       return Response.json(page);
     }),
   );
-  mockSystemTheme();
   const user = userEvent.setup();
   render(
     <ThemeProvider>

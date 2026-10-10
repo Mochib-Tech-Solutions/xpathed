@@ -50,7 +50,10 @@ Replace the uppercase IDs with returned values. `GET /api/sessions/options` list
 ```sh
 pnpm check             # .NET, Web and tooling
 pnpm test:resolution   # real-browser service tests; no paid calls
+pnpm format            # format source, scripts and documentation
 ```
+
+C# uses .NET analyzers and CSharpier. Web, JavaScript, JSON, YAML and Markdown use Prettier; deployment Python uses Ruff. Checks install the pinned Python tooling in an ignored local environment.
 
 VPS deployment uses the production images in `docker/`. GitHub CI validates Docker configuration and build definitions before successful `main` checks trigger the hosted deployment. Local commands and Git hooks use native tools only. Read [SECURITY.md](SECURITY.md) before hosting.
 

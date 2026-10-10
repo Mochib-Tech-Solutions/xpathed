@@ -2,6 +2,7 @@ using System.Buffers.Binary;
 using System.Diagnostics;
 using System.Text.Json;
 using Xpathed.Browser.Protocol;
+using Xpathed.Browser.Scripts;
 using Xpathed.Common.Contracts;
 using Xpathed.Common.Http;
 
@@ -130,7 +131,7 @@ internal sealed class BrowserPageCapture(BrowserPageRuntime page) : IAsyncDispos
                 return;
             }
             var handle = await frame.EvaluateHandleAsync(
-                BrowserCaptureScript.Capture,
+                BrowserScripts.Capture,
                 new
                 {
                     sessionId,
@@ -544,7 +545,7 @@ internal sealed class BrowserPageCapture(BrowserPageRuntime page) : IAsyncDispos
                 continue;
             }
             frame.Highlight = await frame.Handle.EvaluateHandleAsync(
-                "(capture, ids) => (" + BrowserHighlightScript.Create + ")(capture.highlightNodes(ids))",
+                "(capture, ids) => (" + BrowserScripts.Highlight + ")(capture.highlightNodes(ids))",
                 ids
             );
             frame.HighlightCandidateIds = ids;

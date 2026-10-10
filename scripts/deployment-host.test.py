@@ -1,13 +1,13 @@
 import importlib.util
 import io
 import json
+import re
+import tarfile
+import tempfile
+import unittest
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
-import re
-import tempfile
-import tarfile
 from threading import Thread
-import unittest
 from unittest.mock import patch
 
 
@@ -48,23 +48,45 @@ class DeploymentTests(unittest.TestCase):
         self.calls.append((state["revision"], args))
 
     def deploy(self, **kwargs):
-        host.deploy(self.base, self.source, "c" * 40, "d" * 64, run=self.run_compose,
-                    check=lambda *args: None, **kwargs)
+        host.deploy(
+            self.base,
+            self.source,
+            "c" * 40,
+            "d" * 64,
+            run=self.run_compose,
+            check=lambda *args: None,
+            **kwargs,
+        )
 
     def test_unchanged_does_not_build_or_restart(self):
-        deploy(self.base, self.source, "c" * 40, "b" * 64, run=self.run_compose,
-               check=lambda base, state: self.calls.append((state["revision"], ("health",))),
-               clean=lambda state: self.calls.append((state["revision"], ("cleanup",))))
-        self.assertEqual(self.calls, [(self.old["revision"], ("health",)),
-                                     (self.old["revision"], ("cleanup",))])
+        deploy(
+            self.base,
+            self.source,
+            "c" * 40,
+            "b" * 64,
+            run=self.run_compose,
+            check=lambda base, state: self.calls.append((state["revision"], ("health",))),
+            clean=lambda state: self.calls.append((state["revision"], ("cleanup",))),
+        )
+        self.assertEqual(
+            self.calls, [(self.old["revision"], ("health",)), (self.old["revision"], ("cleanup",))]
+        )
         self.assertEqual(json.loads(self.state.read_text()), self.old)
 
     def test_unhealthy_unchanged_inputs_fail_without_build_or_cleanup(self):
         def unhealthy(base, state):
             raise RuntimeError("existing deployment is unhealthy")
+
         with self.assertRaisesRegex(RuntimeError, "existing deployment is unhealthy"):
-            deploy(self.base, self.source, "c" * 40, "b" * 64, run=self.run_compose,
-                   check=unhealthy, clean=lambda state: self.calls.append(("cleanup",)))
+            deploy(
+                self.base,
+                self.source,
+                "c" * 40,
+                "b" * 64,
+                run=self.run_compose,
+                check=unhealthy,
+                clean=lambda state: self.calls.append(("cleanup",)),
+            )
         self.assertEqual(self.calls, [])
         self.assertEqual(json.loads(self.state.read_text()), self.old)
 
@@ -72,10 +94,20 @@ class DeploymentTests(unittest.TestCase):
         def check(base, state):
             self.assertEqual(json.loads(self.state.read_text()), self.old)
             self.calls.append((state["revision"], ("health",)))
+
         def clean(state):
             self.assertEqual(json.loads(self.state.read_text()), state)
             self.calls.append((state["revision"], ("cleanup",)))
-        deploy(self.base, self.source, "c" * 40, "d" * 64, run=self.run_compose, check=check, clean=clean)
+
+        deploy(
+            self.base,
+            self.source,
+            "c" * 40,
+            "d" * 64,
+            run=self.run_compose,
+            check=check,
+            clean=clean,
+        )
         self.assertEqual([args[0] for _, args in self.calls], ["build", "up", "health", "cleanup"])
         self.assertEqual(json.loads(self.state.read_text())["revision"], "c" * 40)
 
@@ -83,15 +115,26 @@ class DeploymentTests(unittest.TestCase):
         def check(base, state):
             if state["revision"] != self.old["revision"]:
                 raise RuntimeError("unhealthy candidate")
+
         with self.assertRaisesRegex(RuntimeError, "unhealthy candidate"):
-            deploy(self.base, self.source, "c" * 40, "d" * 64, run=self.run_compose, check=check,
-                   clean=lambda state: self.fail("Failed deployments must preserve recovery images"))
-        self.assertEqual(self.calls[-1], (self.old["revision"], ("up", "-d", "--no-build", "--remove-orphans")))
+            deploy(
+                self.base,
+                self.source,
+                "c" * 40,
+                "d" * 64,
+                run=self.run_compose,
+                check=check,
+                clean=lambda state: self.fail("Failed deployments must preserve recovery images"),
+            )
+        self.assertEqual(
+            self.calls[-1], (self.old["revision"], ("up", "-d", "--no-build", "--remove-orphans"))
+        )
         self.assertEqual(json.loads(self.state.read_text()), self.old)
 
     def test_failed_build_never_switches(self):
         def run(*args):
             raise RuntimeError("build failed")
+
         with self.assertRaisesRegex(RuntimeError, "build failed"):
             host.deploy(self.base, self.source, "c" * 40, "d" * 64, run=run)
         self.assertEqual(json.loads(self.state.read_text()), self.old)
@@ -117,20 +160,45 @@ class DeploymentTests(unittest.TestCase):
         thread.start()
         try:
             (self.base / "deploy/public-url").write_text(f"http://127.0.0.1:{server.server_port}")
-            with (patch.object(host, "compose", side_effect=self.run_compose),
-                  patch.object(host.subprocess, "run") as protection):
+            with (
+                patch.object(host, "compose", side_effect=self.run_compose),
+                patch.object(host.subprocess, "run") as protection,
+            ):
                 host.healthy(self.base, self.old)
-            protection.assert_called_once_with(["sudo", "-n", "python3",
-                "/usr/local/lib/xpathed/network-policy.py", "--verify"], check=True)
-            self.assertEqual(self.calls, [(self.old["revision"],
-                ("exec", "-T", "web", "wget", "-q", "-O", "/dev/null", "http://resolver:8080/health"))])
+            protection.assert_called_once_with(
+                ["sudo", "-n", "python3", "/usr/local/lib/xpathed/network-policy.py", "--verify"],
+                check=True,
+            )
+            self.assertEqual(
+                self.calls,
+                [
+                    (
+                        self.old["revision"],
+                        (
+                            "exec",
+                            "-T",
+                            "web",
+                            "wget",
+                            "-q",
+                            "-O",
+                            "/dev/null",
+                            "http://resolver:8080/health",
+                        ),
+                    )
+                ],
+            )
         finally:
             server.shutdown()
             thread.join()
             server.server_close()
 
     def test_receiver_rejects_other_commands_without_consuming_input(self):
-        for command in ("", "id", "deploy ../bad hash", "deploy " + "a" * 40 + " " + "b" * 64 + "; id"):
+        for command in (
+            "",
+            "id",
+            "deploy ../bad hash",
+            "deploy " + "a" * 40 + " " + "b" * 64 + "; id",
+        ):
             with self.assertRaises(ValueError):
                 receiver.receive(self.base, command, io.BytesIO(b""))
         self.assertFalse((self.base / "incoming").exists())
@@ -149,12 +217,20 @@ class DeploymentTests(unittest.TestCase):
 
     def test_cleanup_removes_previous_images_and_keeps_current_and_unrelated_images(self):
         current = {"revision": "a" * 40, "previousRevision": "b" * 40}
-        references = [f"xpathed/{service}:{revision * 40}"
-                      for service in host.SERVICES for revision in ("a", "b", "c")]
+        references = [
+            f"xpathed/{service}:{revision * 40}"
+            for service in host.SERVICES
+            for revision in ("a", "b", "c")
+        ]
         references += ["nginx:latest", "xpathed/browser:development", "other/web:" + "c" * 40]
-        self.assertEqual(host.obsolete_images(references, current),
-                         {f"xpathed/{service}:{revision * 40}"
-                          for service in host.SERVICES for revision in ("b", "c")})
+        self.assertEqual(
+            host.obsolete_images(references, current),
+            {
+                f"xpathed/{service}:{revision * 40}"
+                for service in host.SERVICES
+                for revision in ("b", "c")
+            },
+        )
 
 
 if __name__ == "__main__":

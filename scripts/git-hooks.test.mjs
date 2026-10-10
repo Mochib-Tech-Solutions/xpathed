@@ -37,7 +37,7 @@ function repository(t) {
 }
 
 test("local command selection reuses CI ownership without requiring Docker or integration runs", () => {
-  assert.deepEqual(checkCommands(["README.md"]), []);
+  assert.deepEqual(checkCommands(["README.md"]), [["pnpm", "check:tooling"]]);
   assert.deepEqual(checkCommands(["src/Web/src/App.tsx"]), [["pnpm", "check:web"]]);
   assert.deepEqual(checkCommands([".githooks/commit-msg"]), [["pnpm", "check:tooling"]]);
   assert.equal(classifyChanges([".githooks/pre-commit"]).tooling, true);
@@ -128,7 +128,13 @@ test("real Git hooks block invalid commits, failed checks and partial staging wi
   assert.notEqual(commit("# invalid header\nfix: valid second line").status, 0);
   assert.notEqual(commit("  fix: invalid leading spaces").status, 0);
   assert.equal(commit("docs: valid title").status, 0);
-  assert.equal(spawnSync("test", ["-e", join(cwd, "commands.log")]).status, 1);
+  assert.deepEqual(readFileSync(join(cwd, "commands.log"), "utf8").trim().split("\n"), [
+    "check:tooling",
+    "check:tooling",
+    "check:tooling",
+    "check:tooling",
+  ]);
+  rmSync(join(cwd, "commands.log"));
   write("src/Web/old name.ts", "new staged value\n");
   git("add", "src/Web/old name.ts");
   write("src/Web/old name.ts", "unstaged value\n");

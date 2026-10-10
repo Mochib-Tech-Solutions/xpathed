@@ -10,7 +10,7 @@ public sealed partial class ProviderAccounting(IHostApplicationLifetime lifetime
 
     internal Task<ProviderCompletion> Start(Func<CancellationToken, Task<ProviderCompletion>> complete)
     {
-        // ponytail: process-wide cap of 32 pending calls; use a durable worker if restart-safe reconciliation is required.
+        // shortcut: process-wide cap of 32 pending calls; use a durable worker if restart-safe reconciliation is required.
         if (Interlocked.Increment(ref active) > 32)
         {
             Interlocked.Decrement(ref active);

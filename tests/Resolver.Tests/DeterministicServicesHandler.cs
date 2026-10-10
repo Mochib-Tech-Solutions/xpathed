@@ -250,4 +250,33 @@ internal sealed class DeterministicServicesHandler : HttpMessageHandler
                 },
             }
         );
+
+    internal static string CurrentViewCapture()
+    {
+        var capture = JsonNode.Parse(new DeterministicServicesHandler().CaptureBody)!;
+        capture["scope"] = "current_view";
+        capture["candidates"]![0]!["appearance"] = JsonNode.Parse(
+            """{"backgroundColor":"rgb(255, 0, 0)","textColor":"rgb(0, 0, 0)","borderColor":null,"limitations":[]}"""
+        );
+        return capture.ToJsonString();
+    }
+
+    internal static string BilledSelection()
+    {
+        var response = JsonNode.Parse(
+            """{"id":"generation-1","model":"deepseek/deepseek-v4.1-flash","provider":"Wafer","choices":[{"finish_reason":"stop","message":{}}],"usage":{"prompt_tokens":140,"completion_tokens":15,"total_tokens":155,"cost":0.0000215}}"""
+        );
+        response!["choices"]![0]!["message"]!["content"] =
+            """{"complete":true,"actions":[{"step":1,"instruction":"Click Save","action":"click","outcome":"found","candidateId":"button-save","limitation":"none"}]}""";
+        return response.ToJsonString();
+    }
+
+    internal static string ProviderSelection(string selection) =>
+        JsonSerializer.Serialize(
+            new
+            {
+                id = "generation-1",
+                choices = new[] { new { finish_reason = "stop", message = new { content = selection } } },
+            }
+        );
 }

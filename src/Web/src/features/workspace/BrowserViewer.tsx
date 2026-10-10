@@ -494,7 +494,7 @@ export default function BrowserViewer({ session }: { session: Session }) {
   return (
     <>
       <div
-        className="viewer absolute inset-0 flex h-full w-full items-center justify-center overflow-hidden focus-visible:-outline-offset-4"
+        className="absolute inset-0 flex h-full w-full items-center justify-center overflow-hidden focus-visible:-outline-offset-4"
         ref={host}
         role="application"
         tabIndex={0}

@@ -23,7 +23,7 @@ regexes = ['''^API contracts, missing/duplicate $''']
 [[rules.allowlists]]
 description = "Exact dummy value used to test credential redaction"
 condition = "AND"
-paths = ['''^(tests/Resolver\.Tests/ResolutionContractTests\.cs|scripts/security-check\.mjs)$''']
+paths = ['''^(tests/Resolver\.Tests/(ResolutionContractTests|ProviderContractTests)\.cs|scripts/security-check\.mjs)$''']
 regexTarget = "match"
 regexes = ['''^API_KEY=violet-cactus-782"$''']
 
