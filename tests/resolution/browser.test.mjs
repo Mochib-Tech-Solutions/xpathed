@@ -231,6 +231,69 @@ test("viewer-disconnect-completes-close-handshake-and-allows-reconnect", async (
   });
 });
 
+test("viewer-scroll-bursts-preserve-distance-and-subsequent-clicks", async () => {
+  await withFixture(
+    `<style>body { margin: 0; width: 10000px; height: 10000px; background: linear-gradient(white, black); }
+    #expected-target { position: fixed; left: 20px; top: 20px; width: 200px; height: 60px; }
+    select { position: fixed; left: 260px; top: 20px; width: 180px; height: 60px; }</style>
+    <button id="expected-target" onclick="this.dataset.clicks='1';this.style.background='lime'">Click after scrolling</button>
+    <select><option>First</option><option>Second</option></select>
+    <script>window.observedEvents = {};
+    addEventListener('scrollend', () => {window.observedEvents.scrollEndX = scrollX; window.observedEvents.scrollEndY = scrollY;});</script>`,
+    async (session) => {
+      await withFramebuffer(session, async (readFrame, viewer) => {
+        await readFrame();
+        const scroll = (deltaY, count) => {
+          for (let index = 0; index < count; index++)
+            viewer.input({
+              type: "mouse",
+              event: "wheel",
+              x: 100,
+              y: 100,
+              button: "none",
+              buttons: 0,
+              modifiers: 0,
+              deltaX: deltaY * 0.3,
+              deltaY,
+            });
+        };
+        scroll(10, 100);
+        await waitForObservation(
+          (value) =>
+            value.scrollY === 1000 &&
+            value.events.scrollEndY === 1000 &&
+            value.events.scrollEndX === 300,
+        );
+        await readFrame();
+        viewer.pointer(80, 40);
+        viewerClick(viewer, 80, 40);
+        await waitForObservation((value) => value.clicks === "1");
+        scroll(-10, 30);
+        await waitForObservation(
+          (value) =>
+            value.scrollY === 700 && value.events.scrollEndX === 210 && value.clicks === "1",
+        );
+        viewer.pointer(300, 40);
+        viewerClick(viewer, 300, 40);
+        const picker = await viewer.control("select");
+        assert.deepEqual(
+          picker.options.map((option) => option.label),
+          ["First", "Second"],
+        );
+        viewer.input({ type: "select", pickerId: picker.pickerId, optionId: null });
+        await viewer.control("selectClosed");
+        let rendered;
+        for (let attempt = 0; attempt < 50; attempt++) {
+          rendered = await readFrame();
+          const offset = (40 * rendered.width + 30) * 4;
+          if (rendered.pixels[offset + 1] > 200 && rendered.pixels[offset] < 50) return;
+        }
+        assert.fail("Viewer did not stream the click's green result after scrolling");
+      });
+    },
+  );
+});
+
 async function waitForObservation(matches, path = "/fixture") {
   let last;
   for (let attempt = 0; attempt < 100; attempt++) {

@@ -166,6 +166,95 @@ public sealed class BrowserViewerRelayTests
         await completed.Task.WaitAsync(TimeSpan.FromSeconds(2));
     }
 
+    [Fact]
+    public async Task ScrollBurstPreservesDistanceAndFrameAcksWithoutDisconnecting()
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        using var relay = new BrowserViewerRelay();
+        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var resume = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var drained = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var completed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        double distance = 0;
+        await using var server = await StartAsync(async socket =>
+        {
+            await relay.RunAsync(
+                socket,
+                async (input, token) =>
+                {
+                    if (input.GetProperty("type").GetString() == "text")
+                    {
+                        started.TrySetResult();
+                        await resume.Task.WaitAsync(token);
+                    }
+                    else if (input.GetProperty("type").GetString() == "mouse")
+                    {
+                        distance += input.GetProperty("deltaY").GetDouble();
+                    }
+                    else
+                    {
+                        drained.TrySetResult();
+                    }
+                },
+                timeout.Token
+            );
+            completed.TrySetResult();
+        });
+        using var client = new ClientWebSocket();
+        await client.ConnectAsync(Address(server), timeout.Token);
+        await SendAsync(client, new { type = "text", text = "busy" }, timeout.Token);
+        await started.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        relay.Publish(new BrowserVideoFrame("page", "document", 1280, 800, "image"));
+        var first = await ReceiveAsync(client, timeout.Token);
+        for (var index = 0; index < 100; index++)
+        {
+            await SendAsync(
+                client,
+                new
+                {
+                    type = "mouse",
+                    @event = "wheel",
+                    pageId = "page",
+                    documentId = "document",
+                    x = 100,
+                    y = 100,
+                    button = "none",
+                    buttons = 0,
+                    modifiers = 0,
+                    deltaX = 0,
+                    deltaY = 10,
+                },
+                timeout.Token
+            );
+        }
+        await SendAsync(client, new { type = "ack", frameId = first.GetProperty("frameId").GetInt64() }, timeout.Token);
+        relay.Publish(new BrowserVideoFrame("page", "document", 1280, 800, "next"));
+        var next = await ReceiveAsync(client, timeout.Token);
+        Assert.Equal("next", next.GetProperty("data").GetString());
+        await SendAsync(client, new { type = "ack", frameId = next.GetProperty("frameId").GetInt64() }, timeout.Token);
+        await SendAsync(client, new { type = "done" }, timeout.Token);
+        resume.TrySetResult();
+        await drained.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        Assert.Equal(1000, distance);
+        await client.CloseOutputAsync(WebSocketCloseStatus.NormalClosure, "", timeout.Token);
+        await completed.Task.WaitAsync(TimeSpan.FromSeconds(2));
+    }
+
+    private static async Task<JsonElement> ReceiveAsync(WebSocket socket, CancellationToken token)
+    {
+        using var message = new MemoryStream();
+        var buffer = new byte[16384];
+        ValueWebSocketReceiveResult result;
+        do
+        {
+            result = await socket.ReceiveAsync(buffer.AsMemory(), token);
+            Assert.Equal(WebSocketMessageType.Text, result.MessageType);
+            await message.WriteAsync(buffer.AsMemory(0, result.Count), token);
+        } while (!result.EndOfMessage);
+        using var document = JsonDocument.Parse(message.ToArray());
+        return document.RootElement.Clone();
+    }
+
     private static async Task RunAsync(
         WebSocket socket,
         Func<JsonElement, CancellationToken, Task> handle,

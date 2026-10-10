@@ -22,12 +22,17 @@ internal sealed class CdpSelectPicker(CdpRemoteObject retained, JsonElement opti
         expectedGeneration ??= page.DocumentGeneration;
         cancellationToken.ThrowIfCancellationRequested();
         page.EnsureGeneration(expectedGeneration);
+        var metrics = await page.SendAsync("Page.getLayoutMetrics");
+        var viewport = metrics.GetProperty("cssLayoutViewport");
+        page.EnsureGeneration(expectedGeneration);
+        cancellationToken.ThrowIfCancellationRequested();
+        // DOM hit-testing uses document coordinates; viewer input uses viewport coordinates.
         var hit = await page.SendAsync(
             "DOM.getNodeForLocation",
             new
             {
-                x = (int)x,
-                y = (int)y,
+                x = (int)(x + viewport.GetProperty("pageX").GetDouble()),
+                y = (int)(y + viewport.GetProperty("pageY").GetDouble()),
                 includeUserAgentShadowDOM = true,
             }
         );
