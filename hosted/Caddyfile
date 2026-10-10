@@ -26,7 +26,9 @@
         request_header /health -Origin
         @browser_origin header Origin https://{$XPATHED_HOST}
         request_header @browser_origin Origin http://localhost:8080
-        request_body { max_size 16KB }
+        request_body {
+            max_size 16KiB
+        }
         handle /health {
             reverse_proxy 127.0.0.1:18083 {
                 header_up Host localhost:8080

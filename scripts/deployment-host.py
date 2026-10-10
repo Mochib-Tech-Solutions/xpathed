@@ -29,6 +29,8 @@ def build(base, state):
         **os.environ,
         "DOTNET_CLI_HOME": str(cache / "dotnet-home"),
         "NUGET_PACKAGES": str(cache / "nuget"),
+        "NUGET_HTTP_CACHE_PATH": str(cache / "nuget-http"),
+        "XDG_CACHE_HOME": str(cache / "xdg"),
         "DOTNET_CLI_TELEMETRY_OPTOUT": "1",
         "DOTNET_NOLOGO": "1",
     }
