@@ -1,0 +1,71 @@
+{
+  "type": "object",
+  "properties": {
+    "complete": {
+      "type": "boolean"
+    },
+    "actions": {
+      "type": "array",
+      "maxItems": 16,
+      "items": {
+        "type": "object",
+        "properties": {
+          "step": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 16
+          },
+          "instruction": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          },
+          "outcome": {
+            "type": "string",
+            "enum": ["found", "not_found", "unsupported"]
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "click",
+              "double_click",
+              "right_click",
+              "hover",
+              "fill",
+              "type",
+              "clear",
+              "select",
+              "check",
+              "uncheck",
+              "press",
+              "focus",
+              "blur",
+              "upload",
+              "inspect",
+              "unsupported"
+            ]
+          },
+          "candidateId": {
+            "type": ["string", "null"]
+          },
+          "limitation": {
+            "type": "string",
+            "enum": [
+              "none",
+              "ambiguous",
+              "unsupported_action",
+              "current_state_dependency",
+              "appearance_unavailable",
+              "state_unavailable",
+              "target_not_addressable"
+            ]
+          }
+        },
+        "required": ["step", "instruction", "outcome", "action", "candidateId", "limitation"],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": ["complete", "actions"],
+  "additionalProperties": false
+}

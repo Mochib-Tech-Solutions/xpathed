@@ -3,6 +3,7 @@
     <RootNamespace>Xpathed.Resolver</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
+    <EmbeddedResource Include="Prompts/*" />
     <ProjectReference Include="../Common/Common.csproj" />
     <InternalsVisibleTo Include="Resolver.Tests" />
   </ItemGroup>

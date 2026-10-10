@@ -25,16 +25,18 @@ public sealed partial class ResolutionService(
         var requestCancellation = cancellationToken;
         var attemptId = Guid.NewGuid().ToString("N");
         CandidateCapture? capture = null;
-        var completedCalls = new List<ResolutionDiagnostics>();
         var stageTimer = Stopwatch.StartNew();
         var strategy = ActionSelectionStrategy.Strategy;
-        var diagnostics = new ResolutionDiagnostics
-        {
-            Stage = "configuration",
-            Strategy = strategy,
-            ImageRouting = new(request.ImageMode, "not_requested", "no_candidates"),
-        };
         var configurationId = gateway.ConfigurationId();
+        var attempt = new ResolutionAttempt(accounting, traceId, attemptId, configurationId, cancellationToken)
+        {
+            Diagnostics = new ResolutionDiagnostics
+            {
+                Stage = "configuration",
+                Strategy = strategy,
+                ImageRouting = new(request.ImageMode, "not_requested", "no_candidates"),
+            },
+        };
         try
         {
             gateway.EnsureConfigured();
@@ -49,7 +51,7 @@ public sealed partial class ResolutionService(
             capture =
                 await captureResponse.Content.ReadFromJsonAsync<CandidateCapture>(cancellationToken)
                 ?? throw new ApiException(502, "invalid_upstream_response", "The browser returned an invalid capture.");
-            diagnostics = diagnostics with { Capture = capture.Coverage };
+            attempt.Diagnostics = attempt.Diagnostics with { Capture = capture.Coverage };
             BrowserEvidence.ValidateCapture(capture, pageId, request.DocumentId);
             FinishStage();
             var imageDecision = new ImageRoutingDecision(false, "no_candidates", null);
@@ -72,7 +74,7 @@ public sealed partial class ResolutionService(
                     }
                     else
                     {
-                        var routed = await CallProviderAsync(
+                        var routed = await attempt.CallAsync(
                             "image_routing",
                             (token, observe) => gateway.DecideImageAsync(routingInput, token, observe)
                         );
@@ -99,7 +101,7 @@ public sealed partial class ResolutionService(
                 }
                 FinishStage();
             }
-            diagnostics = diagnostics with
+            attempt.Diagnostics = attempt.Diagnostics with
             {
                 ImageRouting = new(
                     request.ImageMode,
@@ -126,9 +128,9 @@ public sealed partial class ResolutionService(
                 }
                 catch (ApiException error) when (error.Code == "capture_image_unavailable")
                 {
-                    diagnostics = diagnostics with
+                    attempt.Diagnostics = attempt.Diagnostics with
                     {
-                        ImageRouting = diagnostics.ImageRouting with
+                        ImageRouting = attempt.Diagnostics.ImageRouting with
                         {
                             Status = "unavailable",
                             Reason = "image_unavailable",
@@ -139,7 +141,7 @@ public sealed partial class ResolutionService(
             }
             Stage("preparation");
             var input = CandidateInput.PrepareInput(request.Instruction, capture);
-            diagnostics = diagnostics with
+            attempt.Diagnostics = attempt.Diagnostics with
             {
                 ModelInputCount = capture.Candidates.Length,
                 ModelInputComplete = capture.Coverage.Complete,
@@ -148,11 +150,12 @@ public sealed partial class ResolutionService(
             FinishStage();
             cancellationToken.ThrowIfCancellationRequested();
             Stage("model");
-            var completion = await CallProviderAsync(
+            var completion = await attempt.CallAsync(
                 "selection",
-                (token, observe) => gateway.CompleteAsync(input, token, observe, capture.Image)
+                (token, observe) => gateway.CompleteAsync(input, token, observe, capture.Image),
+                capture.Image is not null
             );
-            diagnostics = diagnostics with
+            attempt.Diagnostics = attempt.Diagnostics with
             {
                 Model = completion.Diagnostics.Model,
                 Provider = completion.Diagnostics.Provider,
@@ -166,7 +169,7 @@ public sealed partial class ResolutionService(
             if (completion.Diagnostics.TimingsMs.TryGetValue("provider", out var providerMs))
             {
                 // Provider transport is part of model time, not another serial stage.
-                diagnostics.TimingsMs["provider"] = providerMs;
+                attempt.Diagnostics.TimingsMs["provider"] = providerMs;
             }
             if (completion.Diagnostics.Code is { } code)
             {
@@ -188,70 +191,13 @@ public sealed partial class ResolutionService(
                     cancellationToken
                 )
             );
-            var results = selections
-                .Select(
-                    (item, index) =>
-                    {
-                        var verified = validation.Actions[index];
-                        var unsupportedScope = item.Outcome == "not_found" && capture.UnsupportedBoundaryCount > 0;
-                        var code =
-                            unsupportedScope ? "unsupported_scope"
-                            : item.Limitation == "none" ? null
-                            : item.Limitation;
-                        var message = unsupportedScope
-                            ? "Frame or shadow content is outside this capture's supported scope."
-                            : item.Limitation switch
-                            {
-                                "current_state_dependency" =>
-                                    "This command requires separate steps or a page change. No action was executed.",
-                                "appearance_unavailable" =>
-                                    "The requested appearance cannot be established from the captured view.",
-                                "state_unavailable" =>
-                                    "The checked, selected or form-value distinction is not available. Identify the target by its name, section or position.",
-                                "target_not_addressable" =>
-                                    "The requested detail has no separate captured element. Choose the whole graphic or a separately exposed control.",
-                                "ambiguous" => "The instruction does not identify one intended target.",
-                                "unsupported_action" =>
-                                    "Use one supported interaction type per command. It may target several elements in the current view; mixed interactions are unsupported.",
-                                _ => item.Outcome == "not_found"
-                                    ? "No matching element found in the current view."
-                                    : null,
-                            };
-                        return new ActionResolution(
-                            verified.ActionId,
-                            index + 1,
-                            item.Step,
-                            item.Instruction,
-                            item.Action,
-                            unsupportedScope ? "unsupported" : item.Outcome,
-                            verified.Target,
-                            verified.Target?.Frame?.Id ?? capture.FrameId,
-                            attemptId,
-                            code,
-                            message
-                        );
-                    }
-                )
-                .ToArray();
+            var results = BuildActions(selections, validation, capture, attemptId);
             var inspected = results.FirstOrDefault(item => item.Target is not null)?.ActionId;
             FinishStage();
-            diagnostics = diagnostics with { Stage = "complete" };
+            attempt.Diagnostics = attempt.Diagnostics with { Stage = "complete" };
             var outcomes = results.Select(item => item.Outcome).Distinct().ToArray();
             var outcome = outcomes.Length == 1 ? outcomes[0] : "partial";
-            var summary = new ResolutionSummary(
-                true,
-                "unverified",
-                results.Length,
-                results.Count(item => item.Outcome == "found"),
-                results.Count(item => item.Outcome == "not_found"),
-                results.Count(item => item.Outcome == "unsupported"),
-                0,
-                results.Count(item => item.Target?.Interactability?.Status == "blocked"),
-                results.Count(item =>
-                    item.Target is { Interactability: null } || item.Target?.Interactability?.Status == "unknown"
-                ),
-                results.Count(item => item.Target?.Interactability?.Status == "unsupported")
-            );
+            var summary = BuildSummary(results);
             return Result(outcome, results[0].Action, null) with
             {
                 Actions = results,
@@ -265,23 +211,20 @@ public sealed partial class ResolutionService(
         }
         catch (OperationCanceledException) when (requestCancellation.IsCancellationRequested)
         {
-            foreach (var call in completedCalls)
-            {
-                accounting.Record(call, traceId, attemptId, configurationId);
-            }
+            attempt.RecordCompletedCalls();
             throw;
         }
         catch (OperationCanceledException)
         {
             return Failure(
-                diagnostics.Stage == "model" ? "provider_timeout" : "browser_timeout",
+                attempt.Diagnostics.Stage == "model" ? "provider_timeout" : "browser_timeout",
                 "An upstream service did not respond in time."
             );
         }
         catch (HttpRequestException)
         {
             return Failure(
-                diagnostics.Stage == "model" ? "provider_unavailable" : "browser_unavailable",
+                attempt.Diagnostics.Stage == "model" ? "provider_unavailable" : "browser_unavailable",
                 "An upstream service is unavailable."
             );
         }
@@ -292,111 +235,27 @@ public sealed partial class ResolutionService(
 
         void Stage(string stage)
         {
-            diagnostics = diagnostics with { Stage = stage };
+            attempt.Diagnostics = attempt.Diagnostics with { Stage = stage };
             stageTimer.Restart();
         }
 
-        void FinishStage() => diagnostics.TimingsMs[diagnostics.Stage] = stageTimer.Elapsed.TotalMilliseconds;
-
-        async Task<ProviderCompletion> CallProviderAsync(
-            string purpose,
-            Func<CancellationToken, Action<ResolutionDiagnostics>, Task<ProviderCompletion>> complete
-        )
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            ResolutionDiagnostics? received = null;
-            var callTimer = Stopwatch.StartNew();
-            var pending = accounting.Start(token =>
-                complete(token, observed => Volatile.Write(ref received, observed))
-            );
-            var index = diagnostics.ProviderCalls.Length;
-            diagnostics = diagnostics with
-            {
-                ModelCalls = diagnostics.ModelCalls + 1,
-                ProviderCalls =
-                [
-                    .. diagnostics.ProviderCalls,
-                    new(purpose, null, null, null, null, null, "pending", null, 0),
-                ],
-                ProviderAccounting = purpose == "selection" ? "pending" : diagnostics.ProviderAccounting,
-                ImageRouting =
-                    purpose == "selection" && capture?.Image is not null
-                        ? diagnostics.ImageRouting! with
-                        {
-                            Status = "included",
-                        }
-                        : diagnostics.ImageRouting,
-            };
-            try
-            {
-                var completion = await pending.WaitAsync(cancellationToken);
-                completedCalls.Add(completion.Diagnostics);
-                Observe(completion.Diagnostics);
-                return completion;
-            }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-            {
-                var known = Volatile.Read(ref received);
-                if (known is not null)
-                {
-                    Observe(known);
-                }
-                _ = accounting.ObserveLateAsync(
-                    pending,
-                    traceId,
-                    attemptId,
-                    configurationId,
-                    false,
-                    () => Volatile.Read(ref received)
-                );
-                throw;
-            }
-            catch (Exception error) when (error is not OutOfMemoryException)
-            {
-                var evidence = Volatile.Read(ref received) ?? new ResolutionDiagnostics();
-                evidence = evidence with
-                {
-                    Code = error is OperationCanceledException ? "provider_timeout" : "provider_unavailable",
-                };
-                completedCalls.Add(evidence);
-                Observe(evidence);
-                throw;
-            }
-
-            void Observe(ResolutionDiagnostics evidence)
-            {
-                diagnostics.ProviderCalls[index] = new(
-                    purpose,
-                    evidence.Model,
-                    evidence.Provider,
-                    evidence.GenerationId,
-                    evidence.Usage,
-                    evidence.CostEstimate,
-                    evidence.Usage?.Cost is not null ? "completed" : "unavailable",
-                    evidence.Code,
-                    callTimer.Elapsed.TotalMilliseconds
-                );
-                if (purpose == "selection")
-                {
-                    diagnostics = diagnostics with
-                    {
-                        Model = evidence.Model,
-                        Provider = evidence.Provider,
-                        GenerationId = evidence.GenerationId,
-                        FinishReason = evidence.FinishReason,
-                        Usage = evidence.Usage,
-                        CostEstimate = evidence.CostEstimate,
-                        ProviderAccounting = evidence.Usage?.Cost is not null ? "completed" : "unavailable",
-                    };
-                }
-            }
-        }
+        void FinishStage() =>
+            attempt.Diagnostics.TimingsMs[attempt.Diagnostics.Stage] = stageTimer.Elapsed.TotalMilliseconds;
 
         ResolutionResult Failure(string code, string message)
         {
             FinishStage();
-            diagnostics = diagnostics with { Code = code, Message = message };
-            LogFailure(logger, diagnostics.Stage, code, "error", traceId, attemptId, configurationId, attemptId);
+            attempt.Diagnostics = attempt.Diagnostics with { Code = code, Message = message };
+            LogFailure(
+                logger,
+                attempt.Diagnostics.Stage,
+                code,
+                "error",
+                traceId,
+                attemptId,
+                configurationId,
+                attemptId
+            );
             return Result("error", null, null);
         }
 
@@ -406,7 +265,7 @@ public sealed partial class ResolutionService(
             {
                 cancellationToken.ThrowIfCancellationRequested();
             }
-            diagnostics.TimingsMs["total"] = timer.Elapsed.TotalMilliseconds;
+            attempt.Diagnostics.TimingsMs["total"] = timer.Elapsed.TotalMilliseconds;
             return new ResolutionResult(
                 outcome,
                 capture?.SessionId,
@@ -419,7 +278,7 @@ public sealed partial class ResolutionService(
                 configurationId,
                 action,
                 target,
-                diagnostics,
+                attempt.Diagnostics,
                 []
             );
         }

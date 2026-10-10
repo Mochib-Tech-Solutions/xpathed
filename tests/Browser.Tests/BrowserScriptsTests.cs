@@ -24,4 +24,13 @@ public sealed class BrowserScriptsTests
             }
         );
     }
+
+    [Fact]
+    public void CaptureIncludesItsPackagedFragmentsInOneClosure()
+    {
+        Assert.DoesNotContain("/* include:", BrowserScripts.Capture, StringComparison.Ordinal);
+        Assert.StartsWith("async (identity) => {", BrowserScripts.Capture, StringComparison.Ordinal);
+        Assert.Contains("const xpathEvidence", BrowserScripts.Capture, StringComparison.Ordinal);
+        Assert.Contains("const imageSnapshot", BrowserScripts.Capture, StringComparison.Ordinal);
+    }
 }
