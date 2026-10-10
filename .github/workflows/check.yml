@@ -240,6 +240,7 @@ jobs:
             .artifacts/ci/browser/
             .artifacts/ci/browser.log
             .artifacts/ci/browser-contracts.log
+            .artifacts/ci/browser-contract-images/
           include-hidden-files: true
           if-no-files-found: error
           retention-days: 30

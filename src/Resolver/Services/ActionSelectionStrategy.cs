@@ -59,10 +59,10 @@ internal static class ActionSelectionStrategy
         - Geometry is in main-viewport CSS pixels; use it for left/right/above/below and visual order, not DOM
           order. A button description may identify a link, image or custom role.
 
-        - Literal or quoted target names must match their own accessible label or safe text. Prefer exact names
+        - When the command names the target, match its own accessible label or safe text. Prefer exact names
           that satisfy the other constraints; allow clear paraphrases, translations and typos only when no exact
-          name fits. A depicted subject is a visual constraint, not a required alt-text
-          match. Apply every requested name, appearance, scope and exclusion together. If a requested named control is
+          name fits. This name preference does not apply to descriptions of what a graphic depicts. Apply every
+          requested name, appearance, scope and exclusion together. If a requested named control is
           absent, return not_found; text mentioning it in a scope/ancestor or another differently named visible
           control does not supply that target.
 
@@ -107,20 +107,26 @@ internal static class ActionSelectionStrategy
           top-to-bottom rows and left-to-right within each row for explicit visual order unless the command
           specifies another direction. If a reference or an ordinal remains tied, do not choose by ID order.
 
-        - Match the requested target itself using its tag, role and accessible label. Scope containers, headings
-          and descendant text are context, not additional matching controls; select a container only when the
-          command explicitly requests that item/card/container itself.
+        - Match the requested element type and every requested constraint. Use accessible labels/text for
+          requested names, and screenshot pixels within candidate rectangles for requested appearance or depicted
+          subjects. Scope containers, headings and descendant text are context, not additional matching controls;
+          select a container only when the command explicitly requests that item/card/container itself.
 
         - A container that repeats child button text is not another button. For plural controls, return only
           matching controls; never add their parent or a nearby label to satisfy "all".
 
         ## State and appearance evidence
 
-        - When a screenshot is supplied, it and candidate rectangles use the same viewport in CSS pixels. Use
-          the image to recognize visible icons, pictures, colors and layout, then map that evidence to supplied
-          candidate IDs. Never invent an ID or select a pixel coordinate. Candidate names remain browser-derived;
-          do not rename an unnamed image from pixels. The original command owns requested multiplicity; pixels
-          may establish which supplied candidates match. Retained DOM candidates own element identity and state.
+        - When a screenshot is supplied, it and candidate rectangles use the same viewport in CSS pixels.
+          Accessible labels and alt text are author-provided names, not verified descriptions of depicted content.
+          For requests about what a graphic shows, a matching label alone is insufficient: inspect the pixels
+          within its rectangle, then map the matching rectangle to a supplied candidate ID, even when that
+          candidate has a different name. For a depiction/appearance constraint, a matching name cannot override
+          contradictory pixels; for a requested name, use the accessible label even if the graphic depicts
+          something else. Keep browser-provided names unchanged, including unnamed graphics. Never invent an ID
+          or select a coordinate.
+          The original command owns requested multiplicity; pixels may establish which candidates match.
+          Retained DOM candidates own element identity and state.
 
         - Match the requested level: a button containing a star is a button; an image inside that button is a
           different target. A depicted object inside an image, canvas or video is not itself a DOM candidate.

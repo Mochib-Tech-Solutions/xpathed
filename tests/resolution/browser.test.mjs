@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { on, once } from "node:events";
+import { mkdir, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 import test from "node:test";
 import jpeg from "jpeg-js";
 import { networkInterfaces } from "node:os";
@@ -616,10 +618,10 @@ test("capture-opt-in-image-masks-private-values-across-frames-and-shadow-roots",
         documentId: page.documentId,
         includeImage: true,
       });
-      assert.equal(
+      await assertSameMaskedImage(
         changed.image.png,
         capture.image.png,
-        "Changing only private values must not change exported pixels",
+        "capture-opt-in-image-masks-private-values-across-frames-and-shadow-roots",
       );
       assert.ok(!JSON.stringify(changed.candidates).includes("PRIVATE_"));
       const withoutImage = await request(`/pages/${page.pageId}/capture`, {
@@ -664,10 +666,10 @@ test("capture-lazy-image-reuses-identities-and-masks-frames-and-shadow-values", 
       assert.deepEqual(after.values, before.values);
       await observe({ mutateXpath: true });
       const second = await request(`/pages/${page.pageId}/capture-image`, identity);
-      assert.equal(
+      await assertSameMaskedImage(
         second.image.png,
         first.image.png,
-        "Private values must not alter exported pixels",
+        "capture-lazy-image-reuses-identities-and-masks-frames-and-shadow-values",
       );
       const target = capture.candidates.find((candidate) => candidate.label === "About us");
       const selected = await request(`/pages/${page.pageId}/selection`, {
@@ -1109,6 +1111,25 @@ async function observe(command = {}, pagePath = "/fixture") {
 
 function verify(xpaths, replaceTarget = false, reload = false) {
   return observe({ xpaths, replaceTarget, reload });
+}
+
+async function assertSameMaskedImage(actual, expected, caseName) {
+  if (actual === expected) return;
+  const artifactPath = join(".artifacts/ci/browser-contract-images", caseName);
+  const directory = join(process.env.XPATHED_WORKSPACE ?? process.cwd(), artifactPath);
+  let artifactError;
+  try {
+    await mkdir(directory, { recursive: true });
+    await Promise.all([
+      writeFile(join(directory, "expected.png"), Buffer.from(expected, "base64")),
+      writeFile(join(directory, "actual.png"), Buffer.from(actual, "base64")),
+    ]);
+  } catch (error) {
+    artifactError = error.message;
+  }
+  assert.fail(
+    `Changing only private values must not change exported PNG data. Evidence: ${artifactPath}${artifactError ? `; artifact capture failed: ${artifactError}` : ""}`,
+  );
 }
 
 async function waitForSession(sessionId, expected) {

@@ -19,16 +19,13 @@ internal sealed class ChromiumProcess : IAsyncDisposable
             );
         }
         profile = Directory.CreateTempSubdirectory("xpathed-chromium-").FullName;
-        var info = new ProcessStartInfo("/bin/sh")
-        {
-            RedirectStandardInput = true,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-        };
+        var info = new ProcessStartInfo("/bin/sh") { RedirectStandardInput = true, RedirectStandardOutput = true };
         // Chromium reads CDP from fd 3 and writes NUL-delimited JSON to fd 4. Positional
         // arguments keep paths literal; ordinary stdin/stdout cannot contaminate the pipe.
         info.ArgumentList.Add("-c");
-        info.ArgumentList.Add("exec 3<&0 4>&1; exec </dev/null >/dev/null; exec \"$@\"");
+        // Discard stderr in the child: detached helpers can keep an inherited pipe open
+        // after Chromium exits, preventing Process.WaitForExitAsync from completing.
+        info.ArgumentList.Add("exec 3<&0 4>&1; exec </dev/null >/dev/null 2>/dev/null; exec \"$@\"");
         info.ArgumentList.Add("xpathed-chromium");
         info.ArgumentList.Add(executable);
         foreach (
@@ -52,8 +49,6 @@ internal sealed class ChromiumProcess : IAsyncDisposable
             info.ArgumentList.Add(argument);
         }
         process = Process.Start(info) ?? throw new InvalidOperationException("Could not start managed Chromium.");
-        // Drain without logging browser output, which can include visited URLs and page values.
-        process.BeginErrorReadLine();
         Connection.Connect(process.StandardOutput.BaseStream, process.StandardInput.BaseStream);
         using var startup = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         startup.CancelAfter(TimeSpan.FromSeconds(20));
