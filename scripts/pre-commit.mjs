@@ -26,7 +26,6 @@ export function checkCommands(paths) {
   }
   if (selected.web) commands.push(["pnpm", "check:web"]);
   if (selected.tooling) commands.push(["pnpm", "check:tooling"]);
-  if (selected.docker) commands.push(["pnpm", "docker:check"]);
   return commands;
 }
 
@@ -70,10 +69,8 @@ export async function checkStaged(cwd = process.cwd()) {
   const index = git("write-tree").trim();
   const env = { ...process.env };
   for (const key of git("rev-parse", "--local-env-vars").trim().split("\n")) delete env[key];
-  // .NET projects share build outputs; independent frontend/tooling/Docker checks do not.
-  const dotnet = commands.filter(
-    (cmd) => !["check:web", "check:tooling", "docker:check"].includes(cmd[1]),
-  );
+  // .NET projects share build outputs; independent frontend/tooling checks do not.
+  const dotnet = commands.filter((cmd) => !["check:web", "check:tooling"].includes(cmd[1]));
   const independent = commands.filter((cmd) => !dotnet.includes(cmd));
   await runCheckGroups([dotnet, ...independent.map((cmd) => [cmd])], { cwd, env });
   if (
@@ -86,7 +83,7 @@ export async function checkStaged(cwd = process.cwd()) {
     )
   )
     throw new Error("Source or index changed during checks; review, stage and retry the commit.");
-  console.log("Staged checks passed. Deterministic browser integration runs in CI.");
+  console.log("Staged checks passed. Browser integration and Docker validation run in CI.");
 }
 
 if (import.meta.main) {
