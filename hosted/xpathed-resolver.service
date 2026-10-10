@@ -1,0 +1,47 @@
+[Unit]
+Description=xpathed Resolver
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=xpathed-resolver
+Group=xpathed-resolver
+WorkingDirectory=/opt/xpathed/current/resolver
+ExecStart=/opt/dotnet/dotnet /opt/xpathed/current/resolver/Resolver.dll
+Environment=ASPNETCORE_URLS=http://127.0.0.1:18082
+EnvironmentFile=/etc/xpathed/resolver.env
+MemoryMax=512M
+CPUQuota=100%
+TasksMax=128
+RestrictNamespaces=yes
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=25
+KillMode=control-group
+UMask=0077
+Environment=ASPNETCORE_ENVIRONMENT=Production DOTNET_EnableDiagnostics=0 Logging__LogLevel__Default=Warning
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectProc=invisible
+RestrictSUIDSGID=yes
+LockPersonality=yes
+RestrictRealtime=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+SystemCallArchitectures=native
+SystemCallFilter=~@mount @reboot @swap @raw-io @obsolete @privileged
+LimitCORE=0
+
+[Install]
+WantedBy=multi-user.target

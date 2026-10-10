@@ -1,7 +1,10 @@
 import importlib.util
+import json
 import subprocess
+import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 spec = importlib.util.spec_from_file_location(
@@ -9,150 +12,95 @@ spec = importlib.util.spec_from_file_location(
 )
 network = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(network)
-TOKEN = "aabbccdd-0011-2233-4455-66778899aabb"
 
 
 class NetworkTests(unittest.TestCase):
-    def test_private_browser_pipes_require_no_loopback_port_exception(self):
-        rules = network.rules(4, ["198.51.100.17"])
-        returns = [rule for rule in rules if rule[-1] == "RETURN"]
+    def test_only_browser_uid_is_filtered_and_private_and_ipv6_connections_are_rejected(self):
+        rules = network.rules(1234, ["8.8.4.4"])
+        self.assertIn("meta skuid 1234 jump browser", rules)
+        self.assertIn("ct direction reply ct state established,related accept", rules)
+        self.assertIn("meta nfproto ipv6 reject", rules)
+        self.assertIn("fib daddr type local reject", rules)
+        for destination in (*network.PRIVATE_V4, "8.8.4.4"):
+            self.assertIn(destination, rules)
+        accepts = [line.strip() for line in rules.splitlines() if line.endswith("accept")]
         self.assertEqual(
-            returns,
+            accepts,
             [
-                [
-                    "-m",
-                    "conntrack",
-                    "--ctstate",
-                    "RELATED,ESTABLISHED",
-                    "--ctdir",
-                    "REPLY",
-                    "-j",
-                    "RETURN",
-                ],
-                [
-                    "-p",
-                    "udp",
-                    "-m",
-                    "conntrack",
-                    "--ctorigdst",
-                    "127.0.0.11",
-                    "--ctorigdstport",
-                    "53",
-                    "-j",
-                    "RETURN",
-                ],
-                [
-                    "-p",
-                    "tcp",
-                    "-m",
-                    "conntrack",
-                    "--ctorigdst",
-                    "127.0.0.11",
-                    "--ctorigdstport",
-                    "53",
-                    "-j",
-                    "RETURN",
-                ],
-                ["-j", "RETURN"],
+                "ct direction reply ct state established,related accept",
+                "ip daddr 127.0.0.53 udp dport 53 accept",
+                "ip daddr 127.0.0.53 tcp dport 53 accept",
             ],
         )
-        for destination in (*network.PRIVATE_V4, "198.51.100.17"):
-            self.assertIn(["-d", destination, "-j", "REJECT"], rules)
-        self.assertLess(rules.index(["-d", "127.0.0.0/8", "-j", "REJECT"]), len(rules) - 1)
-        self.assertEqual(
-            network.rules(6, []),
-            [
-                [
-                    "-m",
-                    "conntrack",
-                    "--ctstate",
-                    "RELATED,ESTABLISHED",
-                    "--ctdir",
-                    "REPLY",
-                    "-j",
-                    "RETURN",
-                ],
-                ["-j", "REJECT"],
-            ],
-        )
+        self.assertLess(rules.index("fib daddr type local reject"), rules.index("  return"))
 
-    def test_iproute_empty_address_entries_and_ipv6_do_not_break_startup(self):
-        value = '[{"addr_info":[{}, {"family":"inet6","local":"::1"}, {"family":"inet","local":"8.8.8.8"}]}]'
-        with patch.object(network, "command", return_value=value):
-            self.assertEqual(network.host_addresses(), ["8.8.8.8"])
+    def test_root_account_and_unvalidated_addresses_cannot_generate_policy(self):
+        for uid in (0, -1, "1234; accept"):
+            with self.assertRaises(ValueError):
+                network.rules(uid, [])
+        with self.assertRaises(ValueError):
+            network.rules(1234, ["$(id)"])
 
-    def test_failed_ipv6_or_ipv4_filter_never_releases_browser_startup(self):
-        for failed in ("iptables-restore", "ip6tables-restore"):
-            calls = []
+    def test_policy_verification_rejects_tampering_uid_change_or_replaced_helper(self):
+        with tempfile.TemporaryDirectory() as directory:
+            receipt = Path(directory) / "receipt.json"
+            original = {"uid": 1234, "source": "hash", "policy": ["deny"]}
+            with (
+                patch.object(network, "RECEIPT", receipt),
+                patch.object(network.pwd, "getpwnam", return_value=SimpleNamespace(pw_uid=1234)),
+                patch.object(network, "signature", return_value="hash"),
+                patch.object(network, "policy", return_value=["deny"]),
+            ):
+                receipt.write_text(json.dumps(original))
+                network.verify()
+                for key, value in [("uid", 1235), ("source", "changed"), ("policy", ["accept"])]:
+                    receipt.write_text(json.dumps({**original, key: value}))
+                    with self.assertRaises(RuntimeError):
+                        network.verify()
+                receipt.unlink()
+                with self.assertRaises(FileNotFoundError):
+                    network.verify()
 
-            def namespace(pid, *arguments, **kwargs):
-                calls.append(arguments)
-                if arguments[0] == failed:
-                    raise subprocess.CalledProcessError(1, arguments)
-                return ""
+    def test_failed_install_leaves_no_ready_receipt(self):
+        with tempfile.TemporaryDirectory() as directory:
+            receipt = Path(directory) / "receipt.json"
+            public = Path(directory) / "public-url"
+            public.write_text("https://workspace.example.invalid")
+            read = Path.read_text
+
+            def read_text(path, *args, **kwargs):
+                return read(
+                    public if str(path) == "/etc/xpathed/public-url" else path, *args, **kwargs
+                )
 
             with (
-                patch.object(network, "browser", return_value=("container", 42)),
-                patch.object(network, "nonce", return_value=TOKEN),
-                patch.object(network, "host_addresses", return_value=[]),
-                patch.object(network, "namespace", side_effect=namespace),
-                patch.object(network, "command") as command,
+                patch.object(network, "RECEIPT", receipt),
+                patch.object(Path, "read_text", read_text),
+                patch.object(network.pwd, "getpwnam", return_value=SimpleNamespace(pw_uid=1234)),
+                patch.object(
+                    network.socket, "gethostbyname_ex", return_value=("host", [], ["8.8.4.4"])
+                ),
+                patch.object(network.subprocess, "run", return_value=SimpleNamespace(returncode=0)),
+                patch.object(
+                    network, "command", side_effect=subprocess.CalledProcessError(1, "nft")
+                ),
             ):
                 with self.assertRaises(subprocess.CalledProcessError):
-                    network.reconcile()
-                command.assert_not_called()
+                    network.install()
+                self.assertFalse(receipt.exists())
 
-    def test_container_replacement_cannot_release_unprotected_replacement(self):
-        with (
-            patch.object(network, "browser", side_effect=[("old", 42), ("new", 43)]),
-            patch.object(network, "nonce", return_value=TOKEN),
-            patch.object(network, "host_addresses", return_value=[]),
-            patch.object(network, "install"),
-            patch.object(network, "verify_policy"),
-            patch.object(network, "command") as command,
-        ):
-            with self.assertRaisesRegex(RuntimeError, "changed"):
-                network.reconcile()
-            command.assert_not_called()
-
-    def test_restart_requires_fresh_nonce_and_reinstalls_before_acknowledgement(self):
-        events = []
-        with (
-            patch.object(network, "browser", return_value=("same-container", 43)),
-            patch.object(network, "nonce", return_value=TOKEN),
-            patch.object(network, "host_addresses", return_value=[]),
-            patch.object(network, "install", side_effect=lambda *args: events.append("filter")),
-            patch.object(
-                network, "verify_policy", side_effect=lambda *args: events.append("verify")
-            ),
-            patch.object(network, "command", side_effect=lambda *args: events.append("release")),
-        ):
-            result = network.reconcile(("same-container", 42, "old-token"))
-        self.assertEqual(events, ["filter", "verify", "release"])
-        self.assertEqual(result, ("same-container", 43, TOKEN))
-
-    def test_stale_marker_or_changed_container_fails_deployment_health(self):
-        with (
-            patch.object(network, "browser", return_value=("container", 42)),
-            patch.object(network, "verify_policy"),
-            patch.object(network, "host_addresses", return_value=[]),
-            patch.object(network, "nonce", side_effect=[TOKEN, "old-token"]),
-        ):
-            with self.assertRaisesRegex(RuntimeError, "not ready"):
-                network.verify()
-
-    def test_invalid_or_oversized_nonce_is_not_interpreted_as_command(self):
-        for value in ("", "../secret", "$(id)", TOKEN + "x", "a" * 65):
-            with patch.object(network, "command", return_value=value):
-                with self.assertRaises(RuntimeError):
-                    network.nonce("container", "wait")
-
-    def test_host_ip_validation_rejects_command_text(self):
-        with patch.object(
-            network, "command", return_value='[{"addr_info":[{"family":"inet","local":"$(id)"}]}]'
-        ):
-            with self.assertRaises(ValueError):
-                network.host_addresses()
+    def test_kernel_handles_are_ignored_but_rule_order_is_retained(self):
+        value = {
+            "nftables": [
+                {"metainfo": {"version": "1"}},
+                {"rule": {"handle": 4, "expr": ["deny"]}},
+                {"rule": {"handle": 7, "expr": ["return"]}},
+            ]
+        }
+        with patch.object(network, "command", return_value=json.dumps(value)):
+            self.assertEqual(
+                network.policy(), [{"rule": {"expr": ["deny"]}}, {"rule": {"expr": ["return"]}}]
+            )
 
 
 if __name__ == "__main__":

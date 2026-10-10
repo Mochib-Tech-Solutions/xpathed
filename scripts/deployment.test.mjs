@@ -116,7 +116,7 @@ test("host deployment builds first, skips unchanged inputs, and rolls back failu
   execFileSync("python3", ["-B", "scripts/deployment-host.test.py"], { stdio: "pipe" });
 });
 
-test("hosted network isolation fails closed during failures and container restarts", () => {
+test("hosted network isolation fails closed during failures and policy tampering", () => {
   execFileSync("python3", ["-B", "scripts/deployment-network.test.py"], { stdio: "pipe" });
   execFileSync("python3", ["-B", "scripts/hosted-security.test.py"], { stdio: "pipe" });
 });
@@ -147,4 +147,21 @@ test("successful main checks cannot hide a skipped or failed deployment", () => 
     });
     assert.equal(outcome.status === 0, result === "success", result);
   }
+});
+
+test("native Browser permits only its sandbox exceptions and retains host isolation", () => {
+  const unit = readFileSync("hosted/xpathed-browser.service", "utf8");
+  assert.match(unit, /^User=xpathed-browser$/m);
+  assert.match(unit, /^NoNewPrivileges=yes$/m);
+  assert.match(unit, /^CapabilityBoundingSet=$/m);
+  assert.match(unit, /^AmbientCapabilities=$/m);
+  assert.match(unit, /^PrivateTmp=yes$/m);
+  assert.match(unit, /^ProtectSystem=strict$/m);
+  assert.match(unit, /^Requires=xpathed-network.service$/m);
+  assert.match(unit, /^ExecStartPre=.*network-policy.py --verify$/m);
+  assert.match(unit, /^SystemCallFilter=~@mount @reboot @swap @raw-io @obsolete @privileged$/m);
+  const exceptions = [...unit.matchAll(/^SystemCallFilter=([^~].*)$/gm)].map((match) => match[1]);
+  assert.deepEqual(exceptions, ["capset chroot"]);
+  const launcher = readFileSync("src/Browser/Protocol/ChromiumProcess.cs", "utf8");
+  assert.doesNotMatch(launcher, /--no-sandbox|--disable-setuid-sandbox/);
 });

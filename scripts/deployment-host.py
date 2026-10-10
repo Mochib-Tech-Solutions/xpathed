@@ -1,4 +1,4 @@
-"""Build pinned source before switching the existing Compose project; restore on failure."""
+"""Build native releases before switching systemd services; recover a failed switch."""
 
 import fcntl
 import json
@@ -11,82 +11,118 @@ import sys
 import time
 import urllib.request
 from pathlib import Path
+from urllib.parse import urlsplit
 
-SERVICES = ("browser", "resolver", "client-api", "web")
+SERVICES = {"browser": "Browser", "resolver": "Resolver", "client-api": "ClientApi"}
+RUNTIME = Path("/opt/xpathed")
 
 
-def obsolete_images(references, current):
-    pattern = r"xpathed/(browser|resolver|client-api|web):([a-f0-9]{40})"
-    return {
-        reference
-        for reference in references
-        if (match := re.fullmatch(pattern, reference)) and match.group(2) != current["revision"]
+def command(*args, **kwargs):
+    subprocess.run(args, check=True, stdout=sys.stderr, **kwargs)
+
+
+def build(base, state):
+    source = Path(state["source"])
+    output = source / "runtime"
+    cache = source / ".build"
+    environment = {
+        **os.environ,
+        "DOTNET_CLI_HOME": str(cache / "dotnet-home"),
+        "NUGET_PACKAGES": str(cache / "nuget"),
+        "NUGET_HTTP_CACHE_PATH": str(cache / "nuget-http"),
+        "XDG_CACHE_HOME": str(cache / "xdg"),
+        "DOTNET_CLI_TELEMETRY_OPTOUT": "1",
+        "DOTNET_NOLOGO": "1",
     }
-
-
-def cleanup(current):
-    def output(*args):
-        return subprocess.check_output(["sudo", "-n", "docker", *args], text=True).splitlines()
-
-    references = output("image", "ls", "--format", "{{.Repository}}:{{.Tag}}")
-    obsolete = obsolete_images(references, current)
-    # Remove only stopped containers belonging to this stack and obsolete source images.
-    containers = output(
-        "ps",
-        "-a",
-        "--filter",
-        "label=com.docker.compose.project=xpathed-hosted",
-        "--filter",
-        "status=exited",
-        "--filter",
-        "status=dead",
-        "--format",
-        "{{.ID}} {{.Image}}",
-    )
-    for container in containers:
-        identity, reference = container.split()
-        if reference in obsolete:
-            subprocess.run(["sudo", "-n", "docker", "container", "rm", identity], check=True)
-    for reference in sorted(obsolete):
-        # Docker refuses removal of an image still used by any container. Never force it.
-        subprocess.run(["sudo", "-n", "docker", "image", "rm", reference], check=True)
-    print(json.dumps({"cleanup": "completed", "obsoleteImageReferences": len(obsolete)}))
-
-
-def cleanup_safely(current):
-    try:
-        cleanup(current)
-    except (OSError, subprocess.CalledProcessError) as error:
-        # Cleanup failure must not roll back an already healthy application.
-        print(
-            f"Cleanup incomplete ({type(error).__name__}); application remains deployed.",
-            file=sys.stderr,
+    for name, project in SERVICES.items():
+        path = f"src/{project}/{project}.csproj"
+        command("/opt/dotnet/dotnet", "restore", path, "--locked-mode", cwd=source, env=environment)
+        command(
+            "/opt/dotnet/dotnet",
+            "publish",
+            path,
+            "--no-restore",
+            "--configuration",
+            "Release",
+            "-p:UseAppHost=false",
+            "--output",
+            str(output / name),
+            cwd=source,
+            env=environment,
         )
-
-
-def compose(base, state, *arguments):
-    command = [
+    command(
+        "pnpm",
+        "install",
+        "--frozen-lockfile",
+        "--ignore-scripts",
+        "--store-dir",
+        str(cache / "pnpm"),
+        cwd=source,
+    )
+    command("pnpm", "build:web", cwd=source)
+    shutil.copytree(source / "src/Web/dist", output / "web")
+    shutil.copytree(source / "hosted", output / "hosted")
+    command(
         "sudo",
         "-n",
-        "docker",
-        "compose",
-        "-p",
-        "xpathed-hosted",
-        "--project-directory",
-        state["source"],
-        "--env-file",
-        str(base / "deploy/application.env"),
-        "-f",
-        str(Path(state["source"]) / "docker/compose.yaml"),
-        "-f",
-        str(base / "deploy/compose.hosted.yaml"),
-    ]
-    if state.get("override"):
-        command += ["-f", state["override"]]
-    subprocess.run(command + list(arguments), check=True, stdout=sys.stderr)
+        "env",
+        "XPATHED_HOST=" + urlsplit((base / "deploy/public-url").read_text().strip()).hostname,
+        "caddy",
+        "validate",
+        "--config",
+        str(output / "hosted/Caddyfile"),
+        "--adapter",
+        "caddyfile",
+    )
+    # Only immutable compiled files reach the service accounts; no source or build cache.
+    destination = RUNTIME / "releases" / state["revision"]
+    if destination.exists():
+        receipt = json.loads((destination / "release.json").read_text())
+        if receipt != {"revision": state["revision"], "fingerprint": state["fingerprint"]}:
+            raise RuntimeError("Native release identity mismatch")
+        return
+    (output / "release.json").write_text(
+        json.dumps({"revision": state["revision"], "fingerprint": state["fingerprint"]})
+    )
+    temporary = destination.with_suffix(".tmp")
+    command("sudo", "-n", "rm", "-rf", "--", str(temporary))
+    command("sudo", "-n", "cp", "-a", str(output), str(temporary))
+    command("sudo", "-n", "chown", "-R", "root:root", str(temporary))
+    command("sudo", "-n", "chmod", "-R", "a+rX", str(temporary))
+    command("sudo", "-n", "mv", str(temporary), str(destination))
+
+
+def native(base, state, action):
+    if action == "build":
+        build(base, state)
+    elif action == "switch":
+        destination = RUNTIME / "releases" / state["revision"]
+        command("sudo", "-n", "ln", "-sfn", str(destination), str(RUNTIME / "next"))
+        command("sudo", "-n", "mv", "-Tf", str(RUNTIME / "next"), str(RUNTIME / "current"))
+        for name in (*SERVICES, "network"):
+            command(
+                "sudo",
+                "-n",
+                "install",
+                "-m",
+                "644",
+                str(destination / f"hosted/xpathed-{name}.service"),
+                f"/etc/systemd/system/xpathed-{name}.service",
+            )
+        command("sudo", "-n", "systemctl", "daemon-reload")
+        command("sudo", "-n", "systemctl", "restart", *("xpathed-" + name for name in SERVICES))
+        command("sudo", "-n", "systemctl", "reload-or-restart", "caddy")
+    elif action == "stop":
+        command("sudo", "-n", "systemctl", "stop", *("xpathed-" + name for name in SERVICES))
+    else:
+        raise ValueError("Unknown native deployment action")
 
 
 def healthy(base, state):
+    for port in (18081, 18082, 18083):
+        with urllib.request.urlopen(f"http://127.0.0.1:{port}/health", timeout=10) as response:
+            if response.status != 200:
+                raise RuntimeError("Native service health check failed")
     url = (base / "deploy/public-url").read_text().strip()
     for path in ("/", "/health", "/view/health"):
         with urllib.request.urlopen(url + path, timeout=10) as response:
@@ -99,22 +135,7 @@ def healthy(base, state):
                 or not response.headers.get("Strict-Transport-Security")
             ):
                 raise RuntimeError("Hosted security headers are missing")
-    subprocess.run(
-        ["sudo", "-n", "python3", "/usr/local/lib/xpathed/network-policy.py", "--verify"],
-        check=True,
-    )
-    compose(
-        base,
-        state,
-        "exec",
-        "-T",
-        "web",
-        "wget",
-        "-q",
-        "-O",
-        "/dev/null",
-        "http://resolver:8080/health",
-    )
+    command("sudo", "-n", "python3", "/usr/local/lib/xpathed/network-policy.py", "--verify")
 
 
 def wait_healthy(base, state, check=healthy):
@@ -128,58 +149,71 @@ def wait_healthy(base, state, check=healthy):
             time.sleep(5)
 
 
-def deploy(
-    base, source, revision, fingerprint, run=compose, check=wait_healthy, clean=cleanup_safely
-):
+def cleanup(base, current, previous):
+    retained = {state["revision"] for state in (current, previous) if state}
+    for directory in (RUNTIME / "releases").iterdir():
+        if re.fullmatch(r"[a-f0-9]{40}", directory.name) and directory.name not in retained:
+            command("sudo", "-n", "rm", "-rf", "--", str(directory))
+    # Successful native releases retain compiled recovery files, not source/build caches.
+    for directory in (base / "deployments").iterdir():
+        if re.fullmatch(r"[a-f0-9]{40}", directory.name) and not directory.is_symlink():
+            shutil.rmtree(directory)
+
+
+def deploy(base, source, revision, fingerprint, run=native, check=wait_healthy, clean=cleanup):
+    if not re.fullmatch(r"[a-f0-9]{40}", revision) or not re.fullmatch(
+        r"[a-f0-9]{64}", fingerprint
+    ):
+        raise ValueError("Invalid pinned deployment identity")
     state_path = base / "deploy/current.json"
-    previous = json.loads(state_path.read_text())
-    if previous["fingerprint"] == fingerprint:
+    previous = json.loads(state_path.read_text()) if state_path.exists() else None
+    if previous and previous.get("runtime") != "native":
+        raise RuntimeError("Provision and migrate the host before deploying native releases")
+    if previous and previous["fingerprint"] == fingerprint:
         check(base, previous)
-        clean(previous)
         print(json.dumps({"status": "unchanged", "revision": previous["revision"]}))
         return
     release = base / "deployments" / revision
     release.parent.mkdir(exist_ok=True)
     if release.exists():
-        if str(release) == previous["source"]:
-            raise RuntimeError("Refusing to overwrite the active source")
+        if release.is_symlink():
+            raise RuntimeError("Source release must not be a symlink")
         shutil.rmtree(release)
     shutil.copytree(source, release)
-    override = release / "deployment-images.json"
-    override.write_text(
-        json.dumps(
-            {
-                "services": {
-                    name: {
-                        "image": f"xpathed/{name}:{revision}",
-                        "labels": {"org.opencontainers.image.revision": revision},
-                    }
-                    for name in SERVICES
-                }
-            }
-        )
-    )
     candidate = {
         "revision": revision,
         "fingerprint": fingerprint,
         "source": str(release),
-        "override": str(override),
+        "runtime": "native",
     }
-    # A failed build leaves the running stack and successful receipt untouched.
-    run(base, candidate, "build", *SERVICES)
+    # A failed build cannot change running services or a successful receipt.
+    run(base, candidate, "build")
     try:
-        run(base, candidate, "up", "-d", "--no-build", "--remove-orphans")
+        run(base, candidate, "switch")
         check(base, candidate)
         temporary = state_path.with_suffix(".tmp")
         temporary.write_text(json.dumps(candidate, indent=2) + "\n")
+        if previous:
+            recovery = base / "deploy/previous.tmp"
+            recovery.write_text(json.dumps(previous, indent=2) + "\n")
+            recovery.replace(base / "deploy/previous.json")
         temporary.replace(state_path)
     except BaseException:
-        print("Deployment failed; restoring the previous stack.", file=sys.stderr)
-        run(base, previous, "up", "-d", "--no-build", "--remove-orphans")
-        check(base, previous)
+        print("Deployment failed; restoring the previous native release.", file=sys.stderr)
+        if previous:
+            run(base, previous, "switch")
+            check(base, previous)
+        else:
+            run(base, candidate, "stop")
         raise
     print(json.dumps({"status": "deployed", "revision": revision, "fingerprint": fingerprint}))
-    clean(candidate)
+    try:
+        clean(base, candidate, previous)
+    except (OSError, subprocess.CalledProcessError) as error:
+        print(
+            f"Cleanup incomplete ({type(error).__name__}); application remains deployed.",
+            file=sys.stderr,
+        )
 
 
 if __name__ == "__main__":

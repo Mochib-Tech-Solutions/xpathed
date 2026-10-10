@@ -26,17 +26,35 @@
         request_header /health -Origin
         @browser_origin header Origin https://{$XPATHED_HOST}
         request_header @browser_origin Origin http://localhost:8080
-        reverse_proxy web:8080 {
-            header_up Host localhost:8080
-            header_up -Authorization
-            header_down -Server
-            header_down -Strict-Transport-Security
-            header_down -Content-Security-Policy
-            header_down -X-Content-Type-Options
-            header_down -Referrer-Policy
-            header_down -X-Frame-Options
-            header_down -Permissions-Policy
-            header_down -Cache-Control
+        request_body {
+            max_size 16KiB
+        }
+        handle /health {
+            reverse_proxy 127.0.0.1:18083 {
+                header_up Host localhost:8080
+                header_up -Authorization
+            }
+        }
+        handle /view/health {
+            rewrite * /health
+            reverse_proxy 127.0.0.1:18081
+        }
+        handle /api/* {
+            reverse_proxy 127.0.0.1:18083 {
+                header_up Host localhost:8080
+                header_up -Authorization
+            }
+        }
+        handle /view/* {
+            reverse_proxy 127.0.0.1:18081 {
+                header_up Host localhost:8080
+                header_up -Authorization
+            }
+        }
+        handle {
+            root * /opt/xpathed/current/web
+            try_files {path} /index.html
+            file_server
         }
     }
 }
