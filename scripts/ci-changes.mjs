@@ -9,7 +9,6 @@ export function classifyChanges(paths) {
   let tooling = false;
   let docker = false;
   let solution = false;
-  let browser = false;
   for (const path of paths) {
     if (
       /^(\.github\/(workflows|actions)\/|scripts\/ci-(changes|gate)|scripts\/check\.sh$|package(-lock)?\.json$)/.test(
@@ -69,12 +68,6 @@ export function classifyChanges(paths) {
     if (/^tests\/Directory\..*\.(props|targets)$/.test(path))
       projects.forEach((project) => affected.add(project));
     if (path.startsWith("tests/Common.")) projects.forEach((project) => affected.add(project));
-    if (
-      /^(scripts\/(native[.-]|service-process[.])|tests\/resolution\/.*\.mjs$|scripts\/resolution-check\.sh$|docker\/(browser\/|resolver\/|compose\.(yaml|sh)$)|\.dockerignore$|pnpm-(lock|workspace)\.yaml$|\.npmrc$|\.node-version$|\.nvmrc$)/.test(
-        path,
-      )
-    )
-      browser = true;
   }
   return {
     dotnet: projects.filter((project) => affected.has(project)),
@@ -82,8 +75,6 @@ export function classifyChanges(paths) {
     tooling,
     docker,
     solution,
-    browser:
-      browser || ["Browser", "Resolver", "ClientApi"].some((project) => affected.has(project)),
   };
 }
 

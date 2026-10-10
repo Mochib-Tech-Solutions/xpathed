@@ -12,10 +12,8 @@ import {
 } from "./native.mjs";
 
 export function checkOptions(args) {
-  const [kind, ...input] = args.filter((value) => value !== "--");
-  if (kind !== "resolution" || input.length > 1 || (input[0] && input[0] !== "--browser-only"))
-    throw new Error("Use resolution [--browser-only] for provider-free checks.");
-  return { browserOnly: input[0] === "--browser-only" };
+  if (args.some((value) => value !== "--"))
+    throw new Error("Use pnpm test:browser without options.");
 }
 
 export async function checkEnvironment(root, inherited = process.env) {
@@ -37,7 +35,7 @@ export async function checkEnvironment(root, inherited = process.env) {
 
 export async function main(args = process.argv.slice(2)) {
   const root = await realpath(fileURLToPath(new URL("..", import.meta.url)));
-  const options = checkOptions(args);
+  checkOptions(args);
   const env = await checkEnvironment(root);
   env.BROWSER_EXECUTABLE_PATH = await browserExecutable(env);
   const abort = new AbortController();
@@ -77,19 +75,13 @@ export async function main(args = process.argv.slice(2)) {
       ...config.services[0].env,
       XPATHED_BROWSER_URL: config.urls.browser,
       XPATHED_RESOLVER_URL: config.urls.resolver,
-      XPATHED_CLIENT_API_URL: config.urls["client-api"],
-      XPATHED_FIXTURE_URL: fixture,
-      XPATHED_FIXTURE_PORT: String(ports[4]),
       XPATHED_FIXTURE_HOST: "127.0.0.1",
-      XPATHED_ORACLE_PORT: String(ports[5]),
-      XPATHED_ORACLE_URL: `http://127.0.0.1:${ports[5]}`,
       XPATHED_CROSS_ORIGIN_HOST: "localhost",
       XPATHED_VIEWER_ORIGIN: config.urls.browser,
       XPATHED_WORKSPACE: root,
     };
     const services = config.services.filter(
-      (service) =>
-        service.name !== "web" && (service.name !== "client-api" || !options.browserOnly),
+      (service) => service.name === "browser" || service.name === "resolver",
     );
     const artifacts = join(temporary, "build");
     publicEnv.XPATHED_RUNTIME_ARTIFACTS = artifacts;
@@ -118,14 +110,6 @@ export async function main(args = process.argv.slice(2)) {
       ];
     }
     abort.signal.throwIfAborted();
-    await new Promise((done) => reservations[4].close(done));
-    processes.start({
-      name: "fixture",
-      command: process.execPath,
-      args: ["tests/resolution/server.mjs"],
-      env: publicEnv,
-    });
-    await waitForHealth(`${fixture}/health`, abort.signal);
     for (const service of services) {
       abort.signal.throwIfAborted();
       const index = config.services.findIndex((item) => item.name === service.name);
@@ -133,17 +117,27 @@ export async function main(args = process.argv.slice(2)) {
       processes.start(service);
       await waitForHealth(service.health, abort.signal);
     }
-    await new Promise((done) => reservations[5].close(done));
-    await processes.run({
-      name: "Chromium browser checks",
-      command: process.execPath,
-      args: [
-        "--test",
-        "tests/resolution/browser.test.mjs",
-        ...(!options.browserOnly ? ["tests/resolution/pipeline.test.mjs"] : []),
-      ],
-      env: publicEnv,
-    });
+    for (const server of reservations.slice(4)) await new Promise((done) => server.close(done));
+    // Complementary filters cover every case; separate processes isolate fixture state.
+    const pattern = "^(session|viewer|targeting|capture)-";
+    await Promise.all(
+      ["name", "skip"].map((filter, index) =>
+        processes.run({
+          name: `Chromium browser checks ${index + 1}`,
+          command: process.execPath,
+          args: [
+            "--test",
+            `--test-${filter}-pattern=${pattern}`,
+            "tests/resolution/browser.test.mjs",
+          ],
+          env: {
+            ...publicEnv,
+            XPATHED_ORACLE_PORT: String(ports[index + 4]),
+            XPATHED_ORACLE_URL: `http://127.0.0.1:${ports[index + 4]}`,
+          },
+        }),
+      ),
+    );
   } catch (error) {
     if (!abort.signal.aborted) failure = error;
   } finally {
