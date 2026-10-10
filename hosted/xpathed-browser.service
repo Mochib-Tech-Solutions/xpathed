@@ -12,6 +12,7 @@ Group=xpathed-browser
 WorkingDirectory=/opt/xpathed/current/browser
 ExecStart=/opt/dotnet/dotnet /opt/xpathed/current/browser/Browser.dll
 Environment=ASPNETCORE_URLS=http://127.0.0.1:18081
+Environment=HOME=/tmp XDG_CONFIG_HOME=/tmp/.config XDG_CACHE_HOME=/tmp/.cache
 EnvironmentFile=/etc/xpathed/browser.env
 MemoryMax=4G
 CPUQuota=250%
@@ -44,6 +45,8 @@ RestrictRealtime=yes
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
 SystemCallArchitectures=native
 SystemCallFilter=~@mount @reboot @swap @raw-io @obsolete @privileged
+# Chromium drops credentials and filesystem access inside its user namespace.
+SystemCallFilter=capset chroot
 LimitCORE=0
 
 [Install]

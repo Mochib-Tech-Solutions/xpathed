@@ -148,3 +148,20 @@ test("successful main checks cannot hide a skipped or failed deployment", () => 
     assert.equal(outcome.status === 0, result === "success", result);
   }
 });
+
+test("native Browser permits only its sandbox exceptions and retains host isolation", () => {
+  const unit = readFileSync("hosted/xpathed-browser.service", "utf8");
+  assert.match(unit, /^User=xpathed-browser$/m);
+  assert.match(unit, /^NoNewPrivileges=yes$/m);
+  assert.match(unit, /^CapabilityBoundingSet=$/m);
+  assert.match(unit, /^AmbientCapabilities=$/m);
+  assert.match(unit, /^PrivateTmp=yes$/m);
+  assert.match(unit, /^ProtectSystem=strict$/m);
+  assert.match(unit, /^Requires=xpathed-network.service$/m);
+  assert.match(unit, /^ExecStartPre=.*network-policy.py --verify$/m);
+  assert.match(unit, /^SystemCallFilter=~@mount @reboot @swap @raw-io @obsolete @privileged$/m);
+  const exceptions = [...unit.matchAll(/^SystemCallFilter=([^~].*)$/gm)].map((match) => match[1]);
+  assert.deepEqual(exceptions, ["capset chroot"]);
+  const launcher = readFileSync("src/Browser/Protocol/ChromiumProcess.cs", "utf8");
+  assert.doesNotMatch(launcher, /--no-sandbox|--disable-setuid-sandbox/);
+});
