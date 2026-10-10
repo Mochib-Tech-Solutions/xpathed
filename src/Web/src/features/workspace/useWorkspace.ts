@@ -1,3 +1,13 @@
+import {
+  type Settings,
+  emptyWorkspace,
+  emptyChat,
+  historical,
+  updateSession,
+  completeResolution,
+  recordExecution,
+  updateChat,
+} from "./workspaceState";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError, request } from "./api";
 import { canExecute, needsExecutionValue } from "./actionExecution";
@@ -11,59 +21,6 @@ import type {
   Session,
   SessionState,
 } from "./api";
-
-type Settings = { imageMode: ImageMode; autoExecute: boolean };
-type TabChat = Settings & {
-  address: string;
-  instruction: string;
-  history: Resolution[];
-};
-type WorkspaceState = {
-  session: Session | null;
-  snapshot: SessionState | null;
-  tabs: Record<string, TabChat>;
-  initialAddress: string;
-  initialSettings: Settings;
-};
-const defaultSettings: Settings = { imageMode: "auto", autoExecute: false };
-const emptyWorkspace: WorkspaceState = {
-  session: null,
-  snapshot: null,
-  tabs: {},
-  initialAddress: "",
-  initialSettings: defaultSettings,
-};
-const emptyChat: TabChat = { address: "", instruction: "", ...defaultSettings, history: [] };
-const pageAddress = (page: PageState) => (page.url === "about:blank" ? "" : page.url);
-const historical = (entries: Resolution[]) =>
-  entries.map((entry) => (entry.historical ? entry : { ...entry, historical: true }));
-
-function updateSession(previous: WorkspaceState, snapshot: SessionState): WorkspaceState {
-  if (previous.session?.sessionId !== snapshot.sessionId) return previous;
-  const tabs: Record<string, TabChat> = {};
-  for (const page of snapshot.pages) {
-    const chat = previous.tabs[page.pageId];
-    const oldPage = previous.snapshot?.pages.find((old) => old.pageId === page.pageId);
-    const leftPage =
-      previous.snapshot?.activePageId === page.pageId &&
-      (snapshot.activePageId !== page.pageId ||
-        snapshot.activationVersion !== previous.snapshot.activationVersion);
-    tabs[page.pageId] = chat
-      ? {
-          ...chat,
-          address:
-            oldPage?.url !== page.url && (oldPage !== undefined || page.url !== "about:blank")
-              ? pageAddress(page)
-              : chat.address,
-          history:
-            leftPage || oldPage?.documentId !== page.documentId
-              ? historical(chat.history)
-              : chat.history,
-        }
-      : { ...emptyChat, address: pageAddress(page) };
-  }
-  return { ...previous, snapshot, tabs };
-}
 
 export default function useWorkspace() {
   const [browserOptions, setBrowserOptions] = useState<BrowserSessionOptions | null>(null);
@@ -314,38 +271,17 @@ export default function useWorkspace() {
       }
       if (!isCurrent()) return;
       const respondedAt = new Date().toISOString();
-      setWorkspace((previous) => {
-        const origin = previous.tabs[page.pageId];
-        if (!origin) return previous;
-        const currentPage = previous.snapshot?.pages.find(
-          (current) => current.pageId === page.pageId,
-        );
-        return {
-          ...previous,
-          tabs: {
-            ...previous.tabs,
-            [page.pageId]: {
-              ...origin,
-              history: origin.history.map((old) =>
-                old.id === entry.id
-                  ? {
-                      ...old,
-                      result,
-                      error: failure,
-                      respondedAt,
-                      historical:
-                        old.historical ||
-                        (result !== null && failure !== null) ||
-                        previous.snapshot?.activationVersion !== snapshot?.activationVersion ||
-                        previous.snapshot?.activePageId !== page.pageId ||
-                        currentPage?.documentId !== page.documentId,
-                    }
-                  : old,
-              ),
-            },
-          },
-        };
-      });
+      setWorkspace((previous) =>
+        completeResolution(
+          previous,
+          page,
+          snapshot?.activationVersion,
+          entry.id,
+          result,
+          failure,
+          respondedAt,
+        ),
+      );
       const action = result?.actions?.[0];
       const resolvedEntry = { ...entry, result, respondedAt };
       if (
@@ -433,22 +369,9 @@ export default function useWorkspace() {
     const result = entry.result;
     if (!session || !page || !result?.captureId || !isCurrent()) return;
     function updateExecution(execution: NonNullable<Resolution["execution"]>) {
-      setWorkspace((previous) => {
-        const origin = previous.tabs[page!.pageId];
-        if (!origin || previous.session?.sessionId !== session!.sessionId) return previous;
-        return {
-          ...previous,
-          tabs: {
-            ...previous.tabs,
-            [page!.pageId]: {
-              ...origin,
-              history: historical(origin.history).map((old) =>
-                old.id === entry.id ? { ...old, execution } : old,
-              ),
-            },
-          },
-        };
-      });
+      setWorkspace((previous) =>
+        recordExecution(previous, page!.pageId, session!.sessionId, entry.id, execution),
+      );
     }
     updateExecution({ actionId, status: "pending", message: "Executing…" });
     try {
@@ -484,35 +407,18 @@ export default function useWorkspace() {
     }
   }
   function setInstruction(instruction: string) {
-    if (page)
-      setWorkspace((previous) => ({
-        ...previous,
-        tabs: { ...previous.tabs, [page.pageId]: { ...previous.tabs[page.pageId]!, instruction } },
-      }));
+    if (page) setWorkspace((previous) => updateChat(previous, page.pageId, { instruction }));
   }
   function resetChat() {
     if (!page || pending.current) return;
     const latest = chat.history.at(-1);
     if (latest) spotlight(latest, null);
-    setWorkspace((previous) => ({
-      ...previous,
-      tabs: {
-        ...previous.tabs,
-        [page.pageId]: {
-          ...previous.tabs[page.pageId]!,
-          instruction: "",
-          history: [],
-        },
-      },
-    }));
+    setWorkspace((previous) => updateChat(previous, page.pageId, { instruction: "", history: [] }));
   }
   function setAddress(address: string) {
     setWorkspace((previous) =>
       page
-        ? {
-            ...previous,
-            tabs: { ...previous.tabs, [page.pageId]: { ...previous.tabs[page.pageId]!, address } },
-          }
+        ? updateChat(previous, page.pageId, { address })
         : { ...previous, initialAddress: address },
     );
   }
@@ -520,13 +426,7 @@ export default function useWorkspace() {
     if (pending.current) return;
     setWorkspace((previous) =>
       page
-        ? {
-            ...previous,
-            tabs: {
-              ...previous.tabs,
-              [page.pageId]: { ...previous.tabs[page.pageId]!, ...settings },
-            },
-          }
+        ? updateChat(previous, page.pageId, settings)
         : { ...previous, initialSettings: { ...previous.initialSettings, ...settings } },
     );
   }
